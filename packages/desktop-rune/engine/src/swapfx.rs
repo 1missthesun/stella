@@ -182,6 +182,8 @@ fn debug() -> Option<std::ffi::OsString> {
 struct Prim {
     /// What it looks like, wherever it is.
     key: u64,
+    /// Its shape alone, whatever its colour.
+    form: u64,
     /// Its rect's corner, where it is.
     at: [f32; 2],
     /// What it covers on screen: x0, y0, x1, y1.
@@ -253,6 +255,11 @@ fn painted(list: &[Instance], size: (u32, u32), caret: Option<[f32; 4]>) -> Vec<
         for v in [r[2], r[3]].into_iter().chain(inst.radii) {
             q(v, 0.25).hash(&mut hs);
         }
+        let mut shape = hs.clone();
+        if kind == Kind::Glyph {
+            inst.uv.map(f32::to_bits).hash(&mut shape);
+        }
+        let form = shape.finish();
         for v in inst.fill {
             q(v, 1.0 / 64.0).hash(&mut hs);
         }
@@ -272,7 +279,7 @@ fn painted(list: &[Instance], size: (u32, u32), caret: Option<[f32; 4]>) -> Vec<
         }
         [q(inst.params[0], 0.25), q(inst.params[2], 0.25), q(inst.params[3], 1.0 / 64.0)].hash(&mut hs);
         let radius = if kind == Kind::Glyph { 0.0 } else { inst.radii.iter().fold(0.0f32, |m, v| m.max(v.abs())) };
-        out.push(Prim { key: hs.finish(), at: [r[0], r[1]], vis, full: bounds, clip, radius, order: order as u32, glyph: kind == Kind::Glyph, boxy, kind: kind as u8 });
+        out.push(Prim { key: hs.finish(), form, at: [r[0], r[1]], vis, full: bounds, clip, radius, order: order as u32, glyph: kind == Kind::Glyph, boxy, kind: kind as u8 });
     }
     out
 }
@@ -311,6 +318,7 @@ struct Group {
 /// A scroll viewport whose offset changed between the before and the after: where it shows
 /// (device pixels) and how far its content moved.
 struct Scrolled {
+    was: [f32; 4],
     vis: [f32; 4],
     moved: [f32; 2],
 }
@@ -346,8 +354,8 @@ fn scrolled(old: &HashMap<String, View>, new: &HashMap<String, View>) -> Vec<Scr
         .filter_map(|(path, n)| {
             let o = old.get(path)?;
             let moved = [o.off[0] - n.off[0], o.off[1] - n.off[1]];
-            let v = n.vis;
-            ((moved[0].abs() > 0.5 || moved[1].abs() > 0.5) && (o.riding || n.riding)).then_some(Scrolled { vis: [v[0], v[1], v[0] + v[2], v[1] + v[3]], moved })
+            let rect = |v: [f32; 4]| [v[0], v[1], v[0] + v[2], v[1] + v[3]];
+            ((moved[0].abs() > 0.5 || moved[1].abs() > 0.5) && (o.riding || n.riding)).then_some(Scrolled { was: rect(o.vis), vis: rect(n.vis), moved })
         })
         .collect()
 }
@@ -421,9 +429,9 @@ fn diff(old: &[Prim], new: &[Prim], lively: &[[f32; 4]], scrolls: &[Scrolled]) -
     // What moved with a scroll viewport's own offset is the user scrolling; what scrolled in or
     // out of view with it came and went with the scroll, not the swap.
     for v in scrolls {
-        let inside = |r: [f32; 4]| {
+        let within = |r: [f32; 4], c: [f32; 4]| {
             let (cx, cy) = ((r[0] + r[2]) * 0.5, (r[1] + r[3]) * 0.5);
-            cx >= v.vis[0] && cx <= v.vis[2] && cy >= v.vis[1] && cy <= v.vis[3]
+            cx >= c[0] && cx <= c[2] && cy >= c[1] && cy <= c[3]
         };
         let d = v.moved;
         for (c, g) in slides.iter_mut().enumerate() {
@@ -432,25 +440,25 @@ fn diff(old: &[Prim], new: &[Prim], lively: &[[f32; 4]], scrolls: &[Scrolled]) -
             }
             g.scroll = true;
             for (j, p) in new.iter().enumerate() {
-                if fnew[j] == Fate::Slide(c) && inside(p.vis) {
+                if fnew[j] == Fate::Slide(c) && within(p.vis, v.vis) {
                     fnew[j] = Fate::Scrolled;
                 }
             }
             for (i, p) in old.iter().enumerate() {
-                if fo[i] == Fate::Slide(c) && inside(p.vis) {
+                if fo[i] == Fate::Slide(c) && within(p.vis, v.was) {
                     fo[i] = Fate::Scrolled;
                 }
             }
         }
         for (i, p) in old.iter().enumerate() {
             let shifted = [p.vis[0] + d[0], p.vis[1] + d[1], p.vis[2] + d[0], p.vis[3] + d[1]];
-            if fo[i] == Fate::Gone && inside(p.vis) && !overlaps(shifted, v.vis) {
+            if fo[i] == Fate::Gone && within(p.vis, v.was) && !overlaps(shifted, v.vis) {
                 fo[i] = Fate::Scrolled;
             }
         }
         for (j, p) in new.iter().enumerate() {
             let back = [p.vis[0] - d[0], p.vis[1] - d[1], p.vis[2] - d[0], p.vis[3] - d[1]];
-            if fnew[j] == Fate::New && inside(p.vis) && !overlaps(back, v.vis) {
+            if fnew[j] == Fate::New && within(p.vis, v.vis) && !overlaps(back, v.was) {
                 fnew[j] = Fate::Scrolled;
             }
         }
@@ -503,6 +511,28 @@ fn diff(old: &[Prim], new: &[Prim], lively: &[[f32; 4]], scrolls: &[Scrolled]) -
         fo[i] = Fate::Slide(slides.len());
         fnew[j] = Fate::Slide(slides.len());
         slides.push(Group { d, scroll: false, single: true });
+    }
+
+    // Something animating by itself (a shimmering "Working…") that moved with its group goes with it.
+    if !lively.is_empty() {
+        let mut came: HashMap<(u64, i32, i32), Vec<usize>> = HashMap::new();
+        for (j, p) in new.iter().enumerate().filter(|(j, _)| fnew[*j] == Fate::New) {
+            came.entry((p.form, q(p.at[0], 1.0), q(p.at[1], 1.0))).or_default().push(j);
+        }
+        for (i, p) in old.iter().enumerate() {
+            if fo[i] != Fate::Gone || !lively.iter().any(|l| same_spot(*l, p.vis)) {
+                continue;
+            }
+            for (c, g) in slides.iter().enumerate().filter(|(_, g)| !g.scroll && !g.single) {
+                let (x, y) = (q(p.at[0] + g.d[0], 1.0), q(p.at[1] + g.d[1], 1.0));
+                let hit = [(0, 0), (1, 0), (-1, 0), (0, 1), (0, -1)].into_iter().find_map(|(ox, oy)| came.get_mut(&(p.form, x + ox, y + oy)).and_then(Vec::pop));
+                if let Some(j) = hit {
+                    fo[i] = Fate::Slide(c);
+                    fnew[j] = Fate::Slide(c);
+                    break;
+                }
+            }
+        }
     }
 
     // What changes by itself in place (a blinking mascot, a spinner, the caret) is not the swap.

@@ -161,7 +161,9 @@ export type EngineEvent =
   | { t: "audio"; id: string; kind: "ended" | "error"; message?: string }
   | { t: "mic"; gen: number; kind: "live" | "audio" | "ended" | "failed"; ms?: number; pcm?: string; message?: string }
   /** A Stella View's run (engine/src/views.rs): one wake-up's posts, a warning, or how it ended. */
-  | { t: "views"; id: string; gen: number; kind: "posts" | "warning" | "exit"; posts?: unknown[]; message?: string; exit?: "finished" | "failed" | "stopped" };
+  | { t: "views"; id: string; gen: number; kind: "posts" | "warning" | "exit"; posts?: unknown[]; message?: string; exit?: "finished" | "failed" | "stopped" }
+  /** The display frame `views.frame` asked for (id ""): epoch ms it was encoded, began and is due on screen, and the refresh rate. */
+  | { t: "views"; id: ""; kind: "frame"; at: number; started?: number; presentsAt?: number; hz?: number };
 
 export type SelectionRect = { x: number; y: number; w: number; h: number };
 
@@ -372,6 +374,8 @@ export const engine = {
     stop: (id: string) => command({ cmd: "views.stop", id }),
     pause: (id: string) => request<boolean>("views.pause", { id }),
     resume: (id: string) => request<boolean>("views.resume", { id }),
+    /** Asks for the next display frame; its `views` `frame` event is the views' frame clock. */
+    frame: () => command({ cmd: "views.frame" }),
   },
   /** Global input listening for the `uiohook-napi` module (macOS CGEventTap, Windows low-level hooks; rejects elsewhere or without Input Monitoring). */
   inputHook: {

@@ -7,11 +7,17 @@
 //!   once it is running; a syntax error is the reply's error). Starting an id that runs replaces it.
 //! - `views.deliver {id, messages}` queues messages (JSON values) for the program's `receive`.
 //! - `views.stop {id}`, `views.pause {id}`, `views.resume {id}`.
+//! - `views.frame {}` asks for the next display frame: the window draws it (or finds nothing
+//!   changed) at the display's pace, and the frame's event is the views' frame clock, so
+//!   `useFrame` and `requestAnimationFrame` step with the refresh rather than a timer.
 //!
 //! Events: `{t:"views", id, kind:"posts", posts}` (one wake-up's posts, in order),
-//! `{kind:"warning", message}`, `{kind:"exit", exit:"finished"|"failed"|"stopped", message?}`.
+//! `{kind:"warning", message}`, `{kind:"exit", exit:"finished"|"failed"|"stopped", message?}`,
+//! and once per asked-for frame `{t:"views", id:"", kind:"frame", at, started?, presentsAt?, hz?}`
+//! (epoch milliseconds: when it was encoded, when it began, when it is due on screen).
 
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 
 use psychoscript_mobile::{GpuCanvasState, LiveExit, LiveHandler, LiveOptions, LiveRun, Program, PsychoScriptError};
@@ -148,4 +154,41 @@ pub fn stop_all() {
     for run in runs {
         run.live.stop();
     }
+}
+
+/// A view asked for the next frame and hasn't had it yet.
+static FRAME_WANTED: AtomicBool = AtomicBool::new(false);
+
+/// `views.frame`: the next frame of the main window is the views' next frame.
+pub fn want_frame() {
+    if !FRAME_WANTED.swap(true, Ordering::SeqCst) {
+        crate::windows::wake_all();
+    }
+}
+
+/// From the main window's poll: keeps the window's frame loop going while a view waits on a frame.
+pub fn poll(tx: &mut rune::Tx) {
+    if FRAME_WANTED.load(Ordering::SeqCst) {
+        tx.wake_after(std::time::Duration::ZERO);
+    }
+}
+
+/// From `on_frame_encoded`: a frame that drew, found nothing to draw, or was skipped answers the
+/// views' request with its times.
+pub fn on_frame(f: &rune::FrameEncoded) {
+    if f.window().is_some_and(|w| w != "main") || !FRAME_WANTED.swap(false, Ordering::SeqCst) {
+        return;
+    }
+    use crate::metrics::epoch_of;
+    let mut event = json!({ "t": "views", "id": "", "kind": "frame", "at": epoch_of(f.at()) });
+    if let Some(started) = f.started() {
+        event["started"] = epoch_of(started).into();
+    }
+    if let Some(presents) = f.presents_at() {
+        event["presentsAt"] = epoch_of(presents).into();
+    }
+    if let Some(hz) = f.refresh_hz() {
+        event["hz"] = hz.into();
+    }
+    crate::engine::send(event);
 }

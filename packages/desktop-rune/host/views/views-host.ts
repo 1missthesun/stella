@@ -27,7 +27,8 @@ type Engine = typeof BridgeEngine;
 type On = typeof BridgeOn;
 
 const KEEP_ALIVE_MS = 60_000;
-const FRAME_MS = 1000 / 60;
+/** A frame the engine doesn't answer in time (an engine without `views.frame`) comes from a timer. */
+const FRAME_FALLBACK_MS = 100;
 
 export { isViewPath };
 
@@ -87,6 +88,53 @@ const readLegacy = (filePath: string): Record<string, unknown> | null => {
   const parsed = readJsonFile(legacyStorageFile(filePath));
   return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? (parsed as Record<string, unknown>) : null;
 };
+
+/**
+ * The views' frame clock: each request asks the engine for the main window's next display frame
+ * (`views.frame`), and that frame's event runs every callback waiting, with its time. Times sit on
+ * the display's refresh grid, so `useFrame`'s dt is a whole number of refreshes rather than a
+ * timer's drift (a frame due on screen wins over when it was drawn, when the platform says).
+ */
+function displayFrameClock(engine: Engine, on: On, now: () => number) {
+  let queue: Array<(time: number) => void> = [];
+  let asked = false;
+  let fallback: ReturnType<typeof setTimeout> | null = null;
+  let grid: { anchor: number; period: number } | null = null;
+  let last = -Infinity;
+  const run = (time: number) => {
+    asked = false;
+    if (fallback) clearTimeout(fallback);
+    fallback = null;
+    const callbacks = queue;
+    queue = [];
+    last = Math.max(last, time);
+    for (const fn of callbacks) fn(time);
+  };
+  const onGrid = (at: number, hz: number | undefined) => {
+    if (!hz || !Number.isFinite(hz) || hz < 20) return at;
+    const period = 1000 / hz;
+    if (!grid || Math.abs(grid.period - period) > 0.01) grid = { anchor: at, period };
+    let time = grid.anchor + Math.round((at - grid.anchor) / period) * period;
+    // The system clock and the display's drift apart slowly: follow the display.
+    if (Math.abs(time - at) > period / 2) {
+      grid = { anchor: at, period };
+      time = at;
+    }
+    return time <= last ? last + period : time;
+  };
+  on("views", (event) => {
+    if (event.kind !== "frame" || event.id !== "" || !asked) return;
+    const epoch = event.presentsAt ?? event.started ?? event.at;
+    run(onGrid(epoch - performance.timeOrigin, event.hz));
+  });
+  return (fn: (time: number) => void) => {
+    queue.push(fn);
+    if (asked) return;
+    asked = true;
+    engine.views.frame();
+    fallback = setTimeout(() => run(now()), FRAME_FALLBACK_MS);
+  };
+}
 
 function fileStorage(filePath: string): ViewStorage {
   const file = legacyStorageFile(filePath);
@@ -318,21 +366,7 @@ export function createViewsHost(engine: Engine, on: On) {
   const vm = engineVm(engine, on);
   const caps = capabilities(engine);
   const now = () => performance.now();
-  let frameQueue: Array<(time: number) => void> = [];
-  let frameTimer: ReturnType<typeof setTimeout> | null = null;
-  const requestFrame = (fn: (time: number) => void) => {
-    frameQueue.push(fn);
-    if (frameTimer) return;
-    const at = now();
-    const next = Math.ceil(at / FRAME_MS) * FRAME_MS;
-    frameTimer = setTimeout(() => {
-      frameTimer = null;
-      const run = frameQueue;
-      frameQueue = [];
-      const time = now();
-      for (const f of run) f(time);
-    }, Math.max(1, next - at));
-  };
+  const requestFrame = displayFrameClock(engine, on, now);
 
   const readRemote = (entry: Entry) => {
     // Not offered yet: the chat hands each conversation's views over as it renders.

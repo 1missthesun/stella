@@ -167,7 +167,11 @@ export function createWasmVm(): ViewVm & { pause(run: ViewRun): Promise<boolean>
  * `stella.engine.views` on the web: the desktop engine's command set (engine/src/views.rs) over the
  * same workers, its runs' posts, warnings and exits sent as `views` engine events.
  */
-export function createEngineViews(emit: (event: { t: "views"; id: string; gen: number; kind: "posts" | "warning" | "exit"; posts?: unknown[]; message?: string; exit?: ViewExit["kind"] }) => void) {
+type EngineViewsEvent =
+  | { t: "views"; id: string; gen: number; kind: "posts" | "warning" | "exit"; posts?: unknown[]; message?: string; exit?: ViewExit["kind"] }
+  | { t: "views"; id: ""; kind: "frame"; at: number };
+
+export function createEngineViews(emit: (event: EngineViewsEvent) => void) {
   const vm = createWasmVm();
   const runs = new Map<string, { run: ViewRun; gen: number }>();
   let generation = 0;
@@ -206,6 +210,10 @@ export function createEngineViews(emit: (event: { t: "views"; id: string; gen: n
     resume: async (id: string) => {
       const entry = runs.get(id);
       return entry ? vm.resume(entry.run) : false;
+    },
+    /** The page's next display frame, as the desktop engine's `views.frame`. */
+    frame() {
+      requestAnimationFrame((time) => emit({ t: "views", id: "", kind: "frame", at: performance.timeOrigin + time }));
     },
   };
 }

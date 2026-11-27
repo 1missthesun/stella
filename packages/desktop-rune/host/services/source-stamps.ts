@@ -3,6 +3,7 @@
 // holding them, since a new file can change what an import resolves to. A build is used only
 // while every stamp still matches.
 
+import { writeFileSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
 
@@ -57,14 +58,36 @@ export async function buildFolder(dir: string): Promise<{ name: string; path: st
   return { name, path: out };
 }
 
-/** Records `folder`'s `file` as the current build and removes older ones (an open one stays until it can go). */
+const HELD = ".held-";
+
+/** Keeps the build folder holding `file` while this process lives: it reads more of it later (lazy UI files). */
+export function holdBuild(file: string) {
+  try { writeFileSync(path.join(path.dirname(file), `${HELD}${process.pid}`), ""); } catch {}
+}
+
+const heldByLiveProcess = async (folder: string) => {
+  for (const entry of await readdir(folder).catch(() => [] as string[])) {
+    if (!entry.startsWith(HELD)) continue;
+    try {
+      process.kill(Number(entry.slice(HELD.length)), 0);
+      return true;
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code === "EPERM") return true;
+    }
+  }
+  return false;
+};
+
+/** Records `folder`'s `file` as the current build and removes older ones (an open one stays until it can go; a held one until its process ends). */
 export async function recordBuild(dir: string, folder: string, file: string, key: string, stamps: Record<string, string>) {
   const current = path.join(dir, "current.json");
   const temp = `${current}.${process.pid}.tmp`;
   await writeFile(temp, JSON.stringify({ key, file: `${folder}/${file}`, stamps } satisfies BuildManifest));
   await rename(temp, current);
   for (const entry of await readdir(dir).catch(() => [] as string[])) {
-    if (entry !== folder && entry !== "current.json" && !entry.endsWith(".tmp")) await rm(path.join(dir, entry), { recursive: true, force: true }).catch(() => {});
+    if (entry === folder || entry === "current.json" || entry.endsWith(".tmp")) continue;
+    if (await heldByLiveProcess(path.join(dir, entry))) continue;
+    await rm(path.join(dir, entry), { recursive: true, force: true }).catch(() => {});
   }
 }
 

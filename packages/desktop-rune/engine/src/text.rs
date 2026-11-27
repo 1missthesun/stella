@@ -89,6 +89,50 @@ pub fn apply(mut e: El, p: &Props, content_len: usize) -> El {
     e
 }
 
+/// The text style a `<text>` takes from its parent element where it sets none itself, as CSS
+/// inherits it: a bare string in `<row color size weight>` is a text node with only `content`,
+/// and without this it drew in the engine's default ink, which follows the system appearance
+/// rather than the app's theme. Only the parent: a text node is rebuilt whenever its parent is,
+/// so the inherited style can't go stale behind a memoized element.
+pub fn inherit(p: &Props, parent: &Props) -> Option<Props> {
+    let takes = (p.size.is_none() && parent.size.is_some())
+        || (p.weight.is_none() && parent.weight.is_some())
+        || (p.line_height.is_none() && parent.line_height.is_some())
+        || (p.tracking.is_none() && parent.tracking.is_some())
+        || (p.color.is_none() && parent.color.is_some())
+        || (!p.mono && p.family.is_none() && (parent.mono || parent.family.is_some()))
+        || (p.features.is_none() && parent.features.is_some())
+        || (!p.italic && parent.italic)
+        || (p.text_align.is_none() && parent.text_align.is_some())
+        || (p.text_case.is_none() && parent.text_case.is_some())
+        || (p.selection_color.is_none() && parent.selection_color.is_some());
+    if !takes {
+        return None;
+    }
+    let mut c = p.clone();
+    c.size = c.size.or(parent.size);
+    c.weight = c.weight.or(parent.weight);
+    c.line_height = c.line_height.or(parent.line_height);
+    c.tracking = c.tracking.or(parent.tracking);
+    c.color = c.color.or(parent.color);
+    if !c.mono && c.family.is_none() {
+        c.mono = parent.mono;
+        c.family = parent.family.clone();
+    }
+    if c.features.is_none() {
+        c.features = parent.features.clone();
+    }
+    c.italic |= parent.italic;
+    if c.text_align.is_none() {
+        c.text_align = parent.text_align.clone();
+    }
+    if c.text_case.is_none() {
+        c.text_case = parent.text_case.clone();
+    }
+    c.selection_color = c.selection_color.or(parent.selection_color);
+    Some(c)
+}
+
 /// The content and spans of a `<text>`, with links (`href` runs) as byte ranges.
 pub struct Rich {
     pub content: String,

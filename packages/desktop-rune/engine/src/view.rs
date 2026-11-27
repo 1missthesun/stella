@@ -203,7 +203,10 @@ fn build_kind(s: &Win, eng: &Engine, id: u32, n: &Node, p: &Props) -> El {
         Kind::Row => crate::fx::over(children(s, eng, n, crate::fx::under(row(), id, p)), id, p),
         Kind::Col | Kind::Window => crate::fx::over(children(s, eng, n, crate::fx::under(col(), id, p)), id, p),
         Kind::Box => crate::fx::over(children(s, eng, n, crate::fx::under(el(), id, p)), id, p),
-        Kind::Text => text::build(p),
+        Kind::Text => match eng.tree.get(n.parent).filter(|x| x.kind != Kind::Text).and_then(|x| text::inherit(p, &x.props)) {
+            Some(inherited) => text::build(&inherited),
+            None => text::build(p),
+        },
         Kind::Input => crate::input::build(s, id, p),
         Kind::Image => media::image(eng, id, p),
         Kind::Icon => media::icon(p),

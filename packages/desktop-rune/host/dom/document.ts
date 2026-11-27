@@ -87,10 +87,11 @@ function createStyle(onChange: (name: string) => void): DomStyle {
 const dataKey = (prop: string) => `data-${prop.replace(/[A-Z]/g, (c) => `-${c.toLowerCase()}`)}`;
 const dataProp = (attr: string) => attr.slice(5).replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
 
-export type ElementChange = { element: DomElement; kind: "class" | "attribute" | "style"; name: string };
+export type ElementChange = { element: DomElement; kind: "class" | "attribute" | "style" | "children"; name: string };
 const changeListeners = new Set<(change: ElementChange) => void>();
 
-/** Observes class, attribute and style changes on any element (the UI kit reads theme variables from the root). */
+/** Observes class, attribute, style and child-list changes on any element (the UI kit reads theme variables from the root;
+ * a detached drawing such as the StellaCharacter rig redraws only when its own subtree changes). */
 export function onElementChange(listener: (change: ElementChange) => void): () => void {
   changeListeners.add(listener);
   return () => changeListeners.delete(listener);
@@ -171,6 +172,7 @@ export class DomElement extends EventTarget {
     child.parentNode?.removeChild(child);
     child.parentNode = this;
     this.childNodes.push(child);
+    notify({ element: this, kind: "children", name: "" });
     return child;
   }
   append(...nodes: Array<DomElement | string>) { for (const n of nodes) if (typeof n !== "string") this.appendChild(n); }
@@ -180,16 +182,18 @@ export class DomElement extends EventTarget {
     const at = ref ? this.childNodes.indexOf(ref) : -1;
     child.parentNode = this;
     if (at < 0) this.childNodes.push(child); else this.childNodes.splice(at, 0, child);
+    notify({ element: this, kind: "children", name: "" });
     return child;
   }
   removeChild<T extends DomElement>(child: T): T {
     const at = this.childNodes.indexOf(child);
     if (at >= 0) this.childNodes.splice(at, 1);
     child.parentNode = null;
+    notify({ element: this, kind: "children", name: "" });
     return child;
   }
   remove() { this.parentNode?.removeChild(this); }
-  replaceChildren(...nodes: DomElement[]) { this.childNodes.length = 0; for (const n of nodes) this.appendChild(n); }
+  replaceChildren(...nodes: DomElement[]) { for (const c of this.childNodes) c.parentNode = null; this.childNodes.length = 0; for (const n of nodes) this.appendChild(n); notify({ element: this, kind: "children", name: "" }); }
   contains(other: unknown): boolean {
     if (other === this) return true;
     return this.childNodes.some((c) => c.contains(other));
@@ -232,6 +236,8 @@ export class DomCanvasElement extends DomElement {
 
 export class DomDocument extends EventTarget {
   readonly nodeType = 9;
+  /** Rune-only: `onElementChange` for UI code, which reaches the host DOM only through `document`. */
+  readonly observeElementChanges = onElementChange;
   readonly documentElement = new DomElement("html");
   readonly head = new DomElement("head");
   readonly body = new DomElement("body");

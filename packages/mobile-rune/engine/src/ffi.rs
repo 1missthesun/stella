@@ -82,9 +82,12 @@ pub unsafe extern "C" fn sme_push(bytes: *const u8, len: usize) {
     crate::protocol::read_loop(data, tx, b.waker.clone());
 }
 
-/// One Metal layer showing the main window.
+/// One Metal layer (iOS) or `ANativeWindow` (Android) showing the main window.
 pub struct Host {
     host: LayerHost<Win>,
+    /// The `ANativeWindow` the host draws into, held (acquired) until its surface is detached.
+    #[cfg(target_os = "android")]
+    window: *mut c_void,
 }
 
 #[repr(C)]
@@ -98,6 +101,7 @@ pub struct SmeFrame {
 
 /// Attaches the engine to `layer` (a `CAMetalLayer *`) at `w`×`h` points and `scale`.
 /// `wake` is called (any thread) whenever the engine wants a frame.
+#[cfg(target_vendor = "apple")]
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sme_create(layer: *mut c_void, w: f32, h: f32, scale: f32, dark: bool, wake: WakeCb, ctx: *mut c_void) -> *mut Host {
     rune::text::set_fallback_base(Some("Helvetica Neue"));
@@ -119,9 +123,85 @@ pub unsafe extern "C" fn sme_create(layer: *mut c_void, w: f32, h: f32, scale: f
     }
 }
 
+/// Attaches the engine to `window` (an `ANativeWindow *` the caller acquired, e.g. with
+/// `ANativeWindow_fromSurface`; the host owns that reference from here on) at `w`×`h` dp and
+/// `scale` (the display density). `wake` is called (any thread) whenever the engine wants a frame.
+#[cfg(target_os = "android")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sme_create_android(window: *mut c_void, w: f32, h: f32, scale: f32, dark: bool, wake: WakeCb, ctx: *mut c_void) -> *mut Host {
+    rune::text::set_fallback_base(Some("Roboto"));
+    let ctx = ctx as usize;
+    let waker: Waker = Arc::new(move || wake(ctx as *mut c_void));
+    let spec = windows::app_spec((w, h));
+    let state = Win { main: true, ..Win::default() };
+    // SAFETY: the app passes a live, acquired ANativeWindow and calls on the main thread.
+    let host = unsafe { LayerHost::from_android_native_window(window, &spec, state, (w, h), scale, dark, waker) };
+    match host {
+        Ok(host) => {
+            let host = host.with_compositor(crate::fx::Comp::new(None));
+            Box::into_raw(Box::new(Host { host, window }))
+        }
+        Err(e) => {
+            eprintln!("stella-mobile-engine: no Vulkan surface host: {e}");
+            // SAFETY: the reference handed over above.
+            unsafe { crate::android::release_window(window) };
+            std::ptr::null_mut()
+        }
+    }
+}
+
+/// The view's surface is going away (`surfaceDestroyed`): drops the GPU surface and releases
+/// the window before the app returns from that callback. The engine keeps its state.
+#[cfg(target_os = "android")]
+#[unsafe(no_mangle)]
+pub extern "C" fn sme_surface_destroyed(h: *mut Host) {
+    if let Some(h) = host(h) {
+        h.host.detach_surface();
+        if !h.window.is_null() {
+            // SAFETY: the reference the host held.
+            unsafe { crate::android::release_window(h.window) };
+            h.window = std::ptr::null_mut();
+        }
+    }
+}
+
+/// A new surface for the view (`surfaceCreated`/`surfaceChanged` after a destroy): `window` is
+/// acquired by the caller and owned by the host from here on.
+#[cfg(target_os = "android")]
+#[unsafe(no_mangle)]
+pub unsafe extern "C" fn sme_surface_created(h: *mut Host, window: *mut c_void, w: f32, ht: f32, scale: f32) -> bool {
+    let Some(h) = host(h) else {
+        // SAFETY: the reference handed over.
+        unsafe { crate::android::release_window(window) };
+        return false;
+    };
+    h.host.detach_surface();
+    if !h.window.is_null() {
+        // SAFETY: the reference the host held for its previous surface.
+        unsafe { crate::android::release_window(h.window) };
+        h.window = std::ptr::null_mut();
+    }
+    // SAFETY: the app passes a live, acquired ANativeWindow on the main thread.
+    match unsafe { h.host.attach_android_native_window(window, (w, ht), scale) } {
+        Ok(()) => {
+            h.window = window;
+            windows::wake_all();
+            true
+        }
+        Err(e) => {
+            eprintln!("stella-mobile-engine: new surface refused: {e}");
+            // SAFETY: as above.
+            unsafe { crate::android::release_window(window) };
+            false
+        }
+    }
+}
+
 #[unsafe(no_mangle)]
 pub unsafe extern "C" fn sme_destroy(h: *mut Host) {
     if !h.is_null() {
+        #[cfg(target_os = "android")]
+        sme_surface_destroyed(h);
         // SAFETY: made by sme_create.
         drop(unsafe { Box::from_raw(h) });
     }

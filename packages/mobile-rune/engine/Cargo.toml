@@ -5,8 +5,8 @@ edition = "2024"
 license = "MIT"
 publish = false
 
-# The phone build of Stella's Rune engine: a static library the iOS app (and later the Android
-# app) links. It reuses the desktop engine's tree, props, view, markdown and effect modules as
+# The phone build of Stella's Rune engine: a static library the iOS app links, and a shared
+# library (`cargo rustc --crate-type cdylib`, scripts/build-android.sh) the Android app loads. It reuses the desktop engine's tree, props, view, markdown and effect modules as
 # they are (src/lib.rs includes them by path) and replaces only what is about windows, native
 # text fields and the bridge transport (src/mobile/).
 [lib]
@@ -15,10 +15,10 @@ path = "src/lib.rs"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-rune = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70", features = ["tooling"] }
-rune-kit = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70", features = ["markdown", "mermaid"] }
-rune-fx = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
-rune-light = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
+rune = { git = "https://github.com/1missthesun/rune", rev = "8d595e3311417db1c2d2497dc548290faf0071ba", features = ["tooling"] }
+rune-kit = { git = "https://github.com/1missthesun/rune", rev = "8d595e3311417db1c2d2497dc548290faf0071ba", features = ["markdown", "mermaid"] }
+rune-fx = { git = "https://github.com/1missthesun/rune", rev = "8d595e3311417db1c2d2497dc548290faf0071ba" }
+rune-light = { git = "https://github.com/1missthesun/rune", rev = "8d595e3311417db1c2d2497dc548290faf0071ba" }
 wgpu = { version = "~30.0.1", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -27,15 +27,21 @@ image = { version = "0.25", default-features = false, features = ["jpeg", "png",
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
+# The Android app's JNI bridge (src/android.rs). winit is Rune's own (patched below); the engine
+# names it only for the NativeActivity entry winit's Android backend links.
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"
+winit = { version = "0.30.13", default-features = false, features = ["android-native-activity"] }
+
 [patch.crates-io]
-wgpu-hal = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
-naga = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
-winit = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
-sctk-adwaita = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
-parley_engine = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
-accesskit_windows = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
-accesskit_atspi_common = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
-accesskit_macos = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
+wgpu-hal = { git = "https://github.com/1missthesun/rune", rev = "8d595e3311417db1c2d2497dc548290faf0071ba" }
+naga = { git = "https://github.com/1missthesun/rune", rev = "8d595e3311417db1c2d2497dc548290faf0071ba" }
+winit = { git = "https://github.com/1missthesun/rune", rev = "8d595e3311417db1c2d2497dc548290faf0071ba" }
+sctk-adwaita = { git = "https://github.com/1missthesun/rune", rev = "8d595e3311417db1c2d2497dc548290faf0071ba" }
+parley_engine = { git = "https://github.com/1missthesun/rune", rev = "8d595e3311417db1c2d2497dc548290faf0071ba" }
+accesskit_windows = { git = "https://github.com/1missthesun/rune", rev = "8d595e3311417db1c2d2497dc548290faf0071ba" }
+accesskit_atspi_common = { git = "https://github.com/1missthesun/rune", rev = "8d595e3311417db1c2d2497dc548290faf0071ba" }
+accesskit_macos = { git = "https://github.com/1missthesun/rune", rev = "8d595e3311417db1c2d2497dc548290faf0071ba" }
 
 [profile.release]
 codegen-units = 16

@@ -2,11 +2,12 @@
 //!
 //! The desktop engine (`packages/desktop-rune/engine`) is a binary that spawns a Bun host and
 //! reads its frames from a pipe. On a phone the TS UI runs in the app's own JavaScriptCore (iOS)
-//! or V8/JSC (Android) on a JS thread, and this library is linked into the app:
+//! or V8 (Android, through Javet) on a JS thread, and this library is linked into the app:
 //!
 //! - the TS side hands each React commit's frame to [`ffi::sme_push`] (any thread);
-//! - the app's display link calls [`ffi::sme_frame`] on the main thread, which drains frames,
-//!   rebuilds the dirty tree into Rune `El`s and presents one Metal frame through
+//! - the app's display link (iOS `CADisplayLink`, Android `Choreographer`) calls
+//!   [`ffi::sme_frame`] on the main thread, which drains frames, rebuilds the dirty tree into
+//!   Rune `El`s and presents one Metal (iOS) or Vulkan (Android) frame through
 //!   `rune::embed::LayerHost`;
 //! - engine events (presses, layout, scroll, ...) reach the TS side as the same JSON lines the
 //!   desktop host reads, through the app's event callback.
@@ -62,3 +63,6 @@ mod native;
 mod windows;
 
 pub mod ffi;
+
+#[cfg(target_os = "android")]
+mod android;

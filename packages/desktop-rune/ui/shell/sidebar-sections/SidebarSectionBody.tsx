@@ -1,8 +1,9 @@
-import type { ComponentType } from "react";
+import type { ComponentType, ReactNode } from "react";
 import { isDocumentTab, useActiveSidebarSection, useSidebarActiveTabId, useSidebarOpenTabs } from "@/features/workspace-display/sidebar-sections";
 import { FileSidebarTabExistenceReconciler } from "@/shell/sidebar-sections/FileSidebarTabExistenceReconciler";
 import { RetainedSurface } from "../../kit";
 import { mounted, Nothing } from "../../app/mount";
+import { TopInsetContext, useTopInset } from "../top-inset";
 
 type Located = ComponentType<{ location: string | null; active: boolean }>;
 type Activated = ComponentType<{ active: boolean }>;
@@ -16,6 +17,16 @@ const FilesSection = mounted<{ location: string | null; active: boolean }>(impor
 const CloudBrowserTakeoverSection = mounted<{ location: string | null; active: boolean }>(import.meta.glob("./CloudBrowserTakeoverSection.tsx", { eager: true }), "CloudBrowserTakeoverSection", Nothing) as Located;
 
 const PER_ITEM_BODIES: Record<string, Located> = { files: FilesSection, takeover: CloudBrowserTakeoverSection };
+
+/** A section that doesn't scroll under the glass top bar starts below it. */
+function BelowGlass({ children }: { children: ReactNode }) {
+  const inset = useTopInset();
+  return (
+    <col grow={1} minH={0} w="full" pt={inset}>
+      <TopInsetContext.Provider value={0}>{children}</TopInsetContext.Provider>
+    </col>
+  );
+}
 
 /** desktop-ui's `SidebarSectionBody`: each section stays mounted on the stage, shown when its tab is. */
 export function SidebarSectionBody() {
@@ -31,7 +42,9 @@ export function SidebarSectionBody() {
         const active = tab.id === activeTabId;
         return (
           <RetainedSurface key={tab.id} id={`sidebar-section-${tab.id}`} active={active} layered>
-            <Body location={tab.location} active={active} />
+            <BelowGlass>
+              <Body location={tab.location} active={active} />
+            </BelowGlass>
           </RetainedSurface>
         );
       })}
@@ -39,13 +52,17 @@ export function SidebarSectionBody() {
         <AppsSection />
       </RetainedSurface>
       <RetainedSurface id="sidebar-section-browser" active={activeSection === "browser"} layered>
-        <BrowserSection />
+        <BelowGlass>
+          <BrowserSection />
+        </BelowGlass>
       </RetainedSurface>
       <RetainedSurface id="sidebar-section-updates" active={activeSection === "updates"} layered>
         <UpdatesSection />
       </RetainedSurface>
       <RetainedSurface id="sidebar-section-email" active={activeSection === "email"} layered>
-        <EmailSection active={activeSection === "email"} />
+        <BelowGlass>
+          <EmailSection active={activeSection === "email"} />
+        </BelowGlass>
       </RetainedSurface>
       <RetainedSurface id="sidebar-section-schedule" active={activeSection === "schedule"} layered>
         <ScheduleSection active={activeSection === "schedule"} />

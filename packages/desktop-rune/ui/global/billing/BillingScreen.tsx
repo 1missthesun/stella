@@ -20,6 +20,7 @@ import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state"
 import { openExternalUrl } from "@/platform/electron/open-external";
 import { planUsageDialog } from "@/global/billing/plan-usage-dialog-store";
 import { CONNECT_PLAN_COPY } from "@stella/contracts/connect-plan-offer";
+import { useTopInset } from "../../shell/top-inset";
 import {
   connectPlanChatGptOnly,
   connectPlanCopy,
@@ -688,10 +689,11 @@ function CreditSection({
 
 export function BillingScreen() {
   const s = useBillingScreen();
+  const inset = useTopInset();
   return (
     <col w="full" h="full">
       <col w="full" grow={1} shrink minH={0}>
-        <col w="full" {...s.billingScreenScroll}>
+        <col w="full" {...s.billingScreenScroll} pt={(s.billingScreenScroll.py ?? 0) + inset}>
           <BillingPanel />
         </col>
       </col>

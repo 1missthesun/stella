@@ -1,3 +1,4 @@
+import { chromeGlass, COMPOSER_GLASS_ID, composerGroupGlass, useGlassBackdrop } from "../shell/glass";
 import { memo, useCallback, useEffect, useId, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { ChatContext } from "@/shared/types/electron";
 import { useComposerModelPinned } from "@/features/chat/composer-model-pin-store";
@@ -135,12 +136,12 @@ function ComposerImpl({
   const suggestionsActive = suggestionsRequested && !sidebar;
   const t = useT();
   const tokens = useTokens();
+  const glassBackdrop = useGlassBackdrop();
   const { state: uiState } = useUiState();
   const voiceVisible = useRealtimeVoiceVisible() && !sidebar;
   const inputId = `composer-input:${useId()}`;
   const modelMentionMenuRef = useRef<ComposerModelMentionMenuHandle | null>(null);
   const [modelMentionTrigger, setModelMentionTrigger] = useState<ComposerModelMentionTrigger | null>(null);
-  const [focused, setFocused] = useState(false);
   const [composerW, setComposerW] = useState(0);
   const caretRef = useRef<number | null>(null);
   const valueRef = useRef(message);
@@ -308,18 +309,20 @@ function ComposerImpl({
     <col w="full" shrink={false} align="center" justify="end" {...column} onLayout={(r) => setComposerW(r.w)}>
       <ComposerLeadRow replyPeek={replyPeek} catchUpConversationId={catchUp && !sidebar ? conversationId : null} maxW={shellMaxW} />
       <col
+        id={sidebar ? undefined : COMPOSER_GLASS_ID}
         w="full"
         maxW={shellMaxW}
         minH={MIN_COMPOSER_SHELL_HEIGHT}
         pad={1}
         radius={radius}
         clip={radius}
-        gradient={look.gradient}
-        border={isDragOver ? look.dragBorder : focused ? look.focusBorder : look.border}
-        shadows={isDragOver ? [...look.shadows, ...look.dragRing] : look.shadows}
+        fx={sidebar ? chromeGlass(tokens).composer.fx : composerGroupGlass(tokens)}
+        fill={chromeGlass(tokens).composer.fill}
+        onBackdrop={glassBackdrop}
+        border={isDragOver ? look.dragBorder : chromeGlass(tokens).composer.border}
+        shadows={isDragOver ? look.dragRing : undefined}
         motion={SHELL_SPRING}
         layout={SHELL_SPRING.dur}
-        onFocusWithin={setFocused}
       >
         {hasAttachedChips ? (
           <row w="full" wrap pt={8} px={14}>

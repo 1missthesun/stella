@@ -26,9 +26,9 @@ import { DropdownMenu, Icon, Icons, ManualCopyField, MenuItem, MenuSeparator, Re
 import { look, mixOklch, useTokens, derive, type Tokens } from "../../theme";
 import { useHostWindows, HostWindow } from "../../host/HostWindows";
 import { SHELL_TOPBAR_HEIGHT } from "../metrics";
+import { TopInsetContext } from "../top-inset";
 import { useWindowKeys } from "../window-keys";
 import { addContextMenu } from "../../replace/platform/context-menu/context-menu";
-import { useOpenTabNotch } from "../topbar/open-tab-notch";
 import { SidebarSectionBody } from "../sidebar-sections/SidebarSectionBody";
 import { DeferredDisplayContent } from "../sidebar-sections/DeferredDisplayContent";
 import { ViewerStrip } from "./ViewerStrip";
@@ -45,7 +45,8 @@ export interface WorkspaceStageHandle {
 
 const STAGE_INSET = 20;
 const STAGE_RADIUS = 14;
-const STAGE_TOP = SHELL_TOPBAR_HEIGHT - 1;
+/** A stage-mode viewer is a card hanging below the glass top bar, as far under its capsules as the composer is below it. */
+const STAGE_TOP = SHELL_TOPBAR_HEIGHT + 9;
 /** `@container file-viewer (min-width: 760px)`: the strip moves to the left edge and stands up. */
 /** `@container file-viewer (min-width: 760px)`, against the viewer's content box (inside its 1px border). */
 const WIDE_VIEWER = 760;
@@ -71,14 +72,10 @@ const stageLook = (t: Tokens) =>
 /** The rect the stage (and a stage-mode viewer) fills, in the window. */
 const stageInsets = (geo: Geometry) => ({ left: STAGE_INSET, top: STAGE_TOP, right: STAGE_INSET, bottom: stageBottom(geo) });
 
-/** The stage's top edge opens where the topbar's open tab stands on it. */
-function StageEdge({ fill }: { fill: string }) {
-  const notch = useOpenTabNotch();
-  if (!notch) return null;
-  const left = Math.max(0, notch.left - STAGE_INSET);
-  const right = Math.max(0, notch.right - STAGE_INSET);
-  if (right <= left) return null;
-  return <box absolute={{ left, top: -1 }} w={right - left} h={1} fill={fill} inert />;
+/** The window behind a shown stage, up to its top, so the chat running under the glass top bar doesn't show around it. */
+function StageBackdrop({ visible, geo }: { visible: boolean; geo: Geometry }) {
+  const t = useTokens();
+  return <box absolute={{ left: 0, top: 0, right: 0, bottom: stageBottom(geo) }} fill={t.c.background} opacity={visible ? 1 : 0} motion={{ dur: visible ? 0.16 : 0.12 }} inert />;
 }
 
 const useDelayedHidden = (visible: boolean, ms: number) => {
@@ -96,7 +93,6 @@ const useDelayedHidden = (visible: boolean, ms: number) => {
 
 function TabStage({ visible }: { visible: boolean }) {
   const t = useTokens();
-  const l = stageLook(t);
   const geo = useGeometry();
   const hidden = useDelayedHidden(visible, 120);
   const { tabs } = useDisplayTabList();
@@ -107,23 +103,21 @@ function TabStage({ visible }: { visible: boolean }) {
   return (
     <col
       id="workspace-stage"
-      absolute={stageInsets(geo)}
+      absolute={{ left: 0, top: 0, right: 0, bottom: stageBottom(geo) }}
       fill={t.c.background}
-      border={l.edge}
-      radius={STAGE_RADIUS}
-      pad={1}
       opacity={visible ? 1 : 0}
       motion={{ dur: visible ? 0.16 : 0.12 }}
       hidden={hidden}
       inert={!visible}
       label={visible ? undefined : ""}
     >
-      <col id="workspace-stage-body" grow={1} minH={0} clip={STAGE_RADIUS - 1}>
-        <RetainedSurface active={visible} grow={1}>
-          {opened ? <SidebarSectionBody /> : null}
-        </RetainedSurface>
+      <col id="workspace-stage-body" grow={1} minH={0} px={STAGE_INSET} clip={0}>
+        <TopInsetContext.Provider value={SHELL_TOPBAR_HEIGHT}>
+          <RetainedSurface active={visible} grow={1}>
+            {opened ? <SidebarSectionBody /> : null}
+          </RetainedSurface>
+        </TopInsetContext.Provider>
       </col>
-      <StageEdge fill={t.c.background} />
     </col>
   );
 }
@@ -646,38 +640,40 @@ function DockedViewer({ item: docked, carried, bodies, hiddenForExclusiveTab }: 
       : { absolute: { left: shown.x, top: shown.y }, w: shown.width, h: shown.height };
 
   return (
-    <col
-      id="file-viewer-docked"
-      key={item ? "open" : "closed"}
-      role="dialog"
-      label={item?.title}
-      {...frame}
-      fill={t.c.background}
-      border={l.edge}
-      pad={1}
-      radius={STAGE_RADIUS}
-      clip={STAGE_RADIUS}
-      hidden={hidden}
-      inert={hidden}
-      enter={item ? { opacity: 0, y: 8, scale: 0.985, dur: 0.18 } : undefined}
-      motion={{ dur: 0.26 }}
-      instant={Boolean(held || live)}
-      onContextMenu={item ? (at) => itemMenu(item.id, at) : undefined}
-    >
-      {item ? (
-        <ViewerHeader
-          item={item}
-          placement={mode}
-          width={width}
-          onDrag={onHeaderDrag}
-          onDetach={detachable ? () => void popOutViewer(item.id, floatRect) : null}
-          onClose={() => fileViewer.close()}
-        />
-      ) : null}
-      <ViewerMain item={item} bodies={bodies} surface={DOCKED} wide={width - 2 >= WIDE_VIEWER} idBase="file-viewer-docked" />
-      {!stage ? RESIZE_EDGES.map((edge) => <box key={edge} id={`file-viewer-resize-${edge}`} {...edgeBox(edge)} cursor={edge === "n" || edge === "s" ? "nsResize" : edge === "e" || edge === "w" ? "ewResize" : edge === "ne" || edge === "sw" ? "neswResize" : "nwseResize"} onDrag={onResize(edge)} />) : null}
-      {stage ? <StageEdge fill={t.c.background} /> : null}
-    </col>
+    <>
+      {stage && item && !hidden ? <StageBackdrop visible geo={geo} /> : null}
+      <col
+        id="file-viewer-docked"
+        key={item ? "open" : "closed"}
+        role="dialog"
+        label={item?.title}
+        {...frame}
+        fill={t.c.background}
+        border={l.edge}
+        pad={1}
+        radius={STAGE_RADIUS}
+        clip={STAGE_RADIUS}
+        hidden={hidden}
+        inert={hidden}
+        enter={item ? { opacity: 0, y: 8, scale: 0.985, dur: 0.18 } : undefined}
+        motion={{ dur: 0.26 }}
+        instant={Boolean(held || live)}
+        onContextMenu={item ? (at) => itemMenu(item.id, at) : undefined}
+      >
+        {item ? (
+          <ViewerHeader
+            item={item}
+            placement={mode}
+            width={width}
+            onDrag={onHeaderDrag}
+            onDetach={detachable ? () => void popOutViewer(item.id, floatRect) : null}
+            onClose={() => fileViewer.close()}
+          />
+        ) : null}
+        <ViewerMain item={item} bodies={bodies} surface={DOCKED} wide={width - 2 >= WIDE_VIEWER} idBase="file-viewer-docked" />
+        {!stage ? RESIZE_EDGES.map((edge) => <box key={edge} id={`file-viewer-resize-${edge}`} {...edgeBox(edge)} cursor={edge === "n" || edge === "s" ? "nsResize" : edge === "e" || edge === "w" ? "ewResize" : edge === "ne" || edge === "sw" ? "neswResize" : "nwseResize"} onDrag={onResize(edge)} />) : null}
+      </col>
+    </>
   );
 }
 
@@ -830,15 +826,15 @@ function Viewers({ hiddenForExclusiveTab }: { hiddenForExclusiveTab: boolean }) 
 
   return (
     <>
-      {hasDocked ? <DockedViewer item={item} carried={carried} bodies={bodies} hiddenForExclusiveTab={hiddenForExclusiveTab} /> : null}
-      {detached.map(({ name, fileId: id }) => {
-        const shown = itemOf(id);
-        return shown && detachedWindows.has(name) ? (
-          <ViewerSurfaceContext key={name} value={name}>
-            <DetachedViewerFrame name={name} item={shown} bodies={bodies} />
-          </ViewerSurfaceContext>
-        ) : null;
-      })}
+        {hasDocked ? <DockedViewer item={item} carried={carried} bodies={bodies} hiddenForExclusiveTab={hiddenForExclusiveTab} /> : null}
+        {detached.map(({ name, fileId: id }) => {
+          const shown = itemOf(id);
+          return shown && detachedWindows.has(name) ? (
+            <ViewerSurfaceContext key={name} value={name}>
+              <DetachedViewerFrame name={name} item={shown} bodies={bodies} />
+            </ViewerSurfaceContext>
+          ) : null;
+        })}
     </>
   );
 }

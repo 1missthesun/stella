@@ -54,6 +54,7 @@ fn bg(eng: &Engine, node: u32) -> rune::Color {
 pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
     let dark = cx.system_dark();
     let accent = cx.accent().hex();
+    let a11y = A11y { reduce_transparency: cx.system_reduced_transparency(), increase_contrast: cx.system_increased_contrast(), forced_colors: cx.system_contrast().is_some() };
     let maximized = cx.is_maximized();
     let full = cx.is_full_screen();
     let node = s.node;
@@ -105,7 +106,7 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
         }
         None => root,
     };
-    note_state(node, dark, maximized, full, accent);
+    note_state(node, dark, maximized, full, accent, a11y);
     settle_rect(node, cx);
     // As in CSS, a change lands at once unless its element asks for motion (`motion`, `layout`).
     let root = root.motion(rune::Spring::NONE);
@@ -140,6 +141,15 @@ thread_local! {
     static MINIMIZED: std::cell::RefCell<HashMap<u32, bool>> = std::cell::RefCell::new(HashMap::new());
     static SYSTEM_DARK: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
     static ACCENT: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
+    static A11Y: std::cell::Cell<A11y> = const { std::cell::Cell::new(A11y { reduce_transparency: false, increase_contrast: false, forced_colors: false }) };
+}
+
+/// The system's display accessibility settings that change how the UI draws its materials.
+#[derive(Clone, Copy, PartialEq)]
+struct A11y {
+    reduce_transparency: bool,
+    increase_contrast: bool,
+    forced_colors: bool,
 }
 
 pub fn system_dark() -> Option<bool> {
@@ -149,10 +159,17 @@ pub fn system_dark() -> Option<bool> {
 /// What `appearance.get` answers and `appearance` events carry.
 pub fn appearance() -> serde_json::Value {
     let accent = ACCENT.with(|a| a.borrow().clone());
-    json!({ "dark": system_dark().unwrap_or(false), "accentColor": (!accent.is_empty()).then_some(accent) })
+    let a = A11Y.with(|a| a.get());
+    json!({
+        "dark": system_dark().unwrap_or(false),
+        "accentColor": (!accent.is_empty()).then_some(accent),
+        "reduceTransparency": a.reduce_transparency,
+        "increaseContrast": a.increase_contrast,
+        "forcedColors": a.forced_colors,
+    })
 }
 
-fn note_state(node: u32, dark: bool, maximized: bool, full: bool, accent: String) {
+fn note_state(node: u32, dark: bool, maximized: bool, full: bool, accent: String, a11y: A11y) {
     let accent_changed = ACCENT.with(|a| {
         let changed = *a.borrow() != accent;
         if changed {
@@ -160,7 +177,8 @@ fn note_state(node: u32, dark: bool, maximized: bool, full: bool, accent: String
         }
         changed
     });
-    if SYSTEM_DARK.with(|d| d.replace(Some(dark))) != Some(dark) || accent_changed {
+    let a11y_changed = A11Y.with(|a| a.replace(a11y)) != a11y;
+    if SYSTEM_DARK.with(|d| d.replace(Some(dark))) != Some(dark) || accent_changed || a11y_changed {
         let mut ev = appearance();
         ev["t"] = json!("appearance");
         engine::send(ev);

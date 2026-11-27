@@ -4,7 +4,7 @@ import { revealPendingSettingsCard, setSettingsScrollPanel, subscribeSettingsCar
 
 const PANEL_ID = "settings-panel";
 
-export function SettingsPanel({ children, scrollResetKey, narrow = false }: { children: ReactNode; scrollResetKey?: string; narrow?: boolean }) {
+export function SettingsPanel({ children, scrollResetKey, narrow = false, topInset = 0 }: { children: ReactNode; scrollResetKey?: string; narrow?: boolean; topInset?: number }) {
   const s = useSettings();
   const placedKeyRef = useRef<string | undefined>(undefined);
   const place = useRef({ id: PANEL_ID, y: 0, scrollY: 0 });
@@ -30,6 +30,7 @@ export function SettingsPanel({ children, scrollResetKey, narrow = false }: { ch
         w="full"
         {...s.settingsPanel}
         {...(narrow ? s.settingsLayoutBar_settingsPanel : s.settingsLayoutRail_settingsPanel)}
+        pt={((narrow ? s.settingsLayoutBar_settingsPanel : s.settingsLayoutRail_settingsPanel).pt ?? 0) + topInset}
         onLayout={(r) => {
           place.current.y = r.y;
         }}

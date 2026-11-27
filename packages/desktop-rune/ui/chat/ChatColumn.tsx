@@ -25,16 +25,22 @@ import { SessionPausedBanner } from "@/global/local-mode/SessionPausedBanner";
 import { WaitingMessages } from "@/global/local-mode/WaitingMessages";
 import { Icon, Icons, withStroke } from "../kit";
 import { derive, mix, useTokens } from "../theme";
-import type { LegendContentStyle } from "./ChatTimeline";
+import { UnderGlassContext, type LegendContentStyle } from "./ChatTimeline";
+import { SHELL_TOPBAR_HEIGHT } from "../shell/metrics";
+import { AdaptiveGlass, chromeGlass, composerGroupGlass, GlassSheen, useGlassBackdrop } from "../shell/glass";
 import { useFileDrop } from "./use-file-drop";
 import { COMPOSER_GAP, COMPOSER_NARROW_W, COMPOSER_PAD_TOP, composerShellMaxW } from "./Composer";
 import { reportComposerArea } from "../replace/shell/workspace-stage/viewer-geometry";
+import { reportChatColumnEdges } from "../shell/chat-column-edges";
 import type { Layout } from "../../host/rune-jsx/props";
 import type { ChatScrollThumb, ChatScrollThumbHandle } from "./use-chat-scroll-management";
-import { panelSurface } from "./surfaces";
 import { useStaticHomeLook } from "./static-home";
 
 export type { ChatColumnProps };
+
+const CONTENT_PAD_BOTTOM = 28;
+
+const CHAT_COLUMN_MAX_W = 16 * 50;
 
 const FULL_CHAT_CONTENT_STYLE: LegendContentStyle = {
   maxWidth: "min(50rem, 100%)",
@@ -42,10 +48,15 @@ const FULL_CHAT_CONTENT_STYLE: LegendContentStyle = {
   marginRight: "auto",
   paddingLeft: 24,
   paddingRight: 24,
-  paddingTop: 112,
-  paddingBottom: 28,
+  paddingTop: SHELL_TOPBAR_HEIGHT + 112,
+  paddingBottom: CONTENT_PAD_BOTTOM,
 };
 
+const reportColumn = (r: Layout) => {
+  const w = Math.min(CHAT_COLUMN_MAX_W, r.w);
+  const left = r.x + (r.w - w) / 2;
+  reportChatColumnEdges({ left, right: left + w });
+};
 const COMPOSER_OVERLAP = 12;
 const SCROLL_BUTTON_SIZE = 32;
 const SCROLL_BUTTON_BOTTOM = 28;
@@ -55,7 +66,11 @@ type StoreBackedComposerProps = Omit<ComponentProps<typeof Composer>, "message">
 
 const StoreBackedComposer = memo(function StoreBackedComposer({ messageStore, ...props }: StoreBackedComposerProps) {
   const message = useComposerMessage(messageStore);
-  return <Composer {...props} message={message} />;
+  return (
+    <AdaptiveGlass>
+      <Composer {...props} message={message} />
+    </AdaptiveGlass>
+  );
 });
 
 const AboveComposerCards = memo(function AboveComposerCards({ conversationId, onLayout }: { conversationId: string | null; onLayout: (r: Layout) => void }) {
@@ -94,35 +109,45 @@ function useComposerAreaReport() {
   }, [report]);
 }
 
-function ScrollToBottomButton({ onPress }: { onPress: () => void }) {
+/**
+ * The glass button that scrolls to the latest message. It rises out of the composer's glass, pinching
+ * off it, and sinks back into it (one glass group, `composerGroupGlass`); under Reduce Transparency
+ * it's a solid button that fades. Its holder stays mounted so the button can morph back as it goes.
+ */
+function ScrollToBottomButton({ shown, onPress, bottom }: { shown: boolean; onPress: () => void; bottom: number }) {
   const t = useT();
   const tokens = useTokens();
-  const surface = panelSurface(tokens);
+  const backdrop = useGlassBackdrop();
+  const glass = composerGroupGlass(tokens, true);
+  const solid = chromeGlass(tokens).controls;
   return (
-    <box absolute={{ bottom: SCROLL_BUTTON_BOTTOM + COMPOSER_OVERLAP, left: 0, right: 0 }} h={SCROLL_BUTTON_SIZE} center inert={false}>
-      <box
-        role="button"
-        focusable
-        label={t("app.chat.column.scrollToBottom")}
-        w={SCROLL_BUTTON_SIZE}
-        h={SCROLL_BUTTON_SIZE}
-        center
-        radius={SCROLL_BUTTON_SIZE / 2}
-        gradient={surface.gradient}
-        border={surface.border}
-        hoverBorder={tokens.c.panelSurfaceBorderHover}
-        shadows={[...tokens.shadow.sm, ...surface.shadows]}
-        pressScale={0.95}
-        hoverGroup
-        focusRing={{ color: tokens.c.ring, width: 2, offset: 0 }}
-        onPress={onPress}
-        enter="fade"
-        exit="fade"
-      >
-        <box hoverColor={tokens.c.textStrong}>
-          <Icon icon={withStroke(Icons.stella.ChevronDown, 2.5)} size={16} color={tokens.c.textWeak} />
+    <box absolute={{ bottom: bottom + SCROLL_BUTTON_BOTTOM - COMPOSER_OVERLAP, left: 0, right: 0 }} h={SCROLL_BUTTON_SIZE} center inert={!shown}>
+      {shown ? (
+        <box
+          role="button"
+          focusable
+          label={t("app.chat.column.scrollToBottom")}
+          w={SCROLL_BUTTON_SIZE}
+          h={SCROLL_BUTTON_SIZE}
+          center
+          radius={SCROLL_BUTTON_SIZE / 2}
+          fx={glass}
+          fill={glass ? undefined : solid.fill}
+          border={glass ? undefined : solid.border}
+          onBackdrop={backdrop}
+          pressScale={0.95}
+          hoverGroup
+          focusRing={{ color: tokens.c.ring, width: 2, offset: 0 }}
+          onPress={onPress}
+          enter={glass ? undefined : "fade"}
+          exit={glass ? undefined : "fade"}
+        >
+          <GlassSheen radius={SCROLL_BUTTON_SIZE / 2} />
+          <box hoverColor={tokens.c.textStrong}>
+            <Icon icon={withStroke(Icons.stella.ChevronDown, 2.5)} size={16} color={tokens.c.textWeak} />
+          </box>
         </box>
-      </box>
+      ) : null}
     </box>
   );
 }
@@ -219,6 +244,8 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
     ],
   );
   const composerArea = useComposerAreaReport();
+  const [composerStackH, setComposerStackH] = useState(0);
+  const contentStyle = useMemo<LegendContentStyle>(() => ({ ...FULL_CHAT_CONTENT_STYLE, paddingBottom: CONTENT_PAD_BOTTOM + composerStackH - COMPOSER_OVERLAP }), [composerStackH]);
   const { isDragOver, dropHandlers } = useFileDrop({ setChatContext: composer.setChatContext });
 
   const replyComposerRef = useRef(composer);
@@ -277,34 +304,40 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
     <row w="full" h="full" grow={1} minW={0} minH={0} align="stretch">
       <row grow={1} minW={0} minH={0} align="stretch">
         <col grow={1} minW={0} minH={0} {...dropHandlers}>
-          <SessionPausedBanner />
-          <box grow={1} minH={0} w="full" clip={0} mb={-COMPOSER_OVERLAP}>
+          <col absolute={{ left: 0, top: SHELL_TOPBAR_HEIGHT, right: 0 }} raise={2}>
+            <SessionPausedBanner />
+          </col>
+          <box grow={1} minH={0} w="full" clip={0} onLayout={reportColumn}>
             <box w="full" h="full" hidden={scroll.isOpeningScroll} inert={Boolean(focus)}>
               <MessageReplyContext.Provider value={handleReplyToMessage}>
-                <ConversationEvents
-                  messages={messages}
-                  conversationId={conversationId}
-                  pendingUserMessageId={conversation.streaming.pendingUserMessageId}
-                  indicator={indicatorProps}
-                  hasOlderMessages={conversation.history.hasOlderMessages}
-                  isLoadingOlder={conversation.history.isLoadingOlder}
-                  isLoadingHistory={conversation.history.isInitialLoading}
-                  list={list}
-                  className="session-content"
-                  contentContainerStyle={FULL_CHAT_CONTENT_STYLE}
-                  estimatedItemSize={140}
-                  extraTail={chatTail}
-                  takesMessageJumps
-                  onLoadOlder={conversation.history.loadOlder}
-                />
+                <UnderGlassContext.Provider value>
+                  <ConversationEvents
+                    messages={messages}
+                    conversationId={conversationId}
+                    pendingUserMessageId={conversation.streaming.pendingUserMessageId}
+                    indicator={indicatorProps}
+                    hasOlderMessages={conversation.history.hasOlderMessages}
+                    isLoadingOlder={conversation.history.isLoadingOlder}
+                    isLoadingHistory={conversation.history.isInitialLoading}
+                    list={list}
+                    className="session-content"
+                    contentContainerStyle={contentStyle}
+                    estimatedItemSize={140}
+                    extraTail={chatTail}
+                    takesMessageJumps
+                    onLoadOlder={conversation.history.loadOlder}
+                  />
+                </UnderGlassContext.Provider>
               </MessageReplyContext.Provider>
-              {showScrollButton && !assistantReplyPeek.visible ? <ScrollToBottomButton onPress={() => scrollToBottom("smooth")} /> : null}
+              <AdaptiveGlass><ScrollToBottomButton shown={showScrollButton && !assistantReplyPeek.visible} bottom={composerStackH} onPress={() => scrollToBottom("smooth")} /></AdaptiveGlass>
             </box>
             <ConversationFocusOverlay conversationId={conversationId} />
           </box>
-          <AboveComposerCards conversationId={conversationId} onLayout={composerArea.chatAbove} />
-          <col w="full" onLayout={composerArea.chatComposer} enter={composerEntering ? { opacity: 0, y: 12, dur: 0.6, bounce: 0 } : undefined}>
-            {renderComposer(chatReplyPeek)}
+          <col absolute={{ left: 0, right: 0, bottom: 0 }} raise={2} onLayout={(r) => setComposerStackH((h) => (Math.abs(h - r.h) < 0.5 ? h : r.h))}>
+            <AboveComposerCards conversationId={conversationId} onLayout={composerArea.chatAbove} />
+            <col w="full" onLayout={composerArea.chatComposer} enter={composerEntering ? { opacity: 0, y: 12, dur: 0.6, bounce: 0 } : undefined}>
+              {renderComposer(chatReplyPeek)}
+            </col>
           </col>
         </col>
         <ChatScrollbar bind={bindThumb} onDrag={handleThumbDrag} />

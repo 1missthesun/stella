@@ -44,7 +44,7 @@ export type EngineEventOf = {
   menu: { t: "menu"; id: string };
   tray: { t: "tray"; id: string; kind: "click" | "menu" | "double-click" | "right-click"; item?: string };
   shortcut: { t: "shortcut"; accel: string };
-  appearance: { t: "appearance"; dark: boolean; accentColor?: string; reducedMotion?: boolean };
+  appearance: { t: "appearance"; dark: boolean; accentColor?: string; reducedMotion?: boolean; reduceTransparency?: boolean; increaseContrast?: boolean; forcedColors?: boolean };
   display: { t: "display"; kind?: string };
   inputhook: Extract<import("../bridge").EngineEvent, { t: "inputhook" }>;
   audio: Extract<import("../bridge").EngineEvent, { t: "audio" }>;

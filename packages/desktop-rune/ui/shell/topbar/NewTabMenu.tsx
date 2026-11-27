@@ -92,13 +92,13 @@ export function NewTabMenu({ open, onOpenChange, anchorFill, emailDot, dot }: { 
         noWindowDrag
         w={26}
         h={26}
-        radius={7}
+        radius={13}
         center
         shrink={false}
         fill={open ? anchorFill.newOpen : undefined}
         hover={open ? anchorFill.newOpen : anchorFill.newHover}
         hoverGroup
-        focusRing={{ width: 2, offset: 0, color: t.c.ring, radius: 7 }}
+        focusRing={{ width: 2, offset: 0, color: t.c.ring, radius: 13 }}
         onPress={() => onOpenChange(!open)}
       >
         <box>
@@ -106,7 +106,7 @@ export function NewTabMenu({ open, onOpenChange, anchorFill, emailDot, dot }: { 
           {emailDot ? dot("email") : null}
         </box>
       </box>
-      <Panel id="new-tab-menu-popover" anchor="topbar-tabs-new" open={open} onClose={() => onOpenChange(false)} side="bottom" align="start" w={Math.min(360, window.innerWidth - 24)} radius={14} label="Open">
+      <Panel id="new-tab-menu-popover" anchor="topbar-tabs-new" open={open} onClose={() => onOpenChange(false)} side="bottom" align="start" w={Math.min(360, window.innerWidth - 24)} label="Open">
         <col id="new-tab-menu" w="full" maxH={Math.min(480, window.innerHeight - 96)}>
           <WorkList section="home" embedded onPick={() => onOpenChange(false)} idleContent={<PlaceTiles onPick={() => onOpenChange(false)} />} />
         </col>

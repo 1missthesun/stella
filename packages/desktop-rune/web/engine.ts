@@ -1,4 +1,4 @@
-import type { engine as BridgeEngine, EngineEvent, MenuItem } from "../host/bridge";
+import type { Appearance, engine as BridgeEngine, EngineEvent, MenuItem } from "../host/bridge";
 import { registerAll } from "./dom/files";
 import { popupMenu } from "./dom/menu";
 import { elementOf } from "./dom/registry";
@@ -84,7 +84,14 @@ function pickFiles(o: { multi?: boolean; filters?: { extensions: string[] }[] })
 }
 
 let colorMotionTimer: ReturnType<typeof setTimeout> | null = null;
-const dark = () => window.matchMedia("(prefers-color-scheme: dark)").matches;
+const matches = (query: string) => window.matchMedia(query).matches;
+const APPEARANCE_QUERIES = ["(prefers-color-scheme: dark)", "(prefers-reduced-transparency: reduce)", "(prefers-contrast: more)", "(forced-colors: active)"] as const;
+const appearance = (): Appearance => ({
+  dark: matches(APPEARANCE_QUERIES[0]),
+  reduceTransparency: matches(APPEARANCE_QUERIES[1]),
+  increaseContrast: matches(APPEARANCE_QUERIES[2]),
+  forcedColors: matches(APPEARANCE_QUERIES[3]),
+});
 
 const requests: Record<string, (a: Record<string, any>) => unknown> = {
   "selection.get": () => selectionNow() ?? { text: "" },
@@ -175,7 +182,7 @@ export const webEngine: Engine = {
     primary: async () => screenDisplay(),
     cursorPoint: () => unsupported("screen.cursorPoint"),
   },
-  appearance: { get: async () => ({ dark: dark() }) },
+  appearance: { get: async () => appearance() },
   capture: { sources: async () => [], start: () => unsupported("capture"), stop: () => unsupported("capture") },
   audio: { play: () => unsupported("audio"), control: () => unsupported("audio"), devices: async () => [] },
   mic: { start: () => {}, stop: () => {} },
@@ -348,5 +355,5 @@ export function startSelectionEvents() {
   document.addEventListener("selectionchange", () => {
     if (hadSelection && !selectionNow()) settle();
   });
-  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", (e) => emit({ t: "appearance", dark: e.matches }));
+  for (const query of APPEARANCE_QUERIES) window.matchMedia(query).addEventListener("change", () => emit({ t: "appearance", ...appearance() }));
 }

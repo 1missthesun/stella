@@ -13,6 +13,7 @@ import { EmptyState, Icon, Icons, type IconData } from "../../kit";
 import { Form, Input, Select } from "../../kit/compat";
 import { fontSize, look, mixOklch, useTokens } from "../../theme";
 import type { Loop } from "../../../host/rune-jsx/props";
+import { useTopInset } from "../top-inset";
 import { UpdateButton, UpdatesHeading } from "./UpdatesSection";
 
 type Translate = ReturnType<typeof useT>;
@@ -486,6 +487,7 @@ export function ScheduleSection({ active }: { active: boolean }) {
   const [editing, setEditing] = useState<string | null>(null);
   const focus = useScheduleFocus();
   const frame = useRef<ScrollFrame>({ y: 0, h: 0, scrollY: 0 });
+  const inset = useTopInset();
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     if (!active) return;
@@ -521,7 +523,7 @@ export function ScheduleSection({ active }: { active: boolean }) {
           minH={0}
           scrollY
           gap={4}
-          pt={14}
+          pt={14 + inset}
           px={14}
           pb={20}
           onLayout={(r) => {

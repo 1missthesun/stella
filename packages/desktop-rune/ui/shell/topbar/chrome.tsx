@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { layer, mixOklch, radius, derive, type Tokens, useTokens } from "../../theme";
+import { AppModeScope, layer, mixOklch, radius, derive, type Tokens, useTokens } from "../../theme";
+import { menuGlass, POPOVER_GLASS_RADIUS } from "../../kit/menu-glass";
 import { MenuCloseProvider } from "./menu-close";
 import { DismissLayer } from "../../kit/dismiss-layer";
 import { withStroke, type IconData } from "../../kit";
@@ -7,7 +8,7 @@ import { withStroke, type IconData } from "../../kit";
 /** Colours of `.shell-topbar-full__right` controls: muted at rest, 5% / 9% foreground fills. */
 export function topbarLook(t: Tokens) {
   return derive(t, "topbar:controls", (t) => ({
-    rest: t.c.textMuted,
+    rest: t.c.textBase,
     strong: t.c.textStrong,
     hover: mixOklch(t.c.foreground, 5, "transparent"),
     open: mixOklch(t.c.foreground, 9, "transparent"),
@@ -81,10 +82,18 @@ export type PanelProps = {
   children: ReactNode;
 };
 
-/** desktop-ui's `PopoverContent` (`--overlay-surface-bg`, border-base, overlay shadow); opens and closes instantly. */
-export function Panel({ id, anchor, open, onClose, side = "bottom", align = "end", gap = 8, w, h, maxH, label, onHover, modal = true, focusSelf = false, radius: r = radius.lg, children }: PanelProps) {
-  const t = useTokens();
-  if (!open) return null;
+/** desktop-ui's `PopoverContent` as Liquid Glass (`menuGlass`), in the app's own mode even when its trigger's capsule took the other; grows out of its anchor and back into it. */
+export function Panel(props: PanelProps) {
+  if (!props.open) return null;
+  return (
+    <AppModeScope>
+      <PanelGlass {...props} />
+    </AppModeScope>
+  );
+}
+
+function PanelGlass({ id, anchor, onClose, side = "bottom", align = "end", gap = 8, w, h, maxH, label, onHover, modal = true, focusSelf = false, radius: r = POPOVER_GLASS_RADIUS, children }: PanelProps) {
+  const g = menuGlass(useTokens());
   return (
     <MenuCloseProvider value={onClose}>
       <col
@@ -106,14 +115,16 @@ export function Panel({ id, anchor, open, onClose, side = "bottom", align = "end
         h={h}
         maxH={maxH}
         radius={r}
-        clip={r}
-        border={t.c.borderBase}
-        fill={t.c.overlayTop}
-        gradient={t.gradient.overlay}
-        shadows={t.shadow.overlay}
+        border={g.border}
+        fx={g.morph}
+        fill={g.fill}
+        enter={g.morph ? undefined : g.enter}
+        shadows={g.shadows}
         pad={1}
       >
-        <DismissLayer.Provider value={onClose}>{children}</DismissLayer.Provider>
+        <col w="full" grow={1} minH={0} shrink clip={r - 1}>
+          <DismissLayer.Provider value={onClose}>{children}</DismissLayer.Provider>
+        </col>
       </col>
     </MenuCloseProvider>
   );

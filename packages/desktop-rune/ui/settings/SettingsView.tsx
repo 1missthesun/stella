@@ -33,6 +33,7 @@ import {
   requestSettingsCard,
 } from "./settings-card-targets";
 import { platformCapabilities } from "@/platform/capabilities";
+import { useTopInset } from "../shell/top-inset";
 
 const SecureValuesCard = lazy(() =>
   import("./tabs/SecureValuesCard").then((module) => ({
@@ -125,13 +126,15 @@ export const SettingsScreen = ({
     label: t("settings.title"),
   };
 
+  const inset = useTopInset();
+  const nav = narrow ? s.settingsLayoutBar_settingsNav : s.settingsLayoutRail_settingsNav;
   const Layout = narrow ? "col" : "row";
   return (
     <>
       <col {...s.settingsScreen} onLayout={measure}>
         <SettingsScreenScope.Provider value={true}>
         <Layout {...s.settingsLayout}>
-          <col {...(narrow ? s.settingsLayoutBar_settingsNav : s.settingsLayoutRail_settingsNav)}>
+          <col {...nav} pt={(nav.pt ?? 0) + inset}>
             <SettingsSearch value={searchQuery} onChange={setSearchQuery} />
             {narrow ? (
               <SettingsBarNav {...navProps} />
@@ -139,7 +142,7 @@ export const SettingsScreen = ({
               <SettingsRailNav {...navProps} />
             )}
           </col>
-          <SettingsPanel narrow={narrow} scrollResetKey={isSearching ? "search" : activeTab}>
+          <SettingsPanel narrow={narrow} topInset={narrow ? 0 : inset} scrollResetKey={isSearching ? "search" : activeTab}>
             {isSearching ? (
               <SettingsSearchResults query={deferredQuery} onSelect={handleResultSelect} onClear={() => setSearchQuery("")} />
             ) : (

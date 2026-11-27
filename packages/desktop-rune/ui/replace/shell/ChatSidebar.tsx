@@ -22,7 +22,8 @@ import { useReadAloud } from "@/features/voice/services/read-aloud/use-read-alou
 import { useAssistantReplyPeek } from "@/features/chat/hooks/use-assistant-reply-peek";
 import { useCloudConversationSession } from "@/global/auth/hooks/use-cloud-conversation-session";
 import { useCapturedChatContext } from "@/shell/use-captured-chat-context";
-import type { LegendContentStyle } from "../../chat/ChatTimeline";
+import { UnderGlassContext, type LegendContentStyle } from "../../chat/ChatTimeline";
+import { AdaptiveGlass } from "../../shell/glass";
 import { useFileDrop } from "../../chat/use-file-drop";
 
 const SIDEBAR_CONTENT_STYLE: LegendContentStyle = { paddingLeft: 10, paddingRight: 10, paddingTop: 8, paddingBottom: 12 };
@@ -88,7 +89,11 @@ type StoreBackedComposerProps = Omit<ComponentProps<typeof Composer>, "message" 
 const StoreBackedComposer = memo(function StoreBackedComposer({ messageStore, ...props }: StoreBackedComposerProps) {
   const message = useComposerMessage(messageStore);
   const { canSubmit } = deriveComposerState({ message, chatContext: props.chatContext, selectedText: props.selectedText });
-  return <Composer {...props} message={message} canSubmit={canSubmit} />;
+  return (
+    <AdaptiveGlass>
+      <Composer {...props} message={message} canSubmit={canSubmit} />
+    </AdaptiveGlass>
+  );
 });
 
 function AccountScopedChatPanelTab({
@@ -219,6 +224,12 @@ function AccountScopedChatPanelTab({
     [conversationId, extraTail, isStreaming],
   );
 
+  const [composerStackH, setComposerStackH] = useState(0);
+  const contentStyle = useMemo<LegendContentStyle>(() => {
+    const base = wideLayout ? WIDE_PANEL_CONTENT_STYLE : SIDEBAR_CONTENT_STYLE;
+    return { ...base, paddingBottom: (base.paddingBottom ?? 0) + composerStackH };
+  }, [composerStackH, wideLayout]);
+
   const shown = useRetainedSurfaceActive();
   const [panelRect, setPanelRect] = useState<Layout | null>(null);
   useEffect(() => {
@@ -229,45 +240,49 @@ function AccountScopedChatPanelTab({
   return (
     <col id="chat-panel-tab" w="full" h="full" grow={1} minH={0} {...dropHandlers} onLayout={setPanelRect}>
       <col grow={1} minH={0} w="full">
-        <CompactConversationSurface
-          className="chat-sidebar-messages"
-          variant="sidebar"
-          scroll={sidebarScrollApi}
-          messages={messages}
-          conversationId={conversationId}
-          isStreaming={isStreaming}
-          runtimeStatusText={runtimeStatusText}
-          pendingUserMessageId={pendingUserMessageId}
-          indicator={indicatorProps}
-          hasOlderMessages={hasOlderMessages}
-          isLoadingOlder={isLoadingOlder}
-          isLoadingHistory={isInitialLoading}
-          contentContainerStyle={wideLayout ? WIDE_PANEL_CONTENT_STYLE : SIDEBAR_CONTENT_STYLE}
-          estimatedItemSize={wideLayout ? 140 : undefined}
-          extraTail={tail}
-        />
-        <col id="chat-sidebar-composer" w="full" shrink={false} align="center" gap={6} px={wideLayout ? 24 : window.innerWidth <= 600 ? 6 : 12}>
-          <ConnectorConnectCard compact conversationId={conversationId} />
-          <CloudBrowserInterventionCard compact conversationId={conversationId} />
-          <ComposerNotice compact conversationId={conversationId} />
+        <UnderGlassContext.Provider value>
+          <CompactConversationSurface
+            className="chat-sidebar-messages"
+            variant="sidebar"
+            scroll={sidebarScrollApi}
+            messages={messages}
+            conversationId={conversationId}
+            isStreaming={isStreaming}
+            runtimeStatusText={runtimeStatusText}
+            pendingUserMessageId={pendingUserMessageId}
+            indicator={indicatorProps}
+            hasOlderMessages={hasOlderMessages}
+            isLoadingOlder={isLoadingOlder}
+            isLoadingHistory={isInitialLoading}
+            contentContainerStyle={contentStyle}
+            estimatedItemSize={wideLayout ? 140 : undefined}
+            extraTail={tail}
+          />
+        </UnderGlassContext.Provider>
+        <col absolute={{ left: 0, right: 0, bottom: 0 }} raise={2} onLayout={(r) => setComposerStackH((h) => (Math.abs(h - r.h) < 0.5 ? h : r.h))}>
+          <col id="chat-sidebar-composer" w="full" shrink={false} align="center" gap={6} px={wideLayout ? 24 : window.innerWidth <= 600 ? 6 : 12}>
+            <ConnectorConnectCard compact conversationId={conversationId} />
+            <CloudBrowserInterventionCard compact conversationId={conversationId} />
+            <ComposerNotice compact conversationId={conversationId} />
+          </col>
+          <StoreBackedComposer
+            messageStore={inputTextStore}
+            setMessage={setInputText}
+            chatContext={chatContext}
+            setChatContext={setChatContext}
+            selectedText={selectedText}
+            setSelectedText={setSelectedText}
+            isStreaming={isStreaming}
+            focusRequestId={focusRequestId}
+            conversationId={conversationId ?? null}
+            onSend={() => void sendCurrentMessage()}
+            onStop={requestStop}
+            isDragOver={isDragOver}
+            replyPeek={replyPeek}
+            suggestionsActive={false}
+            variant={wideLayout ? "sidebar-wide" : "sidebar"}
+          />
         </col>
-        <StoreBackedComposer
-          messageStore={inputTextStore}
-          setMessage={setInputText}
-          chatContext={chatContext}
-          setChatContext={setChatContext}
-          selectedText={selectedText}
-          setSelectedText={setSelectedText}
-          isStreaming={isStreaming}
-          focusRequestId={focusRequestId}
-          conversationId={conversationId ?? null}
-          onSend={() => void sendCurrentMessage()}
-          onStop={requestStop}
-          isDragOver={isDragOver}
-          replyPeek={replyPeek}
-          suggestionsActive={false}
-          variant={wideLayout ? "sidebar-wide" : "sidebar"}
-        />
       </col>
     </col>
   );

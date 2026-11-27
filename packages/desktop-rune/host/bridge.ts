@@ -140,6 +140,9 @@ export type WindowEventKind =
   | "close-requested" | "closed" | "focus" | "blur" | "resize" | "maximize" | "unmaximize"
   | "enter-full-screen" | "leave-full-screen";
 
+/** The system appearance (`appearance.get` and the `appearance` event): dark mode, the accent colour, and the display accessibility settings that change materials. */
+export type Appearance = { dark: boolean; accentColor?: string; reduceTransparency: boolean; increaseContrast: boolean; forcedColors: boolean };
+
 export type EngineEvent =
   | ElementEvent
   | { t: "reply"; rid: number; ok: boolean; value?: unknown; error?: string }
@@ -148,7 +151,7 @@ export type EngineEvent =
   | { t: "tray"; id: string; kind: "click" | "menu"; item?: string }
   | { t: "shortcut"; accelerator: string; accel: string }
   | { t: "notification"; id: string | null; action: string; reply?: string | null }
-  | { t: "appearance"; dark: boolean; accentColor?: string }
+  | ({ t: "appearance" } & Appearance)
   /** A link the system opened with the app (macOS Apple Event; Windows/Linux the launch's own `stella://` arguments). Later launches' links come through the host's single-instance lock. */
   | { t: "open-url"; url: string }
   | { t: "rec"; result: unknown }
@@ -349,7 +352,7 @@ export function engineApi(request: <T = void>(cmd: string, args?: Record<string,
       /** Rejects: Rune reports the pointer only inside its own windows. */
       cursorPoint: () => request<{ x: number; y: number }>("screen.cursorPoint"),
     },
-    appearance: { get: () => request<{ dark: boolean; accentColor?: string }>("appearance.get") },
+    appearance: { get: () => request<Appearance>("appearance.get") },
     /** Screen capture (ScreenCaptureKit on macOS, Windows.Graphics.Capture on Windows). */
     capture: {
       sources: (o: { types: string[]; thumbnailSize?: { width: number; height: number } }) => request<CaptureSource[]>("capture.sources", o),

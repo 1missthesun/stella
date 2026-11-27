@@ -1,6 +1,7 @@
 import { createContext, isValidElement, useContext, useState, type ReactNode } from "react";
 import { DismissLayer } from "./dismiss-layer";
-import { derive, font, fontSize, layer, look, mix, radius, type Tokens, useTokens } from "../theme";
+import { AppModeScope, derive, font, fontSize, layer, look, mix, radius, type Tokens, useTokens } from "../theme";
+import { MENU_GLASS_RADIUS, menuGlass, POPOVER_GLASS_RADIUS } from "./menu-glass";
 import { Icon, Icons, type IconData } from "./icons";
 
 type Side = "top" | "bottom" | "left" | "right";
@@ -13,15 +14,10 @@ const MenuClose = createContext<() => void>(() => {});
 /** Closes the menu the caller sits in (an item that opens a dialog, say). */
 export const useMenuClose = () => useContext(MenuClose);
 
-/** `--glass-bg` surface with desktop-ui's dropdown chrome (`[data-component="dropdown-menu-content"]`). */
+/** desktop-ui's dropdown chrome (`[data-component="dropdown-menu-content"]`) as Liquid Glass (`menuGlass`). */
 export function menuSurface(t: Tokens) {
-  return {
-    radius: radius.lg,
-    border: t.c.borderBase,
-    gradient: t.gradient.glass,
-    fill: t.c.glassTop,
-    shadows: t.shadow.overlay,
-  } as const;
+  const g = menuGlass(t);
+  return { radius: MENU_GLASS_RADIUS, border: g.border, fx: g.fx, shadows: g.shadows, enter: g.enter } as const;
 }
 
 /**
@@ -69,7 +65,17 @@ export function DropdownMenu({ id, open, onOpenChange, trigger, side = "bottom",
   );
 }
 
-function MenuPanel({ id, triggerId, side, align, sideOffset, minW, maxW, maxH, matchTriggerWidth, returnFocus, close, children }: Omit<DropdownMenuProps, "open" | "onOpenChange" | "trigger"> & { triggerId: string; close: () => void }) {
+type MenuPanelProps = Omit<DropdownMenuProps, "open" | "onOpenChange" | "trigger"> & { triggerId: string; close: () => void };
+
+function MenuPanel(props: MenuPanelProps) {
+  return (
+    <AppModeScope>
+      <MenuPanelGlass {...props} />
+    </AppModeScope>
+  );
+}
+
+function MenuPanelGlass({ id, triggerId, side, align, sideOffset, minW, maxW, maxH, matchTriggerWidth, returnFocus, close, children }: MenuPanelProps) {
   const t = useTokens();
   const entry = useMenuEntryFocus();
   return (
@@ -108,8 +114,11 @@ function itemLook(t: Tokens, destructive: boolean): ItemLook {
       hiIcon: mix(c.textStrong, 25, c.destructive),
     };
   }
-  return { text: c.textBase, icon: c.textWeak, hi: c.menuHighlight, hiText: c.textStrong, hiIcon: c.textStrong };
+  return { text: c.textBase, icon: c.textWeak, hi: menuGlass(t).pill, hiText: c.textStrong, hiIcon: c.textStrong };
 }
+
+/** Concentric with the menu: its corner less the 7 pt padding. */
+const ITEM_RADIUS = MENU_GLASS_RADIUS - 7;
 
 const ITEM_TEXT = look(fontSize.base, 500, { lh: 1.3 });
 
@@ -130,11 +139,11 @@ function ItemRow({ id, disabled, destructive = false, lead, trailing, role, chec
       focusable={!disabled}
       w="full"
       gap={10}
-      px={10}
+      px={12}
       py={8}
       align="center"
       justify={centered ? "center" : undefined}
-      radius={radius.sm}
+      radius={ITEM_RADIUS}
       hover={disabled ? undefined : l.hi}
       hoverColor={disabled ? undefined : l.hiText}
       opacity={disabled ? 0.55 : undefined}
@@ -318,7 +327,6 @@ export type PopoverProps = {
 
 /** desktop-ui's `Popover`: an anchored overlay-surface panel (200–320pt, or `width`), `padded` = `Popover.Body`. */
 export function Popover({ id, open, onOpenChange, trigger, side = "bottom", align = "center", sideOffset = 4, width, padded = true, children }: PopoverProps) {
-  const t = useTokens();
   const triggerId = `${id}-trigger`;
   const close = () => onOpenChange(false);
   return (
@@ -326,27 +334,38 @@ export function Popover({ id, open, onOpenChange, trigger, side = "bottom", alig
       {trigger({ id: triggerId, open, toggle: () => onOpenChange(!open) })}
       {open ? (
         <MenuClose.Provider value={close}>
-          <col
-            id={`${id}-content`}
-            role="dialog"
-            anchor={{ to: triggerId, side, align, gap: sideOffset }}
-            raise={layer.popover}
-            modal={{ clickOutside: true, livePages: true }}
-            onDismiss={close}
-            w={width}
-            minW={width ?? 200}
-            maxW={width ?? 320}
-            radius={radius.lg}
-            border={t.c.borderBase}
-            fill={t.c.overlayTop}
-            gradient={t.gradient.overlay}
-            shadows={t.shadow.overlay}
-            pad={padded ? 12 + 1 : 1}
-          >
-            <DismissLayer.Provider value={close}>{children}</DismissLayer.Provider>
-          </col>
+          <AppModeScope>
+            <PopoverGlass id={id} triggerId={triggerId} side={side} align={align} sideOffset={sideOffset} width={width} padded={padded} close={close}>
+              {children}
+            </PopoverGlass>
+          </AppModeScope>
         </MenuClose.Provider>
       ) : null}
     </>
+  );
+}
+
+function PopoverGlass({ id, triggerId, side, align, sideOffset, width, padded, close, children }: { id: string; triggerId: string; side: Side; align: Align; sideOffset: number; width?: number; padded: boolean; close: () => void; children: ReactNode }) {
+  const g = menuGlass(useTokens());
+  return (
+    <col
+      id={`${id}-content`}
+      role="dialog"
+      anchor={{ to: triggerId, side, align, gap: sideOffset }}
+      raise={layer.popover}
+      modal={{ clickOutside: true, livePages: true }}
+      onDismiss={close}
+      w={width}
+      minW={width ?? 200}
+      maxW={width ?? 320}
+      radius={POPOVER_GLASS_RADIUS}
+      border={g.border}
+      fx={g.fx}
+      shadows={g.shadows}
+      enter={g.enter}
+      pad={padded ? 12 + 1 : 1}
+    >
+      <DismissLayer.Provider value={close}>{children}</DismissLayer.Provider>
+    </col>
   );
 }

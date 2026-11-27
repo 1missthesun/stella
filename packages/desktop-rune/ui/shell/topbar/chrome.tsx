@@ -1,5 +1,6 @@
 import type { ReactNode } from "react";
-import { layer, mixOklch, radius, derive, type Tokens, useTokens } from "../../theme";
+import { AppModeScope, layer, mixOklch, radius, derive, type Tokens, useTokens } from "../../theme";
+import { menuGlass, POPOVER_GLASS_RADIUS } from "../../kit/menu-glass";
 import { MenuCloseProvider } from "./menu-close";
 import { DismissLayer } from "../../kit/dismiss-layer";
 import { withStroke, type IconData } from "../../kit";
@@ -81,10 +82,18 @@ export type PanelProps = {
   children: ReactNode;
 };
 
-/** desktop-ui's `PopoverContent` (`--overlay-surface-bg`, border-base, overlay shadow); opens and closes instantly. */
-export function Panel({ id, anchor, open, onClose, side = "bottom", align = "end", gap = 8, w, h, maxH, label, onHover, modal = true, focusSelf = false, radius: r = radius.lg, children }: PanelProps) {
-  const t = useTokens();
-  if (!open) return null;
+/** desktop-ui's `PopoverContent` as Liquid Glass (`menuGlass`), in the app's own mode even when its trigger's capsule took the other; opens and closes instantly. */
+export function Panel(props: PanelProps) {
+  if (!props.open) return null;
+  return (
+    <AppModeScope>
+      <PanelGlass {...props} />
+    </AppModeScope>
+  );
+}
+
+function PanelGlass({ id, anchor, onClose, side = "bottom", align = "end", gap = 8, w, h, maxH, label, onHover, modal = true, focusSelf = false, radius: r = POPOVER_GLASS_RADIUS, children }: PanelProps) {
+  const g = menuGlass(useTokens());
   return (
     <MenuCloseProvider value={onClose}>
       <col
@@ -107,10 +116,10 @@ export function Panel({ id, anchor, open, onClose, side = "bottom", align = "end
         maxH={maxH}
         radius={r}
         clip={r}
-        border={t.c.borderBase}
-        fill={t.c.overlayTop}
-        gradient={t.gradient.overlay}
-        shadows={t.shadow.overlay}
+        border={g.border}
+        fx={g.fx}
+        shadows={g.shadows}
+        enter={g.enter}
         pad={1}
       >
         <DismissLayer.Provider value={onClose}>{children}</DismissLayer.Provider>

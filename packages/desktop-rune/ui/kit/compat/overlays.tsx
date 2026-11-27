@@ -2,7 +2,8 @@ import { SettingsScreenScope } from "../../global/shared/pill.styles";
 import { Children, cloneElement, createContext, isValidElement, useContext, useId, useState, type ReactElement, type ReactNode } from "react";
 import { Scrim } from "../Dialog";
 import { menuSurface, useMenuEntryFocus } from "../Menu";
-import { font, fontSize, layer, look, mix, radius, useTokens, type Style } from "../../theme";
+import { AppModeScope, font, fontSize, layer, look, mix, radius, useTokens, type Style } from "../../theme";
+import { menuGlass, POPOVER_GLASS_RADIUS } from "../menu-glass";
 import { useT } from "../../i18n";
 import { Icon, Icons } from "../icons";
 import { Press, type DomEvent } from "./press";
@@ -233,9 +234,11 @@ export function DropdownMenuContent({ side = "bottom", align = "center", sideOff
   const { open } = useFloating();
   if (!open) return null;
   return (
-    <FloatingMenu side={side} align={align} sideOffset={sideOffset} label={label} style={style}>
-      {children}
-    </FloatingMenu>
+    <AppModeScope>
+      <FloatingMenu side={side} align={align} sideOffset={sideOffset} label={label} style={style}>
+        {children}
+      </FloatingMenu>
+    </AppModeScope>
   );
 }
 
@@ -268,10 +271,19 @@ function FloatingMenu({ side, align, sideOffset, label, style, children }: { sid
 }
 
 /** desktop-ui's `PopoverContent`: an anchored overlay-surface panel; `PopoverBody` pads it. */
-export function PopoverContent({ side = "bottom", align = "center", sideOffset = 4, anchorTo, children, className: _c, collisionPadding: _p, forceMount: _f, onOpenAutoFocus: _o, onCloseAutoFocus: _cl, onEscapeKeyDown: _e, onInteractOutside: _i, avoidCollisions: _a, "aria-label": label, ...style }: FloatingContentProps) {
-  const t = useTokens();
-  const { open, setOpen, id } = useFloating();
+export function PopoverContent(props: FloatingContentProps) {
+  const { open } = useFloating();
   if (!open) return null;
+  return (
+    <AppModeScope>
+      <PopoverGlass {...props} />
+    </AppModeScope>
+  );
+}
+
+function PopoverGlass({ side = "bottom", align = "center", sideOffset = 4, anchorTo, children, className: _c, collisionPadding: _p, forceMount: _f, onOpenAutoFocus: _o, onCloseAutoFocus: _cl, onEscapeKeyDown: _e, onInteractOutside: _i, avoidCollisions: _a, "aria-label": label, ...style }: FloatingContentProps) {
+  const g = menuGlass(useTokens());
+  const { setOpen, id } = useFloating();
   return (
     <col
       id={`fl${id}-content`}
@@ -283,11 +295,11 @@ export function PopoverContent({ side = "bottom", align = "center", sideOffset =
       onDismiss={() => setOpen(false)}
       minW={200}
       maxW={320}
-      radius={radius.lg}
-      border={t.c.borderBase}
-      fill={t.c.overlayTop}
-      gradient={t.gradient.overlay}
-      shadows={t.shadow.overlay}
+      radius={POPOVER_GLASS_RADIUS}
+      border={g.border}
+      fx={g.fx}
+      shadows={g.shadows}
+      enter={g.enter}
       pad={1}
       {...style}
     >

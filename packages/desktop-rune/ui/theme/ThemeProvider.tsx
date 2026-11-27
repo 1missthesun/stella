@@ -6,6 +6,7 @@ import { loadFonts } from "./fonts";
 import { buildTokens, type Tokens } from "./tokens";
 
 const TokensContext = createContext<Tokens | null>(null);
+const AppTokensContext = createContext<Tokens | null>(null);
 
 /** Seconds a theme or colour-mode switch springs its colours over. */
 export const THEME_SPRING = 0.3;
@@ -25,7 +26,11 @@ function TokensFromTheme({ children }: { children: ReactNode }) {
   const dark = resolvedColorMode === "dark";
   const tokens = useMemo(() => buildTokens({ themeId: theme.id, colors, dark, flat }), [theme.id, colors, dark, flat]);
   useSpringOnChange(tokens, true);
-  return <TokensContext.Provider value={tokens}>{children}</TokensContext.Provider>;
+  return (
+    <AppTokensContext.Provider value={tokens}>
+      <TokensContext.Provider value={tokens}>{children}</TokensContext.Provider>
+    </AppTokensContext.Provider>
+  );
 }
 
 /**
@@ -64,6 +69,13 @@ export function ModeScope({ mode, children }: { mode: "light" | "dark"; children
   const tokens = useMemo(() => (outer.dark === (mode === "dark") ? outer : tokensFor(selectedThemeId, mode)), [outer, mode, selectedThemeId]);
   useSpringOnChange(tokens);
   return <TokensContext.Provider value={tokens}>{children}</TokensContext.Provider>;
+}
+
+/** Back to the app's own theme and mode inside a `ModeScope` (a menu opened from glass chrome that took the other mode). */
+export function AppModeScope({ children }: { children: ReactNode }) {
+  const app = useContext(AppTokensContext);
+  if (!app) return <>{children}</>;
+  return <TokensContext.Provider value={app}>{children}</TokensContext.Provider>;
 }
 
 let fallback: Tokens | null = null;

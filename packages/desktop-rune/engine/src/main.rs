@@ -15,6 +15,7 @@ mod commands;
 mod control;
 #[cfg(target_os = "linux")]
 mod desktop_fonts;
+mod display_watch;
 mod engine;
 mod input;
 mod keys;
@@ -293,6 +294,7 @@ fn main() {
     }
     // Start the TS host before the window and GPU: Bun boots while Rune prewarms the GPU.
     let boot = spawn_ts();
+    display_watch::start();
     engine::set_out(boot.to_host);
     engine::with(|e| {
         e.rx = Some(boot.rx);

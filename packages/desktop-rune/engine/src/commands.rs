@@ -43,6 +43,15 @@ fn window_named(v: &Value) -> Option<u32> {
     engine::read(|e| e.tree.window_of(t))
 }
 
+/// The window a command runs in: the one it names, else the one holding its target, else the
+/// main window. A name no open window has runs nowhere.
+fn window_for(v: &Value) -> Option<u32> {
+    match v.get("window").filter(|w| !w.is_null()) {
+        Some(_) => window_named(v),
+        None => window_named(v).or_else(windows::first_window),
+    }
+}
+
 pub fn route(v: Value) {
     let cmd = s(&v, "cmd").to_owned();
     let rid = rid_of(&v);
@@ -79,7 +88,7 @@ pub fn route(v: Value) {
         "media.probe" => crate::media::probe(rid, &v),
         "appearance.get" => reply(rid, Ok(windows::appearance())),
         "selection.get" => {
-            let w = window_named(&v).or_else(windows::first_window);
+            let w = window_for(&v);
             let text = w.and_then(windows::selected_text);
             let rect = w.and_then(windows::selection_rect);
             reply(rid, Ok(text.map_or(Value::Null, |t| match rect {
@@ -87,8 +96,8 @@ pub fn route(v: Value) {
                 None => json!({ "text": t }),
             })));
         }
-        "selection.lookUp" => reply(rid, Ok(json!(window_named(&v).or_else(windows::first_window).is_some_and(crate::look_up::show)))),
-        "window.isFocused" => reply(rid, Ok(json!(window_named(&v).or_else(windows::first_window).is_some_and(|w| engine::read(|e| e.windows.get(&w).is_some_and(|s| s.focused)))))),
+        "selection.lookUp" => reply(rid, Ok(json!(window_for(&v).is_some_and(crate::look_up::show)))),
+        "window.isFocused" => reply(rid, Ok(json!(window_for(&v).is_some_and(|w| engine::read(|e| e.windows.get(&w).is_some_and(|s| s.focused)))))),
         "menu.setApplicationMenu" => reply(rid, crate::services::app_menu(&v)),
         "screen.cursorPoint" => reply(rid, Err("screen.cursorPoint: Rune doesn't report the pointer outside its windows".into())),
         "notify" => reply(rid, crate::services::notify(&v)),
@@ -105,10 +114,14 @@ pub fn route(v: Value) {
             reply(rid, Ok(Value::Null));
         }
         _ => {
-            let w = window_named(&v).or_else(windows::first_window);
+            let w = window_for(&v);
+            let missing = match v.get("window").filter(|w| !w.is_null()) {
+                Some(w) => format!("{cmd}: no open window {w}"),
+                None => format!("{cmd}: no window to run it in"),
+            };
             match w {
                 Some(w) if windows::queue(w, rid, v) => {}
-                _ => reply(rid, Err(format!("{cmd}: no window to run it in"))),
+                _ => reply(rid, Err(missing)),
             }
         }
     }

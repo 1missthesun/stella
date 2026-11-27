@@ -4,7 +4,7 @@
 //
 //   bun scripts/session.ts start [--account pro|signed-out] [--email <test account>] [--headless] [--show] [--installed] [--first-run] [--name <run>]
 //   bun scripts/session.ts eval '<async function body using api, windows, electron>'
-//   bun scripts/session.ts shot <file.png>
+//   bun scripts/session.ts shot <file.png> [--window <window id>]
 //   bun scripts/session.ts stop
 // --installed lets app-source updates move this checkout, as in an installed app (prove those from a clone).
 // With STELLA_LAUNCHER=1 and a socket on fd 3, the app gets that launcher channel, as from a launcher.
@@ -34,11 +34,12 @@ const POINTER = path.join(RUN_DIR, "run.json");
 const DEV_BACKEND = "https://stella-v2-cloud-builder-dev.fromyou.workers.dev";
 const XVFB = process.env.XVFB ?? path.join(os.homedir(), ".cache/stella-verify/xvfb/usr/bin/Xvfb");
 const ENGINE = process.env.BIN ?? [path.join(os.homedir(), "projects/.rune-target/release/stella-engine"), path.join(ROOT, "engine/target/release/stella-engine")].find(existsSync) ?? "stella-engine";
-const SLOTS = path.join(os.homedir(), "projects/rune-window-slot.sh");
+const SLOTS = process.env.STELLA_RUNE_SLOTS ?? path.join(os.homedir(), "projects/rune-window-slot.sh");
 
 type Run = { runDir: string; dataDir: string; userDataDir: string; homeDir: string; ctlPort: number; display?: string; slot?: string; unseen?: boolean; pids: Record<string, number>; account?: { email: string; plan?: string }; headless: boolean; startedAt: string };
 
 const acquireSlot = () => {
+  if (!existsSync(SLOTS)) return undefined;
   const r = spawnSync(SLOTS, ["acquire", `rune-session-${runName}`], { encoding: "utf8", timeout: 600_000 });
   const slot = r.stdout?.trim();
   if (r.status !== 0 || !slot) throw new Error(`No window slot (${SLOTS}): ${r.stderr}`);
@@ -242,7 +243,7 @@ async function start() {
       STELLA_RUNE_H: String(h),
       STELLA_RUNE_THEME: process.env.THEME ?? "dark",
       STELLA_RUNE_SERVICES: has("--no-services") ? "0" : "1",
-      ...(process.env.STELLA_RUNE_APP ? { STELLA_RUNE_APP: process.env.STELLA_RUNE_APP } : {}),
+      ...Object.fromEntries(["STELLA_RUNE_APP", "STELLA_RUNE_WINDOW", "STELLA_RUNE_GALLERY"].filter((key) => process.env[key]).map((key) => [key, process.env[key]!])),
     });
     // Rune's own diagnostics (RUNE_FRAME_LOG, RUNE_LOOP_CHECK) reach the engine as set.
     for (const [key, value] of Object.entries(process.env)) if (key.startsWith("RUNE_") && key !== "RUNE_RUN" && value) env[key] ??= value;
@@ -276,8 +277,11 @@ async function shot(file: string) {
   const run = readRun();
   if (MAC || WIN) {
     const target = path.resolve(file);
-    const response = await fetch(`http://127.0.0.1:${run.ctlPort}/control/screenshot?path=${encodeURIComponent(target)}`, { signal: AbortSignal.timeout(30_000) });
-    if (!response.ok) throw new Error(`screenshot failed: ${response.status} ${await response.text()}`);
+    const window = flag("--window");
+    const query = new URLSearchParams({ path: target, ...(window ? { window } : {}) });
+    const response = await fetch(`http://127.0.0.1:${run.ctlPort}/control/screenshot?${query}`, { signal: AbortSignal.timeout(30_000) });
+    const body = await response.text();
+    if (!response.ok || body.includes('"error"')) throw new Error(`screenshot failed: ${response.status} ${body}`);
     console.log(target);
     return;
   }

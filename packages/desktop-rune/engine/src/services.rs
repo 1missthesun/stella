@@ -135,7 +135,10 @@ fn menu_items(items: &[Value]) -> Vec<MenuItem<Win>> {
                     if let Some(sc) = it.get("accelerator").and_then(|a| a.as_str()).and_then(|a| accelerator(a).parse::<Shortcut>().ok()) {
                         item = item.key_equivalent(sc);
                     }
-                    item
+                    match SYSTEM_ACTIONS.iter().find(|(role, _)| *role == s(it, "role")) {
+                        Some((_, action)) => item.system_action(*action),
+                        None => item,
+                    }
                 }
             };
             item.id(id)
@@ -152,6 +155,10 @@ const NATIVE_ROLES: &[&str] = &[
     "pasteandmatchstyle", "selectall", "showsubstitutions", "togglesmartquotes", "togglesmartdashes",
     "toggletextreplacement", "startspeaking", "stopspeaking", "minimize", "close", "zoom", "quit", "services",
 ];
+
+/// The roles Electron's macOS menu sends to the first responder as AppKit actions
+/// (`electron_menu_controller.mm` kRolesMap) that Rune's default menu bar has no item for.
+const SYSTEM_ACTIONS: &[(&str, &str)] = &[("togglefullscreen", "toggleFullScreenMode:")];
 
 /// An Electron template without its native-role items, the submenus they leave empty and the
 /// separators left leading, trailing or doubled.

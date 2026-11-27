@@ -1061,6 +1061,125 @@ fn forward_hover(n: u32, view: &WebView) {
     });
 }
 
+/// The pointer over WebView2 is the browser's child windows', in another process, so Rune
+/// would never light what holds the view, where Chromium's `:hover` holds for an iframe's
+/// ancestors. A hook on the system's cursor moves (no work while the pointer rests) tells Rune
+/// where the pointer is as it enters a view and as it moves (at most every 50 ms), and moves Rune's
+/// pointer off the window when it leaves a view for another app. Leaving for Rune's own area,
+/// Rune hears it from its window.
+#[cfg(target_os = "windows")]
+mod win_hover {
+    use std::sync::Mutex;
+    use std::sync::Once;
+    use std::time::{Duration, Instant};
+    use windows::Win32::Foundation::{HWND, POINT};
+    use windows::Win32::Graphics::Gdi::ScreenToClient;
+    use windows::Win32::UI::Accessibility::{HWINEVENTHOOK, SetWinEventHook};
+    use windows::Win32::UI::WindowsAndMessaging::{
+        DispatchMessageW, EVENT_OBJECT_LOCATIONCHANGE, GA_ROOT, GetAncestor, GetCursorPos, GetMessageW, GetWindowThreadProcessId, MSG,
+        OBJID_CURSOR, WINEVENT_OUTOFCONTEXT, WindowFromPoint,
+    };
+
+    #[derive(Clone, Copy)]
+    enum Pointer {
+        Over { root: isize, x: i32, y: i32 },
+        Left { root: isize },
+    }
+
+    static LATEST: Mutex<Option<Pointer>> = Mutex::new(None);
+
+    struct Seen {
+        over: Option<isize>,
+        told: Option<Instant>,
+    }
+    static SEEN: Mutex<Seen> = Mutex::new(Seen { over: None, told: None });
+
+    pub fn start() {
+        static ONCE: Once = Once::new();
+        ONCE.call_once(|| {
+            std::thread::spawn(|| {
+                // SAFETY: an out-of-context hook delivered to this thread's own message loop.
+                unsafe {
+                    let hook = SetWinEventHook(EVENT_OBJECT_LOCATIONCHANGE, EVENT_OBJECT_LOCATIONCHANGE, None, Some(moved), 0, 0, WINEVENT_OUTOFCONTEXT);
+                    if hook.is_invalid() {
+                        return;
+                    }
+                    let mut msg = MSG::default();
+                    while GetMessageW(&mut msg, None, 0, 0).as_bool() {
+                        DispatchMessageW(&msg);
+                    }
+                }
+            });
+        });
+    }
+
+    unsafe extern "system" fn moved(_: HWINEVENTHOOK, _: u32, _: HWND, object: i32, _: i32, _: u32, _: u32) {
+        if object != OBJID_CURSOR.0 {
+            return;
+        }
+        let mut at = POINT::default();
+        // SAFETY: plain queries of the cursor and the window under it.
+        let (over, root) = unsafe {
+            if GetCursorPos(&mut at).is_err() {
+                return;
+            }
+            let hit = WindowFromPoint(at);
+            let root = GetAncestor(hit, GA_ROOT);
+            let mut pid = 0;
+            GetWindowThreadProcessId(root, Some(&mut pid as *mut u32));
+            let ours = !root.is_invalid() && pid == std::process::id();
+            (ours && hit != root, ours.then_some(root.0 as isize))
+        };
+        let mut seen = SEEN.lock().unwrap_or_else(|e| e.into_inner());
+        let tell = if over {
+            let root = root.unwrap_or_default();
+            let entered = seen.over != Some(root);
+            if !entered && seen.told.is_some_and(|t| t.elapsed() < Duration::from_millis(50)) {
+                return;
+            }
+            seen.over = Some(root);
+            seen.told = Some(Instant::now());
+            Pointer::Over { root, x: at.x, y: at.y }
+        } else {
+            let Some(was) = seen.over.take() else { return };
+            if root == Some(was) {
+                return;
+            }
+            Pointer::Left { root: was }
+        };
+        drop(seen);
+        *LATEST.lock().unwrap_or_else(|e| e.into_inner()) = Some(tell);
+        crate::windows::wake_all();
+    }
+
+    /// On the UI thread: hands Rune the latest pointer the hook saw over a view.
+    pub fn drain() {
+        let Some(p) = LATEST.lock().unwrap_or_else(|e| e.into_inner()).take() else { return };
+        let root = match p {
+            Pointer::Over { root, .. } | Pointer::Left { root } => root,
+        };
+        let windows: Vec<u32> = crate::engine::read(|e| e.windows.keys().copied().collect());
+        let Some(window) = windows.into_iter().find(|w| super::hwnd_of(*w).0 as isize == root) else { return };
+        let Some(h) = super::handle_of(window) else { return };
+        let at = match p {
+            Pointer::Over { x, y, .. } => {
+                let mut pt = POINT { x, y };
+                // SAFETY: `root` is this window's live handle, on its own thread.
+                if !unsafe { ScreenToClient(HWND(root as *mut _), &mut pt) }.as_bool() {
+                    return;
+                }
+                let k = h.scale().unwrap_or(1.0) as f32 * super::ui_zoom(window);
+                [pt.x as f32 / k, pt.y as f32 / k]
+            }
+            Pointer::Left { .. } => [-100_000.0, -100_000.0],
+        };
+        let _ = h.inject_script(serde_json::json!([{ "type": "move", "x": at[0], "y": at[1] }]));
+    }
+}
+
+#[cfg(target_os = "windows")]
+pub use win_hover::drain as forward_hover;
+
 /// WebKitGTK ships WebRTC off (Chromium and WKWebView have it on) and reads the setting when a
 /// document is created, so it is set before the view's first load.
 #[cfg(target_os = "linux")]
@@ -1102,7 +1221,10 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
                 #[cfg(target_os = "macos")]
                 mac::round(&view, corners(&p));
                 #[cfg(target_os = "windows")]
-                win_env::cool();
+                {
+                    win_env::cool();
+                    win_hover::start();
+                }
                 eprintln!("stella-engine metric {{\"metric\":\"webview_created\",\"ms\":{:.1},\"node\":{n}}}", t0.elapsed().as_secs_f64() * 1000.0);
                 VIEWS.with(|v| {
                     v.borrow_mut().insert(n, View { view, window, born: n, key: p.id.clone(), baked: baked(&p), protocols: p.protocols.clone().into(), url: p.url.clone(), html: p.html.clone(), rect: r, visible: true, corners: corners(&p), covered: false, backed: false, applied: None, zoom: 1.0, zoomed_at: (0.0, 0.0), #[cfg(target_os = "linux")] backdrop: None })

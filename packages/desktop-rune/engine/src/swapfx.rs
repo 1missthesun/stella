@@ -12,11 +12,12 @@
 //!   its own shape;
 //! - a change over most of the window transitions all of it.
 //!
-//! The engine runs every frame of it; TS sends two commands and hears when the after is taken
-//! (`{"t":"swapfx"}`), so it can hold live updates back until then. Costs nothing at rest: the
-//! slot, the compositor's engagement and the textures exist only while a swap is in flight.
+//! The engine runs every frame of it; TS sends three commands (`swapfx.warm` as it starts
+//! building) and hears when the after is taken (`{"t":"swapfx"}`), so it can hold live updates
+//! back until then. Costs nothing at rest: the slot, the compositor's engagement and the
+//! textures exist only while a swap is in flight (the pipelines, once made, stay).
 
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::collections::{HashMap, VecDeque};
 use std::hash::{Hash, Hasher};
 use std::time::{Duration, Instant};
@@ -78,6 +79,8 @@ thread_local! {
     static REBUILD: Cell<bool> = const { Cell::new(false) };
     /// When the last batch with tree ops was applied.
     static LAST_OPS: Cell<Option<Instant>> = const { Cell::new(None) };
+    /// A swap is coming (`swapfx.warm`): the main window's compositor builds the pipelines.
+    static WARM: Cell<bool> = const { Cell::new(false) };
 }
 
 /// A batch with tree ops was applied.
@@ -120,6 +123,19 @@ pub fn begin(e: &mut Engine) {
     }
     set(Some(Stage::Want));
     touch_main(e);
+}
+
+/// `swapfx.warm`: the host saw a change and is building it. The transition's pipelines start
+/// compiling on a thread now, so the swap that follows does not wait for them (see `Pipes`).
+pub fn warm(e: &mut Engine) {
+    WARM.set(true);
+    touch_main(e);
+    crate::windows::wake_all();
+}
+
+/// Whether the main window's compositor should draw a frame to start `warm`.
+pub fn warm_wanted() -> bool {
+    WARM.get()
 }
 
 /// `swapfx.cancel`: the swap failed; nothing transitions.
@@ -882,12 +898,90 @@ struct Gpu {
     down_layout: wgpu::BindGroupLayout,
     index_layout: wgpu::BindGroupLayout,
     comp_layout: wgpu::BindGroupLayout,
-    module: wgpu::ShaderModule,
     sampler: wgpu::Sampler,
-    pipes: RefCell<HashMap<(&'static str, wgpu::TextureFormat), wgpu::RenderPipeline>>,
+    maker: Maker,
+    pipes: std::sync::Arc<Pipes>,
     uniform: wgpu::Buffer,
     /// Stands in for the records until a swap has some.
     no_recs: wgpu::Buffer,
+}
+
+type PipeKey = (&'static str, wgpu::TextureFormat);
+
+/// The transition's pipelines. Metal has no precompiled copy of this file's WGSL (it is the
+/// engine's own, not Rune's), and compiling all of them on the main thread held the first swap's
+/// frame for ~250 ms on an M4. A thread builds them when a swap is coming (`Gpu::warm`, during
+/// the host's build); a frame that needs one waits only for what is still compiling.
+#[derive(Default)]
+struct Pipes {
+    /// The pipelines made so far, and whether a thread is making more.
+    made: std::sync::Mutex<(HashMap<PipeKey, wgpu::RenderPipeline>, bool)>,
+    ready: std::sync::Condvar,
+}
+
+impl Pipes {
+    fn lock(&self) -> std::sync::MutexGuard<'_, (HashMap<PipeKey, wgpu::RenderPipeline>, bool)> {
+        self.made.lock().unwrap_or_else(|e| e.into_inner())
+    }
+}
+
+/// Ends a warming thread's claim even if a pipeline panics, so no frame waits forever.
+struct Warmed(std::sync::Arc<Pipes>);
+
+impl Drop for Warmed {
+    fn drop(&mut self) {
+        self.0.lock().1 = false;
+        self.0.ready.notify_all();
+    }
+}
+
+/// What a pipeline is made from; cheap to clone onto the warming thread.
+#[derive(Clone)]
+struct Maker {
+    device: wgpu::Device,
+    module: wgpu::ShaderModule,
+    copy: wgpu::BindGroupLayout,
+    down: wgpu::BindGroupLayout,
+    index: wgpu::BindGroupLayout,
+    comp: wgpu::BindGroupLayout,
+}
+
+impl Maker {
+    fn make(&self, entry: &'static str, format: wgpu::TextureFormat) -> wgpu::RenderPipeline {
+        let bind = match entry {
+            "copy" => &self.copy,
+            "down" => &self.down,
+            "index" => &self.index,
+            _ => &self.comp,
+        };
+        let layout = self.device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: Some("swapfx"), bind_group_layouts: &[Some(bind)], immediate_size: 0 });
+        let blend = (entry == "comp").then_some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING);
+        self.device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
+            label: Some("swapfx"),
+            layout: Some(&layout),
+            vertex: wgpu::VertexState { module: &self.module, entry_point: Some(if entry == "index" { "vs_index" } else { "vs" }), compilation_options: Default::default(), buffers: &[] },
+            fragment: Some(wgpu::FragmentState {
+                module: &self.module,
+                entry_point: Some(entry),
+                compilation_options: Default::default(),
+                targets: &[Some(wgpu::ColorTargetState { format, blend, write_mask: wgpu::ColorWrites::ALL })],
+            }),
+            primitive: Default::default(),
+            depth_stencil: None,
+            multisample: Default::default(),
+            multiview_mask: None,
+            cache: None,
+        })
+    }
+}
+
+/// Runs `f` in its own autorelease pool: Metal objects made off the main thread are autoreleased
+/// into it rather than leaked.
+fn pooled<R>(f: impl FnOnce() -> R) -> R {
+    #[cfg(target_os = "macos")]
+    return objc2::rc::autoreleasepool(|_| f());
+    #[cfg(not(target_os = "macos"))]
+    f()
 }
 
 /// Sized resources: the before and live textures (mipped), each pixel's record.
@@ -948,13 +1042,27 @@ impl Swap {
         self.bound = None;
     }
 
+    /// `swapfx::warm` reached the main window's compositor: its pipelines start compiling.
+    pub fn warm(&mut self, f: &rune::compose::Frame<'_, crate::windows::Win>) {
+        WARM.set(false);
+        let key = f.device_key();
+        match self.gpu.as_ref() {
+            Some(gpu) if gpu.key == key => gpu.warm(f.format),
+            _ => {
+                self.res = None;
+                self.bound = None;
+                self.gpu = Some(Gpu::new(f.device, key, f.format));
+            }
+        }
+    }
+
     /// Before the frame draws: moves the swap along and says what the slot's hook does.
     pub fn prepare(&mut self, f: &mut rune::compose::Frame<'_, crate::windows::Win>) {
         let key = f.device_key();
         if self.gpu.as_ref().is_none_or(|g| g.key != key) {
             self.res = None;
             self.bound = None;
-            self.gpu = Some(Gpu::new(f.device, key));
+            self.gpu = Some(Gpu::new(f.device, key, f.format));
         }
         let scale = f.rt.window_scale().max(0.5);
         let size = f.size;
@@ -1174,8 +1282,6 @@ impl Swap {
                 match self.plan {
                     Plan::Keep => {
                         gpu.copy(device, enc, bd, &res.before, s.format);
-                        gpu.pipe(device, "comp", s.format);
-                        gpu.pipe(device, "index", wgpu::TextureFormat::R32Uint);
                         if stage() == Some(Stage::Want) {
                             set(Some(Stage::Have));
                             crate::windows::wake_all();
@@ -1184,7 +1290,7 @@ impl Swap {
                     Plan::Run => {
                         gpu.copy(device, enc, bd, &res.live, s.format);
                         if let Some(b) = &self.bound {
-                            gpu.index(device, enc, &res.index, &b.index, self.recs as u32);
+                            gpu.index(enc, &res.index, &b.index, self.recs as u32);
                         }
                     }
                     Plan::Cover | Plan::Nothing => {}
@@ -1195,7 +1301,7 @@ impl Swap {
                     return;
                 }
                 let Some(res) = self.res.as_ref() else { return };
-                let pipe = gpu.pipe(device, "comp", s.format);
+                let pipe = gpu.pipe("comp", s.format);
                 pass.set_pipeline(&pipe);
                 pass.set_bind_group(0, self.bound.as_ref().map_or(&res.comp, |b| &b.comp), &[]);
                 pass.draw(0..3, 0..1);
@@ -1378,7 +1484,7 @@ fn sampler_entry(binding: u32) -> wgpu::BindGroupLayoutEntry {
 }
 
 impl Gpu {
-    fn new(device: &wgpu::Device, key: rune::compose::DeviceKey) -> Gpu {
+    fn new(device: &wgpu::Device, key: rune::compose::DeviceKey, format: wgpu::TextureFormat) -> Gpu {
         let layout = |label: &str, entries: &[wgpu::BindGroupLayoutEntry]| device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor { label: Some(label), entries });
         let copy_layout = layout("swapfx copy", &[tex_entry(0, float(false))]);
         let down_layout = layout("swapfx down", &[tex_entry(0, float(true)), sampler_entry(1)]);
@@ -1399,44 +1505,58 @@ impl Gpu {
         });
         let uniform = device.create_buffer(&wgpu::BufferDescriptor { label: Some("swapfx"), size: 32, usage: wgpu::BufferUsages::UNIFORM | wgpu::BufferUsages::COPY_DST, mapped_at_creation: false });
         let no_recs = device.create_buffer(&wgpu::BufferDescriptor { label: Some("swapfx records"), size: REC_BYTES as u64, usage: wgpu::BufferUsages::STORAGE, mapped_at_creation: false });
-        Gpu { key, copy_layout, down_layout, index_layout, comp_layout, module, sampler, pipes: RefCell::default(), uniform, no_recs }
+        let maker = Maker { device: device.clone(), module, copy: copy_layout.clone(), down: down_layout.clone(), index: index_layout.clone(), comp: comp_layout.clone() };
+        let gpu = Gpu { key, copy_layout, down_layout, index_layout, comp_layout, sampler, maker, pipes: Default::default(), uniform, no_recs };
+        gpu.warm(format);
+        gpu
     }
 
-    fn pipe(&self, device: &wgpu::Device, entry: &'static str, format: wgpu::TextureFormat) -> wgpu::RenderPipeline {
-        self.pipes
-            .borrow_mut()
-            .entry((entry, format))
-            .or_insert_with(|| {
-                let bind = match entry {
-                    "copy" => &self.copy_layout,
-                    "down" => &self.down_layout,
-                    "index" => &self.index_layout,
-                    _ => &self.comp_layout,
-                };
-                let layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor { label: Some("swapfx"), bind_group_layouts: &[Some(bind)], immediate_size: 0 });
-                let blend = (entry == "comp").then_some(wgpu::BlendState::PREMULTIPLIED_ALPHA_BLENDING);
-                device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
-                    label: Some("swapfx"),
-                    layout: Some(&layout),
-                    vertex: wgpu::VertexState { module: &self.module, entry_point: Some(if entry == "index" { "vs_index" } else { "vs" }), compilation_options: Default::default(), buffers: &[] },
-                    fragment: Some(wgpu::FragmentState {
-                        module: &self.module,
-                        entry_point: Some(entry),
-                        compilation_options: Default::default(),
-                        targets: &[Some(wgpu::ColorTargetState { format, blend, write_mask: wgpu::ColorWrites::ALL })],
-                    }),
-                    primitive: Default::default(),
-                    depth_stencil: None,
-                    multisample: Default::default(),
-                    multiview_mask: None,
-                    cache: None,
-                })
-            })
-            .clone()
+    /// Compiles the pipelines a swap at `format` uses on a thread, in the order a swap needs them.
+    fn warm(&self, format: wgpu::TextureFormat) {
+        let keys: [PipeKey; 4] = [("copy", format), ("down", format), ("index", wgpu::TextureFormat::R32Uint), ("comp", format)];
+        {
+            let mut made = self.pipes.lock();
+            if made.1 || keys.iter().all(|k| made.0.contains_key(k)) {
+                return;
+            }
+            made.1 = true;
+        }
+        let (maker, pipes) = (self.maker.clone(), self.pipes.clone());
+        let spawned = std::thread::Builder::new().name("swapfx-warm".into()).spawn(move || {
+            let _done = Warmed(pipes.clone());
+            for k in keys {
+                if pipes.lock().0.contains_key(&k) {
+                    continue;
+                }
+                let pipe = pooled(|| maker.make(k.0, k.1));
+                pipes.lock().0.entry(k).or_insert(pipe);
+                pipes.ready.notify_all();
+            }
+        });
+        if spawned.is_err() {
+            self.pipes.lock().1 = false;
+        }
     }
 
-    fn pass(&self, device: &wgpu::Device, enc: &mut wgpu::CommandEncoder, pipe: (&'static str, wgpu::TextureFormat), target: &wgpu::TextureView, bind: &wgpu::BindGroup, draw: (u32, u32)) {
-        let pipe = self.pipe(device, pipe.0, pipe.1);
+    fn pipe(&self, entry: &'static str, format: wgpu::TextureFormat) -> wgpu::RenderPipeline {
+        let key = (entry, format);
+        let mut made = self.pipes.lock();
+        loop {
+            if let Some(pipe) = made.0.get(&key) {
+                return pipe.clone();
+            }
+            if !made.1 {
+                break;
+            }
+            made = self.pipes.ready.wait(made).unwrap_or_else(|e| e.into_inner());
+        }
+        drop(made);
+        let pipe = self.maker.make(entry, format);
+        self.pipes.lock().0.entry(key).or_insert(pipe).clone()
+    }
+
+    fn pass(&self, enc: &mut wgpu::CommandEncoder, pipe: (&'static str, wgpu::TextureFormat), target: &wgpu::TextureView, bind: &wgpu::BindGroup, draw: (u32, u32)) {
+        let pipe = self.pipe(pipe.0, pipe.1);
         let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("swapfx"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -1462,15 +1582,15 @@ impl Gpu {
             layout: &self.copy_layout,
             entries: &[wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(src) }],
         });
-        self.pass(device, enc, ("copy", format), &dst.levels[0], &bind, (3, 1));
+        self.pass(enc, ("copy", format), &dst.levels[0], &bind, (3, 1));
         for (i, down) in dst.downs.iter().enumerate() {
-            self.pass(device, enc, ("down", format), &dst.levels[i + 1], down, (3, 1));
+            self.pass(enc, ("down", format), &dst.levels[i + 1], down, (3, 1));
         }
     }
 
     /// Each pixel's topmost record, where the shapes are this frame.
-    fn index(&self, device: &wgpu::Device, enc: &mut wgpu::CommandEncoder, target: &wgpu::TextureView, bind: &wgpu::BindGroup, recs: u32) {
-        self.pass(device, enc, ("index", wgpu::TextureFormat::R32Uint), target, bind, (6, recs));
+    fn index(&self, enc: &mut wgpu::CommandEncoder, target: &wgpu::TextureView, bind: &wgpu::BindGroup, recs: u32) {
+        self.pass(enc, ("index", wgpu::TextureFormat::R32Uint), target, bind, (6, recs));
     }
 
     fn comp_group(&self, device: &wgpu::Device, before: &Mipped, live: &Mipped, index: &wgpu::TextureView, recs: &wgpu::Buffer) -> wgpu::BindGroup {

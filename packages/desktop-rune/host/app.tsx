@@ -182,6 +182,8 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
 
   async function runSwap(label: string, t0: number, mtime: number): Promise<boolean> {
     try {
+      // The transition's pipelines compile on an engine thread while this builds.
+      if (SWAP_FX) command({ cmd: "swapfx.warm" });
       const next = await loadApp();
       const t_built = now();
       app = next;

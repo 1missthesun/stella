@@ -609,7 +609,7 @@ impl Compositor<Win> for Comp {
         if let Some(on) = window_has_fx(self.window) {
             self.engaged.set(on || !self.morphs.is_empty());
         }
-        self.engaged.get() || (self.window.is_none() && self.swap.engaged())
+        self.engaged.get() || (self.window.is_none() && (self.swap.engaged() || crate::swapfx::warm_wanted()))
     }
 
     fn animating(&self) -> bool {
@@ -818,6 +818,9 @@ impl Compositor<Win> for Comp {
             self.swap.prepare(f);
         } else {
             self.swap.settle();
+        }
+        if self.window.is_none() && crate::swapfx::warm_wanted() {
+            self.swap.warm(f);
         }
         let swap = &mut self.swap;
         let clear = f.rt.clear_color();

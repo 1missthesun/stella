@@ -401,6 +401,45 @@ const bunInstall = (env) =>
     child.once("close", (status) => resolve(status ?? 1));
   });
 
+// The launcher's logs folder (<root>/logs), else the app's .git folder.
+const agentClisLog = () => {
+  let dir = appRoot;
+  for (let up = 0; up < 3; up += 1) {
+    dir = path.dirname(dir);
+    if (
+      fs.existsSync(path.join(dir, "launcher.lock")) &&
+      fs.existsSync(path.join(dir, "logs"))
+    ) {
+      return path.join(dir, "logs", "agent-clis.log");
+    }
+  }
+  return path.join(appRoot, ".git", "stella-agent-clis.log");
+};
+
+const startAgentClis = () => {
+  const script = path.join(import.meta.dirname, "install-agent-clis.mjs");
+  if (!fs.existsSync(script) || process.env.STELLA_SKIP_AGENT_CLIS === "1")
+    return;
+  try {
+    const logFile = agentClisLog();
+    const child = spawn(process.execPath, [script, "--log", logFile], {
+      cwd: appRoot,
+      env: process.env,
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true,
+    });
+    child.unref();
+    log(
+      `installing Claude Code and Antigravity in the background if missing (log: ${logFile})`,
+    );
+  } catch (error) {
+    log(
+      `could not start the Claude Code and Antigravity install: ${describe(error)}`,
+    );
+  }
+};
+
 const main = async () => {
   log(
     `lock ${lockHash.slice(0, 12)}, platform ${platformKey() ?? process.platform}, bun ${Bun.version}`,
@@ -414,6 +453,9 @@ const main = async () => {
   const electron = plan
     ? fetchElectron(plan, seeded).catch((error) => ({ error }))
     : null;
+  // Claude Code and Antigravity are ~500 MB together, so they start once the
+  // downloads this install waits on are in, and finish while Stella opens.
+  Promise.all([seeded, electron]).then(startAgentClis);
 
   await seeded;
   const env = { ...process.env };

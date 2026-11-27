@@ -6,6 +6,7 @@ import type {
   ClaudeCliInstallProgress,
   ClaudeCliInstallResult,
 } from "@stella/contracts/claude-local-accounts";
+import { waitForCliInstall } from "@stella/node-shared/integrations/cli-install-lock.js";
 import { forkCancelableInterval } from "./effect-runtime.js";
 
 export type { ClaudeCliInstallProgress, ClaudeCliInstallResult };
@@ -137,6 +138,19 @@ export const installClaudeCli = async (
   const env = options.env ?? process.env;
   const report = options.onProgress ?? (() => {});
   report({ phase: "checking" });
+
+  // A first install may be putting Claude Code in place right now.
+  if (await waitForCliInstall("claude", options.signal)) {
+    const { inspectClaudeCli } = await import("./claude-cli-launch.js");
+    const installed = await inspectClaudeCli(env);
+    if (installed?.check.ok && installed.install.executable) {
+      return {
+        status: "installed",
+        version: installed.check.version,
+        executable: installed.install.executable,
+      };
+    }
+  }
 
   const platform = claudeCliPlatform();
   if (!platform) {

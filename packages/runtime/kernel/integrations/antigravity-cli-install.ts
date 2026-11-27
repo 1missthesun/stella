@@ -6,6 +6,7 @@ import {
   findExternalCliPath,
   findUnrunnableExternalCliPath,
 } from "@stella/node-shared/integrations/external-cli-resolution.js";
+import { waitForCliInstall } from "@stella/node-shared/integrations/cli-install-lock.js";
 import { claudeCliCommandEnv, runCliCommand } from "./claude-cli-command.js";
 import { antigravityHomeFor, askAntigravityCli } from "./antigravity-cli-status.js";
 import { CLI_REPAIR_TIMEOUT_MS, cliRealPath, createCliKeeper, type CliInstall, type CliRepairOutcome } from "./cli-keeper.js";
@@ -113,6 +114,13 @@ const removeReplacedVersions = async (env: NodeJS.ProcessEnv): Promise<void> => 
 };
 
 const runRepair = async (install: Install, env: NodeJS.ProcessEnv, signal?: AbortSignal): Promise<CliRepairOutcome> => {
+  // A first install may be putting agy in place right now.
+  if (await waitForCliInstall("agy", signal)) {
+    const now = await currentInstall(env);
+    const version = now.executable ? await versionOf(now.executable, env) : null;
+    if (version && !olderThan(version, MINIMUM_VERSION)) return { status: "repaired", version, output: "" };
+    install = now;
+  }
   let output = "";
   if (install.executable && (await versionOf(install.executable, env))) {
     const updated = await runCliCommand(install.launcher, ["update"], {

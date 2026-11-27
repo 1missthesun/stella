@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key><string>en</string>
+  <key>CFBundleDisplayName</key><string>Stella Rune</string>
+  <key>CFBundleExecutable</key><string>StellaRune</string>
+  <key>CFBundleIdentifier</key><string>com.stella.rune.dev</string>
+  <key>CFBundleInfoDictionaryVersion</key><string>6.0</string>
+  <key>CFBundleName</key><string>StellaRune</string>
+  <key>CFBundlePackageType</key><string>APPL</string>
+  <key>CFBundleShortVersionString</key><string>0.1.0</string>
+  <key>CFBundleVersion</key><string>1</string>
+  <key>CFBundleSupportedPlatforms</key><array><string>iPhoneSimulator</string></array>
+  <key>CFBundleURLTypes</key>
+  <array><dict><key>CFBundleURLSchemes</key><array><string>stella-rune</string></array></dict></array>
+  <key>LSRequiresIPhoneOS</key><true/>
+  <key>MinimumOSVersion</key><string>17.0</string>
+  <key>UIDeviceFamily</key><array><integer>1</integer><integer>2</integer></array>
+  <key>CADisableMinimumFrameDurationOnPhone</key><true/>
+  <key>UILaunchScreen</key><dict><key>UIColorName</key><string></string></dict>
+  <key>UIRequiredDeviceCapabilities</key><array><string>arm64</string><string>metal</string></array>
+  <key>UISupportedInterfaceOrientations</key><array><string>UIInterfaceOrientationPortrait</string></array>
+  <key>UIStatusBarStyle</key><string>UIStatusBarStyleDefault</string>
+  <key>UIViewControllerBasedStatusBarAppearance</key><true/>
+  <key>NSMicrophoneUsageDescription</key><string>Stella listens while you dictate a message.</string>
+  <key>NSPhotoLibraryUsageDescription</key><string>Stella attaches the photos you pick to your message.</string>
+  <key>NSCameraUsageDescription</key><string>Stella attaches the photos you take to your message.</string>
+</dict>
+</plist>

@@ -1,0 +1,11 @@
+{
+  "extends": "../desktop-rune/tsconfig.json",
+  "compilerOptions": {
+    "paths": {
+      "rune-jsx/*": ["../desktop-rune/host/rune-jsx/*"],
+      "@/*": ["../desktop-ui/src/*"]
+    }
+  },
+  "files": ["../desktop-rune/host/vite-env.d.ts", "js/natives.d.ts", "../desktop-rune/ui/rune.d.ts"],
+  "include": ["js/**/*.ts", "ui/**/*.ts", "ui/**/*.tsx"]
+}

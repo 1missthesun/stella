@@ -1,0 +1,56 @@
+[package]
+name = "stella-mobile-engine"
+version = "0.1.0"
+edition = "2024"
+license = "MIT"
+publish = false
+
+# The phone build of Stella's Rune engine: a static library the iOS app (and later the Android
+# app) links. It reuses the desktop engine's tree, props, view, markdown and effect modules as
+# they are (src/lib.rs includes them by path) and replaces only what is about windows, native
+# text fields and the bridge transport (src/mobile/).
+[lib]
+name = "stella_mobile_engine"
+path = "src/lib.rs"
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+rune = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70", features = ["tooling"] }
+rune-kit = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70", features = ["markdown", "mermaid"] }
+rune-fx = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
+rune-light = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
+wgpu = { version = "~30.0.1", default-features = false }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[patch.crates-io]
+wgpu-hal = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
+naga = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
+winit = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
+sctk-adwaita = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
+parley_engine = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
+accesskit_windows = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
+accesskit_atspi_common = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
+accesskit_macos = { git = "https://github.com/1missthesun/rune", rev = "00d7c211773b47032f9f925fe961555db027ca70" }
+
+[profile.release]
+codegen-units = 16
+incremental = true
+debug = "line-tables-only"
+
+[profile.dist]
+inherits = "release"
+codegen-units = 1
+incremental = false
+lto = "thin"
+strip = true
+debug = false
+
+[lints.rust]
+# The shared desktop modules gate their native webviews on the desktop crate's `webview` feature,
+# which this crate never has (the phone opens web pages in its own native views).
+unexpected_cfgs = { level = "allow", check-cfg = ['cfg(feature, values("webview"))'] }

@@ -397,6 +397,7 @@ fn applied_at_open(p: &Props) -> Applied {
         click_through: Some(p.click_through || is_background(p)),
         content_protection: Some(p.content_protection || is_background(p)),
         font_smoothing: None,
+        size_limits: Some((p.min_size, p.max_size)),
     }
 }
 
@@ -648,6 +649,11 @@ fn apply_window_props(node: u32, tx: &mut Tx) {
         }
         #[cfg(all(feature = "webview", target_os = "windows"))]
         crate::webview::forward_pointer(node, click_through && p.forward_mouse);
+        let limits = Some((p.min_size, p.max_size));
+        if limits != applied.size_limits && !is_background(&p) {
+            h.set_size_limits(p.min_size.map(|[w, ht]| (w, ht)), p.max_size.map(|[w, ht]| (w, ht)));
+            next.size_limits = limits;
+        }
         let protect = p.content_protection || is_background(&p);
         if Some(protect) != applied.content_protection {
             if applied.content_protection.is_some() || protect {

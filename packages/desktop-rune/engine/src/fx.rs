@@ -445,7 +445,8 @@ struct Gpu {
     format: wgpu::TextureFormat,
     fx: FxRenderer,
     lights: HashMap<u32, Lit>,
-    blit: Blit,
+    /// Built with the window's first light: its WGSL compiles at runtime (Metal has no precompiled copy).
+    blit: Option<Blit>,
     clear: wgpu::TextureView,
 }
 
@@ -803,7 +804,7 @@ impl Compositor<Win> for Comp {
                     view_formats: &[],
                 })
                 .create_view(&Default::default());
-            self.gpu = Some(Gpu { key, format: f.format, fx, lights: HashMap::new(), blit: Blit::new(device), clear });
+            self.gpu = Some(Gpu { key, format: f.format, fx, lights: HashMap::new(), blit: None, clear });
         }
         let Some(gpu) = self.gpu.as_mut() else { return };
         gpu.fx.set_srgb_blend(f.srgb_blend());
@@ -856,6 +857,7 @@ impl Compositor<Win> for Comp {
                     let scene = Scene { prims: &prims, lights: &lights, settings: settings(&l.spec, t), emission: None };
                     lit.drew = lit.renderer.render(device, queue, enc, &scene, bd, clear_tex, &lit.view);
                     let rect = [l.rect[0] - o[0], l.rect[1] - o[1], l.rect[2], l.rect[3]];
+                    let blit = blit.get_or_insert_with(|| Blit::new(device));
                     blit.write(queue, &lit.uniform, rect, l.radii, want);
                     if lit.bind.is_none() {
                         lit.bind = Some(blit.bind(device, &lit.uniform, &lit.view));
@@ -863,13 +865,14 @@ impl Compositor<Win> for Comp {
                 }
                 EffectPhase::Draw(pass) => {
                     let Some(lit) = lits.get(&l.node).filter(|x| x.drew) else { return };
-                    if let Some(bind) = &lit.bind {
+                    if let (Some(bind), Some(blit)) = (&lit.bind, blit.as_ref()) {
                         blit.draw(device, pass, s.format, bind);
                     }
                 }
             }
         });
         gpu.lights.retain(|_, l| l.seen);
+        crate::metrics::Metrics::runtime_compiles(device);
         if !watched.is_empty() {
             let done = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
             let landed = done.clone();

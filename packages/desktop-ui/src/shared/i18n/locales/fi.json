@@ -3066,7 +3066,9 @@
         "notSynced": "Tämä näkymä ei ole vielä tullut tilillesi. Yritä hetken kuluttua uudelleen.",
         "noLink": "Jaa linkki, joka avaa tämän näkymän missä tahansa selaimessa. Vierailijoiden tallentamat tiedot pysyvät heidän omassa selaimessaan.",
         "makePrivateLink": "Yksityinen linkki",
-        "madeWithStella": "Tehty Stellalla"
+        "madeWithStella": "Tehty Stellalla",
+        "live": "Näkymä on julkaistu",
+        "publicLink": "Näkymän julkinen linkki"
       }
     },
     "displayPanel": {

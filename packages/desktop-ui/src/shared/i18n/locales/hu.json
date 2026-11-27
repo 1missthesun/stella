@@ -3066,7 +3066,9 @@
         "notSynced": "Ez a nézet még nem érkezett meg a fiókodba. Próbáld újra egy pillanat múlva.",
         "noLink": "Ossz meg egy linket, amely bármely böngészőben futtatja ezt a nézetet. Amit a látogatók mentenek, az a saját böngészőjükben marad.",
         "makePrivateLink": "Privát link",
-        "madeWithStella": "Stellával készült"
+        "madeWithStella": "Stellával készült",
+        "live": "A nézet elérhető",
+        "publicLink": "Nézet nyilvános linkje"
       }
     },
     "displayPanel": {

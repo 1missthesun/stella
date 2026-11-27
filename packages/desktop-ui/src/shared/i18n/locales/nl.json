@@ -3066,7 +3066,9 @@
         "notSynced": "Deze weergave is nog niet in je account aangekomen. Probeer het zo opnieuw.",
         "noLink": "Deel een link die deze weergave in elke browser draait. Wat bezoekers opslaan, blijft in hun eigen browser.",
         "makePrivateLink": "Privélink",
-        "madeWithStella": "Gemaakt met Stella"
+        "madeWithStella": "Gemaakt met Stella",
+        "live": "Weergave staat online",
+        "publicLink": "Openbare weergavelink"
       }
     },
     "displayPanel": {

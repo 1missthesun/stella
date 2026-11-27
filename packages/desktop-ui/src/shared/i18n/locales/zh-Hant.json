@@ -3048,7 +3048,9 @@
         "notSynced": "此檢視尚未同步到你的帳戶。請稍後再試。",
         "noLink": "分享一個可在任何瀏覽器中執行此檢視的連結。訪客儲存的內容只會留在他們自己的瀏覽器中。",
         "makePrivateLink": "私人連結",
-        "madeWithStella": "以 Stella 製作"
+        "madeWithStella": "以 Stella 製作",
+        "live": "檢視已上線",
+        "publicLink": "檢視公開連結"
       }
     },
     "displayPanel": {

@@ -32,7 +32,7 @@ function ViewCard({ view }: { view: IndexedView }) {
         ],
       ]) as unknown as (at: { x: number; y: number }) => void}
     >
-      <Press id={`apps-view-${view.id.replace(/[^\w-]/gu, "_").slice(-60)}`} text={tx(s.appsSectionCard)} {...s.appsSectionCardOpen} title={view.conversationTitle ?? undefined} onPress={() => open(view)}>
+      <Press id={`apps-view-${view.id.replace(/[^\w-]/gu, "_").slice(-60)}`} text={tx(s.appsSectionCard)} {...s.appsSectionCardOpen} label={view.title} title={view.conversationTitle ?? undefined} onPress={() => open(view)}>
         <Icon icon={icon} size={16} strokeWidth={1.7} color={s.appsSectionCardIcon.color} />
         <T {...tx(s.appsSectionCard, s.appsSectionCardOpen)} {...s.appsSectionCardLabel}>
           {view.title}
@@ -45,8 +45,9 @@ function ViewCard({ view }: { view: IndexedView }) {
 export function ViewsLibrary({ views, heading }: { views: readonly IndexedView[]; heading?: string }) {
   const s = useAppsSection();
   if (views.length === 0) return null;
+  // Alone it is the whole list; with Cloud Apps below, a heading and a rule set the two apart.
   return (
-    <col w="full" {...s.cloudAppsLibrary}>
+    <col w="full" {...s.cloudAppsLibrary} {...(heading ? {} : { borderSides: [0, 0, 0, 0] as [number, number, number, number] })}>
       {heading ? (
         <row {...s.cloudAppsLibraryHeading}>
           <T {...tx(s.cloudAppsLibraryHeading)}>{heading}</T>

@@ -3082,7 +3082,9 @@
         "notSynced": "Această vizualizare nu a ajuns încă în contul tău. Încearcă din nou peste un moment.",
         "noLink": "Distribuie un link care rulează această vizualizare în orice browser. Ce salvează vizitatorii rămâne în propriul lor browser.",
         "makePrivateLink": "Link privat",
-        "madeWithStella": "Creat cu Stella"
+        "madeWithStella": "Creat cu Stella",
+        "live": "Vizualizarea este publică",
+        "publicLink": "Link public al vizualizării"
       }
     },
     "displayPanel": {

@@ -3048,7 +3048,9 @@
         "notSynced": "Chế độ xem này chưa đến tài khoản của bạn. Hãy thử lại sau giây lát.",
         "noLink": "Chia sẻ liên kết chạy chế độ xem này trong mọi trình duyệt. Những gì khách truy cập lưu sẽ ở lại trong trình duyệt của họ.",
         "makePrivateLink": "Liên kết riêng tư",
-        "madeWithStella": "Tạo bằng Stella"
+        "madeWithStella": "Tạo bằng Stella",
+        "live": "Chế độ xem đang hoạt động",
+        "publicLink": "Liên kết công khai của chế độ xem"
       }
     },
     "displayPanel": {

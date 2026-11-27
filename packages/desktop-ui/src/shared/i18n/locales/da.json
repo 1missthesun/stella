@@ -3066,7 +3066,9 @@
         "notSynced": "Denne visning er ikke nået til din konto endnu. Prøv igen om et øjeblik.",
         "noLink": "Del et link, der kører denne visning i enhver browser. Det, besøgende gemmer, bliver i deres egen browser.",
         "makePrivateLink": "Privat link",
-        "madeWithStella": "Lavet med Stella"
+        "madeWithStella": "Lavet med Stella",
+        "live": "Visningen er live",
+        "publicLink": "Offentligt link til visning"
       }
     },
     "displayPanel": {

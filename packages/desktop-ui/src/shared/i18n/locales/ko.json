@@ -3048,7 +3048,9 @@
         "notSynced": "이 뷰가 아직 계정에 도착하지 않았습니다. 잠시 후 다시 시도하세요.",
         "noLink": "어떤 브라우저에서든 이 뷰를 실행하는 링크를 공유하세요. 방문자가 저장한 내용은 각자의 브라우저에 남습니다.",
         "makePrivateLink": "비공개 링크",
-        "madeWithStella": "Stella로 제작"
+        "madeWithStella": "Stella로 제작",
+        "live": "뷰가 공개됨",
+        "publicLink": "뷰 공개 링크"
       }
     },
     "displayPanel": {

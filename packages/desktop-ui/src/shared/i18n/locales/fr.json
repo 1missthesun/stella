@@ -3082,7 +3082,9 @@
         "notSynced": "Cette vue n'est pas encore arrivée sur ton compte. Réessaie dans un instant.",
         "noLink": "Partage un lien qui exécute cette vue dans n'importe quel navigateur. Ce que les visiteurs enregistrent reste dans leur propre navigateur.",
         "makePrivateLink": "Lien privé",
-        "madeWithStella": "Fait avec Stella"
+        "madeWithStella": "Fait avec Stella",
+        "live": "La vue est en ligne",
+        "publicLink": "Lien public de la vue"
       }
     },
     "displayPanel": {

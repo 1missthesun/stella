@@ -270,7 +270,7 @@ function CanvasLinkPanel({ item }: { item: CanvasHtmlItem }) {
     );
   }
 
-  return <LinkDetails link={link} pending={pending} copied={copied} copy={copy} setVisibility={setVisibility} onOpen={onOpen} />;
+  return <LinkDetails link={link} pending={pending} copied={copied} copy={copy} setVisibility={setVisibility} onOpen={onOpen} liveLabel={t("shell.display.canvasShare.live")} publicLinkLabel={t("shell.display.canvasShare.publicLink")} />;
 }
 
 /** A link's state, URL and actions: the same for a canvas and a view. */
@@ -281,7 +281,11 @@ function LinkDetails({
   copy,
   setVisibility,
   onOpen,
+  liveLabel,
+  publicLinkLabel,
 }: {
+  liveLabel: string;
+  publicLinkLabel: string;
   link: SharedCanvasLink;
   pending: Pending;
   copied: string | null;
@@ -293,13 +297,13 @@ function LinkDetails({
   const tk = useTokens();
   const l = shareLook(tk);
   const isPublic = isPublicLink(link);
-  const linkLabel = t(isPublic ? "shell.display.canvasShare.publicLink" : "shell.display.canvasShare.privateLink");
+  const linkLabel = isPublic ? publicLinkLabel : t("shell.display.canvasShare.privateLink");
   return (
     <col gap={10}>
       <row align="center" gap={6}>
         <Icon icon={isPublic ? Icons.stella.Globe : Icons.stella.Lock} size={14} strokeWidth={1.6} color={tk.c.textStrong} />
         <text {...TEXT_MEDIUM} color={tk.c.textStrong}>
-          {t(isPublic ? "shell.display.canvasShare.live" : "shell.display.canvasShare.privateLink")}
+          {isPublic ? liveLabel : t("shell.display.canvasShare.privateLink")}
         </text>
       </row>
       <text {...TEXT} color={tk.c.textWeak}>
@@ -531,7 +535,7 @@ function ViewLinkPanel({ viewId }: { viewId: string | null }) {
       </col>
     );
   }
-  return <LinkDetails link={link} pending={pending} copied={copied} copy={copy} setVisibility={setVisibility} onOpen={onOpen} />;
+  return <LinkDetails link={link} pending={pending} copied={copied} copy={copy} setVisibility={setVisibility} onOpen={onOpen} liveLabel={t("shell.display.viewShare.live")} publicLinkLabel={t("shell.display.viewShare.publicLink")} />;
 }
 
 /** Share and the shared-links list over a view open in the panel, as over a canvas. */

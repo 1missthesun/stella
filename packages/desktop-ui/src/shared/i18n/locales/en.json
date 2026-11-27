@@ -3066,7 +3066,9 @@
         "notSynced": "This view hasn't reached your account yet. Try again in a moment.",
         "noLink": "Share a link that runs this view in any browser. What visitors save stays in their own browser.",
         "makePrivateLink": "Private link",
-        "madeWithStella": "Made with Stella"
+        "madeWithStella": "Made with Stella",
+        "live": "View is live",
+        "publicLink": "Public view link"
       }
     },
     "displayPanel": {

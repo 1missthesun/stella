@@ -3066,7 +3066,9 @@
         "notSynced": "Diese Ansicht ist noch nicht in deinem Konto angekommen. Versuch es gleich noch einmal.",
         "noLink": "Teile einen Link, der diese Ansicht in jedem Browser ausführt. Was Besucher speichern, bleibt in ihrem eigenen Browser.",
         "makePrivateLink": "Privater Link",
-        "madeWithStella": "Mit Stella erstellt"
+        "madeWithStella": "Mit Stella erstellt",
+        "live": "Ansicht ist live",
+        "publicLink": "Öffentlicher Ansichtslink"
       }
     },
     "displayPanel": {

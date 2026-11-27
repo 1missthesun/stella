@@ -3048,7 +3048,9 @@
         "notSynced": "Tampilan ini belum sampai ke akunmu. Coba lagi sebentar lagi.",
         "noLink": "Bagikan tautan yang menjalankan tampilan ini di browser mana pun. Apa yang disimpan pengunjung tetap ada di browser mereka sendiri.",
         "makePrivateLink": "Tautan pribadi",
-        "madeWithStella": "Dibuat dengan Stella"
+        "madeWithStella": "Dibuat dengan Stella",
+        "live": "Tampilan sudah aktif",
+        "publicLink": "Tautan publik tampilan"
       }
     },
     "displayPanel": {

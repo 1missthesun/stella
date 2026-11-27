@@ -3098,7 +3098,9 @@
         "notSynced": "Toto zobrazení se ještě nedostalo do vašeho účtu. Zkuste to za chvíli znovu.",
         "noLink": "Sdílejte odkaz, který toto zobrazení spustí v jakémkoli prohlížeči. Co návštěvníci uloží, zůstane v jejich prohlížeči.",
         "makePrivateLink": "Soukromý odkaz",
-        "madeWithStella": "Vytvořeno se Stellou"
+        "madeWithStella": "Vytvořeno se Stellou",
+        "live": "Zobrazení je dostupné",
+        "publicLink": "Veřejný odkaz na zobrazení"
       }
     },
     "displayPanel": {

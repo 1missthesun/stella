@@ -56,8 +56,10 @@ function SharedView({ filePath }: { filePath: string }) {
     document.body.style.background = tk.c.background;
   }, [tk]);
   useEffect(() => {
-    if (!snapshot?.tree) return;
+    if (!snapshot?.tree || document.documentElement.dataset.viewReady) return;
     document.documentElement.dataset.viewReady = "true";
+    // How long the link took to show the view, for anyone measuring it.
+    performance.mark("stella-view-first-render");
   }, [snapshot?.tree]);
 
   const dispatch = useCallback((handler: number, value?: unknown) => views?.dispatch(filePath, handler, value), [views, filePath]);

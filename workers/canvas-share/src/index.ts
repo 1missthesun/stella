@@ -93,12 +93,12 @@ const readCookie = (request: Request, name: string): string | null => {
   return null;
 };
 
-const privatePageHtml = (ownerOpenUrl: string | null): string => `<!doctype html>
+const privatePageHtml = (ownerOpenUrl: string | null, what: "canvas" | "view"): string => `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Private canvas</title>
+<title>Private ${what}</title>
 <style>
   :root { color-scheme: light dark; }
   body { margin: 0; min-height: 100vh; display: grid; place-items: center;
@@ -120,15 +120,15 @@ const privatePageHtml = (ownerOpenUrl: string | null): string => `<!doctype html
 </head>
 <body>
 <main>
-  <h1>This canvas is private</h1>
+  <h1>This ${what} is private</h1>
   <p>Only its owner can open it.</p>
-${ownerOpenUrl ? `  <a class="open" href="${escapeHtml(ownerOpenUrl)}">It's mine, sign in to open it</a>\n` : ""}  <p class="note">To let others see it, its owner can make it public from the canvas's Share menu in Stella.</p>
+${ownerOpenUrl ? `  <a class="open" href="${escapeHtml(ownerOpenUrl)}">It's mine, sign in to open it</a>\n` : ""}  <p class="note">To let others see it, its owner can make it public from the ${what}'s Share menu in Stella.</p>
 </main>
 </body>
 </html>`;
 
-const privatePage = (method: string, ownerOpenUrl: string | null): Response =>
-  new Response(method === "HEAD" ? null : privatePageHtml(ownerOpenUrl), {
+const privatePage = (method: string, ownerOpenUrl: string | null, what: "canvas" | "view" = "canvas"): Response =>
+  new Response(method === "HEAD" ? null : privatePageHtml(ownerOpenUrl, what), {
     status: 403,
     headers: {
       "content-type": "text/html; charset=utf-8",
@@ -534,7 +534,7 @@ export default {
       const secret = viewSecretOf(env);
       if (!owner || !secret) {
         object.body.cancel().catch(() => {});
-        return privatePage(request.method, null);
+        return privatePage(request.method, null, isView ? "view" : "canvas");
       }
       const ownerOpenUrl = ownerOpenUrlOf(env, object.customMetadata, slug);
       const now = Date.now();
@@ -558,11 +558,11 @@ export default {
             },
           });
         }
-        return privatePage(request.method, ownerOpenUrl);
+        return privatePage(request.method, ownerOpenUrl, isView ? "view" : "canvas");
       }
       if (!(await hasOwnerViewCookie(request, secret, owner))) {
         object.body.cancel().catch(() => {});
-        return privatePage(request.method, ownerOpenUrl);
+        return privatePage(request.method, ownerOpenUrl, isView ? "view" : "canvas");
       }
     }
 

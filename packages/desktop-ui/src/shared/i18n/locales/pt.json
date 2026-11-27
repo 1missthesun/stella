@@ -3082,7 +3082,9 @@
         "notSynced": "Esta visualização ainda não chegou à sua conta. Tente novamente em instantes.",
         "noLink": "Compartilhe um link que executa esta visualização em qualquer navegador. O que os visitantes salvam fica no próprio navegador deles.",
         "makePrivateLink": "Link privado",
-        "madeWithStella": "Feito com Stella"
+        "madeWithStella": "Feito com Stella",
+        "live": "A visualização está no ar",
+        "publicLink": "Link público da visualização"
       }
     },
     "displayPanel": {

@@ -3066,7 +3066,9 @@
         "notSynced": "Bu görünüm henüz hesabına ulaşmadı. Birazdan tekrar dene.",
         "noLink": "Bu görünümü herhangi bir tarayıcıda çalıştıran bir bağlantı paylaş. Ziyaretçilerin kaydettikleri kendi tarayıcılarında kalır.",
         "makePrivateLink": "Özel bağlantı",
-        "madeWithStella": "Stella ile yapıldı"
+        "madeWithStella": "Stella ile yapıldı",
+        "live": "Görünüm yayında",
+        "publicLink": "Görünümün herkese açık bağlantısı"
       }
     },
     "displayPanel": {

@@ -3098,7 +3098,9 @@
         "notSynced": "Ten widok nie dotarł jeszcze do Twojego konta. Spróbuj ponownie za chwilę.",
         "noLink": "Udostępnij link, który uruchamia ten widok w dowolnej przeglądarce. To, co zapiszą odwiedzający, zostaje w ich własnej przeglądarce.",
         "makePrivateLink": "Link prywatny",
-        "madeWithStella": "Stworzone w Stelli"
+        "madeWithStella": "Stworzone w Stelli",
+        "live": "Widok jest dostępny",
+        "publicLink": "Publiczny link do widoku"
       }
     },
     "displayPanel": {

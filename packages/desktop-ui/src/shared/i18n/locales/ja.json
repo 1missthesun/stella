@@ -3048,7 +3048,9 @@
         "notSynced": "このビューはまだアカウントに届いていません。少ししてからもう一度お試しください。",
         "noLink": "このビューをどのブラウザでも動かせるリンクを共有します。訪問者が保存した内容はその人のブラウザに残ります。",
         "makePrivateLink": "非公開リンク",
-        "madeWithStella": "Stella で作成"
+        "madeWithStella": "Stella で作成",
+        "live": "ビューを公開中",
+        "publicLink": "ビューの公開リンク"
       }
     },
     "displayPanel": {

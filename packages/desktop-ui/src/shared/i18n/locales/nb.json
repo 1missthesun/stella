@@ -3066,7 +3066,9 @@
         "notSynced": "Denne visningen har ikke kommet til kontoen din ennå. Prøv igjen om et øyeblikk.",
         "noLink": "Del en lenke som kjører denne visningen i en hvilken som helst nettleser. Det besøkende lagrer, blir i deres egen nettleser.",
         "makePrivateLink": "Privat lenke",
-        "madeWithStella": "Laget med Stella"
+        "madeWithStella": "Laget med Stella",
+        "live": "Visningen er publisert",
+        "publicLink": "Offentlig lenke til visningen"
       }
     },
     "displayPanel": {

@@ -3066,7 +3066,9 @@
         "notSynced": "Den här vyn har inte nått ditt konto än. Försök igen om en stund.",
         "noLink": "Dela en länk som kör den här vyn i vilken webbläsare som helst. Det besökare sparar stannar i deras egen webbläsare.",
         "makePrivateLink": "Privat länk",
-        "madeWithStella": "Skapad med Stella"
+        "madeWithStella": "Skapad med Stella",
+        "live": "Vyn är publicerad",
+        "publicLink": "Offentlig länk till vyn"
       }
     },
     "displayPanel": {

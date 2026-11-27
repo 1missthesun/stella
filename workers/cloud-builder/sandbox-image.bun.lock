@@ -6,7 +6,7 @@
       "name": "stella-cloud-executor-image",
       "dependencies": {
         "@anthropic-ai/claude-code": "2.1.294",
-        "@earendil-works/pi-ai": "1.6.1",
+        "@earendil-works/pi-ai": "1.7.0",
         "@googleapis/calendar": "^20.1.0",
         "@googleapis/docs": "^14.1.0",
         "@googleapis/drive": "^26.0.2",
@@ -86,11 +86,11 @@
 
     "@babel/runtime": ["@babel/runtime@7.29.10", "", {}, "sha512-NpugTzbKgGrNe45Ui32cN8vCFFMxVtP/9rtfwv0nP5FRDAjvYBxJcLVpYA9mr1jxP6cnIT7x9LUzuDTbWYYNRA=="],
 
-    "@earendil-works/pi-ai": ["@earendil-works/pi-ai@1.6.1", "", { "dependencies": { "@anthropic-ai/sdk": "0.129.0", "@aws-sdk/client-bedrock-runtime": "3.1127.0", "@aws-sdk/credential-provider-node": "3.972.82", "@earendil-works/pi-schema": "1.6.1", "@earendil-works/pi-telemetry": "1.6.1", "@google/genai": "3.6.1", "@smithy/node-http-handler": "4.12.1", "http-proxy-agent": "9.1.0", "https-proxy-agent": "9.1.0", "openai": "7.59.0", "partial-json": "0.1.7" }, "bin": { "pi-ai": "dist/cli.js" } }, "sha512-EyorgVyA2s4MxNl7YOapzOpdxrc8HUgxHEIOo8QRMK35P7PCOsSiWzMLf6ixKl3/obkg7I3wGJWHq+FdbUz43g=="],
+    "@earendil-works/pi-ai": ["@earendil-works/pi-ai@1.7.0", "", { "dependencies": { "@anthropic-ai/sdk": "0.129.0", "@aws-sdk/client-bedrock-runtime": "3.1127.0", "@aws-sdk/credential-provider-node": "3.972.82", "@earendil-works/pi-schema": "1.7.0", "@earendil-works/pi-telemetry": "1.7.0", "@google/genai": "3.6.1", "@smithy/node-http-handler": "4.12.1", "http-proxy-agent": "9.1.0", "https-proxy-agent": "9.1.0", "openai": "7.59.0", "partial-json": "0.1.7" }, "bin": { "pi-ai": "dist/cli.js" } }, "sha512-iKryMlUYniwWbU7YU0uS7W0+cGd9c6oJ6PzRLOn8j4+1njG4c+BQq1cNawctx/npDqGeOx8ME7Gkgl6K6arPuw=="],
 
-    "@earendil-works/pi-schema": ["@earendil-works/pi-schema@1.6.1", "", {}, "sha512-Q/6W4IiDdIQUochCuvXFpglTByNTFTuMYvMqXjcRiOnxOl/3mQYLAZpZTpBSRWiS4WgeV7NyH/8dQp6ipYZeNg=="],
+    "@earendil-works/pi-schema": ["@earendil-works/pi-schema@1.7.0", "", {}, "sha512-skji4McLg9jum3NFWzFa/4QRGEZhMGnSi3QL8b9VljJkc/QopH2/BFuGKI+VcEwYzKGwsd0I8RzvXGnZGfGltQ=="],
 
-    "@earendil-works/pi-telemetry": ["@earendil-works/pi-telemetry@1.6.1", "", {}, "sha512-3gyjVQlVrPwEq7ZCea8++prMwUkuNXM3v/mzTJ9knJAhqrYLxSVAjYzA1iC3KLq8ismmSQIcnFp++qTwQwNToA=="],
+    "@earendil-works/pi-telemetry": ["@earendil-works/pi-telemetry@1.7.0", "", {}, "sha512-QZkngqktohuFZ2TZuJSXDuUntld4sCMW1tkUPaD4moMEX/z1lwcjycXnd9ChO9HNxm/Jfo+UTiC+N2hkAF9b0w=="],
 
     "@google/genai": ["@google/genai@3.6.1", "", { "dependencies": { "google-auth-library": "^10.3.0", "p-retry": "^4.6.2", "protobufjs": "^7.6.5", "ws": "^8.21.0" }, "peerDependencies": { "@modelcontextprotocol/sdk": "^1.25.2" }, "optionalPeers": ["@modelcontextprotocol/sdk"] }, "sha512-DQIkZkl+VoZc+RUSaJ41vRuywjQDpP0t/oUf5/ddQhNW6JsPjVULW2EgHmuJ1mrr6ACtrmUdPlqtNXF1yfKySg=="],
 

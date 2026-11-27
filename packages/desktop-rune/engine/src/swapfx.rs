@@ -21,6 +21,7 @@ use rune::{El, Spring};
 use rune::render::EffectPhase;
 
 use crate::engine::Engine;
+use crate::props::Kind;
 
 /// The swap slot's effect mark: no node id comes near it.
 pub const MARK: u32 = 0xFFFF_FFF8;
@@ -168,39 +169,146 @@ struct Shape {
 
 /// Every painted box in the main window, keyed by its place in the tree (ids, else kind and
 /// index, with React's generated ids masked), so a remounted element finds its old self.
-fn shapes(rt: &rune::Runtime<crate::windows::Win>, eng: &Engine) -> HashMap<u64, Shape> {
-    let Some(window) = eng.main_node else { return HashMap::new() };
+fn shapes(rt: &rune::Runtime<crate::windows::Win>, eng: &Engine) -> Snap {
+    let Some(window) = eng.main_node else { return Snap::default() };
     let by_id: HashMap<&str, u32> = eng.tree.nodes.iter().filter_map(|(n, node)| node.props.id.as_deref().map(|id| (id, *n))).collect();
     let mut paths: HashMap<u32, Option<u64>> = HashMap::new();
     let mut out = HashMap::new();
+    let mut all: HashMap<u64, Seen> = HashMap::new();
     let mut dup: Vec<u64> = Vec::new();
-    for info in rt.elements() {
-        let Some(key) = info.key.as_deref() else { continue };
-        let node = match key.strip_prefix('n').and_then(|d| d.parse::<u32>().ok()) {
-            Some(n) if eng.tree.get(n).is_some_and(|x| x.props.id.is_none()) => n,
-            _ => match by_id.get(key) {
-                Some(n) => *n,
-                None => continue,
-            },
-        };
-        if info.exiting || info.rect[2] < 4.0 || info.rect[3] < 4.0 {
-            continue;
-        }
+    let found: Vec<(u32, rune::ElementInfo)> = rt
+        .elements()
+        .into_iter()
+        .filter(|info| !info.exiting)
+        .filter_map(|info| {
+            let key = info.key.as_deref()?;
+            let node = match key.strip_prefix('n').and_then(|d| d.parse::<u32>().ok()) {
+                Some(n) if eng.tree.get(n).is_some_and(|x| x.props.id.is_none()) => n,
+                _ => *by_id.get(key)?,
+            };
+            Some((node, info))
+        })
+        .collect();
+    let rects: HashMap<u32, [f32; 4]> = found.iter().map(|(n, info)| (*n, info.rect)).collect();
+    for (node, info) in found {
         let Some(node_ref) = eng.tree.get(node) else { continue };
+        let Some(h) = path_hash(eng, window, node, &mut paths) else { continue };
         let p = &node_ref.props;
         let boxed = p.fill.is_some() || p.gradient.is_some() || p.border.is_some() || p.fx.as_ref().is_some_and(|f| !f.0.is_empty());
-        if !boxed {
-            continue;
-        }
-        let Some(h) = path_hash(eng, window, node, &mut paths) else { continue };
-        if out.insert(h, Shape { rect: info.rect, radius: info.radius.max(0.0) }).is_some() {
+        let visible = info.opacity > 0.01;
+        let paints = visible && (boxed || !matches!(node_ref.kind, Kind::Col | Kind::Row | Kind::Box | Kind::List | Kind::Window));
+        let name = if debug() { format!("{} {:?}", info.path, node_ref.kind) } else { String::new() };
+        let o = scroll_origin(eng, node, &rects);
+        let rel = [info.rect[0] - o[0], info.rect[1] - o[1], info.rect[2], info.rect[3]];
+        if all.insert(h, Seen { rect: info.rect, rel, sig: signature(node_ref, &info), paints, visible, name }).is_some() {
             dup.push(h);
         }
+        if !boxed || info.rect[2] < 4.0 || info.rect[3] < 4.0 {
+            continue;
+        }
+        out.insert(h, Shape { rect: info.rect, radius: info.radius.max(0.0) });
     }
     for h in dup {
         out.remove(&h);
+        all.remove(&h);
     }
-    out
+    Snap { shapes: out, all }
+}
+
+/// Where the content of the scroll container `n` sits in (its scrolled origin), or the window's.
+fn scroll_origin(eng: &Engine, n: u32, rects: &HashMap<u32, [f32; 4]>) -> [f32; 2] {
+    let mut cur = n;
+    while let Some(node) = eng.tree.get(cur) {
+        let parent = node.parent;
+        let Some(up) = (parent != 0).then(|| eng.tree.get(parent)).flatten() else { break };
+        if up.props.scroll_y || up.props.scroll_x {
+            return rects.get(&cur).map_or([0.0, 0.0], |r| [r[0], r[1]]);
+        }
+        cur = parent;
+    }
+    [0.0, 0.0]
+}
+
+/// What an element paints, minus its identity and handlers (React's generated ids differ
+/// between generations).
+fn signature(node: &crate::tree::Node, info: &rune::ElementInfo) -> u64 {
+    let mut props = (*node.props).clone();
+    props.id = None;
+    props.on.clear();
+    let mut hasher = std::collections::hash_map::DefaultHasher::new();
+    format!("{:?}{:?}{:?}", node.kind, props, info.text).hash(&mut hasher);
+    hasher.finish()
+}
+
+#[derive(Default)]
+struct Snap {
+    /// Painted boxes, for the shape morph.
+    shapes: HashMap<u64, Shape>,
+    /// Every element's rect and paint signature.
+    all: HashMap<u64, Seen>,
+}
+
+struct Seen {
+    rect: [f32; 4],
+    /// The rect within its scroll container's content: scrolling moves nothing.
+    rel: [f32; 4],
+    sig: u64,
+    /// Draws something itself: a layout container that only moved changes no pixels of its own.
+    paints: bool,
+    visible: bool,
+    name: String,
+}
+
+fn debug() -> bool {
+    std::env::var_os("STELLA_RUNE_SWAP_FX_DEBUG").is_some()
+}
+
+/// Cells over an element that changed, came or went between the two trees: a picture change
+/// anywhere else (a spinner, a scrollbar fading, a caret) is the app living, not the swap.
+fn changed_cells(old: &Snap, new: &Snap, scale: f32, cols: u32, rows: u32) -> Vec<bool> {
+    let mut mask = vec![false; (cols * rows) as usize];
+    let mut mark = |r: [f32; 4]| {
+        let c = CELL as f32;
+        let x0 = ((r[0] * scale - 2.0) / c).floor().max(0.0) as u32;
+        let y0 = ((r[1] * scale - 2.0) / c).floor().max(0.0) as u32;
+        let x1 = (((r[0] + r[2]) * scale + 2.0) / c).ceil().min(cols as f32) as u32;
+        let y1 = (((r[1] + r[3]) * scale + 2.0) / c).ceil().min(rows as f32) as u32;
+        for y in y0..y1 {
+            for x in x0..x1 {
+                mask[(y * cols + x) as usize] = true;
+            }
+        }
+    };
+    let moved = |a: [f32; 4], b: [f32; 4]| (0..4).any(|i| (a[i] - b[i]).abs() > 0.5);
+    for (h, now) in &new.all {
+        match old.all.get(h) {
+            Some(was) if !was.visible && !now.visible => {}
+            None if !now.visible => {}
+            Some(was) if was.sig == now.sig && (!now.paints || !moved(was.rel, now.rel)) => {}
+            Some(was) => {
+                if debug() {
+                    eprintln!("stella-engine: swapfx: changed {} {:?} → {:?}{}", now.name, was.rect, now.rect, if was.sig == now.sig { "" } else { " (paint)" });
+                }
+                mark(was.rect);
+                mark(now.rect);
+            }
+            None => {
+                if debug() {
+                    eprintln!("stella-engine: swapfx: came {} {:?}", now.name, now.rect);
+                }
+                mark(now.rect)
+            }
+        }
+    }
+    for (h, was) in &old.all {
+        if was.visible && !new.all.contains_key(h) {
+            if debug() {
+                eprintln!("stella-engine: swapfx: went {} {:?}", was.name, was.rect);
+            }
+            mark(was.rect);
+        }
+    }
+    mask
 }
 
 fn path_hash(eng: &Engine, window: u32, n: u32, memo: &mut HashMap<u32, Option<u64>>) -> Option<u64> {
@@ -242,7 +350,7 @@ struct Region {
 /// The changed cells → regions (picture-diff.ts): cells past the threshold, joined across
 /// `JOIN_PT`, each group's bounds grown by the margin, overlapping ones merged. `None`: the whole
 /// window.
-fn regions(diff: &[u8], cols: u32, rows: u32, scale: f32, size: (u32, u32)) -> Option<Vec<[f32; 4]>> {
+fn regions(diff: &[u8], cols: u32, rows: u32, scale: f32, size: (u32, u32), painted: &[[f32; 4]]) -> Option<Vec<[f32; 4]>> {
     let (w, h) = (cols as usize, rows as usize);
     let on: Vec<u8> = diff.iter().map(|v| u8::from(*v > THRESHOLD)).collect();
     let r = ((JOIN_PT * scale) / CELL as f32).ceil().max(1.0) as usize;
@@ -304,6 +412,22 @@ fn regions(diff: &[u8], cols: u32, rows: u32, scale: f32, size: (u32, u32)) -> O
             [a, b, (x + rw + m).min(vw) - a, (y + rh + m).min(vh) - b]
         })
         .collect();
+    // A region ends at the edges of what it mostly covers, never through the middle of a label.
+    let pad = m * 0.5;
+    for r in &mut grown_rects {
+        let area = r[2] * r[3];
+        for e in painted {
+            let ix = (r[0] + r[2]).min(e[0] + e[2]) - r[0].max(e[0]);
+            let iy = (r[1] + r[3]).min(e[1] + e[3]) - r[1].max(e[1]);
+            let e_area = e[2] * e[3];
+            if ix <= 0.0 || iy <= 0.0 || ix * iy < 0.25 * e_area || e_area > 4.0 * area {
+                continue;
+            }
+            let (x0, y0) = (r[0].min(e[0] - pad).max(0.0), r[1].min(e[1] - pad).max(0.0));
+            let (x1, y1) = ((r[0] + r[2]).max(e[0] + e[2] + pad).min(vw), (r[1] + r[3]).max(e[1] + e[3] + pad).min(vh));
+            *r = [x0, y0, x1 - x0, y1 - y0];
+        }
+    }
     loop {
         let mut merged = false;
         'outer: for i in 0..grown_rects.len() {
@@ -323,7 +447,19 @@ fn regions(diff: &[u8], cols: u32, rows: u32, scale: f32, size: (u32, u32)) -> O
         }
     }
     let covered: f32 = grown_rects.iter().map(|r| r[2] * r[3]).sum();
-    (covered <= WHOLE_SHARE * vw * vh && grown_rects.len() <= MAX_REGIONS).then_some(grown_rects)
+    if covered > WHOLE_SHARE * vw * vh || grown_rects.len() > MAX_REGIONS {
+        return None;
+    }
+    // A region at the window's edge runs past it, so its feather never fades the edge in early.
+    const PAST: f32 = 64.0;
+    for r in &mut grown_rects {
+        let (x1, y1) = (r[0] + r[2], r[1] + r[3]);
+        let (x0, y0) = (if r[0] <= 0.5 { -PAST } else { r[0] }, if r[1] <= 0.5 { -PAST } else { r[1] });
+        let x1 = if x1 >= vw - 0.5 { vw + PAST } else { x1 };
+        let y1 = if y1 >= vh - 0.5 { vh + PAST } else { y1 };
+        *r = [x0, y0, x1 - x0, y1 - y0];
+    }
+    Some(grown_rects)
 }
 
 fn dilate(src: &[u8], w: usize, h: usize, r: usize) -> Vec<u8> {
@@ -365,10 +501,11 @@ fn dilate(src: &[u8], w: usize, h: usize, r: usize) -> Vec<u8> {
 
 /// The box in `region` whose shape changed the most visibly: matched old → new, both inside the
 /// region, covering a fair share of it.
-fn morph_in(region: [f32; 4], old: &HashMap<u64, Shape>, new: &HashMap<u64, Shape>, scale: f32) -> Option<([f32; 5], [f32; 5])> {
+fn morph_in(region: [f32; 4], old: &HashMap<u64, Shape>, new: &HashMap<u64, Shape>, scale: f32, size: (u32, u32)) -> Option<([f32; 5], [f32; 5])> {
     let px = |s: &Shape| [s.rect[0] * scale, s.rect[1] * scale, s.rect[2] * scale, s.rect[3] * scale, s.radius * scale];
     let inside = |r: [f32; 5]| r[0] >= region[0] - 2.0 && r[1] >= region[1] - 2.0 && r[0] + r[2] <= region[0] + region[2] + 2.0 && r[1] + r[3] <= region[1] + region[3] + 2.0;
-    let area = region[2] * region[3];
+    let seen = |a: f32, len: f32, max: u32| (a + len).min(max as f32) - a.max(0.0);
+    let area = seen(region[0], region[2], size.0) * seen(region[1], region[3], size.1);
     let mut best: Option<(f32, [f32; 5], [f32; 5])> = None;
     for (h, b) in new {
         let Some(a) = old.get(h) else { continue };
@@ -411,7 +548,7 @@ fn timeline(t: f32) -> (f32, f32, f32, f32, bool) {
 pub struct Swap {
     gpu: Option<Gpu>,
     res: Option<Res>,
-    old: HashMap<u64, Shape>,
+    old: Snap,
     diff: Option<Arc<Mutex<Option<Vec<u8>>>>>,
     land_at: Option<Instant>,
     /// When the comparison in flight was asked for.
@@ -477,7 +614,7 @@ impl Default for Swap {
         Swap {
             gpu: None,
             res: None,
-            old: HashMap::new(),
+            old: Snap::default(),
             diff: None,
             land_at: None,
             asked_at: Instant::now(),
@@ -501,6 +638,18 @@ impl Swap {
         matches!(stage(), Some(Stage::Land | Stage::Run))
     }
 
+    /// After a swap: the pictures it kept go.
+    pub fn settle(&mut self) {
+        if self.res.is_some() || !self.old.all.is_empty() {
+            self.res = None;
+            self.old = Snap::default();
+            self.regions.clear();
+            self.diff = None;
+            self.land_at = None;
+            self.last_cells = None;
+        }
+    }
+
     pub fn release_gpu(&mut self) {
         self.gpu = None;
         self.res = None;
@@ -516,14 +665,7 @@ impl Swap {
         let scale = f.rt.window_scale().max(0.5);
         self.plan = match stage() {
             None => {
-                if self.res.is_some() || !self.old.is_empty() {
-                    self.res = None;
-                    self.old.clear();
-                    self.regions.clear();
-                    self.diff = None;
-                    self.land_at = None;
-                    self.last_cells = None;
-                }
+                self.settle();
                 Plan::Nothing
             }
             Some(Stage::Want) => {
@@ -610,8 +752,19 @@ impl Swap {
             pgm.extend(d.iter().map(|v| v.saturating_mul(8)));
             let _ = std::fs::write(std::path::Path::new(&dir).join(format!("cells-{:.0}.pgm", f.rt.t * 1000.0)), pgm);
         }
-        let found = cells.and_then(|d| regions(&d, res.cols, res.rows, scale, size));
         let new = crate::engine::read(|eng| shapes(f.rt, eng));
+        let found = cells.and_then(|mut d| {
+            if !self.old.all.is_empty() {
+                let mask = changed_cells(&self.old, &new, scale, res.cols, res.rows);
+                for (v, keep) in d.iter_mut().zip(mask) {
+                    if !keep {
+                        *v = 0;
+                    }
+                }
+            }
+            let painted: Vec<[f32; 4]> = new.all.values().filter(|e| e.paints).map(|e| [e.rect[0] * scale, e.rect[1] * scale, e.rect[2] * scale, e.rect[3] * scale]).collect();
+            regions(&d, res.cols, res.rows, scale, size, &painted)
+        });
         self.whole = found.is_none();
         self.regions = match found {
             None => vec![Region { rect: [-64.0, -64.0, size.0 as f32 + 128.0, size.1 as f32 + 128.0], feather: 1.0, blur: 1.0, morph: None }],
@@ -619,7 +772,7 @@ impl Swap {
                 .into_iter()
                 .map(|rect| {
                     let side = rect[2].min(rect[3]) / scale;
-                    Region { rect, feather: FEATHER_PT * scale, blur: (side / 64.0).clamp(0.35, 1.0), morph: morph_in(rect, &self.old, &new, scale) }
+                    Region { rect, feather: FEATHER_PT * scale, blur: (side / 64.0).clamp(0.35, 1.0), morph: morph_in(rect, &self.old.shapes, &new.shapes, scale, size) }
                 })
                 .collect(),
         };

@@ -742,6 +742,8 @@ impl Compositor<Win> for Comp {
         let swapping = self.window.is_none() && crate::swapfx::active();
         if swapping {
             self.swap.prepare(f);
+        } else {
+            self.swap.settle();
         }
         let swap = &mut self.swap;
         let clear = f.rt.clear_color();

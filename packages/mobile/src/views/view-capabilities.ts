@@ -2,15 +2,56 @@
 // https, the same rule the desktop host and the VM's own fetch keep.
 import { Linking, Share } from "react-native";
 import * as Clipboard from "expo-clipboard";
+import * as DocumentPicker from "expo-document-picker";
+import { File } from "expo-file-system";
+import * as Location from "expo-location";
+import { VIEW_ASK_LIMITS } from "@stella/contracts/backend/views";
 import * as Haptics from "expo-haptics";
 import * as Notifications from "expo-notifications";
 import type { ViewCapabilities } from "@stella/views/session";
+import { getBackendClient } from "../lib/backend";
 import { sendToChat } from "../lib/chat-send-queue";
 import { openWebLink } from "../lib/open-web-link";
+import { saveViewFile } from "./native-vm";
 
 const PRIVATE_HOST =
   /^(localhost|.*\.local|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|0\.|\[?::1?\]?$|\[?f[cd][0-9a-f]{2}:|\[?fe80:)/iu;
 const MAX_RESPONSE_CHARS = 8 * 1024 * 1024;
+const MAX_PICKED_BYTES = 4 * 1024 * 1024;
+
+// Android reports some types under older names (CSV as text/comma-separated-values), so each lists them all.
+const MIME_BY_EXTENSION: Record<string, string[]> = {
+  txt: ["text/plain"],
+  md: ["text/markdown", "text/x-markdown"],
+  markdown: ["text/markdown", "text/x-markdown"],
+  csv: ["text/csv", "text/comma-separated-values"],
+  tsv: ["text/tab-separated-values"],
+  json: ["application/json"],
+  html: ["text/html"],
+  htm: ["text/html"],
+  xml: ["text/xml", "application/xml"],
+  ics: ["text/calendar"],
+  vcf: ["text/vcard", "text/x-vcard"],
+  svg: ["image/svg+xml"],
+  yaml: ["application/yaml", "application/x-yaml", "text/yaml"],
+  yml: ["application/yaml", "application/x-yaml", "text/yaml"],
+};
+
+/** `accept` takes MIME types ("text/csv", "text/*") or extensions (".csv"); anything unknown opens everything. */
+const pickerTypes = (accept: unknown): string[] => {
+  if (!Array.isArray(accept) || accept.length === 0) return ["*/*"];
+  const types = new Set<string>();
+  for (const entry of accept) {
+    const value = string(entry).trim().toLowerCase();
+    if (value.includes("/")) types.add(value);
+    else {
+      const mimes = MIME_BY_EXTENSION[value.replace(/^\./u, "")];
+      if (!mimes) return ["*/*"];
+      for (const mime of mimes) types.add(mime);
+    }
+  }
+  return [...types];
+};
 
 const string = (value: unknown) => (typeof value === "string" ? value : String(value ?? ""));
 
@@ -79,6 +120,48 @@ export const viewCapabilities: ViewCapabilities = {
     const url = typeof c.url === "string" ? c.url : "";
     if (!text && !url) throw new Error("share needs text or a url");
     await Share.share({ message: [text, url].filter(Boolean).join("\n"), ...(url ? { url } : {}), ...(typeof c.title === "string" ? { title: c.title } : {}) });
+  },
+  pickFile: async ([options]) => {
+    const result = await DocumentPicker.getDocumentAsync({
+      type: pickerTypes((options as { accept?: unknown } | undefined)?.accept),
+      multiple: false,
+      copyToCacheDirectory: true,
+    });
+    const asset = result.canceled ? null : result.assets[0];
+    if (!asset) return null;
+    const file = new File(asset.uri);
+    try {
+      if ((asset.size ?? file.size ?? 0) > MAX_PICKED_BYTES) throw new Error("That file is bigger than 4 MB");
+      return { name: asset.name, text: await file.text() };
+    } finally {
+      try {
+        file.delete();
+      } catch {
+        // The picker's cache copy; the OS clears it anyway.
+      }
+    }
+  },
+  saveFile: async ([name, content]) => {
+    const text = typeof content === "string" ? content : JSON.stringify(content, null, 2);
+    return await saveViewFile(string(name) || "file.txt", text);
+  },
+  ask: async ([prompt, options]) => {
+    const text = string(prompt);
+    if (text.length > VIEW_ASK_LIMITS.maxPromptChars) throw new Error(`ask takes at most ${VIEW_ASK_LIMITS.maxPromptChars} characters`);
+    const system = (options as { system?: unknown } | undefined)?.system;
+    const answer = await getBackendClient().call(
+      "views.ask",
+      { prompt: text, ...(typeof system === "string" && system ? { system } : {}) },
+      { timeoutMs: VIEW_ASK_LIMITS.timeoutMs + 10_000 },
+    );
+    return answer.text;
+  },
+  location: async () => {
+    const current = await Location.getForegroundPermissionsAsync();
+    const granted = current.granted || (current.canAskAgain && (await Location.requestForegroundPermissionsAsync()).granted);
+    if (!granted) return null;
+    const position = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+    return { latitude: position.coords.latitude, longitude: position.coords.longitude, accuracy: position.coords.accuracy ?? 0 };
   },
   send: async ([text]) => {
     const message = string(text).trim();

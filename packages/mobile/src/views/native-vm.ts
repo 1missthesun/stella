@@ -1,7 +1,9 @@
 // Stella Views' VM on the phone: the StellaViews native module (modules/stella-views) runs each
 // program in a psychoscript-mobile live run on a thread of its own, never on the JS thread. One
 // `onRun` event carries a wake-up's posts as a JSON array text.
-import { requireOptionalNativeModule, type EventSubscription } from "expo-modules-core";
+import type { ComponentType, ReactNode } from "react";
+import type { NativeSyntheticEvent, ViewProps } from "react-native";
+import { requireNativeViewManager, requireOptionalNativeModule, type EventSubscription } from "expo-modules-core";
 import type { ViewExit, ViewRun, ViewVm } from "@stella/views/session";
 import type { ViewMessage, ViewPost } from "@stella/views/protocol";
 
@@ -16,12 +18,30 @@ type StellaViewsNative = {
   stop(id: string): void;
   pause(id: string): boolean;
   resume(id: string): boolean;
+  saveFile(name: string, content: string): Promise<string | null>;
   addListener(event: "onRun", listener: (event: RunEvent) => void): EventSubscription;
 };
 
 const native = requireOptionalNativeModule<StellaViewsNative>("StellaViews");
 
 export const viewsAvailable = (): boolean => native !== null;
+
+/** The system's save dialog (Files on iOS, "save as" on Android); where it went, or null if cancelled. */
+export const saveViewFile = async (name: string, content: string): Promise<string | null> => {
+  if (!native) throw new Error("Saving files needs a newer version of the app.");
+  return await native.saveFile(name, content);
+};
+
+export type KeyCaptureProps = ViewProps & {
+  /** Canonical chords (`mod+shift+alt+ctrl+key`, see view-keys.ts). */
+  chords: string[];
+  autoFocus: boolean;
+  onChord: (event: NativeSyntheticEvent<{ chord: string }>) => void;
+  children?: ReactNode;
+};
+
+/** Hardware-keyboard chords for a view's `useKey`, or null in a build without the module. */
+export const NativeKeyCapture: ComponentType<KeyCaptureProps> | null = native ? requireNativeViewManager<KeyCaptureProps>("StellaViews", "StellaKeyView") : null;
 
 type Listener = { gen: number | null; events: Parameters<ViewVm["start"]>[2]; early: RunEvent[] };
 const listeners = new Map<string, Listener>();

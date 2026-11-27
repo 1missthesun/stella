@@ -9,7 +9,8 @@ import { selectionTick } from "../lib/haptics";
 import { fonts } from "../theme/fonts";
 import { useColors, useTheme } from "../theme/theme-context";
 import type { Colors } from "../theme/colors";
-import { viewsAvailable } from "./native-vm";
+import { NativeKeyCapture, viewsAvailable } from "./native-vm";
+import { chordTable } from "./view-keys";
 import { closeViewFullScreen, openViewFullScreen, useFullScreenView, useIsLiveView, useNewestView, useViewSession } from "./view-host";
 import { ViewIcon } from "./ViewIcon";
 import { ViewRoot } from "./ViewRenderer";
@@ -68,7 +69,7 @@ function ViewBody({ session, snapshot, colors, dark, covered, scroll, onArea }: 
   }
   const layout = (e: LayoutChangeEvent) => onArea(e.nativeEvent.layout.width, e.nativeEvent.layout.height);
   return (
-    <>
+    <KeyChords session={session} keys={snapshot.keys} autoFocus={scroll === "fill"} fill={scroll === "fill"}>
       <ScrollView
         style={scroll === "card" ? { maxHeight: CARD_MAX_H } : { flex: 1 }}
         contentContainerStyle={{ padding: CARD_PAD, ...(scroll === "fill" ? { flexGrow: 1 } : {}) }}
@@ -79,7 +80,23 @@ function ViewBody({ session, snapshot, colors, dark, covered, scroll, onArea }: 
         <ViewRoot tree={snapshot.tree} dispatch={dispatch} colors={colors} dark={dark} modals={!covered} />
       </ScrollView>
       {problem ? <ProblemStrip message={problem.message} onRestart={restart} colors={colors} /> : null}
-    </>
+    </KeyChords>
+  );
+}
+
+/** The view's `useKey` chords from a hardware keyboard while the view has focus (a press gives it focus; full screen takes it at once). */
+function KeyChords({ session, keys, autoFocus, fill, children }: { session: ViewSession | null; keys: readonly string[]; autoFocus: boolean; fill: boolean; children: ReactNode }) {
+  const table = useMemo(() => chordTable(keys), [keys]);
+  const chords = useMemo(() => [...table.keys()], [table]);
+  const onChord = useCallback((event: { nativeEvent: { chord: string } }) => {
+    const chord = table.get(event.nativeEvent.chord);
+    if (chord) session?.key(chord);
+  }, [session, table]);
+  if (!NativeKeyCapture) return <View style={fill ? { flex: 1 } : undefined}>{children}</View>;
+  return (
+    <NativeKeyCapture chords={chords} autoFocus={autoFocus && chords.length > 0} onChord={onChord} style={fill ? { flex: 1 } : undefined}>
+      {children}
+    </NativeKeyCapture>
   );
 }
 

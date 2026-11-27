@@ -7,6 +7,9 @@ import com.anomalyco.psychoscript.LiveOptions
 import com.anomalyco.psychoscript.LiveRun
 import com.anomalyco.psychoscript.Program
 import com.anomalyco.psychoscript.PsychoScriptException
+import android.app.Activity
+import android.content.Intent
+import expo.modules.kotlin.Promise
 import expo.modules.kotlin.exception.CodedException
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -76,7 +79,45 @@ class StellaViewsModule : Module() {
     Function("pause") { id: String -> run(id)?.let { runCatching { it.pause() }.isSuccess } ?: false }
 
     Function("resume") { id: String -> run(id)?.let { runCatching { it.resume() }.isSuccess } ?: false }
+
+    // `stella.saveFile`: the system "save as" dialog; the new document's URI, or null when cancelled.
+    AsyncFunction("saveFile") { name: String, content: String, promise: Promise ->
+      val activity = appContext.currentActivity ?: throw ViewRunException("Nothing on screen can show the save dialog")
+      pendingSave?.second?.resolve(null)
+      pendingSave = content to promise
+      val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+        addCategory(Intent.CATEGORY_OPENABLE)
+        type = mimeFor(name)
+        putExtra(Intent.EXTRA_TITLE, name.replace(Regex("[\\u0000/\\\\:]"), "_").trim().ifEmpty { "file.txt" })
+      }
+      activity.startActivityForResult(intent, SAVE_REQUEST)
+    }
+
+    OnActivityResult { activity, payload ->
+      if (payload.requestCode != SAVE_REQUEST) return@OnActivityResult
+      val (content, promise) = pendingSave ?: return@OnActivityResult
+      pendingSave = null
+      val uri = payload.data?.data
+      if (payload.resultCode != Activity.RESULT_OK || uri == null) {
+        promise.resolve(null)
+        return@OnActivityResult
+      }
+      try {
+        activity.contentResolver.openOutputStream(uri, "wt")!!.use { it.write(content.toByteArray(Charsets.UTF_8)) }
+        promise.resolve(uri.toString())
+      } catch (error: Exception) {
+        promise.reject(ViewRunException("The file couldn't be written: ${error.message}"))
+      }
+    }
+
+    View(StellaKeyView::class) {
+      Events("onChord")
+      Prop("chords") { view: StellaKeyView, chords: List<String> -> view.chords = chords.toSet() }
+      Prop("autoFocus") { view: StellaKeyView, autoFocus: Boolean -> view.setAutoFocus(autoFocus) }
+    }
   }
+
+  private var pendingSave: Pair<String, Promise>? = null
 
   private fun run(id: String): LiveRun? = synchronized(runs) { runs[id]?.live }
 
@@ -112,6 +153,19 @@ class StellaViewsModule : Module() {
   }
 
   companion object {
+    private const val SAVE_REQUEST = 0x5745
+
+    private fun mimeFor(name: String): String = when (name.substringAfterLast('.', "").lowercase()) {
+      "json" -> "application/json"
+      "csv" -> "text/csv"
+      "md", "markdown" -> "text/markdown"
+      "html", "htm" -> "text/html"
+      "xml" -> "text/xml"
+      "ics" -> "text/calendar"
+      "svg" -> "image/svg+xml"
+      else -> "text/plain"
+    }
+
     fun message(error: PsychoScriptException): String = when (error) {
       is PsychoScriptException.Syntax -> located(error.reason, error.line, error.column)
       is PsychoScriptException.Runtime -> located(error.reason, error.line, error.column)

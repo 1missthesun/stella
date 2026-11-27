@@ -98,6 +98,50 @@ public final class StellaViewsModule: Module {
       guard let live = self.run(id) else { return false }
       return (try? live.resume()) != nil
     }
+
+    /// `stella.saveFile`: the Files export sheet for `content` named `name`; the saved file's path,
+    /// or nil when the user cancels.
+    AsyncFunction("saveFile") { (name: String, content: String, promise: Promise) in
+      guard let presenter = self.appContext?.utilities?.currentViewController() else {
+        promise.reject(ViewRunError("Nothing on screen can show the save sheet"))
+        return
+      }
+      let folder = FileManager.default.temporaryDirectory.appendingPathComponent("view-save-\(UUID().uuidString)", isDirectory: true)
+      let file = folder.appendingPathComponent(Self.safeFileName(name))
+      do {
+        try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
+        try content.write(to: file, atomically: true, encoding: .utf8)
+      } catch {
+        promise.reject(ViewRunError("The file couldn't be written: \(error.localizedDescription)"))
+        return
+      }
+      let picker = UIDocumentPickerViewController(forExporting: [file], asCopy: true)
+      let delegate = SaveDelegate { saved in
+        try? FileManager.default.removeItem(at: folder)
+        self.saveDelegate = nil
+        promise.resolve(saved?.path)
+      }
+      self.saveDelegate = delegate
+      picker.delegate = delegate
+      presenter.present(picker, animated: true)
+    }.runOnQueue(.main)
+
+    View(StellaKeyView.self) {
+      Events("onChord")
+      Prop("chords") { (view, chords: [String]) in
+        view.chords = Set(chords)
+      }
+      Prop("autoFocus") { (view, autoFocus: Bool) in
+        view.autoFocus = autoFocus
+      }
+    }
+  }
+
+  private var saveDelegate: SaveDelegate?
+
+  static func safeFileName(_ name: String) -> String {
+    let cleaned = name.components(separatedBy: CharacterSet(charactersIn: "/\\:\u{0}")).joined(separator: "_").trimmingCharacters(in: .whitespacesAndNewlines)
+    return cleaned.isEmpty ? "file.txt" : cleaned
   }
 
   private func run(_ id: String) -> LiveRun? {

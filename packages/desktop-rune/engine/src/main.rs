@@ -204,12 +204,33 @@ fn spawn_host(cmd: &mut Command) -> (Child, Box<dyn std::io::Read + Send>, Box<d
     (child, Box::new(out), Box::new(inp))
 }
 
+/// Stella's pinned Bun (`bun.version` in packages/desktop/launcher.json), where the launchers install
+/// it: `<launcher root>/runtimes/bun-<version>/bun[.exe]`. Only used when STELLA_RUNE_BUN is unset;
+/// the host itself refuses any other version (host/services/stella-bun.ts).
+fn pinned_bun(root: &str) -> Option<String> {
+    let pins = std::fs::read_to_string(std::path::Path::new(root).join("../desktop/launcher.json")).ok()?;
+    let pins: serde_json::Value = serde_json::from_str(&pins).ok()?;
+    let version = pins.get("bun")?.get("version")?.as_str()?;
+    let home = || std::env::var_os(if cfg!(windows) { "USERPROFILE" } else { "HOME" }).map(std::path::PathBuf::from);
+    let launcher_root = match std::env::var_os("STELLA_LAUNCHER_ROOT").filter(|r| !r.is_empty()) {
+        Some(r) => std::path::PathBuf::from(r),
+        None if cfg!(windows) => std::env::var_os("LOCALAPPDATA").map(std::path::PathBuf::from).or_else(|| home().map(|h| h.join("AppData/Local")))?.join("Stella"),
+        None if cfg!(target_os = "macos") => home()?.join("Library/Application Support/Stella"),
+        None => match std::env::var_os("XDG_DATA_HOME").filter(|x| !x.is_empty()) {
+            Some(x) => std::path::PathBuf::from(x).join("stella"),
+            None => home()?.join(".local/share/stella"),
+        },
+    };
+    let bin = launcher_root.join("runtimes").join(format!("bun-{version}")).join(if cfg!(windows) { "bun.exe" } else { "bun" });
+    bin.is_file().then(|| bin.to_string_lossy().into_owned())
+}
+
 fn spawn_ts() -> Boot {
     let root = std::env::var("STELLA_RUNE_ROOT").unwrap_or_else(|_| {
         let exe = std::env::current_exe().ok();
         exe.and_then(|p| p.ancestors().nth(4).map(|p| p.to_string_lossy().into_owned())).unwrap_or_else(|| ".".into())
     });
-    let bun = std::env::var("STELLA_RUNE_BUN").unwrap_or_else(|_| "bun".into());
+    let bun = std::env::var("STELLA_RUNE_BUN").ok().filter(|b| !b.is_empty()).or_else(|| pinned_bun(&root)).unwrap_or_else(|| "bun".into());
     let host = format!("{root}/host/main.tsx");
     let mut cmd = Command::new(&bun);
     cmd.arg(&host).args(std::env::args_os().skip(1)).current_dir(&root).stderr(Stdio::inherit());

@@ -1,13 +1,16 @@
 // Entry of the TS host, spawned by the compiled Rune engine, which owns the bridge fds
 // (host/ELEMENTS.md); all logging goes to stderr. Runs the host bundle while it matches the
-// sources (services/host-bundle.ts), else host/app.tsx from source.
+// sources (services/host-bundle.ts), else host/app.tsx from source. Only the stdio redirect and
+// the Bun version guard load statically: on a wrong Bun the rest may fail to link.
 
 import "./services/stdio";
+import "./services/bun-guard";
 import path from "node:path";
-import { defineAppRoot } from "../../../scripts/lib/module-paths.mjs";
-import { bootMark } from "./services/boot-trace";
-import { currentHostBundle } from "./services/host-bundle";
-import { pinReactBuild } from "./services/ui-mode";
+
+const { defineAppRoot } = await import("../../../scripts/lib/module-paths.mjs");
+const { bootMark } = await import("./services/boot-trace");
+const { currentHostBundle } = await import("./services/host-bundle");
+const { pinReactBuild } = await import("./services/ui-mode");
 
 bootMark("host-start");
 pinReactBuild();

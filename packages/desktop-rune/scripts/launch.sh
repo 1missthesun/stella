@@ -5,7 +5,8 @@ set -euo pipefail
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 RUN="${RUN:-$ROOT/.run/run}"
 mkdir -p "$RUN"; rm -f "$RUN/pid"
-BUN="$(PATH=$(echo "$PATH" | tr ':' '\n' | grep -v shell-shims | paste -sd:) command -v bun)"
+# Stella's pinned Bun (host/services/stella-bun.ts), found by whichever bun is on PATH.
+BUN="$("$(PATH=$(echo "$PATH" | tr ':' '\n' | grep -v shell-shims | paste -sd:) command -v bun)" "$ROOT/host/services/stella-bun.ts")"
 BIN="${BIN:-$ROOT/engine/target/release/stella-rune}"; [ -x "$BIN" ] || BIN="$ROOT/bin/stella-rune"
 W="${W:-1280}"; H="${H:-820}"
 T0=$(date +%s%3N)

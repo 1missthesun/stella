@@ -22,6 +22,7 @@ import { closeSync, existsSync, fstatSync, mkdirSync, openSync, readFileSync, rm
 import os from "node:os";
 import path from "node:path";
 import { borrowClaudeLogin, removeBorrowedClaudeLogin } from "../../../.agents/skills/verify-stella/cli/isolation.mjs";
+import { pinnedBunVersion, stellaBun } from "../host/services/stella-bun";
 
 const ROOT = path.resolve(import.meta.dir, "..");
 const REPO = path.resolve(ROOT, "../..");
@@ -114,10 +115,18 @@ const freePort = async () => {
   return port;
 };
 
-const BUN = (() => {
-  const pinned = path.join(os.homedir(), ".local/share/stella/runtimes/bun-1.4.4/bun");
-  return existsSync(pinned) ? pinned : process.execPath;
-})();
+/** Stella's pinned Bun on every platform (host/services/stella-bun.ts); resolved only for `start`. */
+const stellaBunOrExit = () => {
+  try {
+    const bun = stellaBun();
+    const version = bun === process.execPath ? Bun.version : spawnSync(bun, ["--version"], { encoding: "utf8" }).stdout?.trim();
+    if (version !== pinnedBunVersion() && process.env.STELLA_RUNE_ANY_BUN !== "1") throw new Error(`${bun} is Bun ${version || "(did not run)"}, not Stella's ${pinnedBunVersion()}.`);
+    return bun;
+  } catch (error) {
+    console.error(`session: ${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+};
 
 const shellQuote = (value: string) => `'${value.replaceAll("'", `'\\''`)}'`;
 
@@ -139,6 +148,7 @@ const showOnHyprland = async (env: Record<string, string>, w: number, h: number)
 };
 
 async function start() {
+  const BUN = stellaBunOrExit();
   if (existsSync(POINTER)) {
     const old = readRun();
     if (Object.values(old.pids).some(alive)) throw new Error(`Run ${runName} is still running; stop it first.`);

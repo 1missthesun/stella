@@ -46,7 +46,7 @@ import {
   DeviceRequestServer,
   type ServeDeviceRequest,
 } from "./device-request-server.js";
-import type { SqliteDatabase } from "@stella/node-shared/storage/shared.js";
+import type { SqliteConnection } from "@stella/node-shared/storage/shared.js";
 import {
   ExecutionPlacementInbox,
   type ExecutionPlacementInboxRow,
@@ -144,7 +144,7 @@ type DeviceIdentity = {
 
 type PlacementBridgeOptions = {
   client: ExecutionPlacementClient;
-  database: SqliteDatabase;
+  database: SqliteConnection;
   deviceIdentity: DeviceIdentity;
   signPresenceProof: (message: string) => Promise<string>;
   appVersion: string;

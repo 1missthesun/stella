@@ -129,6 +129,7 @@ const openDatabase = (stellaDataDir: string): PortableSqliteDatabase => {
       throw error;
     }
   }
+  db.exec("PRAGMA synchronous=NORMAL");
   try {
     db.exec("BEGIN IMMEDIATE");
     db.exec(`

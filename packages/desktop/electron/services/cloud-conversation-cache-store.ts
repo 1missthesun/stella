@@ -12,7 +12,7 @@ import {
   type CloudConversationCacheSnapshot,
   type CloudConversationCacheVersion,
 } from "@stella/contracts/cloud-conversation-cache";
-import type { SqliteDatabase } from "@stella/node-shared/storage/shared";
+import type { CachedStatements, SqliteConnection } from "@stella/node-shared/storage/shared";
 
 const AUTHORITY_FIELD_BYTES = 512;
 const TITLE_BYTES = 4 * 1024;
@@ -599,7 +599,10 @@ export class CloudConversationCacheStore {
   private activeAccountScope: string | null = null;
   private activeOwnerGeneration: string | null = null;
 
-  constructor(private readonly db: SqliteDatabase) {
+  private readonly cached: CachedStatements;
+
+  constructor(private readonly db: SqliteConnection) {
+    this.cached = db.statements;
     this.db.exec(`
       CREATE TABLE IF NOT EXISTS cloud_conversation_cache_meta (
         account_scope TEXT NOT NULL,
@@ -673,7 +676,7 @@ export class CloudConversationCacheStore {
       parseMetaRow(storedMeta, authority),
     );
     if (!row) return null;
-    const recordRows = this.db
+    const recordRows = this.cached
       .prepare(
         `SELECT seq, record_json, record_bytes
          FROM cloud_conversation_cache_records
@@ -782,7 +785,7 @@ export class CloudConversationCacheStore {
       let retainedCount = 0;
       if (input.retainedRange) {
         const { fromSeq, toSeq } = input.retainedRange;
-        const retained = this.db
+        const retained = this.cached
           .prepare(
             `SELECT COUNT(*) AS count, COALESCE(SUM(record_bytes), 0) AS bytes,
             MIN(record_bytes) AS minBytes, MAX(record_bytes) AS maxBytes
@@ -825,7 +828,7 @@ export class CloudConversationCacheStore {
         ) {
           throw new RangeError("Cloud conversation cache window is too large.");
         }
-        this.db
+        this.cached
           .prepare(
             `DELETE FROM cloud_conversation_cache_records
           WHERE account_scope = ? AND owner_generation = ? AND conversation_id = ?
@@ -842,7 +845,7 @@ export class CloudConversationCacheStore {
       } else {
         this.deleteExact(input);
       }
-      const insert = this.db.prepare(
+      const insert = this.cached.prepare(
         `INSERT INTO cloud_conversation_cache_records (
            account_scope, owner_generation, conversation_id, epoch,
            seq, record_json, record_bytes
@@ -859,7 +862,7 @@ export class CloudConversationCacheStore {
           record.bytes,
         );
       }
-      this.db
+      this.cached
         .prepare(
           `INSERT INTO cloud_conversation_cache_meta (
              account_scope, owner_generation, conversation_id, epoch,
@@ -923,7 +926,7 @@ export class CloudConversationCacheStore {
   }
 
   private selectMeta(authority: CloudConversationCacheAuthority): unknown {
-    return this.db
+    return this.cached
       .prepare(
         `SELECT account_scope, owner_generation, conversation_id, epoch,
                 head_seq, floor_seq, revision, title, cached_at_ms, record_count
@@ -945,13 +948,13 @@ export class CloudConversationCacheStore {
       authority.ownerGeneration,
       authority.conversationId,
     ];
-    this.db
+    this.cached
       .prepare(
         `DELETE FROM cloud_conversation_cache_records
          WHERE account_scope = ? AND owner_generation = ? AND conversation_id = ?`,
       )
       .run(...params);
-    this.db
+    this.cached
       .prepare(
         `DELETE FROM cloud_conversation_cache_meta
          WHERE account_scope = ? AND owner_generation = ? AND conversation_id = ?`,
@@ -960,7 +963,7 @@ export class CloudConversationCacheStore {
   }
 
   private countMetaWhere(predicate: string, params: unknown[]): number {
-    const row = this.db
+    const row = this.cached
       .prepare(
         `SELECT COUNT(*) AS count FROM cloud_conversation_cache_meta WHERE ${predicate}`,
       )
@@ -969,18 +972,18 @@ export class CloudConversationCacheStore {
   }
 
   private deleteWhere(predicate: string, params: unknown[]): void {
-    this.db
+    this.cached
       .prepare(
         `DELETE FROM cloud_conversation_cache_records WHERE ${predicate}`,
       )
       .run(...params);
-    this.db
+    this.cached
       .prepare(`DELETE FROM cloud_conversation_cache_meta WHERE ${predicate}`)
       .run(...params);
   }
 
   private pruneLeastRecent(): void {
-    const stale = this.db
+    const stale = this.cached
       .prepare(
         `SELECT account_scope, owner_generation, conversation_id
          FROM cloud_conversation_cache_meta

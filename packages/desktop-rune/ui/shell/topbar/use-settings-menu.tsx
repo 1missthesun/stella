@@ -5,8 +5,8 @@ import { feedbackDialog } from "@/shell/sidebar-sections/feedback-dialog-store";
 import { settingsDialog } from "@/shell/settings-dialog-store";
 import { Icons, type IconData } from "../../kit";
 import { lazyScreen, useLazyReady } from "../../kit/lazy";
-import { ConnectorsPopover } from "../sidebar-sections/ConnectorsPopover";
 
+const ConnectorsPopover = lazyScreen(() => import("../sidebar-sections/ConnectorsPopover"), (module) => module.ConnectorsPopover);
 const ThemePicker = lazyScreen(() => import("../../replace/global/settings/ThemePicker"), (module) => module.ThemePicker);
 
 const openPhoneDialog = () => {
@@ -23,6 +23,7 @@ export function useSettingsMenu(anchor: string) {
   const [themeOpen, setThemeOpen] = useState(false);
   const themeReady = useLazyReady(themeOpen, ThemePicker);
   const [connectorsOpen, setConnectorsOpen] = useState(false);
+  const connectorsReady = useLazyReady(connectorsOpen, ConnectorsPopover);
   const pendingPopoverRef = useRef<"theme" | "connectors" | null>(null);
 
   const applyPendingPopover = () => {
@@ -54,14 +55,17 @@ export function useSettingsMenu(anchor: string) {
           },
         ]
       : []),
-    { id: "connectors", label: "Connectors", icon: Icons.stella.Plug, onSelect: () => void (pendingPopoverRef.current = "connectors") },
+    { id: "connectors", label: "Connectors", icon: Icons.stella.Plug, onSelect: () => {
+        pendingPopoverRef.current = "connectors";
+        void ConnectorsPopover.preload();
+      } },
     { id: "feedback", label: "Send feedback", icon: Icons.stella.CircleQuestionMark, onSelect: () => feedbackDialog.open() },
   ];
 
   const popovers = (
     <>
       {themeOpen && themeReady ? <ThemePicker hideTrigger open={themeOpen} onOpenChange={setThemeOpen} side="bottom" align="end" anchor={anchor} /> : null}
-      <ConnectorsPopover open={connectorsOpen} onOpenChange={setConnectorsOpen} side="bottom" align="end" anchor={anchor} />
+      {connectorsReady ? <ConnectorsPopover open={connectorsOpen} onOpenChange={setConnectorsOpen} side="bottom" align="end" anchor={anchor} /> : null}
     </>
   );
 

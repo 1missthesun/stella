@@ -104,12 +104,3 @@
   display: block;
 }
 
-/* Browsers count a flexbox re-centre as a layout shift (CLS), but not a transform. */
-.sd .full-body-home-overlay > .home-content {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  margin-inline: auto;
-  transform: translateY(-50%);
-}

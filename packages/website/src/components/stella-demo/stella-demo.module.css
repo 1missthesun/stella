@@ -189,10 +189,3 @@
   display: none;
 }
 
-.frame[data-armed] .home[hidden] {
-  display: flex !important;
-}
-
-.frame[data-armed] :global(.full-body-chat-layer) {
-  opacity: 0;
-}

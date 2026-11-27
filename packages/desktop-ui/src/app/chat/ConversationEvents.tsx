@@ -1,5 +1,5 @@
 import type { ChatListBinding } from "@/shell/use-chat-scroll-management";
-import { memo, useEffect, useLayoutEffect, useMemo, useReducer, useRef } from "react";
+import { memo, useEffect, useMemo, useRef } from "react";
 import type { MessageRecord } from "@stella/contracts/local-chat";
 import { useEventRows } from "@/features/chat/hooks/use-event-rows";
 import { useThreadActivity } from "@/features/chat/hooks/use-thread-activity";
@@ -38,8 +38,7 @@ function useMessageArrivals(
   rows: readonly EventRowViewModel[],
   conversationId: string | null | undefined,
   pendingUserMessageId: string | null | undefined,
-): number {
-  const [version, bump] = useReducer((current: number) => current + 1, 0);
+): void {
   const seededConversationRef = useRef<string | null | undefined>(undefined);
   const tailAssistantId = useMemo(() => {
     for (let index = rows.length - 1; index >= 0; index -= 1) {
@@ -49,20 +48,18 @@ function useMessageArrivals(
     return null;
   }, [rows]);
 
-  useLayoutEffect(() => {
-    let changed = false;
-    if (seededConversationRef.current !== conversationId) {
+  // Recorded while rendering, so a message's first frame already carries its entrance rather
+  // than gaining it a commit later. The writes are idempotent. A conversation is seeded once its
+  // rows exist, so what it opens with (a welcome included) is present, not arriving.
+  if (seededConversationRef.current !== conversationId) {
+    if (rows.length > 0) {
       seededConversationRef.current = conversationId;
       if (tailAssistantId) recordPresentMessage(tailAssistantId);
-    } else if (tailAssistantId) {
-      changed = recordMessageArrival(tailAssistantId);
     }
-    if (pendingUserMessageId) {
-      changed = recordMessageArrival(pendingUserMessageId) || changed;
-    }
-    if (changed) bump();
-  }, [conversationId, pendingUserMessageId, tailAssistantId]);
-  return version;
+  } else if (tailAssistantId) {
+    recordMessageArrival(tailAssistantId);
+  }
+  if (pendingUserMessageId) recordMessageArrival(pendingUserMessageId);
 }
 
 const withArrival = (row: EventRowViewModel): EventRowViewModel => {
@@ -128,13 +125,9 @@ export const ConversationEvents = memo(function ConversationEvents({
     }
   }, [conversationId, relayedKey]);
 
-  const arrivalVersion = useMessageArrivals(
-    projectedRows,
-    conversationId,
-    pendingUserMessageId,
-  );
+  useMessageArrivals(projectedRows, conversationId, pendingUserMessageId);
   const rows = useMemo(() => {
-    void arrivalVersion;
+    void pendingUserMessageId;
     let changed = false;
     const next = projectedRows.map((row) => {
       const annotated = withArrival(row);
@@ -142,7 +135,7 @@ export const ConversationEvents = memo(function ConversationEvents({
       return annotated;
     });
     return changed ? next : projectedRows;
-  }, [arrivalVersion, projectedRows]);
+  }, [pendingUserMessageId, projectedRows]);
 
   return (
     <ChatTimeline

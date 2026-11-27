@@ -257,8 +257,21 @@ function AttachmentImage({ attachment, index, safeUrl }: { attachment: Attachmen
   return <ImageAttachmentChip thumbnailUrl={safeUrl} fullImageUrl={safeUrl} alt={attachment.name ?? t("app.chat.messageRow.attachmentAlt")} title={t("app.chat.messageRow.clickToEnlarge", { label })} />;
 }
 
-/** The `bubble-pop` entrance: rise 14pt and grow from 84% on a 360ms spring, fading in over 120ms. */
-const bubblePop = (delayMs: number | null) => (delayMs === null ? undefined : { opacity: 0, y: 14, scale: 0.84, dur: MESSAGE_ENTRANCE_MS / 1000, bounce: 0.15 });
+/** The `bubble-pop` entrance of a sent message: rise 14pt and grow from 84% on a 360ms spring. */
+const BUBBLE_POP = { opacity: 0, y: 14, scale: 0.84, dur: MESSAGE_ENTRANCE_MS / 1000, bounce: 0.15 };
+/** A reply fades in where it lands, without growing. */
+const REPLY_FADE = { opacity: 0, dur: 0.12 };
+/** How soon after its arrival a row must mount for its entrance to play. */
+const ENTRANCE_MOUNT_WINDOW_MS = 80;
+
+/**
+ * Whether this mount is the message arriving. Rune's `enter` plays from the start whenever an
+ * element mounts, so a row that remounts (its id changing from the optimistic one to the one the
+ * runtime accepted, or its list cell rebuilt) or that learns of its arrival after its first frame
+ * must not play it again: decided once, at mount.
+ */
+const useArrivingMount = (arrivedAt: number | undefined): boolean =>
+  useState(() => arrivedAt !== undefined && performance.now() - arrivedAt < ENTRANCE_MOUNT_WINDOW_MS)[0];
 
 const reactionLook = (t: ReturnType<typeof useTokens>) => derive(t, "reaction", (k) => ({ fill: k.c.surfaceInset, border: k.c.background }));
 
@@ -267,7 +280,7 @@ export const UserMessageRow = memo(
     const t = useT();
     const tokens = useTokens();
     const surface = useChatSurfaceLook();
-    const entrance = useEntrance(row.arrivedAt, MESSAGE_ENTRANCE_MS, MESSAGE_ENTRANCE_ANIMATION);
+    const arriving = useArrivingMount(row.arrivedAt);
     const reply = useMessageReply();
     const { text, windowLabel, attachments, channelEnvelope } = row;
     const copyAttachment = useMemo(() => primaryCopyAttachment(attachments), [attachments]);
@@ -337,7 +350,7 @@ export const UserMessageRow = memo(
                 radius={surface.user.radius}
                 fill={tokens.c.chatUserBubbleFill}
                 origin={[1, 1]}
-                enter={bubblePop(entrance.delayMs)}
+                enter={arriving ? BUBBLE_POP : undefined}
               >
                 {reaction ? (
                   <box
@@ -393,6 +406,7 @@ export const AssistantMessageRow = memo(
     const surface = useChatSurfaceLook();
     const reply = useMessageReply();
     const entrance = useEntrance(row.arrivedAt, MESSAGE_ENTRANCE_MS, MESSAGE_ENTRANCE_ANIMATION);
+    const arriving = useArrivingMount(row.arrivedAt);
     useReplyArrival(entrance.delayMs !== null, !row.isIntraTurn);
     const text = row.text;
     const hasText = text.trim().length > 0;
@@ -479,7 +493,7 @@ export const AssistantMessageRow = memo(
     const menu = contextMenu(messageMenu({ text: hasBody ? text : "", messageKey: row.id, renderedText: () => (!hasBody ? null : shouldUseBoundedMarkdownPlaintext(bodyText.length) ? bodyText : markdownPlainText(bodyText)), onReply: row.isIntraTurn ? null : reply, readAloud: !row.isIntraTurn }));
     return (
       <col w="full" hoverGroup onContextMenu={menu}>
-        <col w="full" gap={PART_GAP} origin={[0, 1]} enter={bubblePop(entrance.delayMs)}>
+        <col w="full" gap={PART_GAP} enter={arriving ? REPLY_FADE : undefined}>
           {row.voiceSession ? <VoiceSessionCard durationMs={row.voiceSession.durationMs} /> : null}
           {conversationId && (pillRefs.length > 0 || pillCompletions.length > 0) ? <ReplyPreview refs={pillRefs} completions={pillCompletions} conversationId={conversationId} /> : null}
           {row.askRecords?.map((record) => <UserAskRecordCard key={record.id} record={record} />)}

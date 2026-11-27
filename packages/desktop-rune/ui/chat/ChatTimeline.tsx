@@ -52,6 +52,13 @@ type ChatTimelineProps = {
 /** The timeline runs under floating glass chrome at both ends, so it shows there instead of fading out. */
 export const UnderGlassContext = createContext(false);
 
+/**
+ * desktop-ui lays a new or longer message out whole at once and only the pinned scroll eases after it
+ * (use-chat-scroll-management's follow). Rows still ease their height so the pinned viewport glides,
+ * but draw whole, unclipped and unfeathered, so a message never reads as growing open.
+ */
+const MESSAGE_GROWTH = { edge: "none", clip: false } as const;
+
 export const CHAT_DRAW_DISTANCE_COLD_PX = 300;
 export const CHAT_DRAW_DISTANCE_WARM_PX = 1_200;
 
@@ -151,6 +158,39 @@ function WorkingIndicatorRow({ indicator, onVacated }: { indicator: InlineWorkin
   );
 }
 
+type KeyState = { keys: Map<string, string>; sent: Map<string, { key: string; text: string }> };
+
+/**
+ * List keys that survive a sent message being re-identified. The bubble shows under a local id
+ * the moment it is sent, then comes back from the runtime under the id it was accepted as; keyed
+ * by id, its cell would be rebuilt there (the old one leaving as the new one enters, a second
+ * bubble for a moment). A user row that appears in the same update another with the same text
+ * leaves takes over that row's key, so the bubble lands once.
+ */
+function useContinuousKeys(items: readonly TimelineListItem[]): ReadonlyMap<string, string> {
+  const stateRef = useRef<KeyState>({ keys: new Map(), sent: new Map() });
+  return useMemo(() => {
+    const previous = stateRef.current;
+    const present = new Set(items.map((item) => item.id));
+    const left = new Map<string, string>();
+    for (const [id, row] of previous.sent) if (!present.has(id)) left.set(row.text, row.key);
+    const next: KeyState = { keys: new Map(), sent: new Map() };
+    for (const item of items) {
+      let key = previous.keys.get(item.id);
+      const sent = item.type === "message" && item.row.kind === "user" ? item.row : null;
+      if (key === undefined && sent) {
+        key = left.get(sent.text);
+        if (key !== undefined) left.delete(sent.text);
+      }
+      key ??= item.id;
+      next.keys.set(item.id, key);
+      if (sent) next.sent.set(item.id, { key, text: sent.text });
+    }
+    stateRef.current = next;
+    return next.keys;
+  }, [items]);
+}
+
 export const ChatTimeline = memo(function ChatTimeline({
   rows,
   conversationId,
@@ -188,6 +228,7 @@ export const ChatTimeline = memo(function ChatTimeline({
       return item.type === "message" ? { ...item, gapAfter, timeHeaderMs } : { ...item, gapAfter };
     });
   }, [askRecords, indicator, rows, tailPulledUp]);
+  const rowKeys = useContinuousKeys(listItems);
   const latestMediaRowId = useMemo(() => {
     for (let index = rows.length - 1; index >= 0; index -= 1) {
       const row = rows[index];
@@ -220,7 +261,7 @@ export const ChatTimeline = memo(function ChatTimeline({
     if (index >= 0) {
       finishMessageJump(messageJump.requestId);
       jumpPagesRef.current = null;
-      list?.ref.current?.scrollToKey(`chat-row:${listItems[index]!.id}`, MESSAGE_JUMP_VIEW_POSITION);
+      list?.ref.current?.scrollToKey(`chat-row:${rowKeys.get(listItems[index]!.id) ?? listItems[index]!.id}`, MESSAGE_JUMP_VIEW_POSITION);
       setFlashItemId(listItems[index]!.id);
       return;
     }
@@ -351,9 +392,9 @@ export const ChatTimeline = memo(function ChatTimeline({
       {viewport(
         <>
           {isLoadingOlder && hasOlderEvents ? <HistoryStatus /> : null}
-          <list w="full" estimate={estimatedItemSize}>
+          <list w="full" estimate={estimatedItemSize} growth={MESSAGE_GROWTH}>
             {listItems.map((item) => (
-              <col key={item.id} id={`chat-row:${item.id}`} w="full" arrivesWhole={item.type === "message"}>
+              <col key={rowKeys.get(item.id) ?? item.id} id={`chat-row:${rowKeys.get(item.id) ?? item.id}`} w="full" arrivesWhole={item.type === "message"}>
                 {renderItem(item)}
                 {item.gapAfter > 0 ? <box h={item.gapAfter} /> : null}
               </col>

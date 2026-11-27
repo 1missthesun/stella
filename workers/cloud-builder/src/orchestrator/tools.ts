@@ -12,6 +12,7 @@ import { createCloudImageGenTool } from "../cloud-image-gen-tool.js";
 import { createCloudVideoGenTool } from "../cloud-video-gen-tool.js";
 import { createCloudWebTool } from "../cloud-web-tool.js";
 import { createCloudHtmlTool } from "../cloud-html-tool.js";
+import { createCloudViewTool } from "../cloud-view-tool.js";
 import { unwrapRpc } from "../owner-store/errors.js";
 import { createCloudDriveTool } from "../cloud-drive-tool.js";
 import { createCloudReadTool } from "../cloud-read-tool.js";
@@ -238,6 +239,11 @@ export abstract class OrchestratorTools extends OrchestratorPi {
         ownerInternal: toolContext.ownerInternal,
         publishFiles: (writerKey, files) =>
           this.publishTurnFilesCard(turn.turnId, writerKey, files),
+      }),
+      // The user's phone, the web chat and the desktop run views from this call's arguments.
+      createCloudViewTool({
+        turnId: turn.turnId,
+        ownerInternal: toolContext.ownerInternal,
       }),
       createCloudMapTool({
         apiKey: mapsServerKey(this.env),

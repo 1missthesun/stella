@@ -99,8 +99,11 @@ function TabStage({ visible }: { visible: boolean }) {
   const l = stageLook(t);
   const geo = useGeometry();
   const hidden = useDelayedHidden(visible, 120);
+  const { tabs } = useDisplayTabList();
+  // desktop-ui keeps every section mounted. Here they mount once the stage or any tab opens, so a
+  // cold home stays light while an app tab opened from chat still gets the Apps section's app list.
   const [opened, setOpened] = useState(visible);
-  if (visible && !opened) setOpened(true);
+  if ((visible || tabs.length > 0) && !opened) setOpened(true);
   return (
     <col
       id="workspace-stage"

@@ -32,7 +32,7 @@ export function ClaudeCliInstallStatus({
     return (
       <col {...s.claudeInstall} role="status">
         <T w="full" {...s.claudeInstallLabel}>{label}</T>
-        <row {...s.claudeInstallBar} onLayout={(r) => setBarW(r.w)}>
+        <row {...s.claudeInstallBar} onSize={(r) => setBarW(r.w)}>
           {indeterminate ? (
             <row {...s.claudeInstallBar_span} {...s.claudeInstallBarIndeterminate_span} loop={{ kind: "slide", period: 1.4, from: [-0.3 * barW, 0], to: [1.02 * barW, 0] }} />
           ) : (

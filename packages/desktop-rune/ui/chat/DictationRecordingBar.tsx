@@ -120,7 +120,7 @@ function DictationWaveform({ readLevel, color }: { readLevel: () => number; colo
   }, [color, width]);
 
   return (
-    <box grow={1} minW={0} h={WAVEFORM_H} clip={0} inert onLayout={(r) => setWidth(Math.round(r.w))}>
+    <box grow={1} minW={0} h={WAVEFORM_H} clip={0} inert onSize={(r) => setWidth(Math.round(r.w))}>
       {width > 0 ? <vector w={width} h={WAVEFORM_H} viewBox={[width, WAVEFORM_H]} paths={paths} /> : null}
     </box>
   );

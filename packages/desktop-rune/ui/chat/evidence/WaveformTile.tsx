@@ -72,7 +72,7 @@ export const WaveformTile = ({ peaks, filePath, durationLabel }: { peaks: number
       >
         <Icon icon={playing ? Icons.stella.Pause : Icons.stella.Play} size={12} color={tokens.c.foreground} />
       </box>
-      <box grow={1} minW={0} h={PLOT_HEIGHT} inert onLayout={(r) => setPlotW(r.w)}>
+      <box grow={1} minW={0} h={PLOT_HEIGHT} inert onSize={(r) => setPlotW(r.w)}>
         {plotW > 0
           ? peaks.map((peak, index) => {
               const barH = Math.max(0.04, peak ?? 0) * PLOT_HEIGHT;

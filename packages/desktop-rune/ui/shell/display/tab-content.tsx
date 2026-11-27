@@ -238,7 +238,7 @@ function DelimitedTableView({ filePath, title, onRetry }: { filePath: string; ti
       ) : rows.length === 0 ? (
         <PreviewEmpty title={t("shell.display.preview.emptyTitle")} />
       ) : (
-        <col id="display-table-scroll" shrink minH={0} h={Math.min(480, (body.length + 1) * TABLE_ROW) + 2} pad={1} scrollX scrollY fill={tk.c.card} border={tk.c.border} radius={8} clip={8} onLayout={(r) => setTableW((w) => (Math.abs(w - (r.w - 2)) < 0.5 ? w : r.w - 2))}>
+        <col id="display-table-scroll" shrink minH={0} h={Math.min(480, (body.length + 1) * TABLE_ROW) + 2} pad={1} scrollX scrollY fill={tk.c.card} border={tk.c.border} radius={8} clip={8} onSize={(r) => setTableW((w) => (Math.abs(w - (r.w - 2)) < 0.5 ? w : r.w - 2))}>
           <col w={columnCount * columnW}>
             <row sticky="top" fill={headerFill}>{Array.from({ length: columnCount }, (_, i) => cell(header[i] || t("shell.display.spreadsheet.column", { index: i + 1 }), i, true))}</row>
             <list id="display-table-rows" estimate={TABLE_ROW} overscan={[8, 8]} growth={false}>
@@ -544,7 +544,7 @@ export const SourceDiffTabContent = () => {
     : t("shell.display.diff.codeChanges");
   return (
     <Rich id="display-diff">
-      <col w="full" maxW={1040} selfAlign="center" grow={1} minH={0} onLayout={(r) => setWidth(r.w)}>
+      <col w="full" maxW={1040} selfAlign="center" grow={1} minH={0} onSize={(r) => setWidth(r.w)}>
         <PreviewHeader id="display-diff" eyebrow={t("shell.display.diff.changes")} title={headerLabel} tooltip={headerLabel} />
         <col grow={1} minH={0}>
           {!activeBatch ? (

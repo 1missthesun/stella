@@ -38,7 +38,7 @@ export function UsageTable({ columns, rows, rowContentH, measureKey }: { columns
           const natural = widths[index];
           const edge = { ...(index === 0 ? { pl: 0 } : null), ...(index === columns.length - 1 ? { pr: 0 } : null) };
           return (
-            <col key={column.head} w={natural} grow={natural ?? 0} shrink={false} onLayout={(r) => measure(index, r.w)} align={column.end ? "end" : "start"}>
+            <col key={column.head} w={natural} grow={natural ?? 0} shrink={false} onSize={(r) => measure(index, r.w)} align={column.end ? "end" : "start"}>
               <col h={headH} {...s.usageTableHead} {...edge} align={column.end ? "end" : "start"}>
                 <T {...s.usageTableHead} px={0}>{column.head}</T>
               </col>

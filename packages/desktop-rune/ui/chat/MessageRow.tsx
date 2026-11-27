@@ -201,7 +201,7 @@ function UserContextChips({ chips }: { chips: ContextChip[] }) {
   }
   const hidden = chips.slice(visibleCount);
   return (
-    <row w="full" justify="end" align="center" gap={CHIP_GAP} minW={0} onLayout={(r) => setColumnW(r.w)}>
+    <row w="full" justify="end" align="center" gap={CHIP_GAP} minW={0} onSize={(r) => setColumnW(r.w)}>
       {chips.map((chip, index) => (
         <box
           key={chip.key}
@@ -209,7 +209,7 @@ function UserContextChips({ chips }: { chips: ContextChip[] }) {
           absolute={index >= visibleCount ? { left: 0, top: 0 } : undefined}
           hidden={index >= visibleCount}
           inert={index >= visibleCount}
-          onLayout={(r) => setWidths((prev) => (prev[chip.key] === Math.round(r.w) ? prev : { ...prev, [chip.key]: Math.round(r.w) }))}
+          onSize={(r) => setWidths((prev) => (prev[chip.key] === Math.round(r.w) ? prev : { ...prev, [chip.key]: Math.round(r.w) }))}
         >
           {chip.node}
         </box>
@@ -230,7 +230,7 @@ function UserContextChips({ chips }: { chips: ContextChip[] }) {
             center
             onHover={hover.onHover}
             onFocus={hover.onFocus}
-            onLayout={(r) => setOverflowW(Math.round(r.w))}
+            onSize={(r) => setOverflowW(Math.round(r.w))}
           >
             <text size={fontSize.sm} weight={600} lineHeight={15.6} features="'tnum' 1" color={c.text}>
               {`+${hidden.length}`}

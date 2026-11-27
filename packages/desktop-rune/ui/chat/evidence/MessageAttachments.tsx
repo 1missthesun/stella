@@ -133,7 +133,7 @@ export const MessageAttachments = ({
     if (media.length === 0) return null;
     return (
       <col w="full" minW={0} mt={6}>
-        <row w="full" minW={0} gap={TILE_GAP} wrap={wrapped} clip={wrapped ? undefined : 0} onLayout={(r) => setRowWidth(Math.floor(r.w))}>
+        <row w="full" minW={0} gap={TILE_GAP} wrap={wrapped} clip={wrapped ? undefined : 0} onSize={(r) => setRowWidth(Math.floor(r.w))}>
           {shown.map((card) => (
             <box key={card.id} shrink={false}>
               <MediaTile card={card} />

@@ -141,7 +141,7 @@ function HoldLabel({ text, fg, dim, sweepAtMs }: { text: string; fg: string; dim
     return { window: loop(1), inner: loop(-1) };
   }, [half, phase, width]);
   return (
-    <box onLayout={(r) => setWidth(Math.round(r.w))} clip={0}>
+    <box onSize={(r) => setWidth(Math.round(r.w))} clip={0}>
       <text {...LABEL} color={dim} nowrap>
         {text}
       </text>

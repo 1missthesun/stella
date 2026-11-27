@@ -174,7 +174,7 @@ export function CloudBrowserInterventionCard({ compact = false, conversationId }
 
   if (compact) return <col w="full" mb={8}>{card}</col>;
   return (
-    <row w="full" justify="center" px={width < NARROW_W ? 8 : 48} mb={10} onLayout={(r) => setWidth(r.w)}>
+    <row w="full" justify="center" px={width < NARROW_W ? 8 : 48} mb={10} onSize={(r) => setWidth(r.w)}>
       {card}
     </row>
   );

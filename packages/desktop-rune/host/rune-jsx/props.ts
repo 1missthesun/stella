@@ -213,6 +213,8 @@ export type BoxProps = {
   onFocus?: (focused: boolean, keyboard: boolean) => void;
   onFocusWithin?: (within: boolean) => void;
   onLayout?: (r: Layout) => void;
+  /** The element's size, on its first layout and whenever it changes; unlike `onLayout`, never for moving (scrolling) alone. */
+  onSize?: (s: { w: number; h: number }) => void;
   onScroll?: (p: ScrollPos) => void;
   onAtBottom?: (atBottom: boolean) => void;
   /** What a `glass` element sees behind it: mean luminance and its contrast (standard deviation), 0..1, sent when either moves by 0.04, at most every 120 ms. */

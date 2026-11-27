@@ -133,18 +133,28 @@ export function useChatScrollManagement({
     thumbRef.current = handle;
   }, []);
 
+  // Scroll events come every frame: the settle and fade timers below re-arm from a timestamp
+  // when they fire instead of being replaced per event.
+  const manualScrollAtRef = useRef(0);
   const noteManualScroll = useCallback(() => {
+    manualScrollAtRef.current = performance.now();
     if (!isUserScrollingRef.current) {
       isUserScrollingRef.current = true;
       setIsUserScrolling(true);
     }
-    if (manualScrollTimerRef.current) clearTimeout(manualScrollTimerRef.current);
-    manualScrollTimerRef.current = setTimeout(() => {
+    if (manualScrollTimerRef.current) return;
+    const settle = () => {
+      const left = MANUAL_SCROLL_SETTLE_MS - (performance.now() - manualScrollAtRef.current);
+      if (left > 1) {
+        manualScrollTimerRef.current = setTimeout(settle, left);
+        return;
+      }
       manualScrollTimerRef.current = null;
       if (!isUserScrollingRef.current) return;
       isUserScrollingRef.current = false;
       setIsUserScrolling(false);
-    }, MANUAL_SCROLL_SETTLE_MS);
+    };
+    manualScrollTimerRef.current = setTimeout(settle, MANUAL_SCROLL_SETTLE_MS);
   }, []);
 
   const setFollow = useCallback((following: boolean) => {
@@ -162,11 +172,23 @@ export function useChatScrollManagement({
     setFollow(true);
   }, [paginationKey, setFollow]);
 
+  const thumbShownAtRef = useRef(0);
   const hideThumb = useCallback(() => {
+    if (thumbFadeRef.current) clearTimeout(thumbFadeRef.current);
+    thumbFadeRef.current = null;
     if (!thumbVisibleRef.current) return;
     thumbVisibleRef.current = false;
     thumbRef.current?.({ top: 0, height: 0, visible: false });
   }, []);
+  const fadeThumb = useCallback(() => {
+    const left = THUMB_FADE_MS - (performance.now() - thumbShownAtRef.current);
+    if (left > 1) {
+      thumbFadeRef.current = setTimeout(fadeThumb, left);
+      return;
+    }
+    thumbFadeRef.current = null;
+    hideThumb();
+  }, [hideThumb]);
 
   const updateThumb = useCallback(
     ({ y, maxY, viewport }: Metrics) => {
@@ -178,10 +200,10 @@ export function useChatScrollManagement({
       const progress = Math.max(0, Math.min(1, y / Math.max(1, maxY)));
       thumbVisibleRef.current = true;
       handle({ top: progress * Math.max(0, viewport - thumbHeight), height: thumbHeight, visible: true });
-      if (thumbFadeRef.current) clearTimeout(thumbFadeRef.current);
-      thumbFadeRef.current = setTimeout(hideThumb, THUMB_FADE_MS);
+      thumbShownAtRef.current = performance.now();
+      if (!thumbFadeRef.current) thumbFadeRef.current = setTimeout(fadeThumb, THUMB_FADE_MS);
     },
-    [hideThumb],
+    [fadeThumb, hideThumb],
   );
 
   const paginationMetrics = (m: Metrics): HistoryPaginationMetrics => ({ scrollTop: m.y, viewportHeight: m.viewport, contentHeight: m.maxY + m.viewport });

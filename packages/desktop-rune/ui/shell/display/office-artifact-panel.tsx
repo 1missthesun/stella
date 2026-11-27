@@ -217,7 +217,7 @@ export function OfficeArtifactPanel({ previewRef }: { previewRef: OfficePreviewR
   const showRail = outlineKind !== null && entries.length >= 2 && panelWidth + RICH_PADDING * 2 >= OUTLINE_MIN_VIEWER_WIDTH;
 
   return (
-    <col id="display-artifact-panel" grow={1} minH={0} w="full" pad={1} radius={radius.lg} clip={radius.lg} border={tokens.c.border} fill={tokens.c.card} onLayout={(r) => setPanelWidth(r.w)}>
+    <col id="display-artifact-panel" grow={1} minH={0} w="full" pad={1} radius={radius.lg} clip={radius.lg} border={tokens.c.border} fill={tokens.c.card} onSize={(r) => setPanelWidth(r.w)}>
       <row shrink={false} align="center" gap={12} minH={52} pt={9} px={12} pb={9 + 1} borderSides={[0, 0, 1, 0]} border={tokens.c.border} fill={tokens.c.surfaceInset}>
         <row w={0} grow={1} minW={0} align="center" gap={9}>
           <box w={28} h={28} shrink={false} center radius={radius.md} border={tokens.c.border} fill={tone.iconFill}>

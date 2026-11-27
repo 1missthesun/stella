@@ -9,7 +9,6 @@ import { isHtmlPagePath } from "@stella/contracts/page-preview";
 import { presentAssistantText } from "@stella/contracts/assistant-internal-text";
 import { extractStellaAppLinkSlugs } from "@stella/contracts/workspace-apps";
 import type { ReplyRef } from "@stella/contracts/reply-refs";
-import { useEntrance } from "@/features/chat/lib/message-entry-animation-state";
 import { pastedTextPreview, type PastedTextDescriptor } from "@/features/chat/lib/paste-context";
 import type { Attachment, ChannelEnvelope } from "@/features/chat/lib/event-transforms";
 import { localFilePathForPayload } from "@/features/workspace-display/path-to-viewer";
@@ -52,13 +51,12 @@ import { OfficePreviewCard } from "./cards/OfficePreviewCard";
 import { InlineGeneratedImageStrip } from "./cards/InlineGeneratedImageCard";
 import { SourceDiffEndResource } from "./cards/SourceDiffEndResource";
 import { previewCard, pillColors } from "./surfaces";
+import { useBubblePop } from "./bubble-pop";
 
 
 type Translate = ReturnType<typeof useT>;
 
 export const PART_GAP = 8;
-const MESSAGE_ENTRANCE_MS = 360;
-const MESSAGE_ENTRANCE_ANIMATION = "bubble-pop";
 const BUBBLE_MAX_FRACTION = 0.85;
 const CHIP_GAP = 6;
 
@@ -257,8 +255,9 @@ function AttachmentImage({ attachment, index, safeUrl }: { attachment: Attachmen
   return <ImageAttachmentChip thumbnailUrl={safeUrl} fullImageUrl={safeUrl} alt={attachment.name ?? t("app.chat.messageRow.attachmentAlt")} title={t("app.chat.messageRow.clickToEnlarge", { label })} />;
 }
 
-/** The `bubble-pop` entrance: rise 14pt and grow from 84% on a 360ms spring, fading in over 120ms. */
-const bubblePop = (delayMs: number | null) => (delayMs === null ? undefined : { opacity: 0, y: 14, scale: 0.84, dur: MESSAGE_ENTRANCE_MS / 1000, bounce: 0.15 });
+/** desktop-ui pops a sent bubble from its bottom right (`transform-origin: right bottom`) and a reply from its bottom left. */
+const USER_POP_ORIGIN: [number, number] = [1, 1];
+const ASSISTANT_POP_ORIGIN: [number, number] = [0, 1];
 
 const reactionLook = (t: ReturnType<typeof useTokens>) => derive(t, "reaction", (k) => ({ fill: k.c.surfaceInset, border: k.c.background }));
 
@@ -267,7 +266,7 @@ export const UserMessageRow = memo(
     const t = useT();
     const tokens = useTokens();
     const surface = useChatSurfaceLook();
-    const entrance = useEntrance(row.arrivedAt, MESSAGE_ENTRANCE_MS, MESSAGE_ENTRANCE_ANIMATION);
+    const pop = useBubblePop(row.arrivedAt, USER_POP_ORIGIN);
     const reply = useMessageReply();
     const { text, windowLabel, attachments, channelEnvelope } = row;
     const copyAttachment = useMemo(() => primaryCopyAttachment(attachments), [attachments]);
@@ -336,8 +335,7 @@ export const UserMessageRow = memo(
                 px={surface.user.px}
                 radius={surface.user.radius}
                 fill={tokens.c.chatUserBubbleFill}
-                origin={[1, 1]}
-                enter={bubblePop(entrance.delayMs)}
+                loop={pop.loop}
               >
                 {reaction ? (
                   <box
@@ -392,8 +390,8 @@ export const AssistantMessageRow = memo(
     const tokens = useTokens();
     const surface = useChatSurfaceLook();
     const reply = useMessageReply();
-    const entrance = useEntrance(row.arrivedAt, MESSAGE_ENTRANCE_MS, MESSAGE_ENTRANCE_ANIMATION);
-    useReplyArrival(entrance.delayMs !== null, !row.isIntraTurn);
+    const pop = useBubblePop(row.arrivedAt, ASSISTANT_POP_ORIGIN);
+    useReplyArrival(pop.fresh, !row.isIntraTurn);
     const text = row.text;
     const hasText = text.trim().length > 0;
     const hasMapArtifacts = (row.mapArtifacts?.length ?? 0) > 0;
@@ -479,7 +477,7 @@ export const AssistantMessageRow = memo(
     const menu = contextMenu(messageMenu({ text: hasBody ? text : "", messageKey: row.id, renderedText: () => (!hasBody ? null : shouldUseBoundedMarkdownPlaintext(bodyText.length) ? bodyText : markdownPlainText(bodyText)), onReply: row.isIntraTurn ? null : reply, readAloud: !row.isIntraTurn }));
     return (
       <col w="full" hoverGroup onContextMenu={menu}>
-        <col w="full" gap={PART_GAP} origin={[0, 1]} enter={bubblePop(entrance.delayMs)}>
+        <col w="full" gap={PART_GAP} loop={pop.loop}>
           {row.voiceSession ? <VoiceSessionCard durationMs={row.voiceSession.durationMs} /> : null}
           {conversationId && (pillRefs.length > 0 || pillCompletions.length > 0) ? <ReplyPreview refs={pillRefs} completions={pillCompletions} conversationId={conversationId} /> : null}
           {row.askRecords?.map((record) => <UserAskRecordCard key={record.id} record={record} />)}

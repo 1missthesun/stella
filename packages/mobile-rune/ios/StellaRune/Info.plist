@@ -25,6 +25,9 @@
   <key>UIViewControllerBasedStatusBarAppearance</key><true/>
   <key>NSMicrophoneUsageDescription</key><string>Stella listens while you dictate a message.</string>
   <key>NSPhotoLibraryUsageDescription</key><string>Stella attaches the photos you pick to your message.</string>
+  <key>NSLocalNetworkUsageDescription</key><string>Stella finds your computers on this network and connects to them directly.</string>
+  <key>NSBonjourServices</key><array><string>_stella-p2p._udp</string></array>
+  <key>ITSAppUsesNonExemptEncryption</key><false/>
   <key>NSCameraUsageDescription</key><string>Stella uses the camera for the photos you take and to scan your computer's pairing code.</string>
 </dict>
 </plist>

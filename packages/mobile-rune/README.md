@@ -27,6 +27,15 @@ packages/mobile-rune/scripts/build-ios.sh [--skip-engine] [--skip-js] [--dist]
 - Dev builds poll `Documents/driver.txt`, one command per line: `tap?x=&y=`, `drag?…`, `type?text=`, `key?name=return`, `dark?on=0|1`, `perf?start=L` / `perf?stop=L`, `open`.
 - Don't use `simctl openurl` on a running app. iOS shows an "Open in …?" prompt that blocks input until the sim reboots.
 
+## TestFlight
+
+```sh
+packages/mobile-rune/scripts/package-ios.sh --profile <App Store .mobileprovision> [--identity <sha1>] [--keychain <path>] \
+  [--upload --api-key <id> --api-issuer <id> --p8 <AuthKey.p8>]
+```
+
+A prod device build as `com.stella.rune` ("Stella Rune", App Store Connect app 6840196600, internal group "Internal"), so it installs beside the RN app (`com.stella.mobile`). The App ID has no push or Sign in with Apple capability: the build goes without both, Apple sign-in uses Apple's web sign-in (the backend verifies native Apple tokens against `com.stella.mobile` only), and pushes go to the RN app. The build number defaults to the UTC time (`yymmddHHMM`).
+
 ## How native fields work
 
 1. The engine lays out an `<input>` and sends `field` (its style) and `place` (its drawn rect, every time it moves) to the app.

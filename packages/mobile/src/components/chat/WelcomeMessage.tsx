@@ -55,5 +55,6 @@ export const WelcomeMessage = memo(function WelcomeMessage({
 
 const styles = StyleSheet.create({
   fill: { alignSelf: "stretch" },
-  pills: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8 },
+  // The bottom margin matches the documents strip under any message.
+  pills: { flexDirection: "row", flexWrap: "wrap", gap: 6, marginTop: 8, marginBottom: 12 },
 });

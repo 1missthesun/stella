@@ -66,6 +66,7 @@ export const stellaReleases: readonly StellaRelease[] = [
     ],
     more: [
       "Buttons in Settings are quieter and more consistent, with red kept only for things that really delete.",
+      { text: "When you come back to a chat on your phone after a while, it opens on your newest messages in the right order, instead of showing older ones below the latest reply or an empty screen.", product: "Mobile" },
     ],
   },
   {

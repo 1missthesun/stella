@@ -144,7 +144,7 @@ export const browserAttachmentDrivePath = (
     prefix: id.slice(-8),
   });
 
-const UPLOAD_LABEL = "Uploading to Stella's Drive";
+const UPLOAD_LABEL = "Uploading the attachment";
 
 const uploadFailure = (message: string, retryable: boolean): Error =>
   Object.assign(new Error(message), { retryable });

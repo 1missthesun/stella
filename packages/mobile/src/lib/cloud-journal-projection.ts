@@ -858,36 +858,61 @@ export const canonicalCloudDispatchIdForTurn = (
   return null;
 };
 
-const turnDispatchIds = (turn: JournalTurn): readonly string[] => {
-  const memo = turn.memo as { dispatchIds?: readonly string[] };
-  return (memo.dispatchIds ??= turn.records.flatMap((record) =>
-    record.kind === "message" && record.role === "user" && record.clientMsgId
-      ? [record.clientMsgId]
-      : []));
+const turnSentMessageIds = (turn: JournalTurn): readonly string[] => {
+  const memo = turn.memo as { sentMessageIds?: readonly string[] };
+  return (memo.sentMessageIds ??= turn.records.flatMap((record) => {
+    if (record.kind !== "message" || record.role !== "user") return [];
+    const origin = record.payload.originUserMessageId;
+    return [
+      ...(record.clientMsgId ? [record.clientMsgId] : []),
+      ...(typeof origin === "string" && origin.trim() ? [origin.trim()] : []),
+    ];
+  }));
 };
 
-export const acknowledgedCloudDispatchIds = (
+/**
+ * The phone's sends whose message the journal window holds, by the phone's own
+ * message id. The journal names a send in different ways depending on where it
+ * ran: a computer keeps the phone's id as `clientMsgId`, a cloud turn uses the
+ * placement dispatch id (`dsp:…`) and keeps the phone's id as
+ * `originUserMessageId`. Match all of them, or a send that ran on a computer is
+ * never seen as recorded.
+ */
+export const recordedCloudSendIds = (
   index: JournalIndex,
   dispatchBindings: ReadonlyMap<string, string | null>,
 ): ReadonlySet<string> => {
-  const wanted = new Set<string>();
-  for (const dispatchId of dispatchBindings.values()) {
-    if (dispatchId) wanted.add(dispatchId);
-  }
   const found = new Set<string>();
-  for (let at = index.turns.length - 1; at >= 0 && found.size < wanted.size; at -= 1) {
-    for (const id of turnDispatchIds(index.turns[at]!)) {
-      if (wanted.has(id)) found.add(id);
+  if (dispatchBindings.size === 0) return found;
+  const sendByJournalId = new Map<string, string>();
+  for (const [localId, dispatchId] of dispatchBindings) {
+    sendByJournalId.set(localId, localId);
+    if (dispatchId) sendByJournalId.set(dispatchId, localId);
+  }
+  for (
+    let at = index.turns.length - 1;
+    at >= 0 && found.size < dispatchBindings.size;
+    at -= 1
+  ) {
+    for (const id of turnSentMessageIds(index.turns[at]!)) {
+      const localId = sendByJournalId.get(id);
+      if (localId) found.add(localId);
     }
   }
   return found;
 };
 
-export const createRecordedCloudDispatchIds = () => {
+/**
+ * Remembers every send the journal has recorded, for the whole session. The
+ * window can later drop that record (a long background reloads only the newest
+ * records); the send must stay recorded, or its local copy would come back as
+ * unsent below the newest reply.
+ */
+export const createRecordedCloudSends = () => {
   let recorded: ReadonlySet<string> = new Set();
-  return (acknowledged: ReadonlySet<string>): ReadonlySet<string> => {
+  return (seen: ReadonlySet<string>): ReadonlySet<string> => {
     let grown: Set<string> | null = null;
-    for (const id of acknowledged) {
+    for (const id of seen) {
       if (!recorded.has(id)) (grown ??= new Set(recorded)).add(id);
     }
     if (grown) recorded = grown;
@@ -926,7 +951,8 @@ export const mergeCanonicalCloudMessages = (args: {
   canonical: readonly ChatMessage[];
   local: readonly ChatMessage[];
   dispatchBindings: ReadonlyMap<string, string | null>;
-  recordedDispatchIds: ReadonlySet<string>;
+  /** Local ids of the sends the journal has recorded (`recordedCloudSendIds`). */
+  recordedSendIds: ReadonlySet<string>;
 }): ChatMessage[] => {
   if (args.local.length === 0) return args.canonical as ChatMessage[];
   const canonicalIds = new Set(args.canonical.map((message) => message.id));
@@ -938,10 +964,8 @@ export const mergeCanonicalCloudMessages = (args: {
     ),
   );
   const pendingLocalIds = new Set(
-    [...args.dispatchBindings].flatMap(([localId, dispatchId]) =>
-      dispatchId && args.recordedDispatchIds.has(dispatchId)
-        ? []
-        : [localId],
+    [...args.dispatchBindings.keys()].filter(
+      (localId) => !args.recordedSendIds.has(localId),
     ),
   );
   const trackedLocalIds = new Set(args.dispatchBindings.keys());

@@ -10,10 +10,10 @@
 use std::cell::Cell;
 use std::collections::HashMap;
 
-use rune::El;
+use rune::{El, Spring};
 use rune::compose::{Compositor, DeviceKey, Frame};
 use rune::render::{EffectPhase, EffectSite, Instance, KIND_EFFECT};
-use rune_fx::{Fx, FxBlend, FxFrame, FxLayer, FxOptions, FxRenderer, FxSlot, LensParams, ParamKind, Rgb, Shape, Stops, Value};
+use rune_fx::{Fx, FxBlend, FxFrame, FxLayer, FxOptions, FxRenderer, FxSlot, GlassUnion, LensParams, ParamKind, Rgb, Shape, Stops, Value};
 use rune_light::{Light, LightRenderer, Prim, Scene, Settings};
 use serde::Deserialize;
 use serde_json::Value as J;
@@ -32,9 +32,19 @@ const GLASS_BLEED: f32 = 24.0;
 pub enum Effect {
     /// A Liquid Glass lens over what is painted behind the element; `merge` is a second shape
     /// `[x, y, w, h, radius]` in the element's points that the glass flows into.
-    Glass { lens: LensParams, merge: Option<[f32; 5]> },
+    Glass { lens: LensParams, merge: Option<[f32; 5]>, group: Option<String>, morph: Option<MorphSpec> },
     Fill(rune_fx::FillParams),
 }
+
+/// `morphFrom`: the glass grows out of another element's shape when it mounts and goes back
+/// into it as it leaves, on `spring`. `from` is that element's `id` (`None`: the `anchor`'s).
+#[derive(Clone, Debug)]
+pub struct MorphSpec {
+    pub from: Option<String>,
+    pub spring: Spring,
+}
+
+const MORPH_SPRING: Spring = Spring::new(0.5, 0.18);
 
 #[derive(Clone, Debug)]
 pub struct FxSpec {
@@ -129,9 +139,11 @@ fn spec(v: &J) -> Result<FxSpec, String> {
 fn glass(v: &J) -> Result<Effect, String> {
     let mut lens = LensParams::default();
     let mut merge = None;
+    let mut group = None;
+    let mut morph: Option<MorphSpec> = None;
     let Some(o) = v.as_object() else {
         return match v {
-            J::Bool(true) => Ok(Effect::Glass { lens, merge }),
+            J::Bool(true) => Ok(Effect::Glass { lens, merge, group, morph }),
             _ => Err("`glass` is true or an object".into()),
         };
     };
@@ -153,7 +165,21 @@ fn glass(v: &J) -> Result<Effect, String> {
             ("adapt", Some(x)) => lens.adapt = x,
             ("saturation", Some(x)) => lens.saturation = x,
             ("perceptual", _) => lens.perceptual = val.as_bool().ok_or("glass `perceptual` is true or false")?,
-            ("unionK", Some(x)) => lens.union_k = x,
+            ("unionK" | "spacing", Some(x)) => lens.union_k = x,
+            ("group", _) => group = Some(val.as_str().ok_or("glass `group` is a string")?.to_owned()),
+            ("morphFrom", _) => {
+                let from = match val {
+                    J::String(k) => Some(k.clone()),
+                    J::Bool(true) => None,
+                    _ => return Err("glass `morphFrom` is an element id or true (the anchor)".into()),
+                };
+                morph = Some(MorphSpec { from, spring: morph.map_or(MORPH_SPRING, |m| m.spring) });
+            }
+            ("morphMotion", _) => {
+                let m = val.as_object().ok_or("glass `morphMotion` is {dur, bounce}")?;
+                let spring = crate::style::spring(num(m, "dur").unwrap_or(MORPH_SPRING.duration), num(m, "bounce").unwrap_or(MORPH_SPRING.bounce));
+                morph = Some(MorphSpec { spring, from: morph.and_then(|m| m.from) });
+            }
             ("morph", Some(x)) => lens.morph = x,
             ("tint", _) => lens.tint = rgb(val).ok_or("glass `tint` is a colour")?,
             ("merge", _) => {
@@ -164,7 +190,10 @@ fn glass(v: &J) -> Result<Effect, String> {
             (k, _) => return Err(format!("glass has no `{k}`")),
         }
     }
-    Ok(Effect::Glass { lens, merge })
+    if morph.is_some() && !o.contains_key("morphFrom") {
+        return Err("glass `morphMotion` needs `morphFrom`".into());
+    }
+    Ok(Effect::Glass { lens, merge, group, morph })
 }
 
 const RESERVED: &[&str] = &["fill", "preset", "place", "inset", "opacity", "seed", "blend"];
@@ -330,6 +359,11 @@ fn layer_slot(id: u32, i: usize, s: &FxSpec, p: &Props) -> El {
     if matches!(s.effect, Effect::Glass { .. }) {
         e = e.effect_bleed(GLASS_BLEED);
     }
+    // A fade would draw the lens in a layer of its own, with no backdrop to bend; the morph is
+    // its entrance.
+    if matches!(s.effect, Effect::Glass { morph: Some(_), .. }) {
+        e = e.transition(rune::Transition::none());
+    }
     e
 }
 
@@ -388,18 +422,124 @@ pub struct Comp {
     engaged: Cell<bool>,
     gpu: Option<Gpu>,
     animating: bool,
+    /// Glass growing out of (or going back into) its `morphFrom` source, by effect node.
+    morphs: HashMap<u32, Morph>,
 }
 
 impl Comp {
     pub fn new(window: Option<u32>) -> Comp {
-        Comp { window, engaged: Cell::new(false), gpu: None, animating: false }
+        Comp { window, engaged: Cell::new(false), gpu: None, animating: false, morphs: HashMap::new() }
     }
+}
+
+thread_local! {
+    /// Closing `morphFrom` elements whose glass is back in its source: removed at the next poll.
+    static CLOSED: std::cell::RefCell<Vec<u32>> = const { std::cell::RefCell::new(Vec::new()) };
+}
+
+/// How long a removed `morphFrom` element may stay to morph back before it goes regardless.
+pub const CLOSE_MAX: std::time::Duration = std::time::Duration::from_secs(3);
+
+/// The closing elements whose morph ended (see `Tree::closing`).
+pub fn take_closed() -> Vec<u32> {
+    CLOSED.with(|c| std::mem::take(&mut *c.borrow_mut()))
+}
+
+/// One glass morph: progress 0 (the source's shape) to 1 (the element's own) on a spring.
+struct Morph {
+    from: Shape,
+    /// The element's own shape when it was last shown whole: what a closing one shrinks from.
+    to: Shape,
+    from_lens: Option<LensParams>,
+    key: String,
+    spring: Spring,
+    x0: f32,
+    v0: f32,
+    target: f32,
+    t0: f64,
+    seen: bool,
+}
+
+impl Morph {
+    fn at(&self, now: f64) -> (f32, f32) {
+        self.spring.sample(self.x0, self.v0, self.target, (now - self.t0).max(0.0) as f32)
+    }
+
+    fn go(&mut self, target: f32, now: f64) {
+        if self.target == target {
+            return;
+        }
+        let (x, v) = self.at(now);
+        (self.x0, self.v0, self.target, self.t0) = (x, v, target, now);
+    }
+
+    fn settled(&self, now: f64) -> bool {
+        (now - self.t0) as f32 >= self.spring.settling_duration_from(self.x0, self.v0, self.target, 1e-3)
+    }
+}
+
+/// Where the element keyed `key` was drawn last frame, with its corner radius, and its glass.
+fn source_shape(rt: &rune::Runtime<Win>, eng: &crate::engine::Engine, key: &str) -> Option<(Shape, Option<LensParams>)> {
+    let ([x, y, w, h], _) = rt.presented(key)?;
+    let p = eng.tree.find_key(key).and_then(|n| eng.tree.get(n)).map(|n| &*n.props);
+    let r = p.and_then(|p| p.corners.map(|c| c.iter().fold(0.0f32, |a, v| a.max(*v))).or(p.radius)).unwrap_or(0.0);
+    let lens = p.and_then(|p| p.fx.as_ref()).and_then(|l| {
+        l.0.iter().find_map(|s| match &s.effect {
+            Effect::Glass { lens, .. } => Some(*lens),
+            Effect::Fill(_) => None,
+        })
+    });
+    Some((Shape::rounded(x, y, w, h, r), lens))
+}
+
+fn mix_shape(a: Shape, b: Shape, t: f32) -> Shape {
+    let m = |x: f32, y: f32| x + (y - x) * t;
+    let (ra, rb) = (a.rect, b.rect);
+    let (w, h) = (m(ra.w, rb.w).max(1.0), m(ra.h, rb.h).max(1.0));
+    let r = m(a.radius.min(ra.w.min(ra.h) * 0.5), b.radius.min(rb.w.min(rb.h) * 0.5));
+    Shape::rounded(m(ra.x, rb.x), m(ra.y, rb.y), w, h, r.clamp(0.0, w.min(h) * 0.5))
+}
+
+fn mix_lens(a: &LensParams, b: &LensParams, t: f32) -> LensParams {
+    let m = |x: f32, y: f32| x + (y - x) * t;
+    let tint = Rgb([m(a.tint.0[0], b.tint.0[0]), m(a.tint.0[1], b.tint.0[1]), m(a.tint.0[2], b.tint.0[2])]);
+    LensParams {
+        bevel: m(a.bevel, b.bevel),
+        depth: m(a.depth, b.depth),
+        dispersion: m(a.dispersion, b.dispersion),
+        magnification: m(a.magnification, b.magnification),
+        frost: m(a.frost, b.frost),
+        frost_sigma: m(a.frost_sigma, b.frost_sigma),
+        shadow: m(a.shadow, b.shadow),
+        rim: m(a.rim, b.rim),
+        light_angle: m(a.light_angle, b.light_angle),
+        tint,
+        tint_amount: m(a.tint_amount, b.tint_amount),
+        veil: m(a.veil, b.veil),
+        saturation: m(a.saturation, b.saturation),
+        adapt: m(a.adapt, b.adapt),
+        ..*b
+    }
+}
+
+/// Whether the element's glass grows out of a `morphFrom` source (and so morphs back into it
+/// when removed, before it goes).
+pub fn morphs(p: &Props) -> bool {
+    morph_spring(p).is_some()
+}
+
+/// The spring a `morphFrom` glass grows on.
+pub fn morph_spring(p: &Props) -> Option<Spring> {
+    p.fx.as_ref()?.0.iter().find_map(|s| match &s.effect {
+        Effect::Glass { morph: Some(m), .. } => Some(m.spring),
+        _ => None,
+    })
 }
 
 impl Compositor<Win> for Comp {
     fn engaged(&self) -> bool {
         if let Some(on) = window_has_fx(self.window) {
-            self.engaged.set(on);
+            self.engaged.set(on || !self.morphs.is_empty());
         }
         self.engaged.get()
     }
@@ -422,6 +562,13 @@ impl Compositor<Win> for Comp {
         let mut lights: Vec<Lighting> = Vec::new();
         let mut occluders: Vec<(u32, Prim)> = Vec::new();
         let mut watched: Vec<(usize, u32)> = Vec::new();
+        let now = f.rt.t;
+        let morphs = &mut self.morphs;
+        let mut hide: Vec<String> = Vec::new();
+        let mut closed: Vec<u32> = Vec::new();
+        let mut moving = false;
+        let mut grouped: Vec<(String, usize, Shape)> = Vec::new();
+        let mut glass_keys: Vec<(usize, Option<String>)> = Vec::new();
         crate::engine::read(|eng| {
             for (n, i) in f.rt.instances.iter().enumerate() {
                 if i.params[1] != KIND_EFFECT {
@@ -436,15 +583,62 @@ impl Compositor<Win> for Comp {
                     LAYER => {
                         let Some(s) = p.fx.as_ref().and_then(|l| l.0.get(i.uv[0] as usize)) else { continue };
                         let watch = matches!(s.effect, Effect::Glass { .. }) && p.on.iter().any(|h| h == "backdrop") && !watched.iter().any(|w| w.1 == node);
+                        let mut shape = Shape::rounded(x, y, w, h, r);
                         let fx = match &s.effect {
-                            Effect::Glass { lens, merge } => {
+                            Effect::Glass { lens, merge, group, morph } => {
                                 let mut lens = *lens;
                                 lens.second = merge.map(|[mx, my, mw, mh, mr]| Shape::rounded(x - s.inset + mx, y - s.inset + my, mw, mh, mr));
+                                let closing = eng.tree.closing.contains_key(&node);
+                                if let Some(ms) = morph {
+                                    let source = ms.from.clone().or_else(|| p.anchor.as_ref().map(|a| a.to.clone()));
+                                    let m = match (morphs.contains_key(&node), source) {
+                                        (true, _) => morphs.get_mut(&node),
+                                        (false, Some(key)) if !closing => source_shape(f.rt, eng, &key).map(|(from, from_lens)| {
+                                            let start = if reduced { 1.0 } else { 0.0 };
+                                            morphs.entry(node).or_insert(Morph { from, to: shape, from_lens, key, spring: ms.spring, x0: start, v0: 0.0, target: 1.0, t0: now, seen: false })
+                                        }),
+                                        _ => None,
+                                    };
+                                    match m {
+                                        None if closing => {
+                                            closed.push(node);
+                                            continue;
+                                        }
+                                        None => {}
+                                        Some(m) => {
+                                            m.seen = true;
+                                            if closing {
+                                                m.go(0.0, now);
+                                                shape = m.to;
+                                            } else {
+                                                m.to = shape;
+                                            }
+                                            let settled = reduced || m.settled(now);
+                                            if settled && m.target == 0.0 {
+                                                morphs.remove(&node);
+                                                closed.push(node);
+                                                continue;
+                                            }
+                                            if !settled && let Some((from, _)) = source_shape(f.rt, eng, &m.key) {
+                                                m.from = from;
+                                            }
+                                            let at = if settled { m.target } else { m.at(now).0 };
+                                            hide.push(m.key.clone());
+                                            moving |= !settled;
+                                            shape = mix_shape(m.from, shape, at);
+                                            lens = mix_lens(&m.from_lens.unwrap_or(lens), &lens, at.clamp(0.0, 1.0));
+                                        }
+                                    }
+                                }
+                                if let Some(g) = group {
+                                    grouped.push((g.clone(), layers.len(), shape));
+                                }
+                                glass_keys.push((layers.len(), p.id.clone()));
                                 Fx::lens(lens)
                             }
                             Effect::Fill(fill) => Fx::fill(*fill),
                         };
-                        let mut l = fx.on(Shape::rounded(x, y, w, h, r)).at(t).seed(s.seed).reduced(reduced).opacity(s.opacity);
+                        let mut l = fx.on(shape).at(t).seed(s.seed).reduced(reduced).opacity(s.opacity);
                         l.place = rune_fx::Place::Over;
                         if watch {
                             watched.push((layers.len(), node));
@@ -489,7 +683,33 @@ impl Compositor<Win> for Comp {
                 crate::backdrop::forget(|n| eng.tree.get(n).is_some());
             }
         });
-        self.animating = layers.iter().any(FxLayer::is_animating);
+        morphs.retain(|_, m| std::mem::take(&mut m.seen));
+        if !closed.is_empty() {
+            CLOSED.with(|c| c.borrow_mut().extend(closed));
+            moving = true;
+        }
+        // A morph's source shows no glass of its own while the morph holds it.
+        for (layer, key) in &glass_keys {
+            if key.as_ref().is_some_and(|k| hide.contains(k)) {
+                layers[*layer].opacity = 0.0;
+            }
+        }
+        // A glass group draws as one surface at its first member: the others' shapes join its union.
+        grouped.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));
+        for run in grouped.chunk_by(|a, b| a.0 == b.0) {
+            let Some(lead) = run.iter().find(|m| layers[m.1].opacity > 0.0).map(|m| m.1) else { continue };
+            let mut union = GlassUnion::EMPTY;
+            for m in run {
+                if m.1 != lead && layers[m.1].opacity > 0.0 {
+                    union.push(m.2);
+                    layers[m.1].opacity = 0.0;
+                }
+            }
+            if !union.is_empty() {
+                slots[lead] = slots[lead].union(union);
+            }
+        }
+        self.animating = moving || layers.iter().any(FxLayer::is_animating);
         let key = f.device_key();
         if self.gpu.as_ref().is_none_or(|g| g.key != key || g.format != f.format) {
             self.gpu = None;

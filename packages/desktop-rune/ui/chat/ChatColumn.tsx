@@ -28,7 +28,7 @@ import { Icon, Icons, withStroke } from "../kit";
 import { derive, mix, useTokens } from "../theme";
 import { UnderGlassContext, type LegendContentStyle } from "./ChatTimeline";
 import { SHELL_TOPBAR_HEIGHT } from "../shell/metrics";
-import { AdaptiveGlass, chromeGlass, useGlassBackdrop } from "../shell/glass";
+import { AdaptiveGlass, chromeGlass, GlassSheen, useGlassBackdrop } from "../shell/glass";
 import { useFileDrop } from "./use-file-drop";
 import { COMPOSER_GAP, COMPOSER_NARROW_W, COMPOSER_PAD_TOP, composerShellMaxW } from "./Composer";
 import { reportComposerArea } from "../replace/shell/workspace-stage/viewer-geometry";
@@ -126,6 +126,7 @@ function ScrollToBottomButton({ onPress, bottom }: { onPress: () => void; bottom
         enter="fade"
         exit="fade"
       >
+        <GlassSheen radius={SCROLL_BUTTON_SIZE / 2} />
         <box hoverColor={tokens.c.textStrong}>
           <Icon icon={withStroke(Icons.stella.ChevronDown, 2.5)} size={16} color={tokens.c.textWeak} />
         </box>

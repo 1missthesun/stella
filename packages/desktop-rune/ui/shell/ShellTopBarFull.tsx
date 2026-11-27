@@ -10,7 +10,7 @@ import { GlobalModelsControl } from "./GlobalModelsControl";
 import { ShellTopBarAccount } from "./sidebar/ShellTopBarAccount";
 import { SettingsMenuButton } from "./SettingsMenuButton";
 import { WindowControls } from "./WindowControls";
-import { AdaptiveGlass, chromeGlass, useGlassBackdrop } from "./glass";
+import { AdaptiveGlass, chromeGlass, GlassSheen, useGlassBackdrop } from "./glass";
 import { useTokens } from "../theme";
 import { ShellTopBarTabs } from "./topbar/ShellTopBarTabs";
 import type { BoxProps } from "../../host/rune-jsx/props";
@@ -25,6 +25,7 @@ function CapsuleGlass({ children, ...props }: BoxProps & { children: ReactNode }
   const m = chromeGlass(useTokens()).controls;
   return (
     <row h={CAPSULE_H} radius={CAPSULE_H / 2} align="center" windowDrag {...props} fx={m.fx} fill={m.fill} border={m.border} onBackdrop={useGlassBackdrop()}>
+      <GlassSheen radius={CAPSULE_H / 2} />
       {children}
     </row>
   );

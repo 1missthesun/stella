@@ -1,7 +1,7 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import type { Backdrop } from "../../host/rune-jsx/props";
 import { solidEdge, type Material } from "../kit/legible-glass";
-import { alpha, derive, mix, ModeScope, useTokens, type Tokens } from "../theme";
+import { alpha, derive, mix, ModeScope, useTokens, type Gradient, type Tokens } from "../theme";
 
 /**
  * Liquid Glass for the chrome that floats over the chat (the top bar's capsules, the scroll button
@@ -20,7 +20,7 @@ export function chromeGlass(t: Tokens) {
     if (t.material.solid) {
       const edge = solidEdge(t);
       const controls: Material = { fill: composerTint, border: edge };
-      return { controls, composer: { fill: composerTint, border: edge } as Material, hairline: edge };
+      return { controls, composer: { fill: composerTint, border: edge } as Material, hairline: edge, sheen: undefined };
     }
     const controls: Material = {
       fx: { glass: { ...base, bevel: 7, depth: 14, magnification: 1.04, saturation: 1.3, rim: t.dark ? 0.3 : 0.08, shadow: t.dark ? 0.15 : 0.05, veil: 0.75, tint: controlsTint } },
@@ -29,8 +29,17 @@ export function chromeGlass(t: Tokens) {
       fx: { glass: { ...base, bevel: 8, depth: 16, magnification: 1.03, saturation: t.dark ? 1.6 : 1.7, rim: t.dark ? 0.2 : 0.04, shadow: 0, veil: t.dark ? 0.8 : 0.82, tint: composerTint } },
       border: hairline,
     };
-    return { controls, composer, hairline };
+    /** The phone's dark glass buttons lighten toward the bottom (22 at the top, 33 at the bottom over black); light ones are flat. */
+    const sheen: Gradient | undefined = t.dark ? { angle: 180, stops: [[0, "rgba(255,255,255,0)"], [1, "rgba(255,255,255,0.045)"]] } : undefined;
+    return { controls, composer, hairline, sheen };
   });
+}
+
+/** The faint top-to-bottom lightening inside a dark glass control; nothing in light or solid. Put it first among the control's children. */
+export function GlassSheen({ radius }: { radius: number }) {
+  const sheen = chromeGlass(useTokens()).sheen;
+  if (!sheen) return null;
+  return <box absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} radius={radius} gradient={sheen} inert />;
 }
 
 const BackdropReport = createContext<((b: Backdrop) => void) | undefined>(undefined);

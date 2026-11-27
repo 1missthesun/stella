@@ -56,6 +56,16 @@ export const releaseDateLabel = (
 
 export const stellaReleases: readonly StellaRelease[] = [
   {
+    date: "2026-11-27",
+    title: "Much bigger Drive, no file limit",
+    summary: "Stella Drive now holds 100 GB on Plus, 500 GB on Pro and 2 TB on Max, and only its size counts, not how many files you keep.",
+    tags: ["Polish", "Fixes"],
+    highlights: [
+      "Drive storage grows to 100 GB on Plus, 500 GB on Pro and 2 TB on Max. Free grows to 2 GB.",
+      "There is no longer a limit on how many files your Drive holds, so reports and screenshots keep saving however many you have.",
+    ],
+  },
+  {
     date: "2026-11-26",
     title: "Helpers no longer get stuck waiting",
     summary: "When a helper asks the task that started it a question, that task now hears it and answers, wherever each of them runs.",

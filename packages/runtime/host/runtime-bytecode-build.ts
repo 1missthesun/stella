@@ -2,6 +2,7 @@ import { spawn } from "node:child_process";
 import { closeSync, existsSync, mkdirSync, openSync } from "node:fs";
 import { setPriority } from "node:os";
 import path from "node:path";
+import { waitForAppHydration } from "@stella/node-shared/integrations/app-hydration.js";
 import { getFileLogger } from "@stella/node-shared/observability/file-logger.js";
 import {
   checkRuntimeBytecode,
@@ -109,7 +110,13 @@ export const requestRuntimeBytecodeBuild = (args: {
     const request = pending;
     pending = null;
     if (!request || running) return;
-    if (failedStamps.has(computeRuntimeSourceStamp(request.stellaRoot))) return;
-    runBuild(request.stellaRoot, args.bunBinaryPath);
+    // Building needs the packages, which a first install is still
+    // installing behind the app bundle.
+    void waitForAppHydration()
+      .then(() => {
+        if (running || failedStamps.has(computeRuntimeSourceStamp(request.stellaRoot))) return;
+        runBuild(request.stellaRoot, args.bunBinaryPath);
+      })
+      .catch(() => undefined);
   });
 };

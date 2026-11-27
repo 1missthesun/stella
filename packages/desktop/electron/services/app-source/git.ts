@@ -1,6 +1,7 @@
 import { execFile } from "node:child_process";
 import { existsSync } from "node:fs";
 import { constants, setPriority } from "node:os";
+import { waitForAppHydration } from "@stella/node-shared/integrations/app-hydration";
 
 export type GitResult = { code: number; stdout: string; stderr: string };
 
@@ -85,8 +86,11 @@ type GitOptions = {
   input?: string;
 };
 
-export const gitRaw = (cwd: string, args: string[], options: GitOptions = {}) =>
-  run(gitBinary(), args, {
+// A first install opens before the launcher has set up git and the app's
+// checkout (app-hydration.ts): git waits for that instead of failing.
+export const gitRaw = async (cwd: string, args: string[], options: GitOptions = {}) => {
+  await waitForAppHydration({ signal: options.signal });
+  return run(gitBinary(), args, {
     cwd,
     env: { GIT_TERMINAL_PROMPT: "0", ...options.env },
     timeoutMs: options.timeoutMs,
@@ -94,6 +98,7 @@ export const gitRaw = (cwd: string, args: string[], options: GitOptions = {}) =>
     signal: options.signal,
     input: options.input,
   });
+};
 
 export const git = async (cwd: string, args: string[], options: GitOptions = {}) => {
   const result = await gitRaw(cwd, args, options);

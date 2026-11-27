@@ -426,9 +426,12 @@ const startAgentClis = () => {
       ? path.join(logs, "agent-clis.log")
       : path.join(appRoot, ".git", "stella-agent-clis.log");
     // Their downloads and first runs slow Stella's own first start, so
-    // they wait for the launcher to log that Stella is up.
+    // they wait for the launcher to log that Stella is up, unless this
+    // install runs behind an open Stella already (the launcher's hydration of
+    // an app bundle, STELLA_APP_HYDRATION).
     const args = [script, "--log", logFile];
-    if (logs) args.push("--after-ready", path.join(logs, "launcher.log"));
+    if (logs && !process.env.STELLA_APP_HYDRATION)
+      args.push("--after-ready", path.join(logs, "launcher.log"));
     const child = spawn(process.execPath, args, {
       cwd: appRoot,
       env: process.env,

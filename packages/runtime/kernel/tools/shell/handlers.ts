@@ -11,6 +11,11 @@ import { runToolEffect } from "../effect-runtime.js";
 import { isDangerousCommand } from "../command-safety.js";
 import { sanitizeToolVisibleText } from "../safety.js";
 import { resolveManagedShellCommand } from "./launch.js";
+import { getStellaAppDir } from "../../shared/runtime-paths.js";
+import {
+  appHydrationInProgress,
+  waitForAppHydration,
+} from "@stella/node-shared/integrations/app-hydration.js";
 import {
   acquireShellInteraction,
   cleanupShellSessions,
@@ -242,6 +247,14 @@ const resolveWriteStdinOperation = (
     : undefined;
 };
 
+const INSTALLED_APP_COMMAND = /\b(?:git|bun|bunx)\b|STELLA_APP_DIR|STELLA_DRAFTS_DIR/;
+
+const needsInstalledApp = (command: string, cwd: string | undefined): boolean => {
+  if (INSTALLED_APP_COMMAND.test(command)) return true;
+  const appDir = getStellaAppDir();
+  return Boolean(appDir && (command.includes(appDir) || (cwd && cwd.startsWith(appDir))));
+};
+
 export const handleExecCommand = async (
   state: ShellState,
   args: Record<string, unknown>,
@@ -275,6 +288,15 @@ export const handleExecCommand = async (
   }
   if (!prepared.command.trim()) {
     return { error: "cmd is required." };
+  }
+  // A first install opens before the launcher has set up git and the app's
+  // packages; a command that needs them waits for it rather than failing.
+  if (appHydrationInProgress() && needsInstalledApp(prepared.command, prepared.cwd)) {
+    try {
+      await waitForAppHydration({ signal });
+    } catch (error) {
+      return { error: toolErrorMessage(error) };
+    }
   }
   let emittedUpdateChunks = 0;
   const emitOneUpdate = (

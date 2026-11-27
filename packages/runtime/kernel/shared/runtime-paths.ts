@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import path from "node:path";
 import {
   checkRuntimeBytecode,
+  runtimeBytecodeLoaderPath,
   runtimeSourceEntryPath,
   type RuntimeBytecodeVerdict,
 } from "./runtime-bytecode.js";
@@ -87,5 +88,15 @@ export function resolveRuntimeWorkerEntry(options?: {
     return { path: resolveBundledRuntimeFile("worker/entry.js"), bytecode: null };
   }
   const bytecode = checkRuntimeBytecode(root, options?.bunBinaryPath);
-  return { path: bytecode.usable ? bytecode.loaderPath : source, bytecode };
+  if (bytecode.usable) return { path: bytecode.loaderPath, bytecode };
+  // A first install opens from an app bundle, without the packages the
+  // source needs: its build of the worker is complete JavaScript, which any
+  // Bun runs (re-parsing it when the bytecode is not its own).
+  if (
+    !["disabled", "missing", "files"].includes(bytecode.reason) &&
+    !existsSync(path.join(root, "node_modules"))
+  ) {
+    return { path: runtimeBytecodeLoaderPath(root), bytecode };
+  }
+  return { path: source, bytecode };
 }

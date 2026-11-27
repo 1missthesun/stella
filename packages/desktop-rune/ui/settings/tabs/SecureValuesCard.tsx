@@ -268,6 +268,15 @@ function SyncDevices({
         ? { label: t("settings.secureValues.removedHere"), ...askAgain }
         : standing === "waiting" && waiting?.declined
           ? { label: t("settings.secureValues.declined"), ...askAgain }
+          : standing === "waiting" && (waiting?.skipped || waiting?.idle)
+            ? sync.records > 0
+              ? {
+                  label: t("settings.secureValues.onOtherDevices", { names: askNames }),
+                  sub: t("settings.secureValues.useHereHint"),
+                  action: "askAgain" as const,
+                  button: t(justAsked ? "settings.secureValues.askedNow" : "settings.secureValues.useHere"),
+                }
+              : null
           : standing === "waiting" && waiting?.confirmed
             ? { label: t("settings.secureValues.waitingFor", { name: waiting.approver || t("global.savedValuesDevices.otherDevice") }) }
             : standing === "waiting" && waiting?.code

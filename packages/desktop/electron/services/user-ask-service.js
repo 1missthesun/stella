@@ -668,7 +668,18 @@ export class UserAskService {
                 replaceId = exact[0]?.id ?? "";
             }
             else {
-                const found = await this.findSaved(save, fields, exact.length > 0 ? exact : close, request);
+                let found = await this.findSaved(save, fields, exact.length > 0 ? exact : close, request);
+                if (!found?.whole && request.savedOnly !== true && this.sync.canUnlock()) {
+                    // The first time something here needs a saved value this
+                    // computer doesn't hold, offer to bring every saved value
+                    // from the user's other devices (the code check), then
+                    // look again. Declining asks the user as before.
+                    const unlocked = await this.sync.unlockFor(save.service);
+                    if (unlocked === "unlocked") {
+                        const again = await this.saved.findCandidates(save.service, save.account);
+                        found = await this.findSaved(save, fields, again.exact.length > 0 ? again.exact : again.close, request);
+                    }
+                }
                 if (found?.whole) {
                     return found.whole;
                 }
@@ -1378,6 +1389,8 @@ export class UserAskService {
                 return { ok: true };
             case "askAgain":
                 return await this.sync.askAgain();
+            case "skip":
+                return await this.sync.skipJoin();
             case "startOver":
                 return await this.sync.startOver();
             case "remove":

@@ -178,6 +178,12 @@ export type SavedValuesSyncStatus = Readonly<{
     confirmed?: boolean;
     declined?: boolean;
     removed?: boolean;
+    skipped?: boolean;
+    // Not on the list and not asking: this device asks only when something on
+    // it first needs a saved value (or the user asks from Saved logins).
+    idle?: boolean;
+    // The saved value that made this device ask, when one did.
+    forService?: string;
   }>;
   problem?: "reset" | "rollback" | "fork" | "invalid";
   devices: readonly SavedValuesListedDevice[];
@@ -190,7 +196,7 @@ export type SavedValuesSyncStatus = Readonly<{
 
 export type SavedValuesSyncAction =
   | Readonly<{ action: "answer" | "allow" | "decline"; joinId: string }>
-  | Readonly<{ action: "confirm" | "askAgain" | "startOver" }>
+  | Readonly<{ action: "confirm" | "askAgain" | "skip" | "startOver" }>
   | Readonly<{ action: "remove"; deviceId: string }>;
 
 export type SavedValueReleaseRequest = Readonly<{

@@ -58,11 +58,23 @@ export const SavedValuesDeviceLayer = () => {
   });
 
   const request = status?.standing === "member" ? status.requests.find((entry) => !dismissed.has(entry.joinId)) : undefined;
+  // This device asking to join. It asks only when something here first needs
+  // a saved value (or the user asks from Saved logins), and the card shows
+  // from that moment, so both screens follow the same request. Skipping keeps
+  // it off the list until it asks again from Saved logins.
   const waiting = status?.standing === "waiting" ? status.waiting : undefined;
-  const matchKey = waiting?.code && !waiting.confirmed ? `match:${waiting.code}` : null;
-  const showMatch = matchKey !== null && !dismissed.has(matchKey);
+  const asking =
+    !!waiting &&
+    !waiting.declined &&
+    !waiting.removed &&
+    !waiting.skipped &&
+    !waiting.confirmed &&
+    !waiting.askFailed &&
+    (Boolean(waiting.code) || Boolean(waiting.askedAt));
   const ready = onboarding.hydrated && onboarding.completed;
-  const free = useScreenFree(ready && (Boolean(request) || showMatch));
+  const showRequest = ready && Boolean(request);
+  const showAsking = hasConnectedAccount && asking;
+  const free = useScreenFree(showRequest || showAsking);
 
   const dismiss = (key: string) => {
     setDismissed((current) => new Set([...current, key]));
@@ -81,9 +93,9 @@ export const SavedValuesDeviceLayer = () => {
     }
   };
 
-  if (!ready || !free) return null;
+  if (!free) return null;
 
-  if (request) {
+  if (showRequest && request) {
     const allow = async () => {
       const result = await act({ action: "allow", joinId: request.joinId });
       const self = devices?.find((device) => device.deviceId === deviceId);
@@ -114,7 +126,11 @@ export const SavedValuesDeviceLayer = () => {
               <DialogDescription {...s.remoteExecutionConsentText} {...s.remoteExecutionConsentBody_remoteExecutionConsentText}>
                 {t("settings.secureValues.waitingFor", { name: request.name })}
               </DialogDescription>
-            ) : null}
+            ) : (
+              <DialogDescription {...s.remoteExecutionConsentText} {...s.remoteExecutionConsentBody_remoteExecutionConsentText}>
+                {t("global.savedValuesDevices.allowBody", { name: request.name })}
+              </DialogDescription>
+            )}
             {failed ? <T w="full" {...s.remoteExecutionConsentError}>{t("global.savedValuesDevices.failed")}</T> : null}
             <row {...s.remoteExecutionConsentActions}>
               <Button variant="ghost" disabled={busy} className="pill-btn pill-btn--lg" onClick={decline}>
@@ -136,30 +152,47 @@ export const SavedValuesDeviceLayer = () => {
     );
   }
 
-  if (!showMatch || !waiting?.code) return null;
+  if (!showAsking || !waiting) return null;
 
+  const skip = () => void run(() => act({ action: "skip" }));
+  const names = waiting.approvers?.join(" / ") || t("global.savedValuesDevices.otherDevice");
   return (
-    <Dialog open onOpenChange={(next) => !next && !busy && dismiss(matchKey)}>
-      <DialogContent fit {...s.remoteExecutionConsent} data-saved-values-match="">
+    <Dialog open onOpenChange={(next) => !next && !busy && skip()}>
+      <DialogContent
+        fit
+        {...s.remoteExecutionConsent}
+        data-saved-values-match={waiting.code ? "" : undefined}
+        data-saved-values-asking=""
+      >
         <DialogHeader>
-          <DialogTitle>{t("global.savedValuesDevices.getTitle")}</DialogTitle>
+          <DialogTitle>{t("global.savedValuesDevices.unlockTitle")}</DialogTitle>
           <DialogCloseButton aria-label={t("common.close")} />
         </DialogHeader>
         <DialogBody {...s.remoteExecutionConsentBody}>
           <DialogDescription {...s.remoteExecutionConsentText} {...s.remoteExecutionConsentBody_remoteExecutionConsentText}>
-            {t("global.savedValuesDevices.matchTitle", { name: waiting.approver || t("global.savedValuesDevices.otherDevice") })}
+            {waiting.code
+              ? t("global.savedValuesDevices.matchTitle", {
+                  name: waiting.approver || t("global.savedValuesDevices.otherDevice"),
+                })
+              : waiting.forService
+                ? t("global.savedValuesDevices.unlockBodyFor", { service: waiting.forService, names })
+                : t("global.savedValuesDevices.unlockBody", { names })}
           </DialogDescription>
-          <T w="full" {...sSavedValuesDevice.savedValuesDeviceCode}>
-            {formatJoinCode(waiting.code)}
-          </T>
+          {waiting.code ? (
+            <T w="full" {...sSavedValuesDevice.savedValuesDeviceCode}>
+              {formatJoinCode(waiting.code)}
+            </T>
+          ) : null}
           {failed ? <T w="full" {...s.remoteExecutionConsentError}>{t("global.savedValuesDevices.failed")}</T> : null}
           <row {...s.remoteExecutionConsentActions}>
-            <Button variant="ghost" disabled={busy} className="pill-btn pill-btn--lg" onClick={() => void run(() => act({ action: "askAgain" }))}>
-              {t("global.savedValuesDevices.useAnother")}
+            <Button variant="ghost" disabled={busy} className="pill-btn pill-btn--lg" onClick={skip}>
+              {t("global.savedValuesDevices.notNow")}
             </Button>
-            <Button variant="primary" disabled={busy} className="pill-btn pill-btn--primary pill-btn--lg" onClick={() => void run(() => act({ action: "confirm" }))}>
-              {t("global.savedValuesDevices.matches")}
-            </Button>
+            {waiting.code ? (
+              <Button variant="primary" disabled={busy} className="pill-btn pill-btn--primary pill-btn--lg" onClick={() => void run(() => act({ action: "confirm" }))}>
+                {t("global.savedValuesDevices.matches")}
+              </Button>
+            ) : null}
           </row>
         </DialogBody>
       </DialogContent>

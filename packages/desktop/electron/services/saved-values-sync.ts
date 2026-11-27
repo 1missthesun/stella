@@ -67,6 +67,9 @@ const PKCS8_SCOPE = `${PROTECT_SCOPE}:device-key`;
 const SIGN_SCOPE = `${PROTECT_SCOPE}:sign-key`;
 const RECONCILE_DEBOUNCE_MS = 1_500;
 const RETRY_MS = 60_000;
+const UNLOCK_WAIT_MS = 30 * 60_000;
+const CATCH_UP_MS = 45_000;
+const NOT_READY_RETRY_MS = 3_000;
 const MAX_APPROVER_NAMES = 3;
 const GET_BATCH = 50;
 
@@ -83,7 +86,7 @@ type SyncState = {
   cardAt?: number;
   signSecretProtected?: string;
   pin?: SavedValuesRosterPin;
-  joinPaused?: "declined" | "removed";
+  joinPaused?: "declined" | "removed" | "skipped";
   ownJoin?: OwnJoin;
   signers?: Record<string, string>;
 };
@@ -119,6 +122,10 @@ type Answered = Pick<SavedValuesJoin, "joinId" | "device" | "commit"> & {
 
 const POSTED_VISIBLE_MS = 30_000;
 const EXPIRY_SLACK_MS = 250;
+// A request nobody has answered is renewed this long before it ends, so the
+// Allow card on the other devices changes requests in place instead of
+// closing and opening again.
+const JOIN_RENEW_AHEAD_MS = 60_000;
 
 const computerName = () =>
   hostname().trim().replace(/\.(local|localdomain|lan|home)$/i, "").slice(0, 120) || "Computer";
@@ -200,9 +207,15 @@ export class SavedValuesSync {
   private posted: SavedValuesJoin | null = null;
   private answered = new Map<string, Answered>();
   private decided = new Set<string>();
+  // Set while something on this device is waiting for the saved values on the
+  // user's other devices; only then does it ask to join the list.
+  private wanted: { service?: string } | null = null;
+  private caughtUp = false;
+  private waiters = new Set<() => void>();
   private timer: ReturnType<typeof setTimeout> | null = null;
   private expiry: ReturnType<typeof setTimeout> | null = null;
   private retry: ReturnType<typeof setInterval> | null = null;
+  private notReady: ReturnType<typeof setTimeout> | null = null;
   private running: Promise<void> | null = null;
   private again = false;
   private status: SavedValuesSyncStatus = {
@@ -326,9 +339,20 @@ export class SavedValuesSync {
   start(): void {
     const state = this.loadState();
     this.setStatus({ enabled: state?.enabled !== false });
-    if (!state?.enabled) return;
-    const client = this.client();
-    if (!client) return;
+    if (state && !state.enabled) return;
+    const client = state ? this.client() : null;
+    if (!state || !client) {
+      // Early in startup the device id or backend may not be known yet; look
+      // again shortly instead of waiting for the next sign-in.
+      if (!this.notReady) {
+        this.notReady = setTimeout(() => {
+          this.notReady = null;
+          if (!this.stopWatch) this.start();
+        }, NOT_READY_RETRY_MS);
+        this.notReady.unref?.();
+      }
+      return;
+    }
     if (!this.stopWatch) {
       this.stopWatch = client.watch(
         "savedValues.state",
@@ -359,15 +383,22 @@ export class SavedValuesSync {
     this.stopWatch = null;
     if (this.retry) clearInterval(this.retry);
     this.retry = null;
+    if (this.notReady) clearTimeout(this.notReady);
+    this.notReady = null;
     if (this.timer) clearTimeout(this.timer);
     this.timer = null;
     this.stopWaitingForExpiry();
     this.setStatus({ active: false });
   }
 
-  private waitForExpiry(joins: readonly SavedValuesJoin[], now: number): void {
+  private waitForExpiry(joins: readonly SavedValuesJoin[], now: number, selfId: string): void {
     this.stopWaitingForExpiry();
-    const ends = joins.flatMap((join) => (join.state === "open" && join.expiresAt > now ? [join.expiresAt - now] : []));
+    const ends = joins.flatMap((join) => {
+      if (join.state !== "open" || join.expiresAt <= now) return [];
+      const renewAt = join.expiresAt - JOIN_RENEW_AHEAD_MS;
+      const ownUnanswered = join.device.deviceId === selfId && !join.listedNonce;
+      return [ownUnanswered && renewAt > now ? renewAt - now : join.expiresAt - now];
+    });
     if (ends.length === 0) return;
     this.expiry = setTimeout(() => {
       this.expiry = null;
@@ -400,6 +431,74 @@ export class SavedValuesSync {
   private setStatus(patch: Partial<SavedValuesSyncStatus>) {
     this.status = { ...this.status, ...patch };
     this.options.onStatus?.(this.getStatus());
+    for (const waiter of [...this.waiters]) waiter();
+  }
+
+  private waitFor<T>(check: () => T | null, ms: number): Promise<T | null> {
+    return new Promise((resolve) => {
+      const first = check();
+      if (first !== null) {
+        resolve(first);
+        return;
+      }
+      const done = (value: T | null) => {
+        clearTimeout(timer);
+        this.waiters.delete(listener);
+        resolve(value);
+      };
+      const listener = () => {
+        const value = check();
+        if (value !== null) done(value);
+      };
+      const timer = setTimeout(() => done(null), ms);
+      timer.unref?.();
+      this.waiters.add(listener);
+    });
+  }
+
+  /**
+   * True when this device isn't on the list, hasn't been told no, and the
+   * user's other devices hold saved values it could get by joining.
+   */
+  canUnlock(): boolean {
+    const status = this.status;
+    return status.active && status.standing === "waiting" && status.waiting?.idle === true && (status.records ?? 0) > 0;
+  }
+
+  /**
+   * Something here needs a saved value this device doesn't have. Ask to join
+   * the list now (the code check on both screens), and once allowed, wait for
+   * the other devices' saved values to arrive. Joining gives this device every
+   * saved value, so it is asked once, not per value.
+   */
+  async unlockFor(service: string): Promise<"unlocked" | "declined" | "unavailable"> {
+    if (this.status.standing === "member") return "unlocked";
+    if (!this.canUnlock() && !this.wanted) return "unavailable";
+    this.wanted = { service };
+    this.schedule(0);
+    const outcome = await this.waitFor<"member" | "declined" | "unavailable">(() => {
+      const status = this.status;
+      if (status.standing === "member") return "member";
+      if (!this.wanted) return "declined";
+      if (status.standing !== "waiting" || !status.active) return "unavailable";
+      const waiting = status.waiting;
+      if (waiting?.declined || waiting?.skipped || waiting?.removed) return "declined";
+      if (waiting?.askFailed) return "unavailable";
+      return null;
+    }, UNLOCK_WAIT_MS);
+    if (outcome !== "member") {
+      if (this.wanted) {
+        this.wanted = null;
+        this.schedule(0);
+      }
+      return outcome === "declined" ? "declined" : "unavailable";
+    }
+    await this.waitFor(() => (this.caughtUp ? true : null), CATCH_UP_MS);
+    return "unlocked";
+  }
+
+  private wantedFields(): { forService?: string } {
+    return this.wanted?.service ? { forService: this.wanted.service } : {};
   }
 
   noteReleaseLogChanged(): void {
@@ -528,10 +627,29 @@ export class SavedValuesSync {
     delete state.joinPaused;
     delete state.ownJoin;
     this.posted = null;
+    this.wanted = this.wanted ?? {};
     this.saveState();
     await this.reconcile();
     if (state.ownJoin || this.status.standing === "member") return { ok: true };
     return { ok: false, error: this.status.error ?? "Stella isn't connected." };
+  }
+
+  /**
+   * The user chose not to bring their saved logins to this device. Its request
+   * ends on every other device and it stays off the list (no saved logins, and
+   * it can't add devices) until it asks again from Saved logins.
+   */
+  async skipJoin(): Promise<{ ok: boolean; error?: string }> {
+    const state = this.loadState();
+    if (!state) return { ok: false, error: "Saved values aren't syncing here." };
+    if (this.status.standing === "member") return { ok: true };
+    await this.cancelOwnJoin();
+    this.posted = null;
+    this.wanted = null;
+    state.joinPaused = "skipped";
+    this.saveState();
+    this.setStatus({ standing: "waiting", waiting: { code: null, skipped: true }, devices: [], requests: [] });
+    return { ok: true };
   }
 
   async startOver(): Promise<{ ok: boolean; error?: string }> {
@@ -649,7 +767,7 @@ export class SavedValuesSync {
       if (!card || card.publicKey !== state.publicKey) return;
     }
 
-    this.waitForExpiry(remote.joins, now);
+    this.waitForExpiry(remote.joins, now, state.deviceId);
     let check = checkRoster(remote.roster, state.pin);
     if (!check.ok && check.reason === "reset") {
       delete state.pin;
@@ -686,6 +804,7 @@ export class SavedValuesSync {
 
     state.pin = roster.head;
     delete state.joinPaused;
+    this.wanted = null;
     if (state.ownJoin) {
       const finished = state.ownJoin.joinId;
       delete state.ownJoin;
@@ -726,9 +845,17 @@ export class SavedValuesSync {
       this.saveState();
     }
     if (state.joinPaused) {
+      this.wanted = null;
       this.setStatus({
         standing: "waiting",
-        waiting: { code: null, ...(state.joinPaused === "removed" ? { removed: true } : { declined: true }) },
+        waiting: {
+          code: null,
+          ...(state.joinPaused === "removed"
+            ? { removed: true }
+            : state.joinPaused === "skipped"
+              ? { skipped: true }
+              : { declined: true }),
+        },
         devices: [],
         requests: [],
       });
@@ -739,13 +866,31 @@ export class SavedValuesSync {
     if (own && live?.state === "declined") {
       state.joinPaused = "declined";
       delete state.ownJoin;
+      this.wanted = null;
       this.saveState();
       this.setStatus({ standing: "waiting", waiting: { code: null, declined: true }, devices: [], requests: [] });
       return;
     }
     const approvers = this.approverNames(state, roster, remote, now);
-    if (!own || !live || (live.state === "open" && live.expiresAt <= now)) {
+    if (!this.wanted && !own?.confirmed) {
+      // Nothing here needs the saved values yet: don't ask at sign-in or at
+      // launch. A request left from before (nobody waiting for it) ends.
       if (own) {
+        delete state.ownJoin;
+        this.saveState();
+        this.posted = null;
+        void client.call("savedValues.joinCancel", { joinId: own.joinId }).catch(() => undefined);
+      }
+      this.setStatus({ standing: "waiting", waiting: { code: null, idle: true, approvers }, devices: [], requests: [] });
+      return;
+    }
+    const lapsing =
+      live?.state === "open" && (live.expiresAt <= now || (!live.listedNonce && !own?.answer && live.expiresAt - now <= JOIN_RENEW_AHEAD_MS));
+    if (!own || !live || lapsing) {
+      // Renewing early keeps the current request (and its nonce) until the new
+      // one is posted, in case the other device answers it meanwhile.
+      const renewingEarly = !!own && !!live && live.expiresAt > now;
+      if (own && !renewingEarly) {
         delete state.ownJoin;
         this.saveState();
       }
@@ -755,9 +900,10 @@ export class SavedValuesSync {
       try {
         this.posted = await client.call("savedValues.joinStart", { joinId, device: self, commit });
       } catch (error) {
+        if (renewingEarly) throw error;
         this.setStatus({
           standing: "waiting",
-          waiting: { code: null, approvers, askFailed: true },
+          waiting: { code: null, approvers, askFailed: true, ...this.wantedFields() },
           devices: [],
           requests: [],
         });
@@ -767,7 +913,7 @@ export class SavedValuesSync {
       this.saveState();
       this.setStatus({
         standing: "waiting",
-        waiting: { code: null, approvers, askedAt: toDeviceTime(this.posted.createdAt) },
+        waiting: { code: null, approvers, askedAt: toDeviceTime(this.posted.createdAt), ...this.wantedFields() },
         devices: [],
         requests: [],
       });
@@ -805,6 +951,7 @@ export class SavedValuesSync {
         askedAt: toDeviceTime(live.createdAt),
         ...(own.answer ? { approver: own.answer.name } : {}),
         ...(own.confirmed ? { confirmed: true } : {}),
+        ...this.wantedFields(),
       },
       devices: [],
       requests: [],
@@ -1029,6 +1176,9 @@ export class SavedValuesSync {
         signers[id] = state.deviceId;
       }
     }
+    this.caughtUp = [...heads.values()].every(
+      (head) => head.deleted || state.removed[head.id] !== undefined || (head.recipients.includes(state.deviceId) && local.has(head.id)),
+    );
     this.saveState();
     if (changedHere) this.options.onSyncedChange?.();
   }

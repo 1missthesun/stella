@@ -25,6 +25,7 @@ import type { P2pComputer } from "@stella/contracts/p2p";
 import { Text } from "../../src/components/Text";
 import { Icon } from "../../src/components/Icon";
 import { makeSelfHostStyles } from "../../src/components/self-host/self-host-styles";
+import { selfHostServersAvailable } from "../../src/lib/native-capabilities";
 import { tapLight, tapMedium } from "../../src/lib/haptics";
 import {
   bootDeviceLink,
@@ -76,7 +77,7 @@ export default function PairComputerScreen() {
         tapMedium();
         setEntered("");
         setStep({ kind: "input", error: null });
-        router.replace({ pathname: "/p2p/[id]", params: { id: computer.id } });
+        router.push({ pathname: "/p2p/[id]", params: { id: computer.id } });
       } catch (error) {
         setStep({
           kind: "input",
@@ -149,7 +150,7 @@ export default function PairComputerScreen() {
   const goBack = () => {
     tapLight();
     if (router.canGoBack()) router.back();
-    else router.replace("/");
+    else router.replace(selfHostServersAvailable ? "/welcome" : "/login");
   };
 
   if (!stellaP2pAvailable) return <Redirect href="/" />;
@@ -281,7 +282,8 @@ export default function PairComputerScreen() {
               testID="p2p-code-input"
               autoCapitalize="characters"
               autoCorrect={false}
-              onChangeText={setEntered}
+              // Short codes read in capitals whatever the keyboard; full codes keep their case.
+              onChangeText={(value) => setEntered(/^[\w -]{0,10}$/.test(value) ? value.toUpperCase() : value)}
               onSubmitEditing={() => void pair(entered)}
               placeholder="K7M-49PX"
               placeholderTextColor={fadeHex(colors.textMuted, 0.45)}

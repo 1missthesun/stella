@@ -49,10 +49,14 @@ export type ComputerChatState = {
   /** Waiting for their own row to arrive from the computer, oldest first. */
   sent: OutboxItem[];
   outbox: OutboxItem[];
+  /** This phone's copies of the pictures it sent, by request: the computer's rows don't carry them. */
+  previews: Record<string, string[]>;
 };
 
 const CHATS_KEY = "stella-p2p-chats-v1";
 const OUTBOX_KEY = (computerId: string) => `stella-p2p-outbox-v1:${computerId}`;
+const PREVIEWS_KEY = (computerId: string) => `stella-p2p-previews-v1:${computerId}`;
+const PREVIEWS_KEPT = 200;
 
 const awayError = (name: string) => new Error(`${name} is asleep or offline.`);
 
@@ -150,6 +154,7 @@ export function createComputerChat(computerId: string) {
     loadingOlder: false,
     sent: [],
     outbox: [],
+    previews: {},
   };
   const listeners = new Set<() => void>();
   const set = (patch: Partial<ComputerChatState>) => {
@@ -221,6 +226,14 @@ export function createComputerChat(computerId: string) {
     if (sent.length !== state.sent.length) set({ sent });
   };
 
+  const keepPreviews = (item: OutboxItem) => {
+    const uris = item.attachments.filter((a) => a.kind === "image").map((a) => a.uri);
+    if (uris.length === 0) return;
+    const previews = Object.fromEntries([...Object.entries(state.previews), [item.requestId, uris] as const].slice(-PREVIEWS_KEPT));
+    set({ previews });
+    void AsyncStorage.setItem(PREVIEWS_KEY(computerId), JSON.stringify(previews)).catch(() => undefined);
+  };
+
   const saveOutbox = (outbox: OutboxItem[]) => {
     void AsyncStorage.setItem(OUTBOX_KEY(computerId), JSON.stringify(outbox)).catch(() => undefined);
   };
@@ -259,6 +272,7 @@ export function createComputerChat(computerId: string) {
               ...(attachments.length > 0 ? { attachments } : {}),
             };
             await pi({ op: "submit", conversationId: state.conversationId!, requestId: item.requestId, text: item.text, send: sendInfo });
+            keepPreviews(item);
             set({ sent: [...state.sent, item] });
             setOutbox(state.outbox.filter((entry) => entry.requestId !== item.requestId));
             settleSent();
@@ -307,10 +321,17 @@ export function createComputerChat(computerId: string) {
   };
 
   const start = async () => {
-    const [chats, rawOutbox] = await Promise.all([
+    const [chats, rawOutbox, rawPreviews] = await Promise.all([
       knownChats(),
       AsyncStorage.getItem(OUTBOX_KEY(computerId)).catch(() => null),
+      AsyncStorage.getItem(PREVIEWS_KEY(computerId)).catch(() => null),
     ]);
+    if (rawPreviews) {
+      try {
+        const previews = JSON.parse(rawPreviews) as Record<string, string[]>;
+        if (previews && typeof previews === "object") set({ previews: { ...previews, ...state.previews } });
+      } catch {}
+    }
     const known = chats.get(computerId);
     if (known && !theirs) adopt(known);
     if (rawOutbox) {
@@ -373,7 +394,7 @@ export function createComputerChat(computerId: string) {
     },
     async forget() {
       await rememberChat(computerId, null);
-      await AsyncStorage.removeItem(OUTBOX_KEY(computerId)).catch(() => undefined);
+      await AsyncStorage.multiRemove([OUTBOX_KEY(computerId), PREVIEWS_KEY(computerId)]).catch(() => undefined);
     },
     dispose() {
       for (const dispose of disposers.splice(0)) dispose();

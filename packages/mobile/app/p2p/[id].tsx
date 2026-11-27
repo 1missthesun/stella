@@ -10,7 +10,6 @@ import { Text } from "../../src/components/Text";
 import { ChatPane } from "../../src/components/ChatPane";
 import { AppBackdrop, TOP_BAR_BAR_HEIGHT } from "../../src/components/AppBackdrop";
 import { GlassIconButton } from "../../src/components/GlassIconButton";
-import { mainContentStyles } from "../../src/components/MainScreenSurface";
 import { createChatDraftStore } from "../../src/lib/chat-draft-store";
 import {
   appendAttachments,
@@ -105,13 +104,12 @@ function ComputerChatView({ computerId }: { computerId: string }) {
   };
 
   const barHeight = insets.top + TOP_BAR_BAR_HEIGHT;
-  const noticeHeight = notice ? 64 : 0;
 
   return (
     <View style={styles.shell}>
       <StatusBar style={isDark ? "light" : "dark"} />
       <AppBackdrop />
-      <View style={[mainContentStyles.content, { paddingTop: 0 }]}>
+      <View style={styles.pane}>
         <ChatPane
           conversationId={state.conversationId}
           messages={messages}
@@ -134,6 +132,17 @@ function ComputerChatView({ computerId }: { computerId: string }) {
             onSubmit,
             onStop: () => void chat.stop(),
             placeholder: t("mobile.chat.composerPlaceholder"),
+            intervention: notice ? (
+              <View style={styles.notice} accessibilityLiveRegion="polite" testID="p2p-chat-notice">
+                <View
+                  style={[
+                    styles.noticeDot,
+                    { backgroundColor: link === "online" ? colors.ok : fadeHex(colors.textMuted, 0.5) },
+                  ]}
+                />
+                <Text style={styles.noticeText}>{notice}</Text>
+              </View>
+            ) : null,
           }}
           attachments={{
             items: attachments,
@@ -142,7 +151,6 @@ function ComputerChatView({ computerId }: { computerId: string }) {
               setAttachments((current) => current.filter((entry) => entry.id !== attachmentId)),
             max: CHAT_ATTACHMENT_MAX_COUNT,
           }}
-          topInset={barHeight + noticeHeight}
         />
       </View>
       <View pointerEvents="box-none" style={[styles.topBar, { height: barHeight }]}>
@@ -167,24 +175,6 @@ function ComputerChatView({ computerId }: { computerId: string }) {
           />
         </View>
       </View>
-      {notice ? (
-        <View
-          pointerEvents="none"
-          style={[styles.notice, { top: barHeight + 8 }]}
-          accessibilityLiveRegion="polite"
-          testID="p2p-chat-notice"
-        >
-          <View
-            style={[
-              styles.noticeDot,
-              { backgroundColor: link === "online" ? colors.ok : fadeHex(colors.textMuted, 0.5) },
-            ]}
-          />
-          <Text style={styles.noticeText} numberOfLines={2}>
-            {notice}
-          </Text>
-        </View>
-      ) : null}
     </View>
   );
 }
@@ -192,6 +182,7 @@ function ComputerChatView({ computerId }: { computerId: string }) {
 const makeStyles = (colors: ReturnType<typeof useColors>) =>
   StyleSheet.create({
     shell: { flex: 1, backgroundColor: colors.background },
+    pane: { flex: 1, minHeight: 0, paddingHorizontal: 20 },
     topBar: {
       alignItems: "flex-end",
       flexDirection: "row",
@@ -219,17 +210,16 @@ const makeStyles = (colors: ReturnType<typeof useColors>) =>
       letterSpacing: -0.3,
     },
     notice: {
-      position: "absolute",
-      left: 20,
-      right: 20,
-      zIndex: 1,
-      flexDirection: "row",
       alignItems: "center",
+      alignSelf: "stretch",
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+      borderRadius: 15,
+      borderWidth: StyleSheet.hairlineWidth,
+      flexDirection: "row",
       gap: 10,
-      borderRadius: 14,
       paddingHorizontal: 14,
       paddingVertical: 11,
-      backgroundColor: fadeHex(colors.textMuted, 0.1),
     },
     noticeDot: { width: 7, height: 7, borderRadius: 4 },
     noticeText: {

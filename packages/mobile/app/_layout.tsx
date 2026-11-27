@@ -70,7 +70,7 @@ import { ChatSearchProvider } from "../src/lib/chat-search";
 import { I18nProvider, useT } from "../src/i18n";
 import { ShareIntentHandler } from "../src/lib/share-intent-handler";
 import { useSavedValuesSync } from "../src/lib/saved-values";
-import { resumeDeviceLinkIfPaired } from "../src/lib/p2p/link";
+import { resumeDeviceLinkIfPaired, stellaP2pAvailable } from "../src/lib/p2p/link";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -246,8 +246,12 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
     primeCloudConversationAuthority(cloudIdentity);
   }, [cloudIdentity, session.isPending]);
 
+  // Signed out, a phone that has paired a computer opens on its computers instead of sign-in.
+  const [directPaired, setDirectPaired] = useState<boolean | null>(
+    stellaP2pAvailable ? null : false,
+  );
   useEffect(() => {
-    void resumeDeviceLinkIfPaired();
+    void resumeDeviceLinkIfPaired().then(setDirectPaired, () => setDirectPaired(false));
   }, []);
 
   useEffect(() => {
@@ -337,7 +341,8 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
     }
 
     if (onMain || onIndex || (mainChatRequested && !onLogin && !onWelcome)) {
-      router.replace(selfHostServersAvailable ? "/welcome" : "/login");
+      if (directPaired === null) return;
+      router.replace(directPaired ? "/p2p" : selfHostServersAvailable ? "/welcome" : "/login");
     }
   }, [
     fontsReady,
@@ -349,6 +354,7 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
     session.isPending,
     guestReady,
     initialMainHref,
+    directPaired,
   ]);
 
   const authoritySettled =

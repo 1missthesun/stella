@@ -109,7 +109,10 @@ export const computerChatMessages = (state: ComputerChatState, online: boolean):
     records: piRecords(state.pi),
     hasOlder: state.pi.hasOlder,
   });
-  const rows = [...messages];
+  const rows = messages.map((message) => {
+    const uris = message.role === "user" && !message.thumbnailUris?.length ? state.previews[message.id] : undefined;
+    return uris?.length ? { ...message, thumbnailUris: uris, hasImage: true } : message;
+  });
   for (const item of state.sent) rows.push(pendingRow(item));
   for (const item of state.outbox) {
     rows.push(pendingRow(item, item.failed ? "not_sent" : online ? undefined : "queued"));

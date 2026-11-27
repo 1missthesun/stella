@@ -29,8 +29,18 @@ const deviceName = () => (Device.deviceName || Device.modelName || (Platform.OS 
 
 let started: Promise<void> | null = null;
 
+/** Short codes go through Stella's pairing mailbox; a dev build can point at its own. */
+const rendezvous = process.env.EXPO_PUBLIC_STELLA_P2P_RENDEZVOUS?.trim();
+
 const startLink = (): Promise<void> =>
-  (started ??= startStellaP2p({ name: deviceName(), platform: Platform.OS, relay: "default", discoverable: false }).catch((error: unknown) => {
+  (started ??= startStellaP2p({
+    name: deviceName(),
+    platform: Platform.OS,
+    relay: "default",
+    // A phone is never anyone's computer, so it never answers nearby devices.
+    discoverable: false,
+    ...(rendezvous ? { rendezvous } : {}),
+  }).catch((error: unknown) => {
     started = null;
     throw error;
   }));
@@ -121,10 +131,12 @@ export const bootDeviceLink = (): Promise<void> => {
 };
 
 /** At launch: brings the link up only when this phone has paired with a computer before. */
-export const resumeDeviceLinkIfPaired = async (): Promise<void> => {
-  if (!stellaP2pAvailable) return;
-  if ((await AsyncStorage.getItem(PAIRED_KEY).catch(() => null)) !== "1") return;
-  await bootDeviceLink().catch(() => undefined);
+/** Starts the link when this phone has paired a computer before; says whether it has. */
+export const resumeDeviceLinkIfPaired = async (): Promise<boolean> => {
+  if (!stellaP2pAvailable) return false;
+  if ((await AsyncStorage.getItem(PAIRED_KEY).catch(() => null)) !== "1") return false;
+  void bootDeviceLink().catch(() => undefined);
+  return true;
 };
 
 export const getComputers = () => computers;

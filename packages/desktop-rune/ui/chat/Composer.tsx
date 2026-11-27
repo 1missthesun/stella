@@ -142,7 +142,6 @@ function ComposerImpl({
   const inputId = `composer-input:${useId()}`;
   const modelMentionMenuRef = useRef<ComposerModelMentionMenuHandle | null>(null);
   const [modelMentionTrigger, setModelMentionTrigger] = useState<ComposerModelMentionTrigger | null>(null);
-  const [focused, setFocused] = useState(false);
   const [composerW, setComposerW] = useState(0);
   const caretRef = useRef<number | null>(null);
   const valueRef = useRef(message);
@@ -316,12 +315,12 @@ function ComposerImpl({
         pad={1}
         radius={radius}
         clip={radius}
-        {...(sidebar
-          ? { gradient: look.gradient, border: isDragOver ? look.dragBorder : focused ? look.focusBorder : look.border, shadows: isDragOver ? [...look.shadows, ...look.dragRing] : look.shadows }
-          : { fx: chromeGlass(tokens).composer, onBackdrop: glassBackdrop, border: isDragOver ? look.dragBorder : chromeGlass(tokens).hairline, shadows: isDragOver ? look.dragRing : undefined })}
+        fx={chromeGlass(tokens).composer}
+        onBackdrop={glassBackdrop}
+        border={isDragOver ? look.dragBorder : chromeGlass(tokens).hairline}
+        shadows={isDragOver ? look.dragRing : undefined}
         motion={SHELL_SPRING}
         layout={SHELL_SPRING.dur}
-        onFocusWithin={setFocused}
       >
         {hasAttachedChips ? (
           <row w="full" wrap pt={8} px={14}>

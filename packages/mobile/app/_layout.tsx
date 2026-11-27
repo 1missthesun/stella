@@ -70,6 +70,7 @@ import { ChatSearchProvider } from "../src/lib/chat-search";
 import { I18nProvider, useT } from "../src/i18n";
 import { ShareIntentHandler } from "../src/lib/share-intent-handler";
 import { useSavedValuesSync } from "../src/lib/saved-values";
+import { resumeDeviceLinkIfPaired } from "../src/lib/p2p/link";
 
 void SplashScreen.preventAutoHideAsync();
 
@@ -158,6 +159,7 @@ function RootStack() {
       <Stack.Screen name="onboarding" />
       <Stack.Screen name="connect-server" />
       <Stack.Screen name="pair" />
+      <Stack.Screen name="p2p" />
       <Stack.Screen name="(main)" />
       <Stack.Screen name="dev-test-session" />
     </Stack>
@@ -245,6 +247,10 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
   }, [cloudIdentity, session.isPending]);
 
   useEffect(() => {
+    void resumeDeviceLinkIfPaired();
+  }, []);
+
+  useEffect(() => {
     let dispose: (() => void) | null = null;
     let cancelled = false;
     void installNotificationCategoriesAndListeners().then((unsubscribe) => {
@@ -277,6 +283,8 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
     const onOnboarding = pathname === "/onboarding";
     const onServerConnect =
       pathname === "/connect-server" || pathname === "/pair";
+    // A computer's Stella over the direct link needs no account, signed in or not.
+    const onDirectLink = pathname === "/p2p" || pathname.startsWith("/p2p/");
     const onMain = [
       "/chat",
       "/schedule",
@@ -287,7 +295,7 @@ function AuthenticatedLayout({ fontsReady }: { fontsReady: boolean }) {
       "/engine-accounts",
     ].some((route) => pathname.startsWith(route));
 
-    if (onOnboarding || onServerConnect) {
+    if (onOnboarding || onServerConnect || onDirectLink) {
       return;
     }
 

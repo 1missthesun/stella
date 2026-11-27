@@ -36,6 +36,8 @@ import {
   loadLastMainTabHref,
 } from "../../src/lib/last-main-tab";
 import { useT } from "../../src/i18n";
+import { selfHostServersAvailable } from "../../src/lib/native-capabilities";
+import { stellaP2pAvailable } from "../../src/lib/p2p/link";
 import { buildMagicLinkHeaders } from "../../src/lib/auth-integrity-headers";
 import {
   isIntegrityKeyUnknown,
@@ -537,6 +539,22 @@ export default function LoginScreen() {
               <Text style={styles.errorText} accessibilityLiveRegion="polite">
                 {submitState.message}
               </Text>
+            ) : null}
+
+            {stellaP2pAvailable && !selfHostServersAvailable ? (
+              <Pressable
+                onPress={() => router.push("/p2p")}
+                accessibilityRole="button"
+                accessibilityLabel={t("mobile.p2p.title")}
+                testID="login-use-computer"
+                style={({ pressed }) => [
+                  styles.inlineLink,
+                  { alignSelf: "center" },
+                  pressed && styles.inlineLinkPressed,
+                ]}
+              >
+                <Text style={styles.inlineLinkText}>{t("mobile.p2p.title")}</Text>
+              </Pressable>
             ) : null}
 
             <Text style={styles.legalFooter}>

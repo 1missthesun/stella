@@ -1,0 +1,4 @@
+ios/vendor/
+android/vendor/
+android/build/
+android/.cxx/

@@ -8,6 +8,7 @@ import { StellaMarkHero } from "../../src/components/stella-mark/StellaMarkHero"
 import { makeSelfHostStyles } from "../../src/components/self-host/self-host-styles";
 import { tapLight } from "../../src/lib/haptics";
 import { selfHostServersAvailable } from "../../src/lib/native-capabilities";
+import { stellaP2pAvailable } from "../../src/lib/p2p/link";
 import { useColors, useTheme } from "../../src/theme/theme-context";
 import { useT } from "../../src/i18n";
 
@@ -52,6 +53,24 @@ export default function WelcomeScreen() {
             {t("mobile.selfHost.useStella")}
           </Text>
         </Pressable>
+
+        {stellaP2pAvailable ? (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("mobile.p2p.title")}
+            testID="welcome-use-computer"
+            onPress={() => {
+              tapLight();
+              router.push("/p2p");
+            }}
+            style={({ pressed }) => [
+              styles.secondaryButton,
+              pressed && styles.secondaryButtonPressed,
+            ]}
+          >
+            <Text style={styles.secondaryButtonText}>{t("mobile.p2p.title")}</Text>
+          </Pressable>
+        ) : null}
 
         <Pressable
           accessibilityRole="button"

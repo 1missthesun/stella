@@ -95,11 +95,22 @@ fn sees_through(p: &Props) -> bool {
     p.backdrop_blur.is_some_and(|b| b > 0.0) || p.fill.as_ref().is_some_and(|c| c.0.a < 1.0)
 }
 
-/// Fades `e` in a beat behind a `morphFrom` glass growing on `spring`, once it's mostly grown.
+/// Brings a `morphFrom` glass's content in as the glass starts to grow: it's there to press
+/// from the first frame, and fades and scales in well before the glass reaches its size.
 pub fn reveal(e: El, spring: rune::Spring) -> El {
-    let fade = rune::Spring::new(spring.duration * 0.5, 0.0);
-    e.transition(rune::Transition::opacity().springs(rune::SpringPair::new(fade, rune::Spring::new(0.14, 0.0)))).enter_delay(spring.duration * 0.4)
+    let fade = rune::Spring::new((spring.duration * 0.6).max(0.01), 0.0);
+    e.transition(rune::Transition::scale(0.97).combined(rune::Transition::opacity()).springs(rune::SpringPair::new(fade, CONTENT_OUT)))
 }
+
+/// A `morphFrom` glass's border and shadows, which only fit its own shape: they come in as the
+/// glass nears it.
+pub fn reveal_chrome(e: El, spring: rune::Spring) -> El {
+    let fade = rune::Spring::new((spring.duration * 0.35).max(0.01), 0.0);
+    e.transition(rune::Transition::opacity().springs(rune::SpringPair::new(fade, CONTENT_OUT))).enter_delay(spring.duration * 0.5)
+}
+
+/// How fast a closing `morphFrom` glass's content goes, ahead of the glass shrinking back.
+const CONTENT_OUT: rune::Spring = rune::Spring::new(0.07, 0.0);
 
 /// A closing `morphFrom` element (`Tree::closing`): its glass morphing back, nothing to press,
 /// focus or dismiss.
@@ -159,7 +170,7 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
         e = e.transition(rune::Transition::none());
     }
     if closing {
-        e = e.transition(rune::Transition::none()).child_exit(rune::Transition::opacity().springs(rune::SpringPair::new(rune::Spring::new(0.16, 0.0), rune::Spring::new(0.14, 0.0))));
+        e = e.transition(rune::Transition::none()).child_exit(rune::Transition::opacity().springs(rune::SpringPair::new(CONTENT_OUT, CONTENT_OUT)));
     }
     e.key(rune_key(id, p))
 }

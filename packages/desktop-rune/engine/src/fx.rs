@@ -44,7 +44,23 @@ pub struct MorphSpec {
     pub spring: Spring,
 }
 
-const MORPH_SPRING: Spring = Spring::new(0.5, 0.18);
+/// Opens in about 0.2 s, with no visible overshoot.
+const MORPH_SPRING: Spring = Spring::new(0.18, 0.06);
+
+/// The spring a morph goes back on: quicker than it opened, and critically damped.
+fn close_spring(open: Spring) -> Spring {
+    Spring::new((open.duration * 0.7).max(0.01), 0.0)
+}
+
+/// How far through a morph its glass is drawn: none at the source's shape, so the source
+/// (glass, icon and label) shows as itself at both ends, and all of it from `MORPH_SHOWN`.
+const MORPH_HIDDEN: f32 = 0.03;
+const MORPH_SHOWN: f32 = 0.3;
+
+fn morph_alpha(at: f32) -> f32 {
+    let t = ((at - MORPH_HIDDEN) / (MORPH_SHOWN - MORPH_HIDDEN)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
 
 #[derive(Clone, Debug)]
 pub struct FxSpec {
@@ -341,7 +357,7 @@ pub fn under(mut e: El, id: u32, p: &Props) -> El {
     if let Some(spring) = morph_spring(p)
         && (p.border.is_some() || p.shadow.is_some() || p.shadows.is_some())
     {
-        e = e.child(crate::view::reveal(morph_chrome(id, p), spring));
+        e = e.child(crate::view::reveal_chrome(morph_chrome(id, p), spring));
     }
     if p.lit.is_some() {
         e = e.child(slot(id, 0, OCCLUDER, 0.0, p));
@@ -477,6 +493,7 @@ struct Morph {
     from_lens: Option<LensParams>,
     key: String,
     spring: Spring,
+    open: Spring,
     x0: f32,
     v0: f32,
     target: f32,
@@ -495,6 +512,12 @@ impl Morph {
         }
         let (x, v) = self.at(now);
         (self.x0, self.v0, self.target, self.t0) = (x, v, target, now);
+        self.spring = if target == 0.0 { close_spring(self.open) } else { self.open };
+    }
+
+    /// Whether it's done: a closing one once its glass is no longer drawn.
+    fn done(&self, now: f64) -> bool {
+        self.settled(now) || (self.target == 0.0 && self.at(now).0 <= MORPH_HIDDEN)
     }
 
     fn settled(&self, now: f64) -> bool {
@@ -588,11 +611,9 @@ impl Compositor<Win> for Comp {
         let mut watched: Vec<(usize, u32)> = Vec::new();
         let now = f.rt.t;
         let morphs = &mut self.morphs;
-        let mut hide: Vec<String> = Vec::new();
         let mut closed: Vec<u32> = Vec::new();
         let mut moving = false;
         let mut grouped: Vec<(String, usize, Shape)> = Vec::new();
-        let mut glass_keys: Vec<(usize, Option<String>)> = Vec::new();
         crate::engine::read(|eng| {
             for (n, i) in f.rt.instances.iter().enumerate() {
                 if i.params[1] != KIND_EFFECT {
@@ -608,6 +629,7 @@ impl Compositor<Win> for Comp {
                         let Some(s) = p.fx.as_ref().and_then(|l| l.0.get(i.uv[0] as usize)) else { continue };
                         let watch = matches!(s.effect, Effect::Glass { .. }) && p.on.iter().any(|h| h == "backdrop") && !watched.iter().any(|w| w.1 == node);
                         let mut shape = Shape::rounded(x, y, w, h, r);
+                        let mut alpha = 1.0;
                         let fx = match &s.effect {
                             Effect::Glass { lens, merge, group, morph } => {
                                 let mut lens = *lens;
@@ -618,9 +640,16 @@ impl Compositor<Win> for Comp {
                                     let m = match (morphs.contains_key(&node), source) {
                                         (true, _) => morphs.get_mut(&node),
                                         (false, Some(key)) if !closing => source_shape(f.rt, eng, &key).map(|(from, from_lens)| {
-                                            let start = if reduced { 1.0 } else { 0.0 };
+                                            // Reopened while the last one still goes back into the same source: carry on
+                                            // from where that one is drawn, and let it go.
+                                            let (mut x0, mut v0) = (if reduced { 1.0 } else { 0.0 }, 0.0);
+                                            let back = morphs.iter().find(|(n, m)| m.key == key && m.target == 0.0 && eng.tree.closing.contains_key(*n)).map(|(n, _)| *n);
+                                            if let Some(old) = back.filter(|_| !reduced).and_then(|n| morphs.remove(&n).map(|m| (n, m))) {
+                                                (x0, v0) = old.1.at(now);
+                                                closed.push(old.0);
+                                            }
                                             WHOLE.with(|w| w.borrow_mut().insert(node, [shape.rect.w, shape.rect.h]));
-                                            morphs.entry(node).or_insert(Morph { from, to: shape, from_lens, key, spring: ms.spring, x0: start, v0: 0.0, target: 1.0, t0: now, seen: false })
+                                            morphs.entry(node).or_insert(Morph { from, to: shape, from_lens, key, spring: ms.spring, open: ms.spring, x0, v0, target: 1.0, t0: now, seen: false })
                                         }),
                                         _ => None,
                                     };
@@ -639,7 +668,7 @@ impl Compositor<Win> for Comp {
                                                 m.to = shape;
                                                 WHOLE.with(|w| w.borrow_mut().insert(node, [shape.rect.w, shape.rect.h]));
                                             }
-                                            let settled = reduced || m.settled(now);
+                                            let settled = reduced || m.done(now);
                                             if settled && m.target == 0.0 {
                                                 morphs.remove(&node);
                                                 closed.push(node);
@@ -649,7 +678,7 @@ impl Compositor<Win> for Comp {
                                                 m.from = from;
                                             }
                                             let at = if settled { m.target } else { m.at(now).0 };
-                                            hide.push(m.key.clone());
+                                            alpha = morph_alpha(at);
                                             moving |= !settled;
                                             shape = mix_shape(m.from, shape, at);
                                             lens = mix_lens(&m.from_lens.unwrap_or(lens), &lens, at.clamp(0.0, 1.0));
@@ -659,12 +688,11 @@ impl Compositor<Win> for Comp {
                                 if let Some(g) = group {
                                     grouped.push((g.clone(), layers.len(), shape));
                                 }
-                                glass_keys.push((layers.len(), p.id.clone()));
                                 Fx::lens(lens)
                             }
                             Effect::Fill(fill) => Fx::fill(*fill),
                         };
-                        let mut l = fx.on(shape).at(t).seed(s.seed).reduced(reduced).opacity(s.opacity);
+                        let mut l = fx.on(shape).at(t).seed(s.seed).reduced(reduced).opacity(s.opacity * alpha);
                         l.place = rune_fx::Place::Over;
                         if watch {
                             watched.push((layers.len(), node));
@@ -714,12 +742,6 @@ impl Compositor<Win> for Comp {
         if !closed.is_empty() {
             CLOSED.with(|c| c.borrow_mut().extend(closed));
             moving = true;
-        }
-        // A morph's source shows no glass of its own while the morph holds it.
-        for (layer, key) in &glass_keys {
-            if key.as_ref().is_some_and(|k| hide.contains(k)) {
-                layers[*layer].opacity = 0.0;
-            }
         }
         // A glass group draws as one surface at its first member: the others' shapes join its union.
         grouped.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));

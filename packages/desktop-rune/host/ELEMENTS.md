@@ -220,11 +220,16 @@ these props. Types are in `host/rune-jsx/props.ts` (`FxLayer`, `Glass`, `Lightin
 - Morphing: `morphFrom: "id"` (or `true`: the element's `anchor.to`) grows the glass out of that
   element's shape when it mounts, lensing the whole way, and shrinks it back into it when it's
   removed: the engine keeps the element on screen, inert, until the glass is home (at most 3 s).
-  The source's own glass hides while the morph holds it. The element's children, border and
-  shadows fade in once the glass has grown most of the way and fade out at once on removal (the
-  element keeps its size meanwhile), so give the element itself no `enter`/`exit`. The glass is
-  clipped as the element's children are, so a menu that scrolls puts `scrollY` on an inner `col`
-  rather than on the morphing element. `morphMotion: { dur, bounce }` is the spring (0.5 s, 0.18); Reduce Motion skips
+  The source stays as it is the whole time: the morphing glass fades in over it as it leaves the
+  source's shape and out as it gets back, so the morph starts and ends as the source itself, its
+  icon and label included. The element's children are there to press from the first frame and
+  fade and scale in as the glass starts to grow; its border and shadows come in as the glass
+  nears its size. On removal the children fade out at once (the element keeps its size
+  meanwhile), so give the element itself no `enter`/`exit`. Opening it again while it goes back
+  carries on from where the glass is. The glass is clipped as the element's children are, so a
+  menu that scrolls puts `scrollY` on an inner `col` rather than on the morphing element.
+  `morphMotion: { dur, bounce }` is the opening spring (0.18 s, 0.06; it goes back on 0.7× that,
+  critically damped); Reduce Motion skips
   it. A menu anchored to its button:
   `<col anchor={{ to: "plus", side: "top" }} fx={{ glass: { …recipe, morphFrom: true } }}>`.
   `demo/gallery/GlassMorph.tsx` shows a menu, a group and a sliding tab pill

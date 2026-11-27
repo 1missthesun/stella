@@ -54,6 +54,8 @@ pub const WANT_MAX: Duration = Duration::from_millis(120);
 /// follow a swap's first frame), or this long after it landed at the latest.
 const QUIET: Duration = Duration::from_millis(24);
 const SETTLE_MAX: Duration = Duration::from_millis(250);
+/// How long into the run a late commit can still settle what transitions.
+const FOLLOW_SECONDS: f64 = 0.35;
 const MIPS: u32 = 7;
 /// Bytes per record in the shader's `Rec`.
 const REC_BYTES: usize = 64;
@@ -850,6 +852,8 @@ pub struct Swap {
     prev_at: Instant,
     lively: Vec<[f32; 4]>,
     land_at: Option<Instant>,
+    /// When the shapes were last judged (late commits during the run judge them again).
+    judged_at: Instant,
     whole: bool,
     /// Records, and their GPU copy with the bind groups reading it.
     recs: usize,
@@ -910,7 +914,7 @@ struct Mipped {
 
 impl Default for Swap {
     fn default() -> Swap {
-        Swap { gpu: None, res: None, old: Vec::new(), old_views: HashMap::new(), prev: Vec::new(), prev_at: Instant::now(), lively: Vec::new(), land_at: None, whole: false, recs: 0, bound: None, t0: 0.0, uniform: [0.0; 8], plan: Plan::Nothing }
+        Swap { gpu: None, res: None, old: Vec::new(), old_views: HashMap::new(), prev: Vec::new(), prev_at: Instant::now(), lively: Vec::new(), land_at: None, judged_at: Instant::now(), whole: false, recs: 0, bound: None, t0: 0.0, uniform: [0.0; 8], plan: Plan::Nothing }
     }
 }
 
@@ -981,13 +985,22 @@ impl Swap {
                 let landed = *self.land_at.get_or_insert(now);
                 let snap = painted(&f.rt.instances, size, caret(f.rt.ime_area, scale));
                 self.watch(&snap);
-                if now - last_ops() >= QUIET || now - landed >= SETTLE_MAX {
+                // A remount paints its lists a round trip after its first frame: a new tree
+                // with a fraction of the old shapes has not arrived yet.
+                let arriving = snap.len() * 4 < self.old.len();
+                if (now - last_ops() >= QUIET && !arriving) || now - landed >= SETTLE_MAX {
                     self.start(f, scale, now - landed, snap)
                 } else {
                     Plan::Cover
                 }
             }
-            Some(Stage::Run) => Plan::Run,
+            Some(Stage::Run) => {
+                if !self.whole && !self.old.is_empty() && f.rt.t - self.t0 < FOLLOW_SECONDS && last_ops() > self.judged_at {
+                    self.follow(f, scale)
+                } else {
+                    Plan::Run
+                }
+            }
         };
         match self.plan {
             Plan::Cover => self.uniform = [size.0 as f32, size.1 as f32, (MIPS - 1) as f32, 2.0, 1.0, 0.0, 0.0, 0.0],
@@ -1098,10 +1111,12 @@ impl Swap {
         if !self.lively.is_empty() {
             eprintln!("stella-engine: swapfx: live, not the swap: {}", self.lively.iter().map(|l| format!("{:.0},{:.0} {:.0}x{:.0}", l[0], l[1], l[2] - l[0], l[3] - l[1])).collect::<Vec<_>>().join(" | "));
         }
-        self.old = Vec::new();
-        self.old_views = HashMap::new();
+        self.judged_at = Instant::now();
         self.prev = Vec::new();
-        self.lively = Vec::new();
+        if self.whole {
+            self.old = Vec::new();
+            self.old_views = HashMap::new();
+        }
         if !self.whole && self.bound.is_none() {
             set(None);
             crate::engine::with(touch_main);
@@ -1109,6 +1124,33 @@ impl Swap {
         } else {
             set(Some(Stage::Run));
             Plan::Run
+        }
+    }
+
+    /// A commit landed early in the run (something the new tree loads a moment later, such as a
+    /// title it fetches): the shapes are judged again against the before, on the same timeline,
+    /// and fewer shapes transition if what had gone came back. What arrives new (a reply
+    /// streaming on) is live, not the swap.
+    fn follow(&mut self, f: &mut rune::compose::Frame<'_, crate::windows::Win>, scale: f32) -> Plan {
+        self.judged_at = Instant::now();
+        let new = painted(&f.rt.instances, f.size, caret(f.rt.ime_area, scale));
+        let views = scrolled(&self.old_views, &viewports(f.rt, scale));
+        let d = diff(&self.old, &new, &self.lively, &views);
+        match outcome(&self.old, &new, &d, scale, f.size) {
+            Outcome::Local(recs) if recs.len() < self.recs => {
+                if let (Some(g), Some(res)) = (&self.gpu, &self.res) {
+                    eprintln!("stella-engine: swapfx: settled to {} shapes", recs.len());
+                    self.recs = recs.len();
+                    self.bound = Some(g.bind(f.device, res, &recs));
+                }
+                Plan::Run
+            }
+            Outcome::Local(_) | Outcome::Whole(_) => Plan::Run,
+            Outcome::Nothing => {
+                set(None);
+                crate::engine::with(touch_main);
+                Plan::Nothing
+            }
         }
     }
 

@@ -18,6 +18,8 @@ import type { ControlContext } from "./services/control";
 
 const SWAP_QUIET_MS = 80;
 const SWAP_HOLD_MAX_MS = Number(process.env.STELLA_RUNE_SWAP_HOLD_MS ?? 1000);
+/** The engine transitions only what a swap changed (engine/src/swapfx.rs); `STELLA_RUNE_SWAP_FX=0` lands swaps at once. */
+const SWAP_FX = process.env.STELLA_RUNE_SWAP_FX !== "0";
 
 export async function runHost(options: { bundled?: boolean } = {}): Promise<void> {
   const t_boot = now();
@@ -167,6 +169,7 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
       const next = await loadApp();
       const t_built = now();
       app = next;
+      if (SWAP_FX) command({ cmd: "swapfx.begin" });
       if (SWAP_HOLD_MAX_MS > 0) bridge.holdFrames();
       replayLayouts(true);
       store.set((s) => ({ error: null, swaps: s.swaps + 1 }));
@@ -185,6 +188,7 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
       // A broken edit never takes the UI down: the old app keeps running, the error shows.
       bridge.releaseFrames();
       replayLayouts(false);
+      if (SWAP_FX) command({ cmd: "swapfx.cancel" });
       console.error("[ui] hot swap failed, keeping the running UI:", err);
       store.set({ error: String((err as Error).message ?? err).slice(0, 400) });
       return false;

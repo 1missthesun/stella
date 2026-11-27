@@ -105,6 +105,10 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
         }
         None => root,
     };
+    let root = match crate::swapfx::slot().filter(|_| s.main) {
+        Some(slot) => root.child(slot),
+        None => root,
+    };
     note_state(node, dark, maximized, full, accent);
     settle_rect(node, cx);
     // As in CSS, a change lands at once unless its element asks for motion (`motion`, `layout`).
@@ -513,8 +517,12 @@ fn drain(polling: u32) {
     let mut added = Vec::new();
     let mut gone = Vec::new();
     for Msg::Batch(ops, received_at) in batches {
+        if ops.iter().any(|op| !matches!(op, Op::Commit { .. } | Op::Cmd(_) | Op::Blob { .. } | Op::FreeBlob { .. })) {
+            crate::swapfx::note_ops();
+        }
         engine::with(|e| {
             if ops.iter().any(|op| matches!(op, Op::Commit { kind: 1, .. })) {
+                crate::swapfx::landed();
                 crate::swap_view::remember(e);
                 e.swap_settle = Some((std::time::Instant::now() + SWAP_SETTLE, crate::swap_view::USER_INPUT.load(std::sync::atomic::Ordering::Relaxed)));
             }
@@ -757,6 +765,14 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
         }
         held
     }) {
+        wake_dirty(s.node);
+    }
+    if s.main && crate::swapfx::take_rebuild() {
+        engine::with(|e| {
+            if let Some(m) = e.main_node {
+                e.tree.touch(m);
+            }
+        });
         wake_dirty(s.node);
     }
     let decoded = crate::media::decoded_since_built();

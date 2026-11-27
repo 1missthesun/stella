@@ -106,6 +106,8 @@ pub fn route(v: Value) {
         "tray.create" | "tray.setMenu" | "tray.setTooltip" | "tray.setIcon" | "tray.destroy" => reply(rid, crate::services::tray(&cmd, &v)),
         "shortcut.register" | "shortcut.unregister" | "shortcut.unregisterAll" => reply(rid, crate::services::shortcut(&cmd, &v)),
         "quit" => quit(),
+        "swapfx.begin" => engine::with(crate::swapfx::begin),
+        "swapfx.cancel" => engine::with(crate::swapfx::cancel),
         "view.restore" => {
             let marked: Vec<u32> = engine::read(|e| e.windows.iter().filter(|(_, s)| s.swap_view.is_some()).map(|(w, _)| *w).collect());
             for w in marked {

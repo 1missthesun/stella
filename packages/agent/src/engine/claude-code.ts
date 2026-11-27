@@ -44,9 +44,10 @@ import { isPiAgentInput, type PiUserMessage } from "@stella/contracts/pi-chat";
 import { isSafeguardBlockText, markSafeguardBlock } from "@stella/contracts/safeguard-block";
 import {
   CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW,
-  CONTEXT_HANDOFF_TOOL,
   CONTEXT_SIZE_DIAGNOSTIC,
+  isContextHandoffNotesRequest,
   isContextHandoffNudge,
+  isContextHandoffText,
 } from "@stella/contracts/context-handoff";
 import { isSilentReplyText, SILENT_REPLY_MARKER } from "@stella/contracts/reply-refs";
 import { stellaToolNameOf } from "@stella/contracts/claude-code-tool-names";
@@ -152,6 +153,9 @@ const CLAUDE_CODE_CONTEXT_WINDOW = 100_000_000;
 const CLAUDE_CODE_MAX_TOKENS = 128_000;
 const SEEN_LIMIT = 400;
 const REBUILD_MAX_CHARS = 48_000;
+/** A context written from a handoff (its notes and what it kept), or the context its notes are written from, is the
+ * conversation itself rather than background for it, so it's rebuilt whole up to this much of the model's window. */
+const REBUILD_HANDOFF_MAX_CHARS = 1_600_000;
 const UPDATE_MAX_MESSAGE_CHARS = 12_000;
 const SUPERSEDED_SETTLE_MS = 10_000;
 
@@ -210,10 +214,16 @@ export type ClaudeCodeTurnSpec = {
   backgroundWake: boolean;
   quiet: boolean;
   compact?: true;
+  /** Resume `resumeSessionId` into a throwaway copy, leaving that session as it was. Only for transports that `forks`. */
+  fork?: true;
+  /** A side run answered in text alone: no tool runs, and nothing of it joins the conversation's own session. */
+  textOnly?: true;
 };
 
 export type ClaudeCodeTransport = {
   runTurn(spec: ClaudeCodeTurnSpec): Promise<{ text: string; sessionId: string }>;
+  /** Whether `runTurn` takes `fork`. */
+  forks?: boolean;
   preflight?(session: ClaudeCodeSessionRef): Promise<void>;
   resume?(session: ClaudeCodeSessionRef, args: { held?: string; lastReply?: string }): Promise<{ sessionId?: string; restored?: boolean }>;
   hydrate?(session: ClaudeCodeSessionRef, transcript: (meta: ClaudeCodeTranscriptMeta) => string): Promise<string>;
@@ -247,6 +257,21 @@ type CallRecord = {
   name: string;
   native: boolean;
   truncated?: string;
+  /** A native call whose result has come back from the CLI. */
+  settled?: true;
+};
+
+/** Whether a queued CLI event begins a tool call. */
+const startsTool = (event: Record<string, any>): boolean => {
+  if (event.type === "stream_event") {
+    const source = event.event;
+    return source?.type === "content_block_start" && source.content_block?.type === "tool_use";
+  }
+  if (event.type === "assistant") {
+    const content = event.message?.content;
+    return Array.isArray(content) && content.some((block: any) => block?.type === "tool_use");
+  }
+  return false;
 };
 
 type NativeResult = { text: string; isError: boolean };
@@ -276,6 +301,10 @@ type Turn = {
   nextToolSet?: { tools: ClaudeCodeToolSpec[]; nativeTools: readonly string[] };
   carried?: Message[];
   relaunched?: true;
+  /** The newest context boundary the CLI session's context reflects. */
+  holds?: string;
+  /** The session still holds context a newer boundary replaced, so its sizes no longer describe the conversation. */
+  stale?: boolean;
 };
 
 type TurnRequest = {
@@ -416,7 +445,8 @@ const renderMessage = (message: Message): string | undefined => {
       const text = textOf(message.content).trim();
       const images = imagesOf(message.content).length;
       if (!text && images === 0) return undefined;
-      return `[user]\n${clip(text, UPDATE_MAX_MESSAGE_CHARS)}${images ? `\n[${images} image(s)]` : ""}`;
+      const kept = isContextBoundary(message) ? text : clip(text, UPDATE_MAX_MESSAGE_CHARS);
+      return `[user]\n${kept}${images ? `\n[${images} image(s)]` : ""}`;
     }
     case "assistant": {
       const said = textOf(message.content).trim();
@@ -477,11 +507,11 @@ const isContextBoundary = (message: Message): boolean => isPiCompactionBoundary(
 
 const notResident = (message: Message): boolean => residentContextKind(message) === undefined;
 
-const rebuildPrompt = (messages: readonly Message[]): { text: string; images: ImageContent[] } => {
+const rebuildPrompt = (messages: readonly Message[], max = REBUILD_MAX_CHARS): { text: string; images: ImageContent[] } => {
   const { start, users } = trailingUsers(messages);
   const earlier = messages.slice(0, start);
   const resident = residentContextAsOf(earlier) ?? "";
-  const history = renderBounded(earlier.filter(notResident), REBUILD_MAX_CHARS);
+  const history = renderBounded(earlier.filter(notResident), max);
   const request = userPrompt(users);
   const text = [
     resident,
@@ -635,12 +665,17 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     return options.reportedContextWindow?.(resolved) ?? options.reportedContextWindow?.(id) ?? flavor.contextWindow(resolved);
   };
 
+  const handoffRebuildMax = (id: string): number =>
+    Math.max(REBUILD_MAX_CHARS, Math.min(REBUILD_HANDOFF_MAX_CHARS, windowOf(id) * 2));
+
   const compactionWindowOf = (session: ClaudeCodeSessionRef, id: string): number => {
     const window = windowOf(id);
     return flavor === CLAUDE_CODE_FLAVOR && session.role === "worker" ? Math.min(window, CLAUDE_CODE_AGENT_AUTO_COMPACT_WINDOW) : window;
   };
 
   const settleNative = (toolUseId: string, result: NativeResult) => {
+    const call = calls.get(toolUseId);
+    if (call) call.settled = true;
     const waiters = nativeWaiters.get(toolUseId);
     if (waiters) {
       nativeWaiters.delete(toolUseId);
@@ -764,6 +799,86 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       options.transport.close?.(ref);
     }
     return summary;
+  };
+
+  /**
+   * Answer a background handoff's notes request off to the side, leaving the conversation's own session and any turn
+   * running in it alone. A transport that forks resumes a copy of that session, so the request reuses its cached
+   * context; otherwise a throwaway session is written from the request's messages, or, without that, rebuilt as text.
+   */
+  const handoffNotes = async (
+    session: Session,
+    modelInfo: Model<Api>,
+    request: { systemPrompt: string; tools: ClaudeCodeToolSpec[]; nativeTools: readonly string[]; thinkingLevel: ModelThinkingLevel },
+    conversation: readonly Message[],
+    signal: AbortSignal | undefined,
+  ): Promise<string> => {
+    const ask = textOf(conversation.at(-1)!.content as Parameters<typeof textOf>[0]);
+    const prior = conversation.slice(0, -1);
+    session.record ??= (await options.sessions.read(session.piSessionId).catch(() => undefined)) ?? { seen: [] };
+    const held = session.cliSessionId ?? session.record.cliSessionId;
+    const ref: ClaudeCodeSessionRef = {
+      ...session.binding.session,
+      sessionKey: `${session.binding.session.sessionKey}:handoff:${crypto.randomUUID()}`,
+      ephemeral: true,
+    };
+    const hydrate = options.transport.hydrate;
+    const written = hydrate
+      ? async () =>
+          await hydrate(ref, (meta) =>
+            claudeCodeTranscript(prior, meta, sameToolName, thinkingOn(prior, modelInfo.id, options.resolveModel?.(modelInfo.id))),
+          ).catch((error: unknown) => {
+            report(error);
+            return undefined;
+          })
+      : undefined;
+    const fork = options.transport.forks === true && held !== undefined;
+    const resumeSessionId = fork ? held : await written?.();
+    const rebuilt = rebuildPrompt(conversation, handoffRebuildMax(modelInfo.id));
+    const fitted = fitCodeDescriptionForClaudeCode(request.tools, request.systemPrompt);
+    const rebuiltOnly = resumeSessionId === undefined;
+    try {
+      const result = await options.transport.runTurn({
+        session: ref,
+        ...(resumeSessionId ? { resumeSessionId } : {}),
+        ...(fork ? { fork: true as const } : {}),
+        textOnly: true,
+        model: modelInfo.id,
+        thinkingLevel: request.thinkingLevel,
+        systemPrompt: fitted.systemPrompt,
+        prompt: rebuiltOnly ? rebuilt.text : ask,
+        images: [],
+        resumeFallbackPrompt: rebuilt.text,
+        ...(written
+          ? {
+              reseed: async () => {
+                const sessionId = await written();
+                return sessionId ? { sessionId, prompt: ask } : undefined;
+              },
+            }
+          : {}),
+        tools: rebuiltOnly ? [] : fitted.tools,
+        nativeTools: rebuiltOnly ? [] : request.nativeTools,
+        signal: signal ?? new AbortController().signal,
+        executeTool: async () => ({
+          content: [{ type: "text", text: "No tools run while writing handoff notes; reply with the notes as text." }],
+          isError: true,
+        }),
+        onEvent: () => {},
+        onNativeToolEnd: () => {},
+        onStatus: () => {},
+        onSessionId: () => {},
+        onCompaction: () => {},
+        control: () => {},
+        toolSetAfterStep: () => undefined,
+        onBackgroundWake: () => {},
+        backgroundWake: false,
+        quiet: true,
+      });
+      return result.text;
+    } finally {
+      options.transport.close?.(ref);
+    }
   };
 
   const holdUndelivered = (session: Session, messages: readonly Message[]) => {
@@ -956,24 +1071,30 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     const backgroundWake =
       !request.prompt && arrived.length > 0 && arrived.every((message) => wakes?.has(textOf(message.content).trim()) === true);
     if (backgroundWake) for (const message of arrived) wakes?.delete(textOf(message.content).trim());
-    const rebuild = rebuildPrompt(conversation);
     const steering = request.prompt && resumeSessionId;
     const resumedDelta = !steering && resumeSessionId && seenAt >= 0 ? conversation.slice(seenAt + 1) : undefined;
     const boundaryAt = conversation.findLastIndex(isContextBoundary);
     const boundary = boundaryAt >= 0 ? messageKey(conversation[boundaryAt]!) : undefined;
+    const boundaryNew = boundary !== undefined && boundary !== record.boundary && !record.seen.includes(boundary);
+    const priorBoundary = record.boundary;
+    // Background work the CLI is running can't follow it into a fresh session: until it ends, the session carries on
+    // and the new boundary waits, unseen, for a turn that can take it.
+    const deferBoundary = boundaryNew && (session.background?.length ?? 0) > 0;
     const foreign =
       options.transport.hydrate !== undefined &&
       resumedDelta !== undefined &&
       (resumedDelta.some((message) => message.role === "assistant" && message.stopReason !== "aborted" && message.stopReason !== "error") ||
-        (boundary !== undefined && boundary !== record.boundary && !record.seen.includes(boundary)));
-    const delta = foreign ? undefined : resumedDelta;
+        (boundaryNew && !deferBoundary));
+    // A background handoff keeps the steps after its cutoff, which the session has already seen; a transport that
+    // can't write a session starts over from the rebuilt context instead.
     const startedOver =
       !steering &&
       resumeSessionId !== undefined &&
-      seenAt < 0 &&
-      boundary !== undefined &&
-      boundary !== record.boundary &&
-      !record.seen.includes(boundary);
+      (seenAt < 0 || options.transport.hydrate === undefined) &&
+      boundaryNew &&
+      !deferBoundary;
+    const delta = foreign || startedOver ? undefined : resumedDelta;
+    const rebuild = rebuildPrompt(conversation, boundaryAt >= 0 ? handoffRebuildMax(request.model.id) : REBUILD_MAX_CHARS);
     if (startedOver) {
       record.seen = [];
       delete record.undelivered;
@@ -1052,7 +1173,7 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       settle,
       queue: [],
       callIds: new Set(),
-      prompted: conversation,
+      prompted: deferBoundary ? conversation.filter((_, index) => index !== boundaryAt) : conversation,
       ...(!steering && !backgroundWake && baseline !== undefined ? { context: baseline } : {}),
       unsent: [],
       waiting: new Map(),
@@ -1063,6 +1184,9 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       toolSet: { tools: request.tools, nativeTools: request.nativeTools },
       ...(relaunched ? { relaunched: true as const } : {}),
     };
+    const holds = boundaryNew && (deferBoundary || steering) ? priorBoundary : boundary;
+    if (holds !== undefined) turn.holds = holds;
+    if (holds !== boundary) turn.stale = true;
     session.turn = turn;
     session.lastSignAt = performance.now();
     if (!record.open) {
@@ -1255,7 +1379,11 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       const window = reportedWindow ?? compactionWindowOf(turn.session.binding.session, modelInfo.id);
       output.diagnostics = [
         ...(output.diagnostics ?? []).filter((diagnostic) => diagnostic.type !== CONTEXT_SIZE_DIAGNOSTIC),
-        { type: CONTEXT_SIZE_DIAGNOSTIC, timestamp: Date.now(), details: { tokens: contextTokens, window } },
+        {
+          type: CONTEXT_SIZE_DIAGNOSTIC,
+          timestamp: Date.now(),
+          details: { tokens: contextTokens, window, ...(turn.stale ? { stale: true } : {}) },
+        },
       ];
     };
     const closeMessageUsage = () => {
@@ -1473,6 +1601,25 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     }
   };
 
+  /**
+   * Whether a running CLI turn should give way to a background handoff placed since it started: its session still
+   * holds the context the handoff replaced, so a fresh one is written from the new context and the run carries on
+   * there. Waits while the CLI runs background work, which can't follow it, or has already started a tool or finished
+   * the turn past this step; a reply it has only begun streaming is dropped and written again in the fresh session.
+   */
+  const takesHandoff = (session: Session, turn: Turn, conversation: readonly Message[]): boolean => {
+    if (turn.done || (session.background?.length ?? 0) > 0) return false;
+    if (turn.queue.some((item) => item.kind === "end" || startsTool(item.event))) return false;
+    for (const record of calls.values()) if (record.turn === turn && record.native && !record.settled) return false;
+    if (options.transport.hydrate === undefined) return false;
+    const record = session.record;
+    const at = conversation.findLastIndex(isContextBoundary);
+    const message = at >= 0 ? conversation[at]! : undefined;
+    if (!record || !message || message.role !== "user" || !isContextHandoffText(textOf(message.content))) return false;
+    const key = messageKey(message);
+    return key !== undefined && key !== record.boundary && !record.seen.includes(key);
+  };
+
   const streamRound = async (
     modelInfo: Model<Api>,
     context: TranscriptContext,
@@ -1504,6 +1651,29 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
     const systemPrompt = getCurrentSystemPrompt(messages);
     const toolSet = toolSetFor(session.binding, getCurrentTools(messages));
     const conversation = messages.filter((message) => message.role !== "system");
+    const asked = conversation.at(-1);
+    if (asked?.role === "user" && isContextHandoffNotesRequest(textOf(asked.content))) {
+      const thinkingLevel = thinkingLevelOf(streamOptions);
+      try {
+        const text = await handoffNotes(session, modelInfo, { systemPrompt, ...toolSet, thinkingLevel }, conversation, streamOptions?.signal);
+        const output: AssistantMessage = {
+          role: "assistant",
+          content: [{ type: "text", text }],
+          api: modelInfo.api,
+          provider: modelInfo.provider,
+          model: modelInfo.id,
+          usage: ZERO_USAGE(),
+          stopReason: "stop",
+          timestamp: Date.now(),
+        };
+        out.push({ type: "start", partial: output });
+        out.push({ type: "done", reason: "stop", message: output });
+        out.end(output);
+      } catch (error) {
+        fail(markedError(error));
+      }
+      return;
+    }
     let turn = session.turn;
     let superseded: Turn | undefined;
     if (turn) {
@@ -1513,7 +1683,12 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
       const current = turn;
       const ours = results.length > 0 && results.every((message) => message.role === "toolResult" && current.callIds.has(message.toolCallId));
       const stopped = turn.abort.signal.aborted;
-      const replaced = !ours || stopped || (turn.done && turn.queue.length === 0);
+      const replaced = !ours || stopped || (turn.done && turn.queue.length === 0) || takesHandoff(session, turn, conversation);
+      if (!replaced) {
+        const boundaryAt = conversation.findLastIndex(isContextBoundary);
+        const newest = boundaryAt >= 0 ? messageKey(conversation[boundaryAt]!) : undefined;
+        if (newest !== undefined && newest !== turn.holds) turn.stale = true;
+      }
       const moved = !replaced && !turn.done && toolSetKey(turn.toolSet) !== toolSetKey(toolSet);
       if (moved) {
         turn.nextToolSet = toolSet;
@@ -1789,12 +1964,6 @@ export function createClaudeCodeEngine(options: ClaudeCodeEngineOptions) {
               }
               const refused = await cliRuns(record.turn, call.id, record.name, context);
               if (refused !== undefined) return { block: refused };
-              const background = record.name === CONTEXT_HANDOFF_TOOL ? (record.turn.session.background ?? []) : [];
-              if (background.length > 0) {
-                return {
-                  block: `Your own background work is still running in ${flavor.label} (${background.slice(0, 5).join("; ")}), and it can't follow you into a fresh context. Wait for it to finish, or stop what you no longer need with TaskStop, then call ${CONTEXT_HANDOFF_TOOL} again.`,
-                };
-              }
               return undefined;
             },
             afterTool: (call, result) => {

@@ -885,6 +885,68 @@
         "discard": "Hủy"
       },
       "tagline": "Nói và vẽ để cho Stella thấy ý bạn."
+    },
+    "welcomeDemos": {
+      "play": "Phát bản demo này",
+      "replay": "Phát lại bản demo",
+      "errands": {
+        "title": "Chuyến tham quan nhanh",
+        "tablist": "Demo những gì tôi làm được",
+        "chapters": {
+          "errands": {
+            "word": "Việc vặt",
+            "title": "Nhờ một lần. Coi như xong.",
+            "caption": "Tôi tìm đúng nơi, điền biểu mẫu và đưa vào lịch của bạn, giống như cách bạn vẫn làm."
+          },
+          "shopping": {
+            "word": "Mua sắm",
+            "title": "Tôi có thể mua đồ, khi bạn đồng ý.",
+            "caption": "Tôi tìm món đó và đưa đến bước thanh toán. Bạn xác nhận tổng tiền, và tôi đặt hàng."
+          },
+          "work": {
+            "word": "Công việc",
+            "title": "Tệp thật. Nhiều việc cùng lúc.",
+            "caption": "Tôi làm việc bên trong các ứng dụng thật trên máy tính này, và có thể chạy nhiều việc cùng lúc."
+          },
+          "build": {
+            "word": "Xây dựng",
+            "title": "Cứ nói. Tôi sẽ làm.",
+            "caption": "Ứng dụng và trang web theo yêu cầu. Mô tả bằng lời đơn giản, tôi sẽ xây dựng, chạy thử và đưa lên mạng."
+          },
+          "routines": {
+            "word": "Tác vụ định kỳ",
+            "title": "Nhờ một lần. Việc diễn ra mỗi ngày.",
+            "caption": "Hẹn giờ bất cứ việc gì, tôi sẽ làm đúng giờ, kể cả khi bạn đang ngủ."
+          }
+        }
+      },
+      "customize": {
+        "title": "Tôi có thể tự thay đổi mình",
+        "body": "Thiếu một tính năng, hay muốn thứ gì đó hoạt động khác đi? Cứ nói. Tôi sẽ viết lại mã của chính mình, để bạn dùng thử, và bạn quyết định có giữ lại hay không.",
+        "hint": "Thay đổi chỉ nằm trên máy tính này.",
+        "steps": {
+          "ask": {
+            "title": "Nhờ",
+            "body": "Mô tả thay đổi bằng lời đơn giản."
+          },
+          "preview": {
+            "title": "Xem trước",
+            "body": "Một tác vụ xây dựng nó và mở bản xem trước trực tiếp."
+          },
+          "update": {
+            "title": "Cập nhật",
+            "body": "Một cú nhấp để áp dụng. Hoàn tác bất cứ lúc nào."
+          }
+        }
+      },
+      "memory": {
+        "title": "Một cuộc trò chuyện",
+        "titleChatbot": "Bạn biết cảnh này rồi",
+        "bodyChatbot": "Mỗi lần một cuộc trò chuyện mới, thanh bên đầy những cuộc cũ, và chẳng nhớ gì về điều bạn nói tuần trước.",
+        "titleStella": "Với tôi chỉ có một cuộc trò chuyện",
+        "bodyStella": "Không có cuộc trò chuyện mới, không có luồng. Mọi điều bạn từng nói với tôi đều ở cùng một nơi, nên khi bạn hỏi về tuần trước, tôi sẽ tìm lại.",
+        "showStella": "Giờ hãy hỏi tôi"
+      }
     }
   },
   "global": {
@@ -926,7 +988,7 @@
         "other": "Quá nhiều yêu cầu. Hãy thử lại sau {count} giây."
       },
       "welcomeDescription": "Đăng nhập bằng email của bạn để bắt đầu dùng Stella.",
-      "welcomeSub": "Dùng Google hoặc email của bạn để đăng nhập. Không cần mật khẩu.",
+      "welcomeSub": "Dùng Stella trên điện thoại và giữ mọi thứ đồng bộ trên các thiết bị của bạn.",
       "welcomeTitle": "Chào mừng đến với Stella"
     },
     "integrations": {
@@ -968,24 +1030,8 @@
       }
     },
     "localMode": {
-      "authNote": "Đăng nhập sẽ thêm các mô hình của Stella, ứng dụng điện thoại, Drive, tác vụ đám mây và đồng bộ giữa các thiết bị. Các cuộc trò chuyện của bạn ở lại trên máy tính này cho đến khi bạn quyết định.",
-      "banner": "Các cuộc trò chuyện của bạn ở lại trên máy tính này. Đăng nhập để dùng các mô hình của Stella, ứng dụng điện thoại, Drive, tác vụ đám mây và đồng bộ.",
-      "choiceBodyBoth": "Trong lúc bạn dùng Stella ở đây không có tài khoản: {messages} và {notes}. Thêm vào sẽ đưa chúng vào tài khoản của bạn. Không có gì bị thay thế.",
-      "choiceBodyChat": "Trong lúc bạn dùng Stella ở đây không có tài khoản: {messages}. Thêm vào sẽ đặt chúng ở cuối cuộc trò chuyện của bạn. Không có gì bị thay thế.",
-      "choiceBodyMemory": "Trong lúc bạn dùng Stella ở đây không có tài khoản: {notes}. Thêm vào sẽ sao chép chúng vào bộ nhớ của bạn. Không có gì bị thay thế.",
-      "choiceFailed": "Không thể lưu lựa chọn đó. Hãy thử lại.",
-      "choiceTitle": "Thêm những gì bạn đã làm khi không có tài khoản?",
-      "keep": "Chỉ giữ trên máy tính này",
-      "messages": {
-        "one": "1 tin nhắn",
-        "other": "{count} tin nhắn"
-      },
+      "banner": "Các cuộc trò chuyện của bạn ở lại trên máy tính này. Đăng nhập để dùng Stella trên điện thoại và giữ mọi thứ đồng bộ.",
       "needsAccount": "Tính năng này chạy trên đám mây của Stella nên cần tài khoản Stella.",
-      "notes": {
-        "one": "1 ghi chú bộ nhớ",
-        "other": "{count} ghi chú bộ nhớ"
-      },
-      "sync": "Thêm vào cuộc trò chuyện của tôi",
       "syncFailed": "Không thể thêm cuộc trò chuyện này vào tài khoản. Nó vẫn ở trên máy tính này.",
       "synced": "Đã thêm cuộc trò chuyện này vào tài khoản của bạn."
     },
@@ -1760,43 +1806,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "Tiện ích tùy chọn",
-        "lead": "Không mục nào là bắt buộc, nhưng mỗi mục giúp tôi hữu ích hơn.",
-        "start": "Bắt đầu trò chuyện"
-      },
-      "gmail": {
-        "body": "Tìm email, theo kịp các chuỗi thư và soạn nháp trả lời, chỉ cần nhờ.",
-        "connect": "Kết nối Gmail",
-        "connected": "Đã kết nối",
-        "connecting": "Đang chờ Google…",
-        "error": "Không thể kết nối Gmail. Hãy thử lại hoặc bỏ qua lúc này.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Xin chào, tôi là Stella. Trước tiên, hãy chọn cách tôi suy nghĩ: gói Claude hoặc ChatGPT bạn đang có, khóa riêng của bạn hoặc tài khoản Stella."
-      },
-      "progress": "Tiến trình thiết lập",
-      "replies": {
-        "signinDone": "Xong."
-      },
-      "send": "Send",
       "signin": {
         "body": "Chỉ cần một trong số này là đủ. Bạn có thể thêm các cái khác sau.",
         "claudeCliMissing": "Hãy cài Claude Code trước rồi thử lại.",
@@ -1832,8 +1841,7 @@
         "settledNone": "Chưa chọn AI nào",
         "settledNoneDesc": "Đăng nhập hoặc kết nối một gói bất cứ lúc nào để bắt đầu trò chuyện.",
         "fineOwnPlan": "ChatGPT và Claude Code dùng gói đăng ký của chính bạn với OpenAI hoặc Anthropic. Đổi bất cứ lúc nào trong Cài đặt."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "Khi sử dụng Stella, bạn đồng ý với {terms} và {privacy} của chúng tôi.",
     "privacyPolicy": "Chính sách bảo mật",
@@ -2139,7 +2147,17 @@
         "thisComputerInline": "máy tính này",
         "rowNotChosen": "Dùng {email}, không phải {chosen}",
         "rowEnded": "Phiên đăng nhập đã hết hạn",
-        "rowEnding": "Phiên đăng nhập hết hạn vào {date}"
+        "rowEnding": "Phiên đăng nhập hết hạn vào {date}",
+        "automaticHint": "Dùng tài khoản mà Claude Code đã đăng nhập sẵn trên từng máy tính",
+        "chooseNote": "Tài khoản bạn chọn được dùng trên tất cả máy tính của bạn và trên đám mây.",
+        "inUseTitle": "Đang dùng",
+        "missingChosen": "{email} chưa đăng nhập ở đây.",
+        "missingChosenFallback": "{email} chưa đăng nhập ở đây, nên máy này dùng đăng nhập riêng.",
+        "ownLoginNote": "Đăng nhập Claude Code riêng của máy tính này: {email}",
+        "reasonCloudLogin": "Đăng nhập của đám mây",
+        "reasonOtherLogin": "Đã thêm trong Stella",
+        "reasonOwnLogin": "Đăng nhập Claude Code riêng của máy tính này",
+        "reasonSelected": "Đã chọn trong Stella"
       },
       "claudeLogin": {
         "approve": "Phê duyệt trên trang Anthropic vừa mở, việc đăng nhập sẽ tự hoàn tất.",
@@ -2410,11 +2428,6 @@
         "twinkle": "Lấp lánh"
       },
       "title": "Âm báo tin nhắn"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "Chạy lại phần giới thiệu. Dữ liệu của bạn vẫn giữ nguyên.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3399,11 +3412,9 @@
     },
     "onboarding": {
       "link": "Bạn có máy chủ Stella riêng? Kết nối ngay",
-      "prose": "Bạn đã kết nối với {name} với tư cách chủ sở hữu. Giờ hãy chọn thứ tôi dùng để suy nghĩ: gói Claude hoặc ChatGPT bạn đang có, hoặc khóa API của riêng bạn.",
       "title": "Đã kết nối với {name}",
       "body": "Bạn đã đăng nhập với tư cách chủ sở hữu. Chọn thứ Stella dùng để suy nghĩ. Một là đủ.",
-      "bodyOptional": "Bạn đã đăng nhập với tư cách chủ sở hữu. Máy chủ này có mô hình riêng nên bước này là tùy chọn: bạn cũng có thể dùng gói Claude hoặc ChatGPT, hoặc một khóa API.",
-      "settled": "Đã kết nối với {name}"
+      "bodyOptional": "Bạn đã đăng nhập với tư cách chủ sở hữu. Máy chủ này có mô hình riêng nên bước này là tùy chọn: bạn cũng có thể dùng gói Claude hoặc ChatGPT, hoặc một khóa API."
     }
   },
   "contextMenu": {
@@ -3870,6 +3881,21 @@
     "phoneApp": {
       "title": "Stella cũng có trên điện thoại của bạn",
       "detail": "Tải ứng dụng để nhắn tin cho Stella và theo dõi công việc khi bạn không ở bên máy tính này."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Tải Stella for Chrome",
+      "connectGmail": "Kết nối Gmail",
+      "gmailWaiting": "Đang chờ Google…",
+      "gmailRetry": "Thử lại Gmail",
+      "watchErrands": "Xem cách hoạt động",
+      "signIn": "Đăng nhập",
+      "getPhoneApp": "Tải ứng dụng điện thoại",
+      "watchMemory": "Xem cách",
+      "connectPlan": "Kết nối gói",
+      "changeLook": "Đổi giao diện của tôi",
+      "watchCustomize": "Xem thay đổi"
     }
   }
 }

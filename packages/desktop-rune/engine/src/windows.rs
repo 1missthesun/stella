@@ -562,6 +562,8 @@ fn drain(polling: u32) {
         crate::webview::forget_overlay(*n);
         #[cfg(feature = "webview")]
         crate::webview::forget_over(*n);
+        #[cfg(all(feature = "webview", target_os = "windows"))]
+        crate::webview::forward_pointer(*n, false);
         crate::media::forget(*n);
         crate::surface::forget(*n);
         forget_selection(*n);
@@ -645,6 +647,8 @@ fn apply_window_props(node: u32, tx: &mut Tx) {
             }
             next.click_through = Some(click_through);
         }
+        #[cfg(all(feature = "webview", target_os = "windows"))]
+        crate::webview::forward_pointer(node, click_through && p.forward_mouse);
         let limits = Some((p.min_size, p.max_size));
         if limits != applied.size_limits && !is_background(&p) {
             h.set_size_limits(p.min_size.map(|[w, ht]| (w, ht)), p.max_size.map(|[w, ht]| (w, ht)));
@@ -745,6 +749,16 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
     #[cfg(target_os = "windows")]
     crate::webview::tick();
     drain(s.node);
+    let closed = crate::fx::take_closed();
+    if engine::with(|e| {
+        let held = !e.tree.closing.is_empty();
+        if held {
+            e.tree.finish_closing(&closed);
+        }
+        held
+    }) {
+        wake_dirty(s.node);
+    }
     let decoded = crate::media::decoded_since_built();
     let sized = !decoded.is_empty();
     if sized {

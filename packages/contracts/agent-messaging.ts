@@ -81,3 +81,55 @@ export const agentIdentityText = (agent: {
     'Every message from Stella or another agent arrives as `<agent-message from="…" thread_id="…">`, marked `relation="started you"` when it is from whoever started you; answer it with send_message to that thread_id.',
   ].join(" ");
 };
+
+/** A task that messaged whoever started it (without done) and ended its turn waits on their reply. */
+export const STARTER_REPLY_WAKER = "a reply to the message you sent whoever started you";
+
+/** Something is already queued for the task (a message, report or reminder), so a run of its own follows. */
+export const INPUT_ON_ITS_WAY_WAKER = "a message on its way to you";
+
+/** A task that asked with ask_user or request_secure_input waits on that answer, which comes from Stella or the user. */
+export const QUESTION_ASKED_WAKER = "an answer to the question you put to whoever started you";
+
+/**
+ * What a waiting helper's own wait means to the agent that started it: `onStarter` when it waits on
+ * that agent's reply (a debt the starter owes, never something that wakes it), `live` when something
+ * else of the helper's own can still wake it (and so, through its report, the starter).
+ */
+export const helperWait = (wait: { waitingFor?: string; wakers?: readonly string[] }): { onStarter: boolean; live: boolean } => {
+  if (wait.wakers !== undefined) {
+    const others = wait.wakers.map((waker) => waker.trim()).filter((waker) => waker && waker !== STARTER_REPLY_WAKER);
+    return { onStarter: wait.wakers.includes(STARTER_REPLY_WAKER), live: others.length > 0 };
+  }
+  const text = wait.waitingFor?.trim() ?? "";
+  const onStarter = text.includes(STARTER_REPLY_WAKER);
+  return { onStarter, live: text !== "" && text !== IDLE_WAITING_FOR && text !== STARTER_REPLY_WAKER };
+};
+
+export type HelperWaitingOnYou = { threadId: string; description: string };
+
+const helperName = (helper: HelperWaitingOnYou) =>
+  `"${helper.description.replace(/\s+/g, " ").trim().slice(0, 80)}" (thread_id: ${helper.threadId})`;
+
+export const HELPER_WAITS_ON_YOU_MARK = "[Your helper is waiting on you]";
+
+export const helperWaitsOnYouText = (helpers: readonly HelperWaitingOnYou[]): string => {
+  const one = helpers.length === 1;
+  return [
+    `${HELPER_WAITS_ON_YOU_MARK} Your ${one ? "helper" : "helpers"} ${helpers.map(helperName).join(", ")} ${
+      one ? "messaged you and ended its turn" : "messaged you and ended their turns"
+    } waiting for your reply, and nothing else will wake ${one ? "it" : "them"}.`,
+    `Reply with send_message to ${one ? "its thread_id" : "each thread_id"} (handling its point elsewhere is not a reply), or stop_agent ${
+      one ? "it" : "them"
+    } if nothing more is needed from ${one ? "it" : "them"}.`,
+  ].join(" ");
+};
+
+export const doneWhileHelpersWaitText = (helpers: readonly HelperWaitingOnYou[]): string => {
+  const one = helpers.length === 1;
+  return `Not sent: your ${one ? "helper" : "helpers"} ${helpers.map(helperName).join(", ")} ${
+    one ? "is" : "are"
+  } waiting for your reply to ${one ? "its" : "their"} message. Reply with send_message, or stop_agent ${
+    one ? "it" : "them"
+  } if nothing more is needed, then send your report with done: true.`;
+};

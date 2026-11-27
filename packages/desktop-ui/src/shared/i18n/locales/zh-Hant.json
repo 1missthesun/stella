@@ -885,6 +885,68 @@
         "discard": "放棄"
       },
       "tagline": "邊說邊畫，讓 Stella 明白你的意思。"
+    },
+    "welcomeDemos": {
+      "play": "播放此示範",
+      "replay": "重新播放此示範",
+      "errands": {
+        "title": "快速導覽",
+        "tablist": "能力示範",
+        "chapters": {
+          "errands": {
+            "word": "跑腿",
+            "title": "說一次，就辦妥。",
+            "caption": "我會找到對的地方，填好表單，再加進你的行事曆，就像你自己做的一樣。"
+          },
+          "shopping": {
+            "word": "購物",
+            "title": "經你同意，我可以幫你買東西。",
+            "caption": "我找到商品並一路走到結帳。你確認總價，我來下單。"
+          },
+          "work": {
+            "word": "工作",
+            "title": "真實的檔案。多項任務同時進行。",
+            "caption": "我在這台電腦上的真實應用程式裡工作，還能同時處理多項任務。"
+          },
+          "build": {
+            "word": "建置",
+            "title": "說出來，我來做。",
+            "caption": "依需求打造的 App 和網站。用平常的話描述，我來建置、執行並上線。"
+          },
+          "routines": {
+            "word": "例行任務",
+            "title": "說一次，每天都會做。",
+            "caption": "任何事都可以排程，我會準時完成，就算你正在睡覺。"
+          }
+        }
+      },
+      "customize": {
+        "title": "我可以改變自己",
+        "body": "缺少某個功能，或是想讓某樣東西換種方式運作？直接告訴我。我會重寫自己的程式碼，讓你試用，是否保留由你決定。",
+        "hint": "變更只保留在這台電腦上。",
+        "steps": {
+          "ask": {
+            "title": "提出",
+            "body": "用平常的話描述你想要的變更。"
+          },
+          "preview": {
+            "title": "預覽",
+            "body": "由任務建置，並開啟即時預覽。"
+          },
+          "update": {
+            "title": "更新",
+            "body": "點一下即可套用。隨時可以復原。"
+          }
+        }
+      },
+      "memory": {
+        "title": "一個對話",
+        "titleChatbot": "這個你很熟悉",
+        "bodyChatbot": "每次都是新對話，側邊欄堆滿舊對話，也不記得你上週說過什麼。",
+        "titleStella": "和我只有一個對話",
+        "bodyStella": "沒有新對話，沒有討論串。你告訴過我的一切都在同一個地方，所以你問起上週的事，我會去找出來。",
+        "showStella": "現在問我"
+      }
     }
   },
   "global": {
@@ -926,7 +988,7 @@
         "other": "請求太過頻繁。請在 {count} 秒後再試。"
       },
       "welcomeDescription": "用你的電子郵件登入即可開始使用 Stella。",
-      "welcomeSub": "使用 Google 或你的電子郵件登入。不需要密碼。",
+      "welcomeSub": "在手機上也能使用 Stella，所有裝置保持同步。",
       "welcomeTitle": "歡迎使用 Stella"
     },
     "integrations": {
@@ -968,24 +1030,8 @@
       }
     },
     "localMode": {
-      "authNote": "登入後可使用 Stella 的模型、手機 App、Drive、雲端任務和跨裝置同步。在你做出選擇之前，聊天會保留在這台電腦上。",
-      "banner": "你的聊天保留在這台電腦上。登入即可使用 Stella 的模型、手機 App、Drive、雲端任務和同步。",
-      "choiceBodyBoth": "你在這裡未登入使用 Stella 時：{messages}和{notes}。加入後會放進你的帳號，不會取代任何內容。",
-      "choiceBodyChat": "你在這裡未登入使用 Stella 時：{messages}。加入後會放在你的聊天末尾，不會取代任何內容。",
-      "choiceBodyMemory": "你在這裡未登入使用 Stella 時：{notes}。加入後會複製到你的記憶中，不會取代任何內容。",
-      "choiceFailed": "無法儲存該選擇。請再試一次。",
-      "choiceTitle": "要加入你未登入時的內容嗎？",
-      "keep": "只保留在這台電腦上",
-      "messages": {
-        "one": "1 則訊息",
-        "other": "{count} 則訊息"
-      },
+      "banner": "你的聊天保留在這台電腦上。登入後即可在手機上使用 Stella，並讓一切保持同步。",
       "needsAccount": "此功能在 Stella 雲端執行，因此需要 Stella 帳戶。",
-      "notes": {
-        "one": "1 則記憶筆記",
-        "other": "{count} 則記憶筆記"
-      },
-      "sync": "加入我的聊天",
       "syncFailed": "無法將這段聊天加入你的帳號。它仍在這台電腦上。",
       "synced": "這段聊天已加入你的帳號。"
     },
@@ -1760,43 +1806,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "選用功能",
-        "lead": "這些都不是必要的，但每一項都能讓我更有用。",
-        "start": "開始聊天"
-      },
-      "gmail": {
-        "body": "尋找郵件、跟上對話、草擬回覆，只要開口。",
-        "connect": "連接 Gmail",
-        "connected": "已連接",
-        "connecting": "正在等待 Google…",
-        "error": "無法連接 Gmail。請重試，或暫時略過。",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "你好，我是 Stella。首先，選擇我的思考方式：你已有的 Claude 或 ChatGPT 方案、你自己的金鑰，或 Stella 帳戶。"
-      },
-      "progress": "設定進度",
-      "replies": {
-        "signinDone": "好了。"
-      },
-      "send": "Send",
       "signin": {
         "body": "任選其一就夠了。其他的以後再加。",
         "claudeCliMissing": "請先安裝 Claude Code，然後再試一次。",
@@ -1832,8 +1841,7 @@
         "settledNone": "尚未選擇 AI",
         "settledNoneDesc": "隨時登入或連結方案即可開始聊天。",
         "fineOwnPlan": "ChatGPT 和 Claude Code 使用你自己在 OpenAI 或 Anthropic 的訂閱。可隨時在設定中更改。"
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "使用 Stella 即表示您同意我們的{terms}與{privacy}。",
     "privacyPolicy": "隱私權政策",
@@ -2139,7 +2147,17 @@
         "thisComputerInline": "這台電腦",
         "rowNotChosen": "使用 {email}，而不是 {chosen}",
         "rowEnded": "登入已過期",
-        "rowEnding": "登入將於 {date} 過期"
+        "rowEnding": "登入將於 {date} 過期",
+        "automaticHint": "使用每台電腦上 Claude Code 已登入的帳號",
+        "chooseNote": "你選擇的帳號會在你的所有電腦和雲端上使用。",
+        "inUseTitle": "目前使用中",
+        "missingChosen": "{email} 未在此處登入。",
+        "missingChosenFallback": "{email} 未在此處登入，因此使用此處自己的登入。",
+        "ownLoginNote": "這台電腦自己的 Claude Code 登入：{email}",
+        "reasonCloudLogin": "雲端的登入",
+        "reasonOtherLogin": "在 Stella 中新增",
+        "reasonOwnLogin": "這台電腦自己的 Claude Code 登入",
+        "reasonSelected": "在 Stella 中選擇"
       },
       "claudeLogin": {
         "approve": "在開啟的 Anthropic 頁面上核准，登入會自動完成。",
@@ -2410,11 +2428,6 @@
         "twinkle": "閃爍"
       },
       "title": "訊息提示音"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "重新進行新手導覽。你的資料會保留。",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3399,11 +3412,9 @@
     },
     "onboarding": {
       "link": "有自己的 Stella 伺服器？連線它",
-      "prose": "你已作為擁有者連線到 {name}。接下來選擇我用什麼來思考：你已有的 Claude 或 ChatGPT 方案，或你自己的 API 金鑰。",
       "title": "已連線到 {name}",
       "body": "你已作為擁有者登入。選擇 Stella 用什麼來思考，選一個就夠了。",
-      "bodyOptional": "你已作為擁有者登入。此伺服器有自己的模型，所以這一步是選用的：你也可以使用 Claude 或 ChatGPT 方案，或 API 金鑰。",
-      "settled": "已連線到 {name}"
+      "bodyOptional": "你已作為擁有者登入。此伺服器有自己的模型，所以這一步是選用的：你也可以使用 Claude 或 ChatGPT 方案，或 API 金鑰。"
     }
   },
   "contextMenu": {
@@ -3870,6 +3881,21 @@
     "phoneApp": {
       "title": "Stella 也在你的手機上",
       "detail": "取得 App，離開這台電腦時也能傳訊息給 Stella、查看任務進度。"
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "取得 Stella for Chrome",
+      "connectGmail": "連接 Gmail",
+      "gmailWaiting": "正在等待 Google…",
+      "gmailRetry": "重試 Gmail",
+      "watchErrands": "看看它怎麼做",
+      "signIn": "登入",
+      "getPhoneApp": "取得手機 App",
+      "watchMemory": "看看怎麼做",
+      "connectPlan": "連接訂閱",
+      "changeLook": "改變我的外觀",
+      "watchCustomize": "看看變化"
     }
   }
 }

@@ -19,7 +19,6 @@ import {
 } from "react";
 import { AppState } from "react-native";
 import { useChatDraftSelector } from "./chat-draft-store";
-import { postJson } from "./http";
 import { notifySuccess } from "./haptics";
 import { ReplyArrivalHaptics } from "./reply-arrival-haptics";
 import { authClient } from "./auth-client";
@@ -53,6 +52,7 @@ import {
   acknowledgedCloudDispatchIds,
   activeCloudTurnId,
   canonicalCloudDispatchIdForTurn,
+  createRecordedCloudDispatchIds,
   mergeCanonicalCloudMessages,
   projectCloudConversationMessages,
   latestJournalDestinationSwitch,
@@ -83,6 +83,7 @@ import {
   settleUnlistedTasks,
 } from "./journal-tasks";
 import { useConversationAgentLedger } from "./use-conversation-agent-ledger";
+import { useComposerPrewarm } from "./use-composer-prewarm";
 import { mergeJournalTasks } from "./mobile-task-merge";
 import { planCloudTranscriptDisplay } from "./cloud-transcript-display";
 import { useChatAttachmentPreviews } from "./use-chat-attachment-previews";
@@ -555,14 +556,6 @@ export const useCloudCanonicalChatThread = (
   const clientAuthorityReady = authorityReady && !local.authorityIssue;
 
   const composing = useChatDraftSelector(local.draftStore, draftHasText);
-  useEffect(() => {
-    if (!composing) return;
-    void postJson(
-      `/conversations/${encodeURIComponent(authority.conversationId)}/prewarm`,
-      {},
-      { timeoutMs: 10_000 },
-    ).catch(() => undefined);
-  }, [composing, authority.conversationId]);
 
   const pendingSendIds = local.pendingSendIds;
   useEffect(() => {
@@ -658,8 +651,32 @@ export const useCloudCanonicalChatThread = (
     paintedRef.current.store === store
       ? paintedRef.current
       : { store, messages: null, everShown: false };
+  // A window can hold nothing to show: after a long background the socket
+  // reloads only the newest records, and they may all sit inside one long
+  // turn whose prompt is earlier. Page back until a turn can be shown (or
+  // history runs out) instead of painting an empty chat nobody can scroll.
+  const oldestSeq = state.records[0]?.seq;
+  const needsEarlier =
+    projected.length === 0 &&
+    state.hasOlder &&
+    oldestSeq !== undefined &&
+    caughtUp &&
+    state.status === "live";
+  const [earlierRequest, setEarlierRequest] = useState<{
+    store: ConversationStore;
+    oldestSeq: number;
+  } | null>(null);
+  const earlierRequestedHere =
+    earlierRequest?.store === store && earlierRequest.oldestSeq === oldestSeq;
+  const fillingEarlier =
+    needsEarlier && (!earlierRequestedHere || state.loadingOlder);
+  useEffect(() => {
+    if (!needsEarlier || earlierRequestedHere || state.loadingOlder) return;
+    if (store.loadOlder()) setEarlierRequest({ store, oldestSeq: oldestSeq! });
+  }, [earlierRequestedHere, needsEarlier, oldestSeq, state.loadingOlder, store]);
   const display = planCloudTranscriptDisplay({
     caughtUp,
+    fillingEarlier,
     settledFailure,
     cacheVisible,
     cached: cachedProjection?.messages ?? null,
@@ -676,9 +693,10 @@ export const useCloudCanonicalChatThread = (
   });
   const displayedProjection = display.messages;
 
-  const acknowledgedDispatchIds = useMemo(
-    () => acknowledgedCloudDispatchIds(journalWindow, dispatchBindings),
-    [dispatchBindings, journalWindow],
+  const [recordDispatchIds] = useState(createRecordedCloudDispatchIds);
+  const recordedDispatchIds = useMemo(
+    () => recordDispatchIds(acknowledgedCloudDispatchIds(journalWindow, dispatchBindings)),
+    [dispatchBindings, journalWindow, recordDispatchIds],
   );
   const canonical = useMemo(
     () => rebindCanonicalCloudMessages(displayedProjection, dispatchBindings),
@@ -701,13 +719,13 @@ export const useCloudCanonicalChatThread = (
         canonical,
         local: localMessages,
         dispatchBindings,
-        acknowledgedDispatchIds,
+        recordedDispatchIds,
       }),
     [
-      acknowledgedDispatchIds,
       canonical,
       dispatchBindings,
       localMessages,
+      recordedDispatchIds,
     ],
   );
   const messages = useStableChatMessages(
@@ -998,6 +1016,16 @@ export const useCloudCanonicalChatThread = (
     "devices.list",
     authority.conversationId ? {} : "skip",
   ).value?.devices;
+  useComposerPrewarm({
+    conversationId: authority.conversationId,
+    composing,
+    executionTarget,
+    access,
+    devices,
+    execution:
+      execution && executionTarget.mode !== "device" ? execution : undefined,
+    usageLimitRecords: journalWindow.view(USAGE_LIMIT_CARDS),
+  });
   const conversationTasks = useMemo(
     () => applyAgentLedger(foldedTasks, agentLedger, devices),
     [agentLedger, devices, foldedTasks],

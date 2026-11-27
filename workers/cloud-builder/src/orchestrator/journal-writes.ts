@@ -440,6 +440,7 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       ownerGeneration?: string;
       sourceTurnId?: string;
       card?: ConversationCard;
+      onlyFirst?: boolean;
     };
     try {
       body = (await request.json()) as typeof body;
@@ -476,6 +477,9 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       return json({ error: "Conversation owner is unavailable." }, 409);
     }
     let writerKey = `card:${sourceTurnId}:${card.type}`;
+    if (body.onlyFirst === true && this.journal.meta().next_seq > 0) {
+      return json({ skipped: true });
+    }
     if (card.type === "agent-lifecycle") {
       const lifecycle = parseCloudAgentLifecycleCard(card);
       if (!lifecycle) return json({ error: "Malformed request." }, 400);

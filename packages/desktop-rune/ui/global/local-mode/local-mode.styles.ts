@@ -5,11 +5,7 @@ export const useLocalMode = sheet((c, t) => ({
   localModeBannerText: { shrink: true, minW: 0 },
   localModeBannerAction: { py: 3, px: 10, radius: 999, fill: c.primary, color: c.primaryForeground, cursor: "pointer" },
   localModeBannerClose: { pad: 4, radius: 999, cursor: "pointer", hoverColor: c.textBase },
-  localModeChoice: { maxW: 440 },
-  localModeChoiceBody: { pt: 4, pb: 24, px: 24, gap: 16, align: "stretch" },
-  localModeChoice_localModeChoiceText: { pad: 0, pl: 0, pr: 0, pb: 0, mt: 0, color: c.textBase, size: 14, lh: 1.5 },
   localModeChoiceActions: { justify: "end", gap: 10 },
-  authDialogLocalNote: { color: c.mutedForeground, size: 12, lh: 1.45, textAlign: "center" },
   localModeBannerLead: { color: c.textBase, weight: 600 },
   waitingMessages: { mt: 10, mb: 4, align: "end", gap: 6 },
   waitingMessage: { py: 10, px: 14, maxW: "78%", border: mix(c.primary, 55, "transparent"), borderDash: 4, radius: 18, color: c.textBase, size: 14, lh: 1.45 },
@@ -21,6 +17,4 @@ export const useLocalMode = sheet((c, t) => ({
   signOutChoiceCheck: { py: 12, px: 13, gap: 10, align: "start", border: c.border, radius: 8, color: c.textBase, size: 13, lh: 1.45, cursor: "pointer" },
   signOutChoiceCheck_input: { mt: 2 },
   signOutChoiceCheck_small: { mt: 2, color: c.mutedForeground, size: 12 },
-  localModeChoiceActionsSplit: { justify: "between", align: "center" },
-  localModeChoiceKeep: { pad: 0, color: c.mutedForeground, size: 13, underline: true, cursor: "pointer", hoverColor: c.textBase },
 }));

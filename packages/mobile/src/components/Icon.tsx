@@ -81,6 +81,7 @@ export type IconName =
   | "chevrons-up-down"
   | "cloud"
   | "laptop"
+  | "plug"
   | "key"
   | "external-link";
 
@@ -165,6 +166,7 @@ const FEATHER_NAMES: Record<
   "chevrons-up-down": "chevron-down",
   cloud: "cloud",
   laptop: "monitor",
+  plug: "power",
   key: "key",
   "external-link": "external-link",
 };
@@ -247,6 +249,7 @@ const SYMBOL_NAMES: Record<IconName, SymbolViewProps["name"]> = {
   "chevrons-up-down": "chevron.up.chevron.down",
   cloud: "cloud",
   laptop: "laptopcomputer",
+  plug: "powerplug",
   key: "key",
   "external-link": "arrow.up.right",
 };
@@ -277,6 +280,14 @@ export function Icon({
       <Path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8" />
       <Path d="M3 3v5h5" />
       <Path d="M12 7v5l4 2" />
+    </Svg>;
+  }
+  if (name === "plug") {
+    return <Svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth={1.85} strokeLinecap="round" strokeLinejoin="round" style={style}>
+      <Path d="M12 22v-5" />
+      <Path d="M9 8V2" />
+      <Path d="M15 8V2" />
+      <Path d="M18 8v5a4 4 0 0 1-4 4h-4a4 4 0 0 1-4-4V8Z" />
     </Svg>;
   }
   if (Platform.OS === "ios") {

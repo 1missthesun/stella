@@ -1076,9 +1076,10 @@ mod win_hover {
     use windows::Win32::Graphics::Gdi::ScreenToClient;
     use windows::Win32::UI::Accessibility::{HWINEVENTHOOK, SetWinEventHook};
     use windows::Win32::UI::WindowsAndMessaging::{
-        DispatchMessageW, EVENT_OBJECT_LOCATIONCHANGE, GA_ROOT, GetAncestor, GetCursorPos, GetMessageW, GetWindowThreadProcessId, MSG,
-        OBJID_CURSOR, WINEVENT_OUTOFCONTEXT, WindowFromPoint,
+        DispatchMessageW, EVENT_OBJECT_LOCATIONCHANGE, GA_ROOT, GetAncestor, GetCursorPos, GetMessageW, GetWindowRect, GetWindowThreadProcessId,
+        IsWindowVisible, MSG, OBJID_CURSOR, WINEVENT_OUTOFCONTEXT, WindowFromPoint,
     };
+    use windows::Win32::Foundation::RECT;
 
     #[derive(Clone, Copy)]
     enum Pointer {
@@ -1093,6 +1094,32 @@ mod win_hover {
         told: Option<Instant>,
     }
     static SEEN: Mutex<Seen> = Mutex::new(Seen { over: None, told: None });
+
+    /// Click-through windows that still hear the pointer move (Electron's
+    /// `setIgnoreMouseEvents(true, { forward: true })`): Windows sends a WS_EX_TRANSPARENT window
+    /// no mouse messages, so this hook tells Rune of every move over one. By window node.
+    static FORWARD: Mutex<Vec<(u32, isize)>> = Mutex::new(Vec::new());
+
+    pub fn forward(node: u32, root: Option<isize>) {
+        let mut f = FORWARD.lock().unwrap_or_else(|e| e.into_inner());
+        f.retain(|(n, _)| *n != node);
+        if let Some(root) = root {
+            f.push((node, root));
+            drop(f);
+            start();
+        }
+    }
+
+    fn forwarding_at(at: POINT) -> Option<isize> {
+        let f = FORWARD.lock().unwrap_or_else(|e| e.into_inner());
+        f.iter().map(|(_, r)| *r).find(|r| {
+            let h = HWND(*r as *mut _);
+            let mut rc = RECT::default();
+            // SAFETY: plain queries of a window this process made; a closed one fails them.
+            let live = unsafe { IsWindowVisible(h).as_bool() && GetWindowRect(h, &mut rc).is_ok() };
+            live && at.x >= rc.left && at.x < rc.right && at.y >= rc.top && at.y < rc.bottom
+        })
+    }
 
     pub fn start() {
         static ONCE: Once = Once::new();
@@ -1130,11 +1157,16 @@ mod win_hover {
             let ours = !root.is_invalid() && pid == std::process::id();
             (ours && hit != root, ours.then_some(root.0 as isize))
         };
+        let forwarded = forwarding_at(at);
+        let (over, root) = match forwarded {
+            Some(r) => (true, Some(r)),
+            None => (over, root),
+        };
         let mut seen = SEEN.lock().unwrap_or_else(|e| e.into_inner());
         let tell = if over {
             let root = root.unwrap_or_default();
             let entered = seen.over != Some(root);
-            if !entered && seen.told.is_some_and(|t| t.elapsed() < Duration::from_millis(50)) {
+            if !entered && forwarded.is_none() && seen.told.is_some_and(|t| t.elapsed() < Duration::from_millis(50)) {
                 return;
             }
             seen.over = Some(root);
@@ -1637,6 +1669,13 @@ mod win_snap {
             }
         }
     }
+}
+
+/// A click-through window `node` hears the pointer move over it while `on`.
+#[cfg(target_os = "windows")]
+pub fn forward_pointer(node: u32, on: bool) {
+    let root = on.then(|| hwnd_of(node).0 as isize).filter(|r| *r != 0);
+    win_hover::forward(node, root);
 }
 
 /// What other threads left for the UI thread: snapshots and the pointer over a view.

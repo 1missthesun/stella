@@ -27,6 +27,7 @@ import { wakePromptOf } from "@stella/contracts/agent-wake-prompt";
 import { NO_MESSAGE_ID, recordMessageId } from "../stella/message-ids.ts";
 import { appendedEntries, onConversationChange, runEnded } from "../stella/conversation-events.ts";
 import { boundedReplay } from "../stella/doc-checkpoint.ts";
+import { parseWelcomeMark, type WelcomeMark } from "@stella/contracts/welcome-message";
 
 const spawnedThreadId = (details: unknown, text: string): string | undefined => {
   const fromDetails = (details as { thread_id?: unknown } | undefined)?.thread_id;
@@ -64,6 +65,7 @@ export type LocalLogWrite =
       replyTo?: string;
       followedByToolCall?: boolean;
       notice?: true;
+      welcome?: WelcomeMark;
     }
   | {
       key: string;
@@ -392,6 +394,7 @@ export async function localLogMirror(args: {
                 emoji: reaction.emoji,
               });
             }
+            const welcome = parseWelcomeMark((message as { welcome?: unknown }).welcome);
             if (text) {
               await log.write({
                 key,
@@ -400,6 +403,7 @@ export async function localLogMirror(args: {
                 timestamp: message.timestamp,
                 ...(replyTo ? { replyTo } : {}),
                 ...(calls.length > 0 ? { followedByToolCall: true } : {}),
+                ...(welcome ? { welcome } : {}),
               });
               const relayed = await relayedReport(entry.id);
               if (relayed) await log.write({ ...relayed, timestamp: Math.max(relayed.timestamp, message.timestamp + 1) });

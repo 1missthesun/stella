@@ -438,6 +438,7 @@ export const createGateHost = (deps: GateHostDependencies): OwnerHost => ({
             ownerGeneration: input.ownerGeneration,
             sourceTurnId: input.sourceTurnId,
             card: input.card,
+            ...(input.onlyFirst ? { onlyFirst: true } : {}),
           }),
         },
       );

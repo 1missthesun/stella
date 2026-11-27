@@ -288,7 +288,8 @@ export function PromptPresetCard() {
           <div className="prompt-preset-actions">
             <Button
               type="button"
-              className="pill-btn"
+              variant="ghost"
+              className="pill-btn pill-btn--primary"
               disabled={busy}
               onClick={() => void handleSave()}
             >
@@ -340,7 +341,7 @@ export function PromptPresetCard() {
               <Button
                 type="button"
                 variant="ghost"
-                className="pill-btn"
+                className="pill-btn pill-btn--danger"
                 disabled={busy}
                 onClick={() => void handleDelete()}
               >

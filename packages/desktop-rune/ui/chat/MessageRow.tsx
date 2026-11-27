@@ -42,6 +42,7 @@ import { UserAskRecordCard } from "./UserAskRecordCard";
 import { VoiceSessionCard } from "./VoiceSessionCard";
 import { ScheduleNotices } from "./cards/ScheduleNotices";
 import { ReminderFireCard } from "./cards/ReminderFireCard";
+import { WelcomeMessage } from "../features/welcome/WelcomeMessage";
 import { MessageAttachments } from "./evidence/MessageAttachments";
 import { FilePills } from "./FilePills";
 import { AppPreviewCard } from "./cards/AppPreviewCard";
@@ -487,7 +488,7 @@ export const AssistantMessageRow = memo(
             <row w="full" minW={0} align="start" gap={4}>
               <col w="fit" maxW={surface.assistant.maxW} minW={0} py={surface.assistant.py} px={surface.assistant.px} radius={surface.assistant.radius} fill={tokens.c.chatAssistantBubbleFillTop} gradient={tokens.gradient.assistantBubble}>
                 <ChatTextColor.Provider value={tokens.c.chatAssistantBubbleText}>
-                  <Markdown text={bodyText} cacheKey={row.cacheKey} hideHorizontalRules hiddenFilePaths={hiddenFileKeys} onContextMenu={menu} joinSelection />
+                  {row.welcome ? <WelcomeMessage /> : <Markdown text={bodyText} cacheKey={row.cacheKey} hideHorizontalRules hiddenFilePaths={hiddenFileKeys} onContextMenu={menu} joinSelection />}
                   {evidencePaths.length > 0 ? <MessageAttachments filePaths={evidencePaths} part="documents" /> : null}
                   {replyFiles.length > 0 ? <FilePills files={replyFiles} variant="bubble" /> : null}
                 </ChatTextColor.Provider>

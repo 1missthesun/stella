@@ -1,4 +1,7 @@
 import { computerOnlyInCloudMessage, isComputerOnlyProviderId } from "@stella/contracts/backend/providers";
+import { CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE } from "@stella/contracts/backend/billing";
+import { BILLING_UNAVAILABLE_MESSAGE } from "@stella/contracts/stella-usage-limit";
+import type { CloudTurnLane } from "@stella/contracts/turn-plane/turn-start";
 import type { OwnerCaller } from "../owner-store/registry.js";
 import {
   HEADER_IDENTITY_LEVEL,
@@ -89,6 +92,76 @@ export const executionUnavailableMessage = (
 export const snapshotAllowsCloudSandbox = (
   snapshot: Pick<OwnerSnapshot, "cloudSandbox">,
 ): boolean => snapshot.cloudSandbox?.enabled !== false;
+
+export const snapshotAdmissionRefusal = (
+  snapshot: Pick<OwnerSnapshot, "enforcement" | "writable">,
+): OwnerGateRefusal | null => {
+  if (snapshot.enforcement?.status === "suspended") {
+    return refuse(
+      "owner_suspended",
+      "This account can't use Stella's cloud right now.",
+      false,
+    );
+  }
+  if (!snapshot.writable) {
+    return refuse(
+      "owner_purged",
+      "This account's cloud data is being reset or deleted.",
+      false,
+    );
+  }
+  return null;
+};
+
+export type CloudTurnRefusal = {
+  code:
+    | "subscription_required"
+    | "usage_limit"
+    | "execution_unavailable"
+    | "billing_unavailable";
+  message: string;
+  retryable: boolean;
+};
+
+export const cloudTurnRefusal = (
+  snapshot: Pick<
+    OwnerSnapshot,
+    | "cloudSandbox"
+    | "usageLimit"
+    | "billingUnavailable"
+    | "connectedEngines"
+    | "connectedProviders"
+  >,
+  execution: OwnerSnapshot["execution"],
+  lane: CloudTurnLane,
+): CloudTurnRefusal | null => {
+  if (execution.engine === "anthropic" && !snapshotAllowsCloudSandbox(snapshot)) {
+    return {
+      code: "subscription_required",
+      message: CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE,
+      retryable: false,
+    };
+  }
+  if (execution.engine === "anthropic" && lane !== "wake" && snapshot.usageLimit) {
+    return { code: "usage_limit", message: snapshot.usageLimit.message, retryable: false };
+  }
+  if (!snapshotAllowsExecution(snapshot, execution)) {
+    return {
+      code: "execution_unavailable",
+      message: executionUnavailableMessage(execution),
+      retryable: false,
+    };
+  }
+  if (execution.engine === "stella" && lane !== "wake") {
+    if (snapshot.billingUnavailable) {
+      return { code: "billing_unavailable", message: BILLING_UNAVAILABLE_MESSAGE, retryable: true };
+    }
+    if (snapshot.usageLimit) {
+      return { code: "usage_limit", message: snapshot.usageLimit.message, retryable: false };
+    }
+  }
+  return null;
+};
 
 export const refuse = (
   code: OwnerGateRefusalCode,

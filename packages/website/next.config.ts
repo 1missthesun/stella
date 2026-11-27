@@ -77,6 +77,7 @@ const nextConfig: NextConfig = {
   async rewrites() {
     return [
       { source: "/ai/:slug([a-z0-9-]+).md", destination: "/ai-md/:slug" },
+      { source: "/docs/:topic([a-z0-9-]+).md", destination: "/docs-md/:topic" },
       { source: "/how/:niche([a-z0-9-]+)/:problem([a-z0-9-]+).md", destination: "/how-md/:niche/:problem" },
       { source: "/how/:niche([a-z0-9-]+).md", destination: "/how-md/:niche" },
       ...(stellaBackendUrl

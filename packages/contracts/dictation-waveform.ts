@@ -22,6 +22,14 @@ export type DictationLevelMeter = {
   reset: () => void;
 };
 
+export const DICTATION_LEVEL_WINDOW_MS = WINDOW_MS;
+
+export function dictationLevelFromRms(rms: number): number {
+  const db = rms > 0 ? 20 * Math.log10(rms) : -Infinity;
+  const x = (db - FLOOR_DB) / (CEILING_DB - FLOOR_DB);
+  return x <= 0 ? 0 : x >= 1 ? 1 : Math.pow(x, CURVE);
+}
+
 export function createDictationLevelMeter(): DictationLevelMeter {
   let energy = 0;
   let windowMs = 0;
@@ -32,9 +40,7 @@ export function createDictationLevelMeter(): DictationLevelMeter {
     const rms = Math.sqrt(energy / windowMs);
     energy = 0;
     windowMs = 0;
-    const db = rms > 0 ? 20 * Math.log10(rms) : -Infinity;
-    const x = (db - FLOOR_DB) / (CEILING_DB - FLOOR_DB);
-    latest = x <= 0 ? 0 : x >= 1 ? 1 : Math.pow(x, CURVE);
+    latest = dictationLevelFromRms(rms);
     if (latest > peak) peak = latest;
   };
 

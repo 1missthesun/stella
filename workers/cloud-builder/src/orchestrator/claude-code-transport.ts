@@ -216,15 +216,18 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
     }
     const turn = await host.turn(spec.signal);
     const attemptGeneration = await host.nextAttempt();
+    // A compaction or a text-only side run (background handoff notes) runs on the side thread with neither tools nor
+    // system prompt, on a session written for it, and leaves the conversation's own session alone.
+    const side = spec.compact === true || spec.textOnly === true;
     const identity: CloudCliTurnIdentity = {
       conversationId: turn.conversationId,
-      threadId: spec.compact ? orchestratorCliCompactThreadId(turn.conversationId) : orchestratorCliThreadId(turn.conversationId),
+      threadId: side ? orchestratorCliCompactThreadId(turn.conversationId) : orchestratorCliThreadId(turn.conversationId),
       turnId: `${turn.turnId}.cc${attemptGeneration}`,
       attemptGeneration,
     };
     const staged = hydrated.get(spec.session.sessionKey);
     const hydrateSession = staged !== undefined && staged === spec.resumeSessionId ? staged : undefined;
-    const adoptSession = spec.compact || hydrateSession ? undefined : adopting.get(turn.conversationId);
+    const adoptSession = side || hydrateSession ? undefined : adopting.get(turn.conversationId);
     const result = new Promise<{ text: string; sessionId: string }>((resolve, reject) => {
       attempts.set(attemptKey(identity), {
         identity,
@@ -262,11 +265,11 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
             audience: turn.audience,
             budgetMicroCents: turn.budgetMicroCents,
             identity,
-            execution: spec.compact ? { ...turn.execution, model: spec.model } : turn.execution,
+            execution: side ? { ...turn.execution, model: spec.model } : turn.execution,
             prompt,
             spec: {
-              systemPrompt: spec.compact ? "" : spec.systemPrompt,
-              toolCatalog: spec.compact
+              systemPrompt: side ? "" : spec.systemPrompt,
+              toolCatalog: side
                 ? []
                 : spec.tools.map((tool) => ({
                     name: tool.name,
@@ -276,9 +279,9 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
               ...(adoptSession ? { adoptSession } : {}),
               ...(hydrateSession ? { hydrateSession } : {}),
               ...(startFresh ? { startFresh: true as const } : {}),
-              ...(spec.compact ? { compact: true as const } : {}),
+              ...(side ? { compact: true as const } : {}),
               ...(spec.quiet ? { quiet: true } : {}),
-              ...(!spec.compact && spec.nativeTools.some((name) => CLOUD_CLI_WEB_TOOLS.includes(name))
+              ...(!side && spec.nativeTools.some((name) => CLOUD_CLI_WEB_TOOLS.includes(name))
                 ? { webTools: true as const }
                 : {}),
             },
@@ -300,7 +303,7 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
     let steering: Promise<void> = Promise.resolve();
     spec.control({
       inject: ({ text, images, onConsumed, onDropped }) => {
-        if (spec.compact || images.length > 0 || !text.trim() || text.length > STEER_MAX_CHARS || attempt.finished) return false;
+        if (side || images.length > 0 || !text.trim() || text.length > STEER_MAX_CHARS || attempt.finished) return false;
         steering = steering.then(async () => {
           const accepted =
             !attempt.finished &&
@@ -333,6 +336,7 @@ export const createCloudClaudeCodeTransport = (host: CloudClaudeCodeHost): Cloud
       hydrated: Boolean(hydrateSession),
       startFresh,
       compact: Boolean(spec.compact),
+      textOnly: Boolean(spec.textOnly),
       dispatchMs: Math.round(performance.now() - started),
     });
     return await result;

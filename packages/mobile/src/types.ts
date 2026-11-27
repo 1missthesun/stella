@@ -157,6 +157,7 @@ export type ComposerPastedText = {
 export type ChatMessage = {
   askRecords?: readonly UserAskRecord[];
   reminder?: { fireId: string; scheduleId: string; dueAt?: number };
+  welcome?: import("@stella/contracts/welcome-message").WelcomeMark;
   scheduleNotice?: import("@stella/contracts/schedule-notice").ScheduleNoticeCard;
   scheduleNoticeRun?: readonly import("@stella/contracts/schedule-notice").ScheduleNoticeCard[];
   replyRefs?: ReplyRef[];

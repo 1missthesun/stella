@@ -1,0 +1,240 @@
+
+
+.ochatbot,
+.ostella {
+  display: flex;
+  width: 100%;
+  height: 100%;
+  border-radius: 12px;
+  border: 1px solid color-mix(in oklch, var(--foreground) 10%, transparent);
+  background: var(--background);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  font-family: var(--font-family-sans, "Manrope", system-ui, sans-serif);
+  font-size: var(--font-size-2xs);
+  color: var(--foreground);
+}
+
+.ochatbot__sidebar {
+  width: 32%;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 8px;
+  background: color-mix(in oklch, var(--foreground) 4%, transparent);
+  border-right: 1px solid color-mix(in oklch, var(--foreground) 8%, transparent);
+  overflow: hidden;
+}
+
+.ochatbot__new {
+  padding: 5px 8px;
+  margin-bottom: 4px;
+  border-radius: 6px;
+  border: 1px solid color-mix(in oklch, var(--foreground) 14%, transparent);
+  font-weight: var(--weight-medium);
+}
+
+.ochatbot__thread {
+  padding: 4px 8px;
+  border-radius: 6px;
+  color: color-mix(in oklch, var(--foreground) 70%, transparent);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ochatbot__thread[data-active] {
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+  color: var(--foreground);
+}
+
+.ochatbot__main,
+.ostella__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 7px;
+  padding: 14px;
+}
+
+.ostella {
+  flex-direction: column;
+}
+
+.ostella__bar {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 26px;
+  padding: 0 12px;
+  border-bottom: 1px solid color-mix(in oklch, var(--foreground) 7%, transparent);
+  color: color-mix(in oklch, var(--foreground) 65%, transparent);
+  font-size: 9.5px;
+}
+
+.ostella__history {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  opacity: 0.55;
+}
+
+.orecall {
+  align-self: flex-start;
+  max-width: 88%;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 9px;
+  border-radius: 10px;
+  border: 1px solid color-mix(in oklch, var(--primary) 40%, transparent);
+  background: color-mix(in oklch, var(--primary) 9%, transparent);
+  opacity: 0;
+  transform: translate3d(0, 6px, 0);
+  transition:
+    opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.orecall[data-visible] {
+  opacity: 1;
+  transform: none;
+}
+
+.orecall__head {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 9px;
+  font-weight: var(--weight-semibold);
+  letter-spacing: 0.04em;
+  color: color-mix(in oklch, var(--primary) 85%, var(--foreground));
+  overflow: hidden;
+}
+
+.orecall__scan {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    color-mix(in oklch, var(--background) 70%, transparent) 50%,
+    transparent 100%
+  );
+  transform: translateX(-100%);
+  opacity: 0;
+}
+
+.orecall[data-visible]:not([data-found]) .orecall__scan {
+  opacity: 1;
+  animation: orecallScan 0.9s linear infinite;
+}
+
+@keyframes orecallScan {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+.orecall__quote {
+  display: block;
+  max-height: 0;
+  overflow: hidden;
+  padding-left: 7px;
+  border-left: 2px solid color-mix(in oklch, var(--primary) 55%, transparent);
+  color: color-mix(in oklch, var(--foreground) 75%, transparent);
+  line-height: 1.4;
+  opacity: 0;
+  transition:
+    max-height 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    opacity 0.3s ease 0.1s;
+}
+
+.orecall[data-found] .orecall__quote {
+  max-height: 60px;
+  opacity: 1;
+}
+
+.ostella__divider {
+  align-self: center;
+  font-size: 8.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in oklch, var(--foreground) 60%, transparent);
+  padding: 2px 0;
+}
+
+.ochatbot__bubble {
+  max-width: 88%;
+  padding: 6px 10px;
+  border-radius: 12px;
+  line-height: 1.4;
+  opacity: 0;
+  transform: translate3d(0, 6px, 0);
+  transition:
+    opacity 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.4s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.ochatbot__bubble[data-visible] {
+  opacity: 1;
+  transform: none;
+}
+
+.ochatbot__bubble[data-role="user"] {
+  align-self: flex-end;
+  background: var(--chat-user-bubble-fill, var(--primary));
+  color: var(--chat-user-bubble-text, var(--primary-foreground));
+  border-bottom-right-radius: 4px;
+}
+
+.ochatbot__bubble[data-role="assistant"] {
+  align-self: flex-start;
+  background: color-mix(in oklch, var(--foreground) 7%, transparent);
+  border-bottom-left-radius: 4px;
+}
+
+.ochatbot__composer {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid color-mix(in oklch, var(--foreground) 12%, transparent);
+  color: color-mix(in oklch, var(--foreground) 45%, transparent);
+}
+
+.omorph {
+  position: relative;
+  width: 100%;
+  height: 100%;
+}
+
+.omorph > * {
+  position: absolute;
+  inset: 0;
+  transition:
+    opacity 0.5s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 0.5s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.omorph[data-mode="chatbot"] > .omorph__stella,
+.omorph[data-mode="stella"] > .omorph__chatbot {
+  opacity: 0;
+  transform: scale(0.97);
+  pointer-events: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ochatbot__bubble,
+  .orecall,
+  .orecall__quote,
+  .omorph > * {
+    transition: none;
+  }
+
+  .orecall[data-visible]:not([data-found]) .orecall__scan {
+    animation: none;
+  }
+}

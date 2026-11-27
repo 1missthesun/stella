@@ -154,6 +154,7 @@ import type { OwnerEvent } from "@stella/contracts/turn-plane/owner-events";
 import {
   decideDispatchPlacement,
   type DevicePresenceState,
+  FAILOVER_REASON_PREFIX,
   isOwnScheduledWork,
   isTerminalDispatchState,
   MAX_DEVICE_ID_CHARS,
@@ -215,6 +216,7 @@ import {
   log,
   isRecord,
   snapshotAllowsCloudSandbox,
+  snapshotAdmissionRefusal,
   refuse,
   dispatchSummary,
   fail,
@@ -242,7 +244,9 @@ export {
 } from "./owner-gate/constants.js";
 export {
   OwnerGateSnapshotError,
+  cloudTurnRefusal,
   executionUnavailableMessage,
+  snapshotAdmissionRefusal,
   snapshotAllowsExecution,
   snapshotAllowsCloudSandbox,
 } from "./owner-gate/support.js";
@@ -1310,20 +1314,8 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         false,
       );
     }
-    if (snapshot.enforcement?.status === "suspended") {
-      return refuse(
-        "owner_suspended",
-        "This account can't use Stella's cloud right now.",
-        false,
-      );
-    }
-    if (!snapshot.writable) {
-      return refuse(
-        "owner_purged",
-        "This account's cloud data is being reset or deleted.",
-        false,
-      );
-    }
+    const held = snapshotAdmissionRefusal(snapshot);
+    if (held) return held;
     if (
       input.lane === "agent" &&
       !input.deferCloudSandboxCheck &&
@@ -1829,6 +1821,7 @@ export class OwnerGate extends OwnerGateCloudDispatch {
     });
     let candidates: DevicePresenceState[] = [];
     let awaitsReconnect = false;
+    let failingOver = false;
     const ownWork = isOwnScheduledWork(
       {
         ingress: request.ingress,
@@ -1889,6 +1882,27 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         if (reconnecting) {
           candidates = [reconnecting];
           awaitsReconnect = true;
+        }
+      }
+      if (candidates.length === 0 && decision.onNoEligibleComputer === "cloud") {
+        const failover = this.failoverCandidates(
+          {
+            dispatch_id: dispatchId,
+            kind: request.kind,
+            subject: request.subject,
+            ingress: request.ingress,
+            requested_target_mode: targetMode,
+            requested_executor_device_id: request.targetDeviceId ?? null,
+            requesting_device_id: requestingDeviceId ?? null,
+            required_capabilities: JSON.stringify(requiredCapabilities),
+            on_no_eligible_computer: "cloud",
+          },
+          snapshot,
+          now,
+        )[0];
+        if (failover) {
+          candidates = [failover];
+          failingOver = true;
         }
       }
     }
@@ -1954,7 +1968,9 @@ export class OwnerGate extends OwnerGateCloudDispatch {
       onNoEligibleComputer = decision.onNoEligibleComputer;
       if (candidates.length > 0) {
         state = "offering";
-        fallbackReason = decision.reason;
+        fallbackReason = failingOver
+          ? `${FAILOVER_REASON_PREFIX}selected-device-unavailable`
+          : decision.reason;
         offerDeadlineAt =
           now +
           (awaitsReconnect
@@ -2062,6 +2078,14 @@ export class OwnerGate extends OwnerGateCloudDispatch {
         log("info", "dispatch_offer_awaits_reconnect", {
           dispatchId,
           deviceId: request.targetDeviceId,
+        });
+      }
+      if (failingOver) {
+        log("info", "dispatch_failover_offered", {
+          dispatchId,
+          fromDeviceId: request.targetDeviceId,
+          deviceId: candidates[0]?.deviceId,
+          reason: "selected-device-unavailable",
         });
       }
       for (const candidate of candidates) {

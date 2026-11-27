@@ -54,7 +54,7 @@ const SECTIONS: Section[] = [
   {
     provider: "chatgpt",
     titleKey: "mobile.engineAccounts.chatgptSection",
-    connectKey: "settings.engineAccounts.addChatgpt",
+    connectKey: "mobile.engineAccounts.connectChatgpt",
   },
 ];
 

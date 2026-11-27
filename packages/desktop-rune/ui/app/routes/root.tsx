@@ -48,7 +48,7 @@ const glob = <T,>(modules: Record<string, Record<string, unknown>>, name: string
 const ChatColumn = mounted<ChatColumnProps>(import.meta.glob("../../chat/ChatColumn.tsx", { eager: true }), "ChatColumn", Nothing);
 const SelfHostPairScreen = glob<object>(import.meta.glob("../../replace/global/self-host/SelfHostPairScreen.tsx", { eager: true }), "SelfHostPairScreen");
 const SignInScreen = glob<object>(import.meta.glob("../../replace/global/auth/SignInScreen.tsx", { eager: true }), "SignInScreen");
-const SignedOutLocalChoice = glob<{ signedIn: boolean; isPrivate: boolean; conversationId: string | null }>(import.meta.glob("../../replace/global/local-mode/SignedOutLocalChoice.tsx", { eager: true }), "SignedOutLocalChoice");
+const SignedOutLocalSync = glob<{ signedIn: boolean; isPrivate: boolean; conversationId: string | null }>(import.meta.glob("../../replace/global/local-mode/SignedOutLocalSync.tsx", { eager: true }), "SignedOutLocalSync");
 const SignOutDialog = glob<object>(import.meta.glob("../../replace/global/auth/SignOutDialog.tsx", { eager: true }), "SignOutDialog");
 const AccountSwitchGuard = glob<object>(import.meta.glob("../../replace/global/local-mode/AccountSwitchGuard.tsx", { eager: true }), "AccountSwitchGuard");
 const FullShellDialogs = glob<{ activeDialog: "auth" | "connect" | null; onDialogOpenChange: (open: boolean) => void }>(import.meta.glob("../../replace/shell/full-shell-dialogs.tsx", { eager: true }), "FullShellDialogs");
@@ -381,7 +381,7 @@ export function RootLayout() {
     <>
       <SignOutDialog />
       <AccountSwitchGuard />
-      <SignedOutLocalChoice
+      <SignedOutLocalSync
         signedIn={authBootstrapStatus === "ready"}
         isPrivate={isPrivate}
         conversationId={conversationId}
@@ -562,7 +562,6 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
             composer={chat.composer}
             scroll={chat.scroll}
             conversationId={conversationId}
-            showHomeContent={chat.showHomeContent}
           />
         </col>
         <col id="route-outlet-surface" absolute={{ left: 0, top: SHELL_TOPBAR_HEIGHT, right: 0, bottom: 0 }} hidden={isOnChatRoute}>

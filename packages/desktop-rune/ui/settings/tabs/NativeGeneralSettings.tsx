@@ -20,7 +20,6 @@ import { getSettingsErrorMessage } from "@/global/settings/tabs/shared";
 import { SettingsToggleCard } from "./settings-toggle-card";
 import { MessageSoundCard } from "./MessageSoundCard";
 import { BrowserExtensionClients } from "./BrowserExtensionClients";
-import { OnboardingReplayCard } from "../../global/onboarding/chat/OnboardingReplayCard";
 
 const isMacAdminPromptCancelled = (error: unknown) => {
   const message = error instanceof Error ? error.message : String(error ?? "");
@@ -177,7 +176,6 @@ export function NativeDesktopGeneralSettings() {
         </SettingsCardDesc>
       </SettingsCard>
       <PromptPresetCard />
-      <OnboardingReplayCard />
       <SettingsCard>
         <SettingsCardHeader>
           <SettingsCardTitle titleKey="settings.resetCustomizations.title" variant="row" />

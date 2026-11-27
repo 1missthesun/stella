@@ -893,6 +893,68 @@
         "discard": "Vazgeç"
       },
       "tagline": "Ne demek istediğini Stella'ya göstermek için konuş ve çiz."
+    },
+    "welcomeDemos": {
+      "play": "Bu demoyu oynat",
+      "replay": "Demoyu yeniden oynat",
+      "errands": {
+        "title": "Kısa tur",
+        "tablist": "Yetenek demoları",
+        "chapters": {
+          "errands": {
+            "word": "İşler",
+            "title": "Bir kez iste. Hallolmuş say.",
+            "caption": "Doğru yeri bulurum, formu doldururum ve takvimine eklerim, tıpkı senin yaptığın gibi."
+          },
+          "shopping": {
+            "word": "Alışveriş",
+            "title": "Onayınla bir şeyler satın alabilirim.",
+            "caption": "Bulurum ve ödeme adımına kadar getiririm. Sen toplamı onaylarsın, ben siparişi veririm."
+          },
+          "work": {
+            "word": "Çalışma",
+            "title": "Gerçek dosyalar. Aynı anda birkaç iş.",
+            "caption": "Bu bilgisayardaki gerçek uygulamaların içinde çalışırım ve aynı anda birden fazla işi yürütebilirim."
+          },
+          "build": {
+            "word": "Oluştur",
+            "title": "Söyle. Ben yapayım.",
+            "caption": "Siparişe göre uygulamalar ve web siteleri. Sade kelimelerle anlat; ben yapayım, çalıştırayım ve yayına alayım."
+          },
+          "routines": {
+            "word": "Rutinler",
+            "title": "Bir kez söyle. Her gün olsun.",
+            "caption": "İstediğini zamanla, ben tam vaktinde yapayım, sen uyurken bile."
+          }
+        }
+      },
+      "customize": {
+        "title": "Kendimi değiştirebilirim",
+        "body": "Bir özellik mi eksik, ya da bir şeyin farklı çalışmasını mı istiyorsun? Sadece iste. Kendi kodumu yeniden yazarım, denemene izin veririm, tutup tutmayacağına sen karar verirsin.",
+        "hint": "Değişiklikler bu bilgisayarda kalır.",
+        "steps": {
+          "ask": {
+            "title": "İste",
+            "body": "Değişikliği sade kelimelerle anlat."
+          },
+          "preview": {
+            "title": "Önizle",
+            "body": "Bir görev onu oluşturur ve canlı bir önizleme açar."
+          },
+          "update": {
+            "title": "Güncelle",
+            "body": "Uygulamak için tek tık. İstediğin zaman geri al."
+          }
+        }
+      },
+      "memory": {
+        "title": "Tek bir sohbet",
+        "titleChatbot": "Bunu bilirsin",
+        "bodyChatbot": "Her seferinde yeni bir sohbet, eski sohbetlerle dolu bir kenar çubuğu ve geçen hafta söylediklerine dair hiçbir hafıza.",
+        "titleStella": "Benimle tek bir sohbet",
+        "bodyStella": "Yeni sohbet yok, başlık yok. Bana söylediğin her şey aynı yerde; geçen haftayı sorduğunda gidip bulurum.",
+        "showStella": "Şimdi bana sor"
+      }
     }
   },
   "global": {
@@ -935,7 +997,7 @@
         "other": "Çok fazla istek. {count} saniye içinde tekrar deneyin."
       },
       "welcomeDescription": "Stella'yı kullanmaya başlamak için e-postanızla giriş yapın.",
-      "welcomeSub": "Giriş yapmak için Google'ı veya e-postanızı kullanın. Parolaya gerek yok.",
+      "welcomeSub": "Stella'yı telefonunda kullan ve her şeyi tüm cihazlarında eşitlenmiş tut.",
       "welcomeTitle": "Stella'ya hoş geldiniz"
     },
     "integrations": {
@@ -977,24 +1039,8 @@
       }
     },
     "localMode": {
-      "authNote": "Giriş yapmak Stella'nın modellerini, telefon uygulamasını, Drive'ı, bulut görevlerini ve cihazlar arası eşitlemeyi ekler. Sen karar verene kadar sohbetlerin bu bilgisayarda kalır.",
-      "banner": "Sohbetlerin bu bilgisayarda kalır. Stella'nın modelleri, telefon uygulaması, Drive, bulut görevleri ve eşitleme için giriş yap.",
-      "choiceBodyBoth": "Stella'yı burada hesapsız kullanırken: {messages} ve {notes}. Eklersen hesabına geçerler. Oradaki hiçbir şey değiştirilmez.",
-      "choiceBodyChat": "Stella'yı burada hesapsız kullanırken: {messages}. Eklersen sohbetinin sonuna eklenirler. Oradaki hiçbir şey değiştirilmez.",
-      "choiceBodyMemory": "Stella'yı burada hesapsız kullanırken: {notes}. Eklersen belleğine kopyalanırlar. Oradaki hiçbir şey değiştirilmez.",
-      "choiceFailed": "Seçim kaydedilemedi. Tekrar dene.",
-      "choiceTitle": "Hesapsız yaptıkların eklensin mi?",
-      "keep": "Yalnızca bu bilgisayarda tut",
-      "messages": {
-        "one": "1 mesaj",
-        "other": "{count} mesaj"
-      },
+      "banner": "Sohbetlerin bu bilgisayarda kalır. Stella'yı telefonunda kullanmak ve her şeyi eşitlenmiş tutmak için giriş yap.",
       "needsAccount": "Bu Stella'nın bulutunda çalışır, bu yüzden bir Stella hesabı gerekir.",
-      "notes": {
-        "one": "1 bellek notu",
-        "other": "{count} bellek notu"
-      },
-      "sync": "Sohbetime ekle",
       "syncFailed": "Bu sohbet hesabına eklenemedi. Hâlâ bu bilgisayarda.",
       "synced": "Bu sohbet hesabına eklendi."
     },
@@ -1770,43 +1816,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "İsteğe bağlı ekstralar",
-        "lead": "Hiçbiri zorunlu değil, ama her biri beni daha faydalı yapar.",
-        "start": "Sohbete başla"
-      },
-      "gmail": {
-        "body": "E-postaları bul, yazışmalara yetiş ve yanıt taslakları hazırla, sadece iste.",
-        "connect": "Gmail'i bağla",
-        "connected": "Bağlandı",
-        "connecting": "Google bekleniyor…",
-        "error": "Gmail bağlanamadı. Tekrar dene veya şimdilik atla.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Merhaba, ben Stella. Önce nasıl düşüneceğimi seç: mevcut Claude veya ChatGPT planın, kendi anahtarın ya da bir Stella hesabı."
-      },
-      "progress": "Kurulum ilerlemesi",
-      "replies": {
-        "signinDone": "Tamam."
-      },
-      "send": "Send",
       "signin": {
         "body": "Bunlardan biri yeterli. Diğerlerini sonra ekleyebilirsin.",
         "claudeCliMissing": "Önce Claude Code'u yükle, sonra tekrar dene.",
@@ -1842,8 +1851,7 @@
         "settledNone": "Henüz yapay zekâ seçilmedi",
         "settledNoneDesc": "Sohbete başlamak için istediğin zaman giriş yap ya da bir plan bağla.",
         "fineOwnPlan": "ChatGPT ve Claude Code, OpenAI veya Anthropic'teki kendi aboneliğini kullanır. Bunu istediğin zaman Ayarlar'dan değiştirebilirsin."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "Stella'yı kullanarak {terms} ve {privacy} koşullarımızı kabul etmiş olursunuz.",
     "privacyPolicy": "Gizlilik politikamızı",
@@ -2149,7 +2157,17 @@
         "thisComputerInline": "bu bilgisayar",
         "rowNotChosen": "{chosen} değil, {email} kullanılıyor",
         "rowEnded": "Oturum sona erdi",
-        "rowEnding": "Oturum {date} tarihinde sona erecek"
+        "rowEnding": "Oturum {date} tarihinde sona erecek",
+        "automaticHint": "Her bilgisayarda Claude Code'da zaten açık olan hesabı kullanır",
+        "chooseNote": "Seçtiğin hesap tüm bilgisayarlarında ve bulutta kullanılır.",
+        "inUseTitle": "Şu anda kullanımda",
+        "missingChosen": "{email} burada oturum açmamış.",
+        "missingChosenFallback": "{email} burada oturum açmamış, bu yüzden kendi oturumu kullanılıyor.",
+        "ownLoginNote": "Bu bilgisayarın kendi Claude Code oturumu: {email}",
+        "reasonCloudLogin": "Bulutun oturumu",
+        "reasonOtherLogin": "Stella'da eklendi",
+        "reasonOwnLogin": "Bu bilgisayarın kendi Claude Code oturumu",
+        "reasonSelected": "Stella'da seçildi"
       },
       "claudeLogin": {
         "approve": "Açılan Anthropic sayfasında onaylayın, oturum açma kendiliğinden tamamlanır.",
@@ -2420,11 +2438,6 @@
         "twinkle": "Pırıltı"
       },
       "title": "Mesaj sesi"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "Başlangıç turunu yeniden çalıştır. Verilerin korunur.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3433,11 +3446,9 @@
     },
     "onboarding": {
       "link": "Kendi Stella sunucun mu var? Bağla",
-      "prose": "{name} sunucusuna sahibi olarak bağlısın. Şimdi neyle düşüneceğimi seç: Claude veya ChatGPT planın ya da kendi API anahtarın.",
       "title": "{name} sunucusuna bağlandı",
       "body": "Sahibi olarak oturum açtın. Stella'nın neyle düşüneceğini seç. Biri yeterli.",
-      "bodyOptional": "Sahibi olarak oturum açtın. Bu sunucunun kendi modelleri var, bu yüzden bu isteğe bağlı: Claude veya ChatGPT planını ya da bir API anahtarını da kullanabilirsin.",
-      "settled": "{name} sunucusuna bağlandı"
+      "bodyOptional": "Sahibi olarak oturum açtın. Bu sunucunun kendi modelleri var, bu yüzden bu isteğe bağlı: Claude veya ChatGPT planını ya da bir API anahtarını da kullanabilirsin."
     }
   },
   "contextMenu": {
@@ -3929,6 +3940,21 @@
     "phoneApp": {
       "title": "Stella telefonunda da var",
       "detail": "Bu bilgisayardan uzaktayken Stella'ya mesaj atmak ve görevlerini takip etmek için uygulamayı indir."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Stella for Chrome'u edin",
+      "connectGmail": "Gmail'i bağla",
+      "gmailWaiting": "Google bekleniyor…",
+      "gmailRetry": "Gmail'i yeniden dene",
+      "watchErrands": "Çalışırken izle",
+      "signIn": "Oturum aç",
+      "getPhoneApp": "Telefon uygulamasını edin",
+      "watchMemory": "Nasıl olduğunu gör",
+      "connectPlan": "Abonelik bağla",
+      "changeLook": "Görünümümü değiştir",
+      "watchCustomize": "Değişimi izle"
     }
   }
 }

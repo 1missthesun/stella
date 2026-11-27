@@ -1,6 +1,7 @@
 import type { IdentityLevel } from "../gateway/api.js";
 
 import type { BillingPlan, PaidBillingPlan } from "../billing-plans.js";
+import type { StellaUsageLimit } from "../stella-usage-limit.js";
 
 export type { BillingPlan, PaidBillingPlan } from "../billing-plans.js";
 
@@ -45,6 +46,8 @@ export type BillingStatus = {
   isAnonymous: boolean;
   identityLevel: IdentityLevel;
   plan: BillingPlan;
+  cloudSandbox?: CloudSandboxAccess;
+  usageLimit?: StellaUsageLimit;
   subscriptionStatus: string;
   cancelAtPeriodEnd: boolean;
   currentPeriodEnd: number | null;

@@ -8,8 +8,6 @@ const EAGER_LAYERS = [
 ];
 const BOOTSTRAP_DIR = "packages/desktop-ui/src/bootstrap";
 const CLOUD_BIND = "packages/desktop-ui/src/features/cloud/CloudProjectsCard.tsx";
-const HOME_SURFACE = "packages/desktop-ui/src/shell/use-chat-home-surface.ts";
-const STATIC_HOME = "packages/desktop-ui/web-static-home.html";
 
 export async function check(root) {
   const read = (file) => readFileSync(path.join(root, file), "utf8");
@@ -42,10 +40,5 @@ export async function check(root) {
     problems.push(`${CLOUD_BIND} handleFinishConnect must run only from its button's click`);
   }
 
-  const surfaceKey = read(HOME_SURFACE).match(/const LAST_SURFACE_KEY = "([^"]+)";/)?.[1];
-  if (!surfaceKey) problems.push(`${HOME_SURFACE} no longer declares LAST_SURFACE_KEY`);
-  else if (!read(STATIC_HOME).includes(`getItem("${surfaceKey}")`)) {
-    problems.push(`${STATIC_HOME} must read the same key as LAST_SURFACE_KEY in ${HOME_SURFACE} ("${surfaceKey}")`);
-  }
   return problems;
 }

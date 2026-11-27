@@ -51,6 +51,7 @@ export type OwnerSnapshot = {
     capabilities?: ExecutionCapability[];
   }>;
   connectedEngines?: Array<"anthropic" | "chatgpt">;
+  cloudClaudeLoginEnded?: true;
   connectedProviders?: string[];
   fetchedAt: number;
   ttlMs: number;

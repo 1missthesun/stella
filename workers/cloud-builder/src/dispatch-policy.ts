@@ -16,6 +16,7 @@ import {
   DISPATCH_PAYLOAD_MAX_BYTES,
 } from "@stella/contracts/turn-plane/placement";
 import { parseCloudTurnContext } from "@stella/contracts/turn-plane/turn-start";
+import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import { isComputerOnlyExecution, parseCloudExecutionSelection } from "./turn-start-request.js";
 
 export const CLOUD_PROVIDED_CAPABILITIES: readonly ExecutionCapability[] = [
@@ -93,6 +94,44 @@ export const isOwnScheduledWork = (
   row.ingress === "schedule" &&
   Boolean(deviceId) &&
   row.requesting_device_id === deviceId;
+
+export const isOwnSend = (
+  row: { ingress: string; requesting_device_id: string | null },
+  deviceId: string | null | undefined,
+): boolean =>
+  row.ingress === "desktop" &&
+  Boolean(deviceId) &&
+  row.requesting_device_id === deviceId;
+
+export const FAILOVER_REASON_PREFIX = "holder-failover:";
+
+export const failsOverToDevices = (row: {
+  kind: string;
+  subject: string;
+  requested_target_mode: string | null;
+  requested_executor_device_id: string | null;
+  on_no_eligible_computer: string;
+}): boolean =>
+  row.kind === "chat" &&
+  row.subject === "portable" &&
+  row.requested_target_mode === "device" &&
+  Boolean(row.requested_executor_device_id) &&
+  row.on_no_eligible_computer === "cloud";
+
+export const runsExecutionOn = (
+  presence: Pick<DevicePresenceState, "capabilities" | "antigravityModels">,
+  execution: CloudExecutionSelection | undefined,
+): boolean => {
+  if (!execution) return true;
+  if (execution.engine === "anthropic") return presence.capabilities.includes("claude-code");
+  if (execution.engine === "chatgpt") return presence.capabilities.includes("chatgpt");
+  if (execution.engine === "provider" && execution.provider === "antigravity") {
+    if (!presence.capabilities.includes("antigravity")) return false;
+    const models = presence.antigravityModels ?? [];
+    return models.length === 0 || models.some((model) => model === execution.model || model.startsWith(`${execution.model}-`));
+  }
+  return true;
+};
 
 export const ingressMayClaimComputerSubject = (
   ingress: ExecutionIngress,

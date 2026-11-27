@@ -144,6 +144,9 @@ async function start() {
   const userDataDir = path.join(RUN_DIR, "user-data");
   const homeDir = path.join(RUN_DIR, "home");
   for (const dir of [dataDir, userDataDir, homeDir]) mkdirSync(dir, { recursive: true, mode: 0o700 });
+  // The NVIDIA driver keeps its shader cache in ~/.cache only if the folder exists; without it every launch compiles
+  // every shader again and the engine keeps ~100 MB more, so timings and memory wouldn't match a real home.
+  mkdirSync(path.join(homeDir, ".cache"), { recursive: true });
   symlinkSync(dataDir, path.join(homeDir, ".stella"), WIN ? "junction" : "dir");
   writeFileSync(path.join(homeDir, ".gitconfig"), "[user]\n\tname = Stella Rune Verify\n\temail = verify@test.stella.local\n");
   const keyFile = path.join(RUN_DIR, "protected-storage.key");

@@ -236,14 +236,14 @@
   cursor: default;
 }
 
-.server-list__main:not(:disabled):hover .server-list__name {
-  color: var(--interactive);
+.server-list__main:not(:disabled):hover {
+  background: color-mix(in oklch, var(--foreground) 4.5%, transparent);
 }
 
 .server-list__main:focus-visible,
 .server-list__remove:focus-visible {
-  outline: 2px solid var(--interactive);
-  outline-offset: 1px;
+  outline: none;
+  box-shadow: var(--focus-ring);
 }
 
 .server-list__icon {
@@ -289,9 +289,17 @@
   background: var(--primary);
 }
 
-.server-list__main--add .server-list__icon,
+.server-list__main--add .server-list__icon {
+  color: var(--text-weak);
+}
+
 .server-list__main--add .server-list__name {
-  color: var(--interactive);
+  color: var(--text-base);
+}
+
+.server-list__main--add:not(:disabled):hover .server-list__icon,
+.server-list__main--add:not(:disabled):hover .server-list__name {
+  color: var(--text-strong);
 }
 
 .server-list__main--add {

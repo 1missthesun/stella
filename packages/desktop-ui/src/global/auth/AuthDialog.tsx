@@ -33,7 +33,6 @@ import {
   isTransientRequestError,
   REQUEST_BUDGET_MS,
 } from "@stella/contracts/request-deadline";
-import { useSignedOutLocalMode } from "@/features/chat/services/chat-storage-preference";
 import "./AuthDialog.css";
 import "@/global/local-mode/local-mode.css";
 
@@ -193,7 +192,6 @@ function SignInChoices({ onDismiss }: { onDismiss: () => void }) {
 
 export function AuthMethods({ loginHint }: { loginHint?: string | null } = {}) {
   const t = useT();
-  const localMode = useSignedOutLocalMode();
   const { user } = useAuthSessionState();
   const bootstrapStatus = useAuthBootstrapState().status;
   const accountHint =
@@ -204,7 +202,6 @@ export function AuthMethods({ loginHint }: { loginHint?: string | null } = {}) {
       <div className="auth-dialog-hero">
         <p className="auth-dialog-headline">{t("global.auth.welcomeTitle")}</p>
         <p className="auth-dialog-sub">{t("global.auth.welcomeSub")}</p>
-        {localMode ? <p className="auth-dialog-local-note">{t("global.localMode.authNote")}</p> : null}
       </div>
       <GoogleAuthButton loginHint={accountHint} />
       <PasskeyAuthButton />

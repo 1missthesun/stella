@@ -909,6 +909,68 @@
         "discard": "Zahodit"
       },
       "tagline": "Mluvte a kreslete, ať Stella vidí, co myslíte."
+    },
+    "welcomeDemos": {
+      "play": "Přehrát tuto ukázku",
+      "replay": "Přehrát ukázku znovu",
+      "errands": {
+        "title": "Rychlá prohlídka",
+        "tablist": "Ukázky toho, co umím",
+        "chapters": {
+          "errands": {
+            "word": "Pochůzky",
+            "title": "Stačí jednou říct. Je to vyřízené.",
+            "caption": "Najdu správné místo, vyplním formulář a přidám to do tvého kalendáře, stejně jako bys to udělal ty."
+          },
+          "shopping": {
+            "word": "Nákupy",
+            "title": "Umím nakupovat, s tvým souhlasem.",
+            "caption": "Najdu to a dovedu to až k pokladně. Ty potvrdíš částku a já odešlu objednávku."
+          },
+          "work": {
+            "word": "Práce",
+            "title": "Skutečné soubory. Několik úloh najednou.",
+            "caption": "Pracuju ve skutečných aplikacích na tomto počítači a zvládnu víc než jednu úlohu najednou."
+          },
+          "build": {
+            "word": "Tvorba",
+            "title": "Řekni to. Já to postavím.",
+            "caption": "Aplikace a weby na míru. Popiš to obyčejnými slovy a já to postavím, spustím a dám na internet."
+          },
+          "routines": {
+            "word": "Rutiny",
+            "title": "Řekni to jednou. Stane se to každý den.",
+            "caption": "Naplánuj cokoli a udělám to načas, i když budeš spát."
+          }
+        }
+      },
+      "customize": {
+        "title": "Můžu měnit sama sebe",
+        "body": "Chybí ti funkce, nebo chceš, aby něco fungovalo jinak? Stačí říct. Přepíšu svůj vlastní kód, nechám tě to vyzkoušet a ty rozhodneš, jestli to necháš.",
+        "hint": "Změny zůstávají na tomto počítači.",
+        "steps": {
+          "ask": {
+            "title": "Zeptej se",
+            "body": "Popiš změnu jednoduchými slovy."
+          },
+          "preview": {
+            "title": "Náhled",
+            "body": "Úloha to vytvoří a otevře živý náhled."
+          },
+          "update": {
+            "title": "Aktualizovat",
+            "body": "Jedno kliknutí to použije. Kdykoli můžeš vrátit zpět."
+          }
+        }
+      },
+      "memory": {
+        "title": "Jedna konverzace",
+        "titleChatbot": "Tohle znáš",
+        "bodyChatbot": "Pokaždé nový chat, postranní panel plný starých a žádná paměť na to, co jsi říkal minulý týden.",
+        "titleStella": "Se mnou je to jedna konverzace",
+        "bodyStella": "Žádné nové chaty, žádná vlákna. Všechno, co jsi mi kdy řekl, je na jednom místě, takže když se zeptáš na minulý týden, dohledám to.",
+        "showStella": "Teď se zeptej mě"
+      }
     }
   },
   "global": {
@@ -953,7 +1015,7 @@
         "other": "Příliš mnoho požadavků. Zkuste to znovu za {count} sekund."
       },
       "welcomeDescription": "Přihlaste se e-mailem a začněte Stellu používat.",
-      "welcomeSub": "Přihlaste se přes Google nebo e-mailem. Heslo není potřeba.",
+      "welcomeSub": "Používejte Stellu i v telefonu a mějte vše synchronizované napříč zařízeními.",
       "welcomeTitle": "Vítejte ve Stelle"
     },
     "integrations": {
@@ -995,24 +1057,8 @@
       }
     },
     "localMode": {
-      "authNote": "Přihlášením získáte modely Stelly, mobilní aplikaci, Drive, úlohy v cloudu a synchronizaci mezi zařízeními. Vaše chaty zůstanou v tomto počítači, dokud se nerozhodnete.",
-      "banner": "Vaše chaty zůstávají v tomto počítači. Přihlaste se pro modely Stelly, mobilní aplikaci, Drive, úlohy v cloudu a synchronizaci.",
-      "choiceBodyBoth": "Když jste tu používali Stellu bez účtu: {messages} a {notes}. Přidáním se přesunou do vašeho účtu. Nic se nenahradí.",
-      "choiceBodyChat": "Když jste tu používali Stellu bez účtu: {messages}. Přidáním se umístí na konec vašeho chatu. Nic se nenahradí.",
-      "choiceBodyMemory": "Když jste tu používali Stellu bez účtu: {notes}. Přidáním se zkopírují do vaší paměti. Nic se nenahradí.",
-      "choiceFailed": "Volbu se nepodařilo uložit. Zkuste to znovu.",
-      "choiceTitle": "Přidat, co jste dělali bez účtu?",
-      "keep": "Ponechat jen na tomto počítači",
-      "messages": {
-        "one": "1 zpráva",
-        "other": "zprávy: {count}"
-      },
+      "banner": "Vaše chaty zůstávají v tomto počítači. Přihlaste se a používejte Stellu i v telefonu se vším synchronizovaným.",
       "needsAccount": "Běží to v cloudu Stelly, takže je potřeba účet Stella.",
-      "notes": {
-        "one": "1 poznámka v paměti",
-        "other": "poznámky v paměti: {count}"
-      },
-      "sync": "Přidat do mého chatu",
       "syncFailed": "Chat se nepodařilo přidat do účtu. Pořád je na tomto počítači.",
       "synced": "Chat byl přidán do vašeho účtu."
     },
@@ -1790,43 +1836,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "Volitelné doplňky",
-        "lead": "Nic z toho není povinné, ale každá z nich mě udělá užitečnější.",
-        "start": "Začít chatovat"
-      },
-      "gmail": {
-        "body": "Najdi e-maily, dožeň konverzace a nech si napsat odpovědi, stačí říct.",
-        "connect": "Připojit Gmail",
-        "connected": "Připojeno",
-        "connecting": "Čekám na Google…",
-        "error": "Gmail se nepodařilo připojit. Zkus to znovu, nebo to zatím přeskoč.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Ahoj, jsem Stella. Nejdřív vyberte, jak budu přemýšlet: předplatné Claude nebo ChatGPT, které už máte, vlastní klíč nebo účet Stella."
-      },
-      "progress": "Průběh nastavení",
-      "replies": {
-        "signinDone": "Hotovo."
-      },
-      "send": "Send",
       "signin": {
         "body": "Stačí kterákoli z těchto možností. Ostatní můžeš přidat později.",
         "claudeCliMissing": "Nejdřív nainstalujte Claude Code a pak to zkuste znovu.",
@@ -1862,8 +1871,7 @@
         "settledNone": "Zatím není vybrána žádná AI",
         "settledNoneDesc": "Kdykoli se přihlaste nebo připojte předplatné a můžete začít chatovat.",
         "fineOwnPlan": "ChatGPT a Claude Code používají vaše vlastní předplatné u OpenAI nebo Anthropic. Změnit to můžete kdykoli v Nastavení."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "Používáním Stelly souhlasíte s našimi {terms} a {privacy}.",
     "privacyPolicy": "Zásadami ochrany osobních údajů",
@@ -2169,7 +2177,17 @@
         "thisComputerInline": "tento počítač",
         "rowNotChosen": "Používá {email}, ne {chosen}",
         "rowEnded": "Přihlášení skončilo",
-        "rowEnding": "Přihlášení skončí {date}"
+        "rowEnding": "Přihlášení skončí {date}",
+        "automaticHint": "Použije účet, ke kterému je Claude Code na daném počítači už přihlášený",
+        "chooseNote": "Vybraný účet se použije na všech vašich počítačích i v cloudu.",
+        "inUseTitle": "Právě používáno",
+        "missingChosen": "{email} tu není přihlášený.",
+        "missingChosenFallback": "{email} tu není přihlášený, proto se používá vlastní přihlášení.",
+        "ownLoginNote": "Vlastní přihlášení tohoto počítače ke Claude Code: {email}",
+        "reasonCloudLogin": "Přihlášení cloudu",
+        "reasonOtherLogin": "Přidáno ve Stella",
+        "reasonOwnLogin": "Vlastní přihlášení tohoto počítače ke Claude Code",
+        "reasonSelected": "Vybráno ve Stella"
       },
       "claudeLogin": {
         "approve": "Schvalte to na stránce Anthropic, která se otevřela, a přihlášení se dokončí samo.",
@@ -2440,11 +2458,6 @@
         "twinkle": "Třpyt"
       },
       "title": "Zvuk zpráv"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "Projděte úvodní nastavení znovu. Vaše data zůstanou.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3497,11 +3510,9 @@
     },
     "onboarding": {
       "link": "Máte vlastní server Stella? Připojte ho",
-      "prose": "Jsi připojen k {name} jako vlastník. Teď vyber, čím budu myslet: tvůj plán Claude nebo ChatGPT, nebo vlastní klíč API.",
       "title": "Připojeno k {name}",
       "body": "Jsi přihlášen jako vlastník. Vyber, čím Stella myslí. Stačí jedno.",
-      "bodyOptional": "Jsi přihlášen jako vlastník. Tento server má vlastní modely, takže je to volitelné: můžeš použít i svůj plán Claude nebo ChatGPT, nebo klíč API.",
-      "settled": "Připojeno k {name}"
+      "bodyOptional": "Jsi přihlášen jako vlastník. Tento server má vlastní modely, takže je to volitelné: můžeš použít i svůj plán Claude nebo ChatGPT, nebo klíč API."
     }
   },
   "contextMenu": {
@@ -4043,6 +4054,21 @@
     "phoneApp": {
       "title": "Stella je i ve vašem telefonu",
       "detail": "Stáhněte si aplikaci a pište Stelle a sledujte své úkoly, i když nejste u tohoto počítače."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Získat Stella for Chrome",
+      "connectGmail": "Připojit Gmail",
+      "gmailWaiting": "Čekám na Google…",
+      "gmailRetry": "Zkusit Gmail znovu",
+      "watchErrands": "Podívat se, jak pracuje",
+      "signIn": "Přihlásit se",
+      "getPhoneApp": "Získat aplikaci pro telefon",
+      "watchMemory": "Ukázat jak",
+      "connectPlan": "Připojit předplatné",
+      "changeLook": "Změnit můj vzhled",
+      "watchCustomize": "Podívat se na změnu"
     }
   }
 }

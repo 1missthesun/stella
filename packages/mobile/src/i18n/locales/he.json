@@ -921,7 +921,17 @@
         "thisComputerInline": "המחשב הזה",
         "rowNotChosen": "משתמש ב-{email}, לא ב-{chosen}",
         "rowEnded": "ההתחברות הסתיימה",
-        "rowEnding": "ההתחברות מסתיימת ב-{date}"
+        "rowEnding": "ההתחברות מסתיימת ב-{date}",
+        "automaticHint": "משתמש בחשבון ש-Claude Code כבר מחובר אליו בכל מחשב",
+        "chooseNote": "החשבון שתבחרו ישמש בכל המחשבים שלכם ובענן.",
+        "inUseTitle": "בשימוש עכשיו",
+        "missingChosen": "{email} לא מחובר כאן.",
+        "missingChosenFallback": "{email} לא מחובר כאן, לכן נעשה שימוש בחיבור המקומי.",
+        "ownLoginNote": "החיבור של המחשב הזה ל-Claude Code: {email}",
+        "reasonCloudLogin": "החיבור של הענן",
+        "reasonOtherLogin": "נוסף ב‑Stella",
+        "reasonOwnLogin": "החיבור של המחשב הזה ל-Claude Code",
+        "reasonSelected": "נבחר ב-Stella"
       },
       "claudeLogin": {
         "whereCloud": "מתחברים ל-Claude Code בענן שלכם.",

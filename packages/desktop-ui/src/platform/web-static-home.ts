@@ -1,12 +1,9 @@
-type StaticGreeting = { kind: "time" } | { kind: "fun"; text: string };
-
 declare global {
   interface Window {
-    __stellaStaticGreeting?: StaticGreeting;
     __stellaStaticHomeKeepInput?: (event: FocusEvent) => void;
     __stellaStaticHandoff?: {
       at: number;
-      target: "home" | "chat" | "none";
+      target: "chat" | "none";
       chars: number;
       dx: number;
       dy: number;
@@ -34,7 +31,6 @@ const saveRootSnapshot = () => {
     return;
   }
 };
-const CHAT_FALLBACK_MS = 1500;
 const GIVE_UP_MS = 20_000;
 const GUARD_MS = 15_000;
 const SETTLED_MS = 2000;
@@ -48,21 +44,14 @@ const setNativeValue = (field: HTMLTextAreaElement, value: string) => {
 const usable = (field: HTMLTextAreaElement) =>
   !field.disabled && field.offsetParent !== null && !field.closest("[inert]");
 
-const homeComposer = () =>
-  [...document.querySelectorAll<HTMLTextAreaElement>("#root .full-body-main--home textarea.chat-composer-textarea")].find(usable) ??
-  null;
-
 const anyComposer = () =>
-  homeComposer() ??
-  [...document.querySelectorAll<HTMLTextAreaElement>("#root textarea.chat-composer-textarea")].find(usable) ??
-  null;
+  [...document.querySelectorAll<HTMLTextAreaElement>("#root textarea.chat-composer-textarea")].find(usable) ?? null;
 
 export function adoptStaticHome(): void {
   const shell = document.getElementById(SHELL_ID);
   const draft = shell?.querySelector("textarea");
   if (!shell || !draft) return;
   const startedAt = performance.now();
-  let chatSince: number | null = null;
 
   const stopKeepingInput = () => {
     const keepInput = window.__stellaStaticHomeKeepInput;
@@ -138,7 +127,7 @@ export function adoptStaticHome(): void {
     requestAnimationFrame(check);
   };
 
-  const handOff = (field: HTMLTextAreaElement, target: "home" | "chat") => {
+  const handOff = (field: HTMLTextAreaElement) => {
     stopKeepingInput();
     const text = draft.value;
     const focused = document.activeElement === draft || shell.dataset.appFocused === "true";
@@ -148,7 +137,7 @@ export function adoptStaticHome(): void {
     const to = field.getBoundingClientRect();
     window.__stellaStaticHandoff = {
       at: performance.now(),
-      target,
+      target: "chat",
       chars: text.length,
       dx: to.x - from.x,
       dy: to.y - from.y,
@@ -164,15 +153,9 @@ export function adoptStaticHome(): void {
 
   const wait = () => {
     if (!shell.isConnected) return;
-    const home = homeComposer();
-    if (home) {
-      handOff(home, "home");
-      return;
-    }
     const chat = anyComposer();
-    chatSince = chat ? (chatSince ?? performance.now()) : null;
-    if (chat && chatSince !== null && performance.now() - chatSince > CHAT_FALLBACK_MS) {
-      handOff(chat, "chat");
+    if (chat) {
+      handOff(chat);
       return;
     }
     const offChat = Boolean(document.querySelector("#root .route-outlet-surface--active"));

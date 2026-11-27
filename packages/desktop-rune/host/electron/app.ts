@@ -246,9 +246,9 @@ class App extends EventEmitter {
   }
 
   /** The Dock label on macOS, the main window's taskbar count on Windows (engine `app.setBadge`). */
-  showBadge(label: string, count?: number) {
+  showBadge(label: string, count?: number, description?: string) {
     this.badgeLabel = label;
-    void engine()?.app.setBadge(label || null, count).catch((error: Error) => warnOnce("app.setBadge", `engine app.setBadge failed: ${error.message}`));
+    void engine()?.app.setBadge(label || null, count, description).catch((error: Error) => warnOnce("app.setBadge", `engine app.setBadge failed: ${error.message}`));
   }
   getBadgeCount() { return this.badgeCount; }
   setUserTasks() { return true; }

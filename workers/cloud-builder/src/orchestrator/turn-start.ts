@@ -1,11 +1,10 @@
-import { BILLING_UNAVAILABLE_MESSAGE } from "@stella/contracts/stella-usage-limit";
 import {
   type AdmittedCloudChat,
   chatTurnFingerprintSource,
   type CloudChatPreparation,
 } from "../cloud-chat-admission.js";
 import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
-import type { PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
+import type { PiBrainClaimDecision, PiBrainRecord } from "@stella/contracts/turn-plane/pi-brain";
 import { TERMINAL_DISPATCH_STATES } from "@stella/contracts/turn-plane/placement";
 import type {
   ConversationCreatedEvent,
@@ -20,13 +19,12 @@ import {
   TURN_PLANE_PROTOCOL,
   TURN_PROMPT_MAX_CHARS,
 } from "@stella/contracts/turn-plane/turn-start";
-import { CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE } from "@stella/contracts/backend/billing";
 import {
   type OwnerGateAdmission,
   type OwnerGateAdmissionWithLease,
   type OwnerGateAdmitInput,
+  cloudTurnRefusal,
   snapshotAllowsCloudSandbox,
-  executionUnavailableMessage,
   snapshotAllowsExecution,
 } from "../owner-gate.js";
 import {
@@ -322,15 +320,25 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
         }
       } else if (brain?.host === "device") {
         const holder = await this.piBrainHolderState(ownerId, brain.deviceId);
-        let claim = await this.claimPiBrain({
-          claimant: { host: "cloud" },
-          claimEpoch: null,
-          holder: { forEpoch: brain.epoch, ...holder },
-        });
-        const placeOn =
-          claim.decision.kind === "elsewhere" &&
-          claim.record?.host === "device" &&
-          !(claim.record.epoch === brain.epoch && holder.refusal)
+        const failsOver =
+          (holder.gone === true || holder.refusal !== undefined) &&
+          (await this.piBrainFailsOver(ownerId, brain.deviceId));
+        let claim: {
+          decision: PiBrainClaimDecision;
+          record: PiBrainRecord | null;
+          takenOver: boolean;
+        } = failsOver
+          ? { decision: { kind: "elsewhere", reason: "holder_live" }, record: brain, takenOver: false }
+          : await this.claimPiBrain({
+              claimant: { host: "cloud" },
+              claimEpoch: null,
+              holder: { forEpoch: brain.epoch, ...holder },
+            });
+        const placeOn = failsOver
+          ? brain
+          : claim.decision.kind === "elsewhere" &&
+              claim.record?.host === "device" &&
+              !(claim.record.epoch === brain.epoch && holder.refusal)
             ? claim.record
             : undefined;
         if (placeOn) {
@@ -350,6 +358,7 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
               deviceId: placeOn.deviceId,
               epoch: placeOn.epoch,
               dispatchId,
+              ...(failsOver ? { failover: true } : {}),
             });
             await this.followPlacedChat({
               clientMsgId: start.clientMsgId,
@@ -593,54 +602,23 @@ export abstract class OrchestratorTurnStart extends OrchestratorLocalTurn {
         (conversationExecution && allowed(conversationExecution)
           ? conversationExecution
           : snapshot.execution);
-      if (
-        execution.engine === "anthropic" &&
-        !snapshotAllowsCloudSandbox(snapshot)
-      ) {
-        return await refuse(
-          "subscription_required",
-          CLOUD_SANDBOX_SUBSCRIPTION_REQUIRED_MESSAGE,
-          false,
-        );
-      }
-      if (execution.engine === "anthropic" && lane !== "wake" && snapshot.usageLimit) {
-        log("info", "turn_refused_usage_limit", {
-          conversationId,
-          turnId,
-          lane,
-          reason: snapshot.usageLimit.reason,
-        });
-        return await refuse("usage_limit", snapshot.usageLimit.message, false);
-      }
-      if (!snapshotAllowsExecution(snapshot, execution)) {
-        return await refuse(
-          "execution_unavailable",
-          executionUnavailableMessage(execution),
-          false,
-        );
-      }
-      if (execution.engine === "stella" && lane !== "wake") {
-        if (snapshot.billingUnavailable) {
+      const refusal = cloudTurnRefusal(snapshot, execution, lane);
+      if (refusal) {
+        if (refusal.code === "usage_limit") {
+          log("info", "turn_refused_usage_limit", {
+            conversationId,
+            turnId,
+            lane,
+            reason: snapshot.usageLimit?.reason ?? null,
+          });
+        } else if (refusal.code === "billing_unavailable") {
           log("error", "turn_refused_billing_unavailable", {
             conversationId,
             turnId,
             lane,
           });
-          return await refuse(
-            "billing_unavailable",
-            BILLING_UNAVAILABLE_MESSAGE,
-            true,
-          );
         }
-        if (snapshot.usageLimit) {
-          log("info", "turn_refused_usage_limit", {
-            conversationId,
-            turnId,
-            lane,
-            reason: snapshot.usageLimit.reason,
-          });
-          return await refuse("usage_limit", snapshot.usageLimit.message, false);
-        }
+        return await refuse(refusal.code, refusal.message, refusal.retryable);
       }
 
       const now = Date.now();

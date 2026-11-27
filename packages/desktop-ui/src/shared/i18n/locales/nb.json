@@ -893,6 +893,68 @@
         "discard": "Forkast"
       },
       "tagline": "Snakk og tegn for å vise Stella hva du mener."
+    },
+    "welcomeDemos": {
+      "play": "Spill av denne demoen",
+      "replay": "Spill av demoen på nytt",
+      "errands": {
+        "title": "Den raske omvisningen",
+        "tablist": "Demoer av det jeg kan",
+        "chapters": {
+          "errands": {
+            "word": "Ærender",
+            "title": "Spør én gang. Så er det ordnet.",
+            "caption": "Jeg finner riktig sted, fyller ut skjemaet og legger det i kalenderen, på samme måte som du ville gjort det."
+          },
+          "shopping": {
+            "word": "Handling",
+            "title": "Jeg kan kjøpe ting, med ditt OK.",
+            "caption": "Jeg finner det og tar det helt til kassen. Du bekrefter beløpet, og jeg legger inn bestillingen."
+          },
+          "work": {
+            "word": "Arbeid",
+            "title": "Ekte filer. Flere oppgaver samtidig.",
+            "caption": "Jeg jobber i de ekte appene på denne datamaskinen, og jeg kan kjøre mer enn én oppgave om gangen."
+          },
+          "build": {
+            "word": "Bygg",
+            "title": "Si det. Jeg bygger det.",
+            "caption": "Apper og nettsider etter mål. Beskriv det med vanlige ord, så bygger jeg det, kjører det og legger det ut på nett."
+          },
+          "routines": {
+            "word": "Rutiner",
+            "title": "Be om det én gang. Det skjer hver dag.",
+            "caption": "Planlegg hva som helst, så gjør jeg det i tide, selv mens du sover."
+          }
+        }
+      },
+      "customize": {
+        "title": "Jeg kan endre meg selv",
+        "body": "Mangler du en funksjon, eller vil du at noe skal fungere annerledes? Bare spør. Jeg skriver om min egen kode, lar deg prøve den, og du bestemmer om den skal beholdes.",
+        "hint": "Endringer blir på denne datamaskinen.",
+        "steps": {
+          "ask": {
+            "title": "Spør",
+            "body": "Beskriv endringen med vanlige ord."
+          },
+          "preview": {
+            "title": "Forhåndsvis",
+            "body": "En oppgave bygger den og åpner en levende forhåndsvisning."
+          },
+          "update": {
+            "title": "Oppdater",
+            "body": "Ett klikk for å ta den i bruk. Angre når som helst."
+          }
+        }
+      },
+      "memory": {
+        "title": "Én samtale",
+        "titleChatbot": "Denne kjenner du",
+        "bodyChatbot": "En ny chat hver gang, et sidepanel fullt av gamle, og ingen hukommelse om hva du sa forrige uke.",
+        "titleStella": "Med meg er det én samtale",
+        "bodyStella": "Ingen nye chatter, ingen tråder. Alt du noen gang har fortalt meg, er på samme sted, så når du spør om forrige uke, finner jeg det.",
+        "showStella": "Spør meg nå"
+      }
     }
   },
   "global": {
@@ -935,7 +997,7 @@
         "other": "For mange forespørsler. Prøv igjen om {count} sekunder."
       },
       "welcomeDescription": "Logg på med e-posten din for å begynne å bruke Stella.",
-      "welcomeSub": "Bruk Google eller e-posten din for å logge på. Ingen passord nødvendig.",
+      "welcomeSub": "Bruk Stella på telefonen og hold alt synkronisert på tvers av enhetene dine.",
       "welcomeTitle": "Velkommen til Stella"
     },
     "integrations": {
@@ -977,24 +1039,8 @@
       }
     },
     "localMode": {
-      "authNote": "Når du logger inn, får du Stellas modeller, mobilappen, Drive, skyoppgaver og synkronisering mellom enheter. Chattene dine blir på denne datamaskinen til du velger.",
-      "banner": "Chattene dine blir på denne datamaskinen. Logg inn for Stellas modeller, mobilappen, Drive, skyoppgaver og synkronisering.",
-      "choiceBodyBoth": "Mens du brukte Stella her uten konto: {messages} og {notes}. Når du legger dem til, havner de i kontoen din. Ingenting der erstattes.",
-      "choiceBodyChat": "Mens du brukte Stella her uten konto: {messages}. Når du legger dem til, havner de sist i chatten din. Ingenting der erstattes.",
-      "choiceBodyMemory": "Mens du brukte Stella her uten konto: {notes}. Når du legger dem til, kopieres de til minnet ditt. Ingenting der erstattes.",
-      "choiceFailed": "Kunne ikke lagre valget. Prøv igjen.",
-      "choiceTitle": "Legge til det du gjorde uten konto?",
-      "keep": "Behold dem bare på denne datamaskinen",
-      "messages": {
-        "one": "1 melding",
-        "other": "{count} meldinger"
-      },
+      "banner": "Chattene dine blir på denne datamaskinen. Logg inn for å bruke Stella på telefonen og holde alt synkronisert.",
       "needsAccount": "Dette kjører i Stellas sky og krever derfor en Stella-konto.",
-      "notes": {
-        "one": "1 minnenotat",
-        "other": "{count} minnenotater"
-      },
-      "sync": "Legg til i chatten min",
       "syncFailed": "Kunne ikke legge chatten til i kontoen din. Den er fortsatt på denne datamaskinen.",
       "synced": "Chatten er lagt til i kontoen din."
     },
@@ -1770,43 +1816,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "Valgfrie tillegg",
-        "lead": "Ingen av disse er påkrevd, men hver av dem gjør meg mer nyttig.",
-        "start": "Begynn å chatte"
-      },
-      "gmail": {
-        "body": "Finn e-poster, hold deg oppdatert på tråder og lag utkast til svar, bare ved å spørre.",
-        "connect": "Koble til Gmail",
-        "connected": "Tilkoblet",
-        "connecting": "Venter på Google…",
-        "error": "Kunne ikke koble til Gmail. Prøv igjen, eller hopp over inntil videre.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Hei, jeg er Stella. Velg først hvordan jeg tenker: Claude- eller ChatGPT-abonnementet du har, din egen nøkkel eller en Stella-konto."
-      },
-      "progress": "Oppsettsfremdrift",
-      "replies": {
-        "signinDone": "Ferdig."
-      },
-      "send": "Send",
       "signin": {
         "body": "Én av disse er nok. Du kan legge til de andre senere.",
         "claudeCliMissing": "Installer Claude Code først, og prøv igjen.",
@@ -1842,8 +1851,7 @@
         "settledNone": "Ingen AI valgt ennå",
         "settledNoneDesc": "Logg inn eller koble til et abonnement når som helst for å begynne å chatte.",
         "fineOwnPlan": "ChatGPT og Claude Code bruker ditt eget abonnement hos OpenAI eller Anthropic. Endre dette når som helst i Innstillinger."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "Ved å bruke Stella godtar du våre {terms} og {privacy}.",
     "privacyPolicy": "Personvernerklæring",
@@ -2149,7 +2157,17 @@
         "thisComputerInline": "denne datamaskinen",
         "rowNotChosen": "Bruker {email}, ikke {chosen}",
         "rowEnded": "Påloggingen er utløpt",
-        "rowEnding": "Påloggingen utløper {date}"
+        "rowEnding": "Påloggingen utløper {date}",
+        "automaticHint": "Bruker kontoen Claude Code allerede er pålogget med på hver datamaskin",
+        "chooseNote": "Kontoen du velger, brukes på alle datamaskinene dine og i skyen.",
+        "inUseTitle": "I bruk nå",
+        "missingChosen": "{email} er ikke pålogget her.",
+        "missingChosenFallback": "{email} er ikke pålogget her, så den lokale påloggingen brukes.",
+        "ownLoginNote": "Denne datamaskinens egen Claude Code-pålogging: {email}",
+        "reasonCloudLogin": "Skyens pålogging",
+        "reasonOtherLogin": "Lagt til i Stella",
+        "reasonOwnLogin": "Denne datamaskinens egen Claude Code-pålogging",
+        "reasonSelected": "Valgt i Stella"
       },
       "claudeLogin": {
         "approve": "Godkjenn på Anthropic-siden som ble åpnet, så fullføres det av seg selv.",
@@ -2420,11 +2438,6 @@
         "twinkle": "Glimt"
       },
       "title": "Meldingslyd"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "Kjør introduksjonen på nytt. Dataene dine beholdes.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3433,11 +3446,9 @@
     },
     "onboarding": {
       "link": "Har du din egen Stella-server? Koble den til",
-      "prose": "Du er koblet til {name} og logget inn som eier. Velg nå hva jeg tenker med: Claude- eller ChatGPT-abonnementet ditt, eller din egen API-nøkkel.",
       "title": "Koblet til {name}",
       "body": "Du er logget inn som eier. Velg hva Stella tenker med. Én er nok.",
-      "bodyOptional": "Du er logget inn som eier. Denne serveren har egne modeller, så dette er valgfritt: du kan også bruke Claude- eller ChatGPT-abonnementet ditt, eller en API-nøkkel.",
-      "settled": "Koblet til {name}"
+      "bodyOptional": "Du er logget inn som eier. Denne serveren har egne modeller, så dette er valgfritt: du kan også bruke Claude- eller ChatGPT-abonnementet ditt, eller en API-nøkkel."
     }
   },
   "contextMenu": {
@@ -3929,6 +3940,21 @@
     "phoneApp": {
       "title": "Stella er også på telefonen din",
       "detail": "Last ned appen for å sende meldinger til Stella og følge oppgavene dine når du er borte fra denne datamaskinen."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Hent Stella for Chrome",
+      "connectGmail": "Koble til Gmail",
+      "gmailWaiting": "Venter på Google…",
+      "gmailRetry": "Prøv Gmail igjen",
+      "watchErrands": "Se den i arbeid",
+      "signIn": "Logg på",
+      "getPhoneApp": "Hent mobilappen",
+      "watchMemory": "Se hvordan",
+      "connectPlan": "Koble til et abonnement",
+      "changeLook": "Endre utseendet mitt",
+      "watchCustomize": "Se den endre seg"
     }
   }
 }

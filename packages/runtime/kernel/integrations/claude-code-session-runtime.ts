@@ -124,6 +124,13 @@ export type ClaudeCodeTurnRequest = {
   shellEnv?: Record<string, string>;
   cliBridgeSocketPath?: string;
   vanilla?: boolean;
+  /**
+   * Resume `persistedSessionId` into a new session the CLI doesn't save, leaving that session as it was: a side run
+   * on the conversation's own context, such as writing background handoff notes.
+   */
+  forkSession?: boolean;
+  /** Refuse every tool call, the CLI's own ones too, without changing the request the model sees (or its cache). */
+  denyTools?: boolean;
   effortLevel?: string;
   prompt: string;
   resumeFallbackPrompt?: string;
@@ -821,11 +828,18 @@ export const claudeCodeNativeToolMatcher = (stellaToolNames: readonly string[]) 
   stellaToolNames.length > 0
     ? `^(?!mcp__|(?:${stellaToolNames.map(escapeRegExp).join("|")})$).*`
     : "^(?!mcp__).*";
+const DENY_TOOLS_HOOK_COMMAND = `"${process.execPath}" -e "process.stderr.write('No tools run in this side request; answer with text only.');process.exit(2)"`;
 const buildClaudeCodeRedactingSettings = (
   hook: ClaudeCodeToolMcpHost["postToolUseHook"],
   stellaToolNames: readonly string[],
+  denyTools = false,
 ) => {
   const settings = buildClaudeCodeHookSettingsObject();
+  if (denyTools) {
+    settings.hooks.PreToolUse = [
+      { matcher: ".*", hooks: [{ type: "command", command: DENY_TOOLS_HOOK_COMMAND }] },
+    ];
+  }
   settings.hooks.PostToolUse = [
     {
       matcher: claudeCodeNativeToolMatcher(stellaToolNames),
@@ -2592,6 +2606,7 @@ class ClaudeCodeSessionRuntime {
       }
       if (
         useResume &&
+        !request.forkSession &&
         !session.thinkingStripped &&
         isRejectedThinkingSignatureError(message)
       ) {
@@ -2737,6 +2752,7 @@ class ClaudeCodeSessionRuntime {
     }
     if (useResume) {
       args.push("--resume", session.sessionId);
+      if (request.forkSession) args.push("--fork-session", "--no-session-persistence");
     }
     return args;
   }
@@ -2756,6 +2772,8 @@ class ClaudeCodeSessionRuntime {
       request.autoCompactWindowTokens ?? null,
       request.cliBridgeSocketPath ?? "",
       request.settingSources ?? null,
+      Boolean(request.forkSession),
+      Boolean(request.denyTools),
     ]);
   }
   async ensureMcpHost(
@@ -2773,7 +2791,7 @@ class ClaudeCodeSessionRuntime {
     }
     const catalogKey = crypto
       .createHash("sha256")
-      .update(JSON.stringify(request.tools))
+      .update(JSON.stringify([request.tools, Boolean(request.denyTools)]))
       .digest("hex");
     if (session.mcpHost && session.mcpToolCatalogKey === catalogKey) {
       return session.mcpHost;
@@ -2797,6 +2815,7 @@ class ClaudeCodeSessionRuntime {
       buildClaudeCodeRedactingSettings(
         session.mcpHost.postToolUseHook,
         session.mcpHost.claudeToolNames,
+        request.denyTools === true,
       ),
       { encoding: "utf8", mode: 0o600 },
     );

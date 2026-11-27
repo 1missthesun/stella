@@ -25,6 +25,7 @@ export type WindowSnapshot = {
   alwaysOnTop: boolean;
   opacity: number;
   ignoreMouseEvents: boolean;
+  forwardMouseEvents: boolean;
   bounds: Rectangle;
   minWidth?: number;
   minHeight?: number;
@@ -245,6 +246,7 @@ export class BrowserWindow extends BaseWindow {
     alwaysOnTop: boolean;
     opacity: number;
     ignoreMouseEvents: boolean;
+    forwardMouseEvents: boolean;
     bounds: Rectangle;
     resizable: boolean;
     minimized: boolean;
@@ -302,6 +304,7 @@ export class BrowserWindow extends BaseWindow {
       alwaysOnTop: options.alwaysOnTop ?? false,
       opacity: options.opacity ?? 1,
       ignoreMouseEvents: false,
+      forwardMouseEvents: false,
       bounds: {
         x: options.x ?? Math.round(work.x + (work.width - width) / 2),
         y: options.y ?? Math.round(work.y + (work.height - height) / 2),
@@ -366,6 +369,7 @@ export class BrowserWindow extends BaseWindow {
       alwaysOnTop: this.state.alwaysOnTop,
       opacity: this.state.opacity,
       ignoreMouseEvents: this.state.ignoreMouseEvents,
+      forwardMouseEvents: this.state.forwardMouseEvents,
       bounds: { ...this.state.bounds },
       minWidth: this.state.minSize[0] || undefined,
       minHeight: this.state.minSize[1] || undefined,
@@ -479,7 +483,7 @@ export class BrowserWindow extends BaseWindow {
   setFocusable(on: boolean) { this.set({ focusable: on }); }
   setResizable(on: boolean) { this.set({ resizable: on }); }
   setSkipTaskbar(on: boolean) { this.set({ skipTaskbar: on }); }
-  setIgnoreMouseEvents(ignore: boolean, _opts?: unknown) { this.set({ ignoreMouseEvents: ignore }); }
+  setIgnoreMouseEvents(ignore: boolean, opts?: { forward?: boolean }) { this.set({ ignoreMouseEvents: ignore, forwardMouseEvents: ignore && opts?.forward === true }); }
   setContentProtection(on: boolean) { this.set({ contentProtection: on }); }
   setMinimumSize(w: number, h: number) { this.set({ minSize: [w, h] }); }
   setMaximumSize(w: number, h: number) { this.set({ maxSize: [w, h] }); }
@@ -502,7 +506,7 @@ export class BrowserWindow extends BaseWindow {
   setIcon() {}
   setOverlayIcon(overlay: unknown, description = "") {
     const count = Number(/^\d+/.exec(description)?.[0] ?? (overlay ? 1 : 0));
-    app.showBadge(count > 0 ? String(count) : "", count);
+    app.showBadge(count > 0 ? String(count) : "", count, description);
   }
   setThumbarButtons() { return true; }
   setThumbnailClip() {}

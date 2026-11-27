@@ -120,23 +120,8 @@ const SOURCES: { file: string; pick: Pick; keyframes: string[] }[] = [
     keyframes: [],
   },
   {
-    file: "app/home/home.css",
-    pick: (s) =>
-      [
-        ".home-content",
-        ".full-body-main--home",
-        ".full-body-main--home .home-content",
-        ".full-body-main--home .composer-wrap",
-        ".home-stella-title",
-        ".full-body-main--home-leaving .home-stella-title",
-        ".full-body-main--home-leaving .full-body-home-status",
-        ".full-body-main--home-leaving .composer-wrap",
-      ].includes(s),
-    keyframes: ["homeContentFadeIn", "homeContentFadeOut"],
-  },
-  {
     file: "shell/full-shell.layout.css",
-    pick: (s) => [".chat-viewport-region", ".full-body-chat-layer", ".full-body-chat-layer--hidden", ".full-body-home-overlay", ".session-content", ".shell-topbar-tab"].includes(s),
+    pick: (s) => [".chat-viewport-region", ".full-body-chat-layer", ".session-content", ".shell-topbar-tab"].includes(s),
     keyframes: [],
   },
   {
@@ -296,7 +281,6 @@ const TIMINGS: { name: string; file: string; constant: string }[] = [
   { name: "activityMarkSize", file: "shell/ShellTopBarActivity.tsx", constant: "MARK_SIZE_PX" },
   { name: "activityLabelShimmerMs", file: "shell/ShellTopBarActivity.tsx", constant: "LABEL_SHIMMER_MS" },
   { name: "indicatorMarkSize", file: "app/chat/WorkingIndicator.tsx", constant: "INDICATOR_MARK_SIZE_PX" },
-  { name: "homeLeaveMs", file: "app/chat/ChatColumn.tsx", constant: "HOME_LEAVE_MS" },
   { name: "rowGap", file: "app/chat/ChatTimeline.tsx", constant: "ROW_GAP" },
   { name: "assistantRunGap", file: "app/chat/ChatTimeline.tsx", constant: "ASSISTANT_RUN_GAP" },
   { name: "userRunGap", file: "app/chat/ChatTimeline.tsx", constant: "USER_RUN_GAP" },

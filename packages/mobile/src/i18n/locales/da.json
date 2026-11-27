@@ -920,7 +920,17 @@
         "thisComputerInline": "denne computer",
         "rowNotChosen": "Bruger {email}, ikke {chosen}",
         "rowEnded": "Login er udløbet",
-        "rowEnding": "Login udløber {date}"
+        "rowEnding": "Login udløber {date}",
+        "automaticHint": "Bruger det, Claude Code allerede er logget ind med på hver computer",
+        "chooseNote": "Den konto, du vælger, bruges på alle dine computere og i skyen.",
+        "inUseTitle": "I brug nu",
+        "missingChosen": "{email} er ikke logget ind her.",
+        "missingChosenFallback": "{email} er ikke logget ind her, så der bruges det lokale login.",
+        "ownLoginNote": "Denne computers eget Claude Code-login: {email}",
+        "reasonCloudLogin": "Skyens login",
+        "reasonOtherLogin": "Tilføjet i Stella",
+        "reasonOwnLogin": "Denne computers eget Claude Code-login",
+        "reasonSelected": "Valgt i Stella"
       },
       "claudeLogin": {
         "whereCloud": "Logger ind på Claude Code i din cloud.",

@@ -885,6 +885,68 @@
         "discard": "취소"
       },
       "tagline": "말하고 그려서 Stella에게 의도를 보여 주세요."
+    },
+    "welcomeDemos": {
+      "play": "이 데모 재생",
+      "replay": "데모 다시 재생",
+      "errands": {
+        "title": "빠른 둘러보기",
+        "tablist": "할 수 있는 일 데모",
+        "chapters": {
+          "errands": {
+            "word": "심부름",
+            "title": "한 번만 말하세요. 처리해 둘게요.",
+            "caption": "알맞은 곳을 찾고, 양식을 채우고, 캘린더에 넣어 둘게요. 직접 하시는 것과 똑같은 방식으로요."
+          },
+          "shopping": {
+            "word": "쇼핑",
+            "title": "허락해 주시면 물건도 살 수 있어요.",
+            "caption": "상품을 찾아 결제 단계까지 가져가요. 합계를 확인해 주시면 제가 주문할게요."
+          },
+          "work": {
+            "word": "업무",
+            "title": "진짜 파일. 여러 작업을 동시에.",
+            "caption": "저는 이 컴퓨터의 실제 앱 안에서 일하고, 한 번에 여러 작업을 진행할 수 있어요."
+          },
+          "build": {
+            "word": "만들기",
+            "title": "말만 하세요. 제가 만들게요.",
+            "caption": "원하는 대로 만드는 앱과 웹사이트. 쉬운 말로 설명하시면 만들고, 실행하고, 온라인에 올려 드려요."
+          },
+          "routines": {
+            "word": "루틴",
+            "title": "한 번만 요청하세요. 매일 해 둘게요.",
+            "caption": "무엇이든 예약해 두세요. 주무시는 동안에도 제때 처리할게요."
+          }
+        }
+      },
+      "customize": {
+        "title": "저는 스스로를 바꿀 수 있어요",
+        "body": "기능이 없거나 다르게 동작하길 원하세요? 그냥 요청하세요. 제가 제 코드를 직접 고쳐서 써 보실 수 있게 하고, 유지할지는 직접 정하세요.",
+        "hint": "변경 사항은 이 컴퓨터에만 남아요.",
+        "steps": {
+          "ask": {
+            "title": "요청",
+            "body": "바꾸고 싶은 점을 쉬운 말로 설명하세요."
+          },
+          "preview": {
+            "title": "미리보기",
+            "body": "작업이 만들어서 실시간 미리보기를 열어 줘요."
+          },
+          "update": {
+            "title": "업데이트",
+            "body": "한 번 클릭하면 적용돼요. 언제든 실행 취소할 수 있어요."
+          }
+        }
+      },
+      "memory": {
+        "title": "하나의 대화",
+        "titleChatbot": "익숙한 모습이죠",
+        "bodyChatbot": "매번 새 채팅, 오래된 채팅으로 가득한 사이드바, 그리고 지난주에 한 말은 기억하지 못하죠.",
+        "titleStella": "저와는 하나의 대화예요",
+        "bodyStella": "새 채팅도, 스레드도 없어요. 저에게 말씀하신 모든 것이 한곳에 있어서, 지난주 일을 물으시면 찾아올게요.",
+        "showStella": "이제 저에게 물어보세요"
+      }
     }
   },
   "global": {
@@ -926,7 +988,7 @@
         "other": "요청이 너무 많습니다. {count}초 후에 다시 시도하세요."
       },
       "welcomeDescription": "이메일로 로그인해 Stella를 사용해 보세요.",
-      "welcomeSub": "Google이나 이메일로 로그인하세요. 비밀번호는 필요 없습니다.",
+      "welcomeSub": "휴대폰에서도 Stella를 쓰고 모든 기기에서 동기화하세요.",
       "welcomeTitle": "Stella에 오신 것을 환영합니다"
     },
     "integrations": {
@@ -968,24 +1030,8 @@
       }
     },
     "localMode": {
-      "authNote": "로그인하면 Stella 모델, 휴대폰 앱, Drive, 클라우드 작업, 기기 간 동기화를 쓸 수 있어요. 직접 선택하기 전까지 채팅은 이 컴퓨터에 남아 있어요.",
-      "banner": "채팅은 이 컴퓨터에 남아 있어요. 로그인하면 Stella 모델, 휴대폰 앱, Drive, 클라우드 작업, 동기화를 쓸 수 있어요.",
-      "choiceBodyBoth": "계정 없이 여기서 Stella를 사용하는 동안: {messages}, {notes}. 추가하면 계정으로 들어가요. 계정의 내용은 바뀌지 않아요.",
-      "choiceBodyChat": "계정 없이 여기서 Stella를 사용하는 동안: {messages}. 추가하면 채팅 끝에 들어가요. 계정의 내용은 바뀌지 않아요.",
-      "choiceBodyMemory": "계정 없이 여기서 Stella를 사용하는 동안: {notes}. 추가하면 메모리에 복사돼요. 계정의 내용은 바뀌지 않아요.",
-      "choiceFailed": "선택을 저장하지 못했어요. 다시 시도해 주세요.",
-      "choiceTitle": "계정 없이 한 내용을 추가할까요?",
-      "keep": "이 컴퓨터에만 보관",
-      "messages": {
-        "one": "메시지 1개",
-        "other": "메시지 {count}개"
-      },
+      "banner": "채팅은 이 컴퓨터에 남아 있어요. 로그인하면 휴대폰에서도 Stella를 쓰고 모든 것을 동기화할 수 있어요.",
       "needsAccount": "이 기능은 Stella 클라우드에서 실행되므로 Stella 계정이 필요해요.",
-      "notes": {
-        "one": "메모리 노트 1개",
-        "other": "메모리 노트 {count}개"
-      },
-      "sync": "내 채팅에 추가",
       "syncFailed": "이 채팅을 계정에 추가하지 못했어요. 이 컴퓨터에는 그대로 있어요.",
       "synced": "이 채팅을 계정에 추가했어요."
     },
@@ -1760,43 +1806,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "선택 기능",
-        "lead": "모두 필수는 아니지만, 하나하나가 저를 더 유용하게 만들어요.",
-        "start": "채팅 시작하기"
-      },
-      "gmail": {
-        "body": "이메일 찾기, 스레드 따라잡기, 답장 초안 작성까지 말만 하면 돼요.",
-        "connect": "Gmail 연결",
-        "connected": "연결됨",
-        "connecting": "Google을 기다리는 중…",
-        "error": "Gmail을 연결하지 못했어요. 다시 시도하거나 지금은 건너뛰세요.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "안녕하세요, Stella예요. 먼저 제가 생각하는 방식을 고르세요. 이미 있는 Claude 또는 ChatGPT 요금제, 내 키, 또는 Stella 계정을 사용할 수 있어요."
-      },
-      "progress": "설정 진행 상황",
-      "replies": {
-        "signinDone": "완료했어요."
-      },
-      "send": "Send",
       "signin": {
         "body": "이 중 하나면 충분해요. 나머지는 나중에 추가할 수 있어요.",
         "claudeCliMissing": "먼저 Claude Code를 설치한 후 다시 시도하세요.",
@@ -1832,8 +1841,7 @@
         "settledNone": "아직 선택한 AI가 없습니다",
         "settledNoneDesc": "언제든 로그인하거나 요금제를 연결하면 채팅을 시작할 수 있습니다.",
         "fineOwnPlan": "ChatGPT와 Claude Code는 OpenAI 또는 Anthropic의 본인 구독을 사용합니다. 설정에서 언제든 바꿀 수 있습니다."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "Stella를 사용하면 {terms} 및 {privacy}에 동의하게 됩니다.",
     "privacyPolicy": "개인정보 처리방침",
@@ -2139,7 +2147,17 @@
         "thisComputerInline": "이 컴퓨터",
         "rowNotChosen": "{chosen}이 아닌 {email} 사용",
         "rowEnded": "로그인 만료됨",
-        "rowEnding": "로그인 {date} 만료"
+        "rowEnding": "로그인 {date} 만료",
+        "automaticHint": "각 컴퓨터의 Claude Code에 이미 로그인된 계정을 사용합니다",
+        "chooseNote": "선택한 계정은 모든 컴퓨터와 클라우드에서 사용됩니다.",
+        "inUseTitle": "현재 사용 중",
+        "missingChosen": "{email}은(는) 여기에 로그인되어 있지 않습니다.",
+        "missingChosenFallback": "{email}은(는) 여기에 로그인되어 있지 않아 이 컴퓨터의 로그인을 사용합니다.",
+        "ownLoginNote": "이 컴퓨터의 Claude Code 로그인: {email}",
+        "reasonCloudLogin": "클라우드의 로그인",
+        "reasonOtherLogin": "Stella에서 추가됨",
+        "reasonOwnLogin": "이 컴퓨터의 Claude Code 로그인",
+        "reasonSelected": "Stella에서 선택함"
       },
       "claudeLogin": {
         "approve": "열린 Anthropic 페이지에서 승인하면 자동으로 완료됩니다.",
@@ -2410,11 +2428,6 @@
         "twinkle": "반짝임"
       },
       "title": "메시지 소리"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "온보딩을 다시 진행합니다. 데이터는 유지됩니다.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3399,11 +3412,9 @@
     },
     "onboarding": {
       "link": "나만의 Stella 서버가 있나요? 연결하기",
-      "prose": "{name}에 소유자로 연결되었습니다. 이제 제가 생각에 쓸 것을 고르세요: 사용 중인 Claude 또는 ChatGPT 요금제, 또는 직접 가진 API 키.",
       "title": "{name}에 연결됨",
       "body": "소유자로 로그인했습니다. Stella가 생각에 쓸 것을 고르세요. 하나면 충분합니다.",
-      "bodyOptional": "소유자로 로그인했습니다. 이 서버에는 자체 모델이 있으므로 선택 사항입니다. Claude 또는 ChatGPT 요금제나 API 키도 사용할 수 있습니다.",
-      "settled": "{name}에 연결됨"
+      "bodyOptional": "소유자로 로그인했습니다. 이 서버에는 자체 모델이 있으므로 선택 사항입니다. Claude 또는 ChatGPT 요금제나 API 키도 사용할 수 있습니다."
     }
   },
   "contextMenu": {
@@ -3870,6 +3881,21 @@
     "phoneApp": {
       "title": "Stella는 휴대폰에도 있어요",
       "detail": "앱을 받으면 이 컴퓨터에서 떨어져 있을 때도 Stella에게 메시지를 보내고 작업을 확인할 수 있어요."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Stella for Chrome 받기",
+      "connectGmail": "Gmail 연결",
+      "gmailWaiting": "Google을 기다리는 중…",
+      "gmailRetry": "Gmail 다시 시도",
+      "watchErrands": "작동하는 모습 보기",
+      "signIn": "로그인",
+      "getPhoneApp": "휴대폰 앱 받기",
+      "watchMemory": "방법 보기",
+      "connectPlan": "요금제 연결",
+      "changeLook": "내 모습 바꾸기",
+      "watchCustomize": "바뀌는 모습 보기"
     }
   }
 }

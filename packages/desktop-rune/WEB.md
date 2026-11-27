@@ -55,9 +55,8 @@ Cold layout is the one figure behind: 25 ms of it is the static home's first lay
 autofocus forces before the first frame; the app's own layouts add about 16 ms.
 
 The static home (`web/static-home/`) is desktop-ui's `--static-home` for the Rune page: the
-greeting and composer in the look the app saved for the next load, typeable before the bundle
-runs. The app takes the draft, selection and focus over in place, and the home surface starts
-as the home when the last session left it there, so nothing moves.
+empty chat's docked composer in the look the app saved for the next load, typeable before the
+bundle runs. The app takes the draft, selection and focus over in place, so nothing moves.
 
 ## Per-user renderers
 

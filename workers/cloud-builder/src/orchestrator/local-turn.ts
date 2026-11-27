@@ -245,20 +245,25 @@ export abstract class OrchestratorLocalTurn extends OrchestratorJournalWrites {
   }
 
   protected async handlePiBrain(request: Request): Promise<Response> {
-    const refusal =
-      request.method === "GET"
-        ? await this.readerRefusal(request)
-        : await this.localTurnOwner(request);
-    if (refusal instanceof Response) return refusal;
     if (request.method === "GET") {
+      const refusal = await this.readerRefusal(request);
+      if (refusal instanceof Response) return refusal;
       return json({
         record:
           (await this.ctx.storage.get<PiBrainRecord>(PI_BRAIN_KEY)) ?? null,
       } satisfies PiBrainResponse);
     }
-    const host = parsePiBrainHost(await request.json().catch(() => null));
+    const owner = await this.localTurnOwner(request);
+    if (owner instanceof Response) return owner;
+    const body = await request.json().catch(() => null);
+    const host = parsePiBrainHost(body);
     if (!host) return json({ error: "Name the cloud or a device." }, 400);
-    const record = await this.setPiBrain(host);
+    const failover =
+      host.host === "device" &&
+      (body as { failover?: unknown } | null)?.failover === true;
+    const record = failover
+      ? await this.failOverPiBrainTo(owner.ownerId, host)
+      : await this.setPiBrain(host);
     return json({ record } satisfies PiBrainResponse);
   }
 

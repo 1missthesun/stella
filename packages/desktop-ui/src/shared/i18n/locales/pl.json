@@ -909,6 +909,68 @@
         "discard": "Odrzuć"
       },
       "tagline": "Mów i rysuj, aby pokazać Stelli, o co ci chodzi."
+    },
+    "welcomeDemos": {
+      "play": "Odtwórz tę prezentację",
+      "replay": "Odtwórz ponownie",
+      "errands": {
+        "title": "Szybka wycieczka",
+        "tablist": "Prezentacje możliwości",
+        "chapters": {
+          "errands": {
+            "word": "Sprawy",
+            "title": "Poproś raz. Załatwione.",
+            "caption": "Znajduję właściwe miejsce, wypełniam formularz i wpisuję to do kalendarza, tak samo jak Ty."
+          },
+          "shopping": {
+            "word": "Zakupy",
+            "title": "Mogę kupować rzeczy, za Twoją zgodą.",
+            "caption": "Znajduję to i doprowadzam do kasy. Ty potwierdzasz kwotę, a ja składam zamówienie."
+          },
+          "work": {
+            "word": "Praca",
+            "title": "Prawdziwe pliki. Kilka zadań naraz.",
+            "caption": "Pracuję w prawdziwych aplikacjach na tym komputerze i mogę wykonywać więcej niż jedno zadanie naraz."
+          },
+          "build": {
+            "word": "Tworzenie",
+            "title": "Powiedz. Zbuduję to.",
+            "caption": "Aplikacje i strony internetowe na zamówienie. Opisz to zwykłymi słowami, a ja to zbuduję, uruchomię i opublikuję."
+          },
+          "routines": {
+            "word": "Rutyny",
+            "title": "Poproś raz. Dzieje się codziennie.",
+            "caption": "Zaplanuj cokolwiek, a zrobię to na czas, nawet gdy śpisz."
+          }
+        }
+      },
+      "customize": {
+        "title": "Mogę zmieniać samą siebie",
+        "body": "Brakuje Ci funkcji albo chcesz, żeby coś działało inaczej? Po prostu poproś. Przepiszę własny kod, dam Ci go wypróbować, a Ty zdecydujesz, czy go zachować.",
+        "hint": "Zmiany zostają na tym komputerze.",
+        "steps": {
+          "ask": {
+            "title": "Poproś",
+            "body": "Opisz zmianę zwykłymi słowami."
+          },
+          "preview": {
+            "title": "Podgląd",
+            "body": "Zadanie to zbuduje i otworzy podgląd na żywo."
+          },
+          "update": {
+            "title": "Aktualizuj",
+            "body": "Jedno kliknięcie, by to zastosować. Cofniesz w każdej chwili."
+          }
+        }
+      },
+      "memory": {
+        "title": "Jedna rozmowa",
+        "titleChatbot": "Znasz to",
+        "bodyChatbot": "Za każdym razem nowy czat, pasek boczny pełen starych i żadnej pamięci o tym, co mówiłeś w zeszłym tygodniu.",
+        "titleStella": "Ze mną to jedna rozmowa",
+        "bodyStella": "Żadnych nowych czatów, żadnych wątków. Wszystko, co mi kiedykolwiek powiedziałeś, jest w jednym miejscu, więc gdy pytasz o zeszły tydzień, odszukuję to.",
+        "showStella": "Teraz zapytaj mnie"
+      }
     }
   },
   "global": {
@@ -953,7 +1015,7 @@
         "other": "Za dużo żądań. Spróbuj ponownie za {count} sekundy."
       },
       "welcomeDescription": "Zaloguj się e-mailem, aby zacząć korzystać ze Stelli.",
-      "welcomeSub": "Zaloguj się przez Google lub e-mailem. Hasło niepotrzebne.",
+      "welcomeSub": "Korzystaj ze Stelli na telefonie i miej wszystko zsynchronizowane na swoich urządzeniach.",
       "welcomeTitle": "Witamy w Stelli"
     },
     "integrations": {
@@ -995,24 +1057,8 @@
       }
     },
     "localMode": {
-      "authNote": "Logowanie daje modele Stelli, aplikację na telefon, Drive, zadania w chmurze i synchronizację między urządzeniami. Twoje czaty zostają na tym komputerze, dopóki nie zdecydujesz.",
-      "banner": "Twoje czaty zostają na tym komputerze. Zaloguj się, aby korzystać z modeli Stelli, aplikacji na telefon, Drive, zadań w chmurze i synchronizacji.",
-      "choiceBodyBoth": "Gdy korzystałeś tu ze Stelli bez konta: {messages} i {notes}. Dodanie przeniesie je na Twoje konto. Nic nie zostanie zastąpione.",
-      "choiceBodyChat": "Gdy korzystałeś tu ze Stelli bez konta: {messages}. Dodanie umieści je na końcu Twojego czatu. Nic nie zostanie zastąpione.",
-      "choiceBodyMemory": "Gdy korzystałeś tu ze Stelli bez konta: {notes}. Dodanie skopiuje je do Twojej pamięci. Nic nie zostanie zastąpione.",
-      "choiceFailed": "Nie udało się zapisać wyboru. Spróbuj ponownie.",
-      "choiceTitle": "Dodać to, co zrobiłeś bez konta?",
-      "keep": "Zachowaj je tylko na tym komputerze",
-      "messages": {
-        "one": "1 wiadomość",
-        "other": "wiadomości: {count}"
-      },
+      "banner": "Twoje czaty zostają na tym komputerze. Zaloguj się, aby korzystać ze Stelli na telefonie i mieć wszystko zsynchronizowane.",
       "needsAccount": "To działa w chmurze Stelli, więc wymaga konta Stella.",
-      "notes": {
-        "one": "1 notatka w pamięci",
-        "other": "notatki w pamięci: {count}"
-      },
-      "sync": "Dodaj do mojego czatu",
       "syncFailed": "Nie udało się dodać czatu do konta. Nadal jest na tym komputerze.",
       "synced": "Czat został dodany do Twojego konta."
     },
@@ -1790,43 +1836,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "Opcjonalne dodatki",
-        "lead": "Żaden nie jest wymagany, ale każdy sprawia, że jestem bardziej przydatna.",
-        "start": "Zacznij rozmowę"
-      },
-      "gmail": {
-        "body": "Znajduj e-maile, nadrabiaj wątki i twórz szkice odpowiedzi, wystarczy poprosić.",
-        "connect": "Połącz Gmaila",
-        "connected": "Połączono",
-        "connecting": "Czekam na Google…",
-        "error": "Nie udało się połączyć Gmaila. Spróbuj ponownie lub na razie pomiń.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Cześć, jestem Stella. Najpierw wybierz, jak myślę: plan Claude lub ChatGPT, który już masz, własny klucz albo konto Stella."
-      },
-      "progress": "Postęp konfiguracji",
-      "replies": {
-        "signinDone": "Gotowe."
-      },
-      "send": "Send",
       "signin": {
         "body": "Wystarczy jedna z tych opcji. Pozostałe dodasz później.",
         "claudeCliMissing": "Najpierw zainstaluj Claude Code, a potem spróbuj ponownie.",
@@ -1862,8 +1871,7 @@
         "settledNone": "Nie wybrano jeszcze AI",
         "settledNoneDesc": "Zaloguj się lub połącz plan w dowolnej chwili, aby zacząć rozmowę.",
         "fineOwnPlan": "ChatGPT i Claude Code korzystają z Twojej własnej subskrypcji w OpenAI lub Anthropic. Możesz to zmienić w dowolnej chwili w Ustawieniach."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "Korzystając ze Stelli, akceptujesz nasze {terms} oraz {privacy}.",
     "privacyPolicy": "Politykę prywatności",
@@ -2169,7 +2177,17 @@
         "thisComputerInline": "ten komputer",
         "rowNotChosen": "Używa {email}, nie {chosen}",
         "rowEnded": "Logowanie wygasło",
-        "rowEnding": "Logowanie wygasa {date}"
+        "rowEnding": "Logowanie wygasa {date}",
+        "automaticHint": "Używa konta, do którego Claude Code jest już zalogowany na danym komputerze",
+        "chooseNote": "Wybrane konto jest używane na wszystkich Twoich komputerach i w chmurze.",
+        "inUseTitle": "Teraz w użyciu",
+        "missingChosen": "{email} nie jest tu zalogowane.",
+        "missingChosenFallback": "{email} nie jest tu zalogowane, więc używane jest własne logowanie.",
+        "ownLoginNote": "Własne logowanie tego komputera do Claude Code: {email}",
+        "reasonCloudLogin": "Logowanie chmury",
+        "reasonOtherLogin": "Dodane w Stella",
+        "reasonOwnLogin": "Własne logowanie tego komputera do Claude Code",
+        "reasonSelected": "Wybrane w Stella"
       },
       "claudeLogin": {
         "approve": "Zatwierdź na otwartej stronie Anthropic, a logowanie zakończy się samo.",
@@ -2440,11 +2458,6 @@
         "twinkle": "Migotanie"
       },
       "title": "Dźwięk wiadomości"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "Przejdź wprowadzenie ponownie. Twoje dane zostają.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3497,11 +3510,9 @@
     },
     "onboarding": {
       "link": "Masz własny serwer Stella? Połącz go",
-      "prose": "Masz połączenie z {name} jako właściciel. Teraz wybierz, czym mam myśleć: Twój plan Claude lub ChatGPT albo Twój własny klucz API.",
       "title": "Połączono z {name}",
       "body": "Zalogowano jako właściciel. Wybierz, czym myśli Stella. Wystarczy jedno.",
-      "bodyOptional": "Zalogowano jako właściciel. Ten serwer ma własne modele, więc to opcjonalne: możesz też użyć planu Claude lub ChatGPT albo klucza API.",
-      "settled": "Połączono z {name}"
+      "bodyOptional": "Zalogowano jako właściciel. Ten serwer ma własne modele, więc to opcjonalne: możesz też użyć planu Claude lub ChatGPT albo klucza API."
     }
   },
   "contextMenu": {
@@ -4043,6 +4054,21 @@
     "phoneApp": {
       "title": "Stella jest też na Twoim telefonie",
       "detail": "Pobierz aplikację, aby pisać do Stelli i śledzić swoje zadania, gdy nie siedzisz przy tym komputerze."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Pobierz Stella for Chrome",
+      "connectGmail": "Połącz Gmaila",
+      "gmailWaiting": "Czekam na Google…",
+      "gmailRetry": "Spróbuj ponownie z Gmailem",
+      "watchErrands": "Zobacz, jak działa",
+      "signIn": "Zaloguj się",
+      "getPhoneApp": "Pobierz aplikację na telefon",
+      "watchMemory": "Zobacz jak",
+      "connectPlan": "Połącz subskrypcję",
+      "changeLook": "Zmień mój wygląd",
+      "watchCustomize": "Zobacz, jak się zmienia"
     }
   }
 }

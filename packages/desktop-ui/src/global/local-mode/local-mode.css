@@ -50,37 +50,10 @@
   color: var(--text-base);
 }
 
-.local-mode-choice[data-slot="dialog-content"] {
-  max-width: 440px;
-}
-
-.local-mode-choice-body[data-slot="dialog-body"] {
-  padding: 4px 24px 24px;
-  gap: 16px;
-  align-items: stretch;
-}
-
-.local-mode-choice .local-mode-choice-text[data-slot="dialog-description"] {
-  display: block;
-  padding: 0;
-  margin: 0;
-  color: var(--text-base);
-  font-size: var(--font-size-md);
-  line-height: 1.5;
-}
-
 .local-mode-choice-actions {
   display: flex;
   justify-content: flex-end;
   gap: 10px;
-}
-
-.auth-dialog-local-note {
-  margin: 0;
-  color: var(--muted-foreground);
-  font-size: var(--font-size-sm);
-  line-height: 1.45;
-  text-align: center;
 }
 
 .local-mode-banner__lead {
@@ -172,24 +145,3 @@
   font-size: var(--font-size-sm);
 }
 
-.local-mode-choice-actions--split {
-  justify-content: space-between;
-  align-items: center;
-}
-
-.local-mode-choice-keep {
-  margin: 0;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  color: var(--muted-foreground);
-  font: inherit;
-  font-size: var(--font-size-base);
-  text-decoration: underline;
-  text-underline-offset: 2px;
-  cursor: pointer;
-}
-
-.local-mode-choice-keep:hover {
-  color: var(--text-base);
-}

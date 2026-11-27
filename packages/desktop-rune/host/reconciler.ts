@@ -5,7 +5,7 @@
 import Reconciler from "react-reconciler";
 import { ConcurrentRoot, ContinuousEventPriority, DefaultEventPriority, DiscreteEventPriority } from "react-reconciler/constants";
 import { createContext, type ReactNode } from "react";
-import { blob, command, commitCtx, flushFrame, ops, opsPending, setElementDispatch, type ElementEvent } from "./bridge";
+import { blob, command, commitCtx, flushFrame, freeBlob, ops, opsPending, setElementDispatch, type ElementEvent } from "./bridge";
 
 type Handlers = Record<string, (...args: any[]) => void>;
 /** Props set through a ref, outside React. They stay over React's until set again. */
@@ -14,7 +14,8 @@ type Direct = Record<string, unknown>;
 class Instance {
   json = "";
   handlers: Handlers = {};
-  blob?: { src: string; id: number };
+  /** The `<image src>` whose blob it holds (`srcBlobs`). */
+  src?: string;
   direct?: Direct;
   react: Record<string, any> = {};
   constructor(readonly id: number, readonly type: string) {}
@@ -80,22 +81,68 @@ async function fetchSrc(src: string): Promise<Response> {
   return response;
 }
 
+type SrcBlob = { id: number | null; holders: Set<Instance>; freeing?: ReturnType<typeof setTimeout> };
+/** `<image src>` bytes the engine holds, one blob per source shared by the elements showing it, so an element remounted
+ * with the same source reuses it; it is freed `SRC_BLOB_GRACE_MS` after the last element lets go, which outlasts a hot
+ * swap's remount of data-loaded content. */
+const srcBlobs = new Map<string, SrcBlob>();
+const SRC_BLOB_GRACE_MS = 5000;
+
 /** `<image src>` that the engine can't read itself (data:, http(s), object URLs and app-scheme URLs like stella-media:) goes over as a blob. */
 function resolveSrc(inst: Instance, src: string): string {
-  if (!BYTES_SRC.test(src) && !APP_SCHEME_SRC.test(src)) return src;
-  if (inst.blob?.src === src) return `blob:${inst.blob.id}`;
-  if (src.startsWith("data:")) {
-    inst.blob = { src, id: blob(bytesOf(src)) };
-    return `blob:${inst.blob.id}`;
+  if (!BYTES_SRC.test(src) && !APP_SCHEME_SRC.test(src)) {
+    dropSrc(inst);
+    return src;
   }
+  if (inst.src !== src) {
+    dropSrc(inst);
+    let entry = srcBlobs.get(src);
+    if (!entry) {
+      entry = { id: src.startsWith("data:") ? blob(bytesOf(src)) : null, holders: new Set() };
+      srcBlobs.set(src, entry);
+      if (entry.id === null) loadSrc(src, entry);
+    }
+    clearTimeout(entry.freeing);
+    entry.freeing = undefined;
+    entry.holders.add(inst);
+    inst.src = src;
+  }
+  const id = srcBlobs.get(src)?.id;
+  return id == null ? "" : `blob:${id}`;
+}
+
+function loadSrc(src: string, entry: SrcBlob) {
   void fetchSrc(src).then(async (r) => {
-    if (!r.ok || !instances.has(inst.id)) return;
-    inst.blob = { src, id: blob(new Uint8Array(await r.arrayBuffer())) };
-    inst.json = serialize(inst, inst.react);
-    ops.props(inst.id, inst.json);
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    const bytes = new Uint8Array(await r.arrayBuffer());
+    if (srcBlobs.get(src) !== entry) return;
+    entry.id = blob(bytes);
+    for (const inst of entry.holders) {
+      if (!instances.has(inst.id)) continue;
+      inst.json = serialize(inst, inst.react);
+      ops.props(inst.id, inst.json);
+    }
     flushFrame(true);
-  }).catch((err) => console.error("[ui] image fetch failed", src, err));
-  return "";
+  }).catch((err) => {
+    console.error("[ui] image fetch failed", src, err);
+    // A later render of these elements tries again.
+    if (srcBlobs.get(src) !== entry) return;
+    srcBlobs.delete(src);
+    for (const inst of entry.holders) inst.src = undefined;
+  });
+}
+
+function dropSrc(inst: Instance) {
+  const src = inst.src;
+  if (src === undefined) return;
+  inst.src = undefined;
+  const entry = srcBlobs.get(src);
+  if (!entry || !entry.holders.delete(inst) || entry.holders.size) return;
+  entry.freeing = setTimeout(() => {
+    if (srcBlobs.get(src) !== entry || entry.holders.size) return;
+    srcBlobs.delete(src);
+    if (entry.id !== null) freeBlob(entry.id);
+  }, SRC_BLOB_GRACE_MS);
 }
 
 function bytesOf(src: string): Uint8Array {
@@ -248,6 +295,7 @@ let currentPriority = DefaultEventPriority;
 
 function release(inst: Instance) {
   instances.delete(inst.id);
+  dropSrc(inst);
 }
 
 const config: any = {
@@ -306,7 +354,7 @@ const config: any = {
   hideTextInstance(inst: Instance) { ops.props(inst.id, JSON.stringify({ content: "" })); },
   unhideTextInstance(inst: Instance) { ops.props(inst.id, inst.json); },
   detachDeletedInstance(inst: Instance) {
-    instances.delete(inst.id);
+    release(inst);
   },
   getRootHostContext: () => ({}),
   getChildHostContext: (ctx: object) => ctx,

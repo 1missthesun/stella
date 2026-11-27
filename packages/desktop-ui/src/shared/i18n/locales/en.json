@@ -893,6 +893,68 @@
         "discard": "Discard"
       },
       "tagline": "Talk and draw to show Stella what you mean."
+    },
+    "welcomeDemos": {
+      "play": "Play this demo",
+      "replay": "Replay this demo",
+      "errands": {
+        "title": "The quick tour",
+        "tablist": "Capability demos",
+        "chapters": {
+          "errands": {
+            "word": "Errands",
+            "title": "Ask once. Consider it handled.",
+            "caption": "I find the right place, fill in the form, and put it on your calendar, the same way you would."
+          },
+          "shopping": {
+            "word": "Shopping",
+            "title": "I can buy things, with your OK.",
+            "caption": "I find it and get it to checkout. You confirm the total, and I place the order."
+          },
+          "work": {
+            "word": "Work",
+            "title": "Real files. Several jobs at once.",
+            "caption": "I work inside the real apps on this computer, and I can run more than one job at a time."
+          },
+          "build": {
+            "word": "Build",
+            "title": "Say it. I'll build it.",
+            "caption": "Apps and websites, made to order. Describe it in plain words and I'll build it, run it, and put it online."
+          },
+          "routines": {
+            "word": "Routines",
+            "title": "Ask once. It happens every day.",
+            "caption": "Schedule anything and I'll do it on time, even while you sleep."
+          }
+        }
+      },
+      "customize": {
+        "title": "I can change myself",
+        "body": "Missing a feature, or want something to work differently? Just ask. I'll rewrite my own code, let you try it, and you decide whether to keep it.",
+        "hint": "Changes stay on this computer.",
+        "steps": {
+          "ask": {
+            "title": "Ask",
+            "body": "Describe the change in plain words."
+          },
+          "preview": {
+            "title": "Preview",
+            "body": "A task builds it and opens a live preview."
+          },
+          "update": {
+            "title": "Update",
+            "body": "One click to apply it. Undo any time."
+          }
+        }
+      },
+      "memory": {
+        "title": "One conversation",
+        "titleChatbot": "You know this one",
+        "bodyChatbot": "A new chat every time, a sidebar full of old ones, and no memory of what you said last week.",
+        "titleStella": "With me it's one conversation",
+        "bodyStella": "No new chats, no threads. Everything you've ever told me is in the same place, so when you ask about last week I go and find it.",
+        "showStella": "Now ask me"
+      }
     }
   },
   "global": {
@@ -935,7 +997,7 @@
         "other": "Too many requests. Try again in {count} seconds."
       },
       "welcomeDescription": "Sign in with your email to start using Stella.",
-      "welcomeSub": "Use Google or your email to sign in. No password needed.",
+      "welcomeSub": "Use Stella on your phone and keep everything in sync across your devices.",
       "welcomeTitle": "Welcome to Stella"
     },
     "integrations": {
@@ -977,24 +1039,8 @@
       }
     },
     "localMode": {
-      "authNote": "Signing in adds Stella's models, the phone app, Drive, cloud tasks and sync across devices. Your chats stay on this computer until you choose.",
-      "banner": "Your chats stay on this computer. Sign in for Stella's models, the phone app, Drive, cloud tasks and sync.",
-      "choiceBodyBoth": "While you used Stella here without an account: {messages} and {notes}. Adding puts them into your account. Nothing there is replaced.",
-      "choiceBodyChat": "While you used Stella here without an account: {messages}. Adding puts them at the end of your chat. Nothing there is replaced.",
-      "choiceBodyMemory": "While you used Stella here without an account: {notes}. Adding copies them into your Memory. Nothing there is replaced.",
-      "choiceFailed": "Couldn't save that choice. Try again.",
-      "choiceTitle": "Add what you did without an account?",
-      "keep": "Keep them on this computer only",
-      "messages": {
-        "one": "1 message",
-        "other": "{count} messages"
-      },
+      "banner": "Your chats stay on this computer. Sign in to use Stella on your phone and keep everything in sync.",
       "needsAccount": "This runs in Stella's cloud, so it needs a Stella account.",
-      "notes": {
-        "one": "1 Memory note",
-        "other": "{count} Memory notes"
-      },
-      "sync": "Add to my chat",
       "syncFailed": "Couldn't add this chat to your account. It's still on this computer.",
       "synced": "This chat was added to your account."
     },
@@ -1770,43 +1816,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "Optional extras",
-        "lead": "None of these are required, but each one makes me more useful.",
-        "start": "Start chatting"
-      },
-      "gmail": {
-        "body": "Find emails, catch up on threads, and draft replies, just by asking.",
-        "connect": "Connect Gmail",
-        "connected": "Connected",
-        "connecting": "Waiting for Google…",
-        "error": "Couldn't connect Gmail. Try again, or skip for now.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Hi, I'm Stella. First, choose how I think: the Claude or ChatGPT plan you already have, your own key, or a Stella account."
-      },
-      "progress": "Setup progress",
-      "replies": {
-        "signinDone": "Done."
-      },
-      "send": "Send",
       "signin": {
         "body": "Any one of these is enough. You can add the others later.",
         "claudeCliMissing": "Install Claude Code first, then try again.",
@@ -1842,8 +1851,7 @@
         "settledNone": "No AI chosen yet",
         "settledNoneDesc": "Sign in or connect a plan any time to start chatting.",
         "fineOwnPlan": "ChatGPT and Claude Code use your own subscription with OpenAI or Anthropic. Change this any time in Settings."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "By using Stella, you agree to our {terms} and {privacy}.",
     "privacyPolicy": "Privacy Policy",
@@ -2149,7 +2157,17 @@
         "thisComputerInline": "this computer",
         "rowNotChosen": "Uses {email}, not {chosen}",
         "rowEnded": "Sign-in ended",
-        "rowEnding": "Sign-in ends {date}"
+        "rowEnding": "Sign-in ends {date}",
+        "automaticHint": "Uses whatever Claude Code is already signed in to on each computer",
+        "chooseNote": "The account you choose is used on all your computers and in the cloud.",
+        "inUseTitle": "In use now",
+        "missingChosen": "{email} isn't signed in here.",
+        "missingChosenFallback": "{email} isn't signed in here, so this uses its own login.",
+        "ownLoginNote": "This computer's own Claude Code login: {email}",
+        "reasonCloudLogin": "The cloud's login",
+        "reasonOtherLogin": "Added in Stella",
+        "reasonOwnLogin": "This computer's own Claude Code login",
+        "reasonSelected": "Chosen in Stella"
       },
       "claudeLogin": {
         "approve": "Approve on Anthropic's page that opened, and it finishes by itself.",
@@ -2420,11 +2438,6 @@
         "twinkle": "Twinkle"
       },
       "title": "Message sound"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "Run onboarding again. Your data stays.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3433,11 +3446,9 @@
     },
     "onboarding": {
       "link": "Have your own Stella server? Connect it",
-      "prose": "You're connected to {name}, signed in as its owner. Next, choose what I think with: the Claude or ChatGPT plan you already have, or your own API key.",
       "title": "Connected to {name}",
       "body": "You're signed in as its owner. Pick what Stella thinks with. Any one is enough.",
-      "bodyOptional": "You're signed in as its owner. This server has its own models, so this is optional: you can also use your Claude or ChatGPT plan, or an API key.",
-      "settled": "Connected to {name}"
+      "bodyOptional": "You're signed in as its owner. This server has its own models, so this is optional: you can also use your Claude or ChatGPT plan, or an API key."
     }
   },
   "contextMenu": {
@@ -3929,6 +3940,21 @@
     "phoneApp": {
       "title": "Stella is on your phone too",
       "detail": "Get the app to message Stella and check on your tasks when you're away from this computer."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Get Stella for Chrome",
+      "connectGmail": "Connect Gmail",
+      "gmailWaiting": "Waiting for Google…",
+      "gmailRetry": "Try Gmail again",
+      "watchErrands": "Watch it work",
+      "signIn": "Sign in",
+      "getPhoneApp": "Get the phone app",
+      "watchMemory": "See how",
+      "connectPlan": "Connect a plan",
+      "changeLook": "Change how I look",
+      "watchCustomize": "Watch it change"
     }
   }
 }

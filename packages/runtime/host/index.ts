@@ -105,7 +105,7 @@ import type {
   DispatchPayload,
   DispatchSummary,
 } from "@stella/contracts/turn-plane/placement";
-import type { SqliteDatabase } from "@stella/node-shared/storage/shared.js";
+import { SqliteConnection, type SqliteDatabase } from "@stella/node-shared/storage/shared.js";
 import type { CloudSchedules } from "./cloud-schedules.js";
 import type { RuntimeHostHandler } from "./client-protocol.js";
 import type {
@@ -266,7 +266,7 @@ export class StellaRuntimeHost {
   claudeCodeLogin: { signedIn: boolean; at: number; pending?: Promise<void> } = { signedIn: false, at: 0 };
   planLogins: { providers: string[]; at: number; pending?: Promise<void> } = { providers: [], at: 0 };
   pendingDestinationHandoffs = new Map<string, { canceled: boolean }>();
-  hostDatabase: SqliteDatabase | null = null;
+  hostDatabase: SqliteConnection | null = null;
   constructor(options: StellaRuntimeHostOptions) {
     this.options = options;
     for (const [name, call] of Object.entries(appServiceCalls)) {
@@ -833,6 +833,7 @@ export class StellaRuntimeHost {
             ...platformCapabilities,
             "engine-sign-ins",
             "email-page",
+            "chat-failover",
             ...(claudeCode ? (["claude-code"] as const) : []),
             ...(chatGpt ? (["chatgpt"] as const) : []),
             ...(antigravity ? (["antigravity"] as const) : []),
@@ -960,6 +961,10 @@ export class StellaRuntimeHost {
           return { status: "ok", finalText: "" };
         }
         const userAuthored = !handoff && !scheduled;
+        const failover =
+          dispatch.requestedTargetMode === "device" &&
+          Boolean(dispatch.requestedExecutorDeviceId) &&
+          dispatch.requestedExecutorDeviceId !== this.deviceIdentity?.deviceId;
         const result = await this.requestWorker<RuntimeAutomationTurnResult>(
           METHOD_NAMES.INTERNAL_WORKER_RUN_AUTOMATION,
           {
@@ -969,6 +974,7 @@ export class StellaRuntimeHost {
             userAuthoredPrompt: userAuthored,
             ...(scheduled ? { scheduled: true } : {}),
             ...(handoff ? { handoff: true } : {}),
+            ...(failover ? { failover: true } : {}),
             rejectIfBusy: false,
             executionPlacementRunId: placementLocalChatRunId(
               dispatch.dispatchId,
@@ -1751,6 +1757,20 @@ export class StellaRuntimeHost {
         );
         return;
       }
+      if (here.mode === "device") {
+        const tookOver = await this.requestWorker(
+          METHOD_NAMES.INTERNAL_WORKER_PI_CHAT,
+          { ...request, send: { ...send, followSender: true, failover: true } },
+          { ensureWorker: true, recordActivity: true },
+        ).then(
+          () => true,
+          (error: unknown) => {
+            console.warn("[pi-chat] This computer could not take over a send its holder did not take.", error);
+            return false;
+          },
+        );
+        if (tookOver) return;
+      }
       const moved = await this.startPlacedChat(
         {
           conversationId: request.conversationId,
@@ -2161,8 +2181,10 @@ export class StellaRuntimeHost {
     this.deviceIdentity = await this.options.hostHandlers.getDeviceIdentity();
     const dbStartedAt = performance.now();
     const HostDatabase = loadSqliteDatabaseCtorSync();
-    const hostDatabase = new HostDatabase(
-      getDesktopDatabasePath(this.options.initializeParams.stellaDataDirPath),
+    const hostDatabase = new SqliteConnection(
+      new HostDatabase(
+        getDesktopDatabasePath(this.options.initializeParams.stellaDataDirPath),
+      ),
     );
     const dbInit = initializeDesktopDatabase(hostDatabase);
     getFileLogger()?.process("host.services-init.timing", {

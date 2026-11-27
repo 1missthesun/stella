@@ -1,6 +1,6 @@
 import type { SqliteDatabase } from "./shared.js";
 
-export const SCHEMA_VERSION = 11;
+export const SCHEMA_VERSION = 12;
 
 export const CORE_SCHEMA_SQL = `
 CREATE TABLE IF NOT EXISTS meta (
@@ -69,13 +69,6 @@ CREATE TABLE IF NOT EXISTS entry_ref (
 );
 CREATE INDEX IF NOT EXISTS idx_entry_ref_target
   ON entry_ref(conversation_id, target_kind, target_key, entry_seq);
-`;
-
-export const SEARCH_TEXT_INDEX_NAME = "idx_entry_search_conv_created";
-export const SEARCH_TEXT_INDEX_SQL = `
-CREATE INDEX IF NOT EXISTS idx_entry_search_conv_created
-  ON entry(conversation_id, created_at, seq, role, id, search_text)
-  WHERE search_text IS NOT NULL;
 `;
 
 export const CLOUD_SCHEMA_SQL = `
@@ -299,6 +292,12 @@ const MIGRATIONS: Migration[] = [
     version: 11,
     apply: (db) => {
       db.exec(DROP_ENTRY_SEARCH_INDEX_SQL);
+    },
+  },
+  {
+    version: 12,
+    apply: (db) => {
+      db.exec("DROP INDEX IF EXISTS idx_entry_search_conv_created;");
     },
   },
 ];

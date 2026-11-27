@@ -286,6 +286,7 @@ export type MessageMetadata = {
   };
   voiceSession?: VoiceSessionSummaryMetadata;
   reminder?: { fireId: string; scheduleId: string; dueAt?: number };
+  welcome?: { version: number };
   scheduleNotice?: import("./schedule-notice.js").ScheduleNoticeCard;
 };
 

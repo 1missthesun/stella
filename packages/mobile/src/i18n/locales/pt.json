@@ -921,7 +921,17 @@
         "thisComputerInline": "este computador",
         "rowNotChosen": "Usa {email}, não {chosen}",
         "rowEnded": "Login expirado",
-        "rowEnding": "O login expira em {date}"
+        "rowEnding": "O login expira em {date}",
+        "automaticHint": "Usa a conta já conectada no Claude Code de cada computador",
+        "chooseNote": "A conta que você escolher é usada em todos os seus computadores e na nuvem.",
+        "inUseTitle": "Em uso agora",
+        "missingChosen": "{email} não está conectada aqui.",
+        "missingChosenFallback": "{email} não está conectada aqui, então é usado o login próprio.",
+        "ownLoginNote": "Login do Claude Code deste computador: {email}",
+        "reasonCloudLogin": "O login da nuvem",
+        "reasonOtherLogin": "Adicionado no Stella",
+        "reasonOwnLogin": "O login do Claude Code deste computador",
+        "reasonSelected": "Escolhida no Stella"
       },
       "claudeLogin": {
         "whereCloud": "Entrando no Claude Code na sua nuvem.",

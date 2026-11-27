@@ -491,21 +491,6 @@ body[data-display-expanding="true"] .shell-topbar-tablist {
   transition: opacity 220ms ease;
 }
 
-.full-body-chat-layer--hidden {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.full-body-home-overlay {
-  position: absolute;
-  inset: 0;
-  z-index: 10;
-}
-
-.full-body-home-overlay.full-body-main--home-leaving {
-  pointer-events: none;
-}
-
 .full-body-main:has(> .chat-viewport-region + .composer-wrap) {
   --chat-composer-overlap: 12px;
 }

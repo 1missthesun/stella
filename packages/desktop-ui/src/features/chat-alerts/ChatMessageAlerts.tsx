@@ -155,7 +155,7 @@ export function ChatMessageAlerts({
   const summary = useMemo(() => summarize(messages), [messages]);
   const loaded = conversationId !== null && !chat.conversation.isInitialLoading;
   const attentive =
-    windowAttention && isOnChatRoute && !chat.showHomeContent && chat.scroll.isNearBottom;
+    windowAttention && isOnChatRoute && chat.scroll.isNearBottom;
 
   const [seen, setSeen] = useState<Seen | null>(null);
 

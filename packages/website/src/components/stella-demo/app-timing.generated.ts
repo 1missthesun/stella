@@ -22,8 +22,6 @@ export const APP_TIMING = {
   activityLabelShimmerMs: 1900,
   /** INDICATOR_MARK_SIZE_PX in desktop-ui/src/app/chat/WorkingIndicator.tsx */
   indicatorMarkSize: 24,
-  /** HOME_LEAVE_MS in desktop-ui/src/app/chat/ChatColumn.tsx */
-  homeLeaveMs: 280,
   /** ROW_GAP in desktop-ui/src/app/chat/ChatTimeline.tsx */
   rowGap: 20,
   /** ASSISTANT_RUN_GAP in desktop-ui/src/app/chat/ChatTimeline.tsx */

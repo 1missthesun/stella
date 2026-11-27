@@ -155,21 +155,6 @@ export function StellaDemoPlayer({ steps, theme = "dark", label }: { steps: Demo
                 </div>
               </div>
 
-              <div className={`full-body-home-overlay full-body-main--home ${s.home}`} ref={(el) => void (parts.current.home = el ?? undefined)} aria-hidden="true" hidden>
-                <div className="home-content">
-                  <div className="home-stella-title" ref={(el) => void (parts.current.greeting = el ?? undefined)} suppressHydrationWarning>
-                    Good evening
-                  </div>
-                  <div className="composer-wrap">
-                    <ComposerView
-                      fieldRef={(el) => void (parts.current.homeField = el ?? undefined)}
-                      formRef={(el) => void (parts.current.homeForm = el ?? undefined)}
-                      submitRef={(el) => void (parts.current.homeSubmit = el ?? undefined)}
-                    />
-                  </div>
-                </div>
-              </div>
-
               {task ? (
                 <div
                   data-component="popover-content"

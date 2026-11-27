@@ -921,7 +921,17 @@
         "thisComputerInline": "cet ordinateur",
         "rowNotChosen": "Utilise {email}, pas {chosen}",
         "rowEnded": "Connexion expirée",
-        "rowEnding": "La connexion expire le {date}"
+        "rowEnding": "La connexion expire le {date}",
+        "automaticHint": "Utilise le compte déjà connecté à Claude Code sur chaque ordinateur",
+        "chooseNote": "Le compte que vous choisissez est utilisé sur tous vos ordinateurs et dans le cloud.",
+        "inUseTitle": "Utilisé actuellement",
+        "missingChosen": "{email} n’est pas connecté ici.",
+        "missingChosenFallback": "{email} n’est pas connecté ici, la connexion locale est donc utilisée.",
+        "ownLoginNote": "Connexion à Claude Code propre à cet ordinateur : {email}",
+        "reasonCloudLogin": "La connexion du cloud",
+        "reasonOtherLogin": "Ajouté dans Stella",
+        "reasonOwnLogin": "La connexion à Claude Code propre à cet ordinateur",
+        "reasonSelected": "Choisi dans Stella"
       },
       "claudeLogin": {
         "whereCloud": "Connexion à Claude Code dans votre cloud.",

@@ -112,6 +112,7 @@ export const EXECUTION_CAPABILITIES = [
   "antigravity",
   "engine-sign-ins",
   "email-page",
+  "chat-failover",
 ] as const;
 export type ExecutionCapability = (typeof EXECUTION_CAPABILITIES)[number];
 

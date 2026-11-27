@@ -3,7 +3,7 @@ import type {
   DispatchSummary,
   ExecutionKind,
 } from "@stella/contracts/turn-plane/placement";
-import type { SqliteDatabase } from "@stella/node-shared/storage/shared.js";
+import type { SqliteConnection } from "@stella/node-shared/storage/shared.js";
 
 type PlacementOutcome = "completed" | "failed" | "canceled";
 
@@ -98,7 +98,7 @@ const fromInboxRow = (row: InboxDbRow): ExecutionPlacementInboxRow => ({
 });
 
 export class ExecutionPlacementInbox {
-  constructor(private readonly database: SqliteDatabase) {
+  constructor(private readonly database: SqliteConnection) {
     this.database.exec(`
       CREATE TABLE IF NOT EXISTS execution_placement_runtime_state (
         id INTEGER PRIMARY KEY CHECK (id = 1),
@@ -140,7 +140,7 @@ export class ExecutionPlacementInbox {
     `);
     const inboxColumns = new Set(
       (
-        this.database
+        this.database.statements
           .prepare("PRAGMA table_info(execution_placement_inbox)")
           .all() as Array<{ name: string }>
       ).map((column) => column.name),
@@ -168,7 +168,7 @@ export class ExecutionPlacementInbox {
     ownerGeneration: string;
     now: number;
   }): { presenceSessionId: string; reused: boolean } {
-    const current = this.database
+    const current = this.database.statements
       .prepare(
         `SELECT owner_id, owner_generation, presence_session_id
          FROM execution_placement_runtime_state WHERE id = 1`,
@@ -183,7 +183,7 @@ export class ExecutionPlacementInbox {
     const presenceSessionId = `presence:${randomUUID()}`;
     this.database.exec("BEGIN IMMEDIATE;");
     try {
-      this.database
+      this.database.statements
         .prepare(
           `UPDATE execution_placement_inbox
            SET cancel_rpc_pending = 1, cancel_orphan_on_ack = 1,
@@ -195,7 +195,7 @@ export class ExecutionPlacementInbox {
            WHERE state IN ('claimed', 'accepted', 'running')`,
         )
         .run(args.now);
-      this.database
+      this.database.statements
         .prepare(
           `UPDATE execution_placement_inbox
            SET state = 'orphaned', updated_at = ?
@@ -203,7 +203,7 @@ export class ExecutionPlacementInbox {
              AND cancel_rpc_pending = 0`,
         )
         .run(args.now);
-      this.database
+      this.database.statements
         .prepare(
           `INSERT INTO execution_placement_runtime_state (
              id, owner_id, owner_generation, presence_session_id,
@@ -254,7 +254,7 @@ export class ExecutionPlacementInbox {
     }
     this.database.exec("BEGIN IMMEDIATE;");
     try {
-      this.database
+      this.database.statements
         .prepare(
           `INSERT INTO execution_placement_inbox (
              dispatch_id, owner_id, owner_generation, presence_session_id,
@@ -288,7 +288,7 @@ export class ExecutionPlacementInbox {
   }
 
   get(dispatchId: string): ExecutionPlacementInboxRow | null {
-    const row = this.database
+    const row = this.database.statements
       .prepare(`SELECT * FROM execution_placement_inbox WHERE dispatch_id = ?`)
       .get(dispatchId) as InboxDbRow | undefined;
     return row ? fromInboxRow(row) : null;
@@ -300,7 +300,7 @@ export class ExecutionPlacementInbox {
     presenceSessionId: string;
   }): ExecutionPlacementInboxRow[] {
     return (
-      this.database
+      this.database.statements
         .prepare(
           `SELECT * FROM execution_placement_inbox
            WHERE owner_id = ? AND owner_generation = ?
@@ -320,7 +320,7 @@ export class ExecutionPlacementInbox {
 
   listAllUnfinished(): ExecutionPlacementInboxRow[] {
     return (
-      this.database
+      this.database.statements
         .prepare(
           `SELECT * FROM execution_placement_inbox
            WHERE state IN (
@@ -334,7 +334,7 @@ export class ExecutionPlacementInbox {
 
   listCancellationPending(): ExecutionPlacementInboxRow[] {
     return (
-      this.database
+      this.database.statements
         .prepare(
           `SELECT * FROM execution_placement_inbox
            WHERE cancel_rpc_pending = 1
@@ -354,7 +354,7 @@ export class ExecutionPlacementInbox {
       now: number;
     },
   ) {
-    this.database
+    this.database.statements
       .prepare(
         `UPDATE execution_placement_inbox
          SET cancel_rpc_pending = 1,
@@ -380,7 +380,7 @@ export class ExecutionPlacementInbox {
   }
 
   acknowledgeCancellation(dispatchId: string, now: number) {
-    this.database
+    this.database.statements
       .prepare(
         `UPDATE execution_placement_inbox
          SET state = CASE
@@ -396,7 +396,7 @@ export class ExecutionPlacementInbox {
   }
 
   acknowledgeClaimRelease(dispatchId: string, now: number) {
-    this.database
+    this.database.statements
       .prepare(
         `UPDATE execution_placement_inbox
          SET state = 'orphaned', cancel_rpc_pending = 0,
@@ -407,7 +407,7 @@ export class ExecutionPlacementInbox {
   }
 
   markAccepted(dispatchId: string, dispatch: DispatchSummary, now: number) {
-    this.database
+    this.database.statements
       .prepare(
         `UPDATE execution_placement_inbox
          SET state = 'accepted', dispatch_json = ?, updated_at = ?
@@ -418,7 +418,7 @@ export class ExecutionPlacementInbox {
   }
 
   markRunning(dispatchId: string, now: number) {
-    this.database
+    this.database.statements
       .prepare(
         `UPDATE execution_placement_inbox
          SET state = 'running', started_at = COALESCE(started_at, ?),
@@ -439,7 +439,7 @@ export class ExecutionPlacementInbox {
       now: number;
     },
   ) {
-    this.database
+    this.database.statements
       .prepare(
         `UPDATE execution_placement_inbox
          SET state = 'terminal_pending', terminal_outcome = ?,
@@ -461,7 +461,7 @@ export class ExecutionPlacementInbox {
   }
 
   markTerminal(dispatchId: string, dispatch: DispatchSummary, now: number) {
-    this.database
+    this.database.statements
       .prepare(
         `UPDATE execution_placement_inbox
          SET state = 'terminal', dispatch_json = ?, cancel_rpc_pending = 0,
@@ -472,7 +472,7 @@ export class ExecutionPlacementInbox {
   }
 
   markOrphaned(dispatchId: string, now: number) {
-    this.database
+    this.database.statements
       .prepare(
         `UPDATE execution_placement_inbox
          SET state = 'orphaned', cancel_rpc_pending = 0,
@@ -483,7 +483,7 @@ export class ExecutionPlacementInbox {
   }
 
   pruneTerminal(before: number) {
-    this.database
+    this.database.statements
       .prepare(
         `DELETE FROM execution_placement_inbox
          WHERE state IN ('terminal', 'orphaned') AND updated_at < ?`,

@@ -181,6 +181,7 @@ const piLocalLog = (
                       streamStartedAtMs: message.timestamp,
                       ...(message.followedByToolCall ? { followedByToolCall: true } : {}),
                     },
+                    ...(message.welcome ? { welcome: message.welcome } : {}),
                   },
           },
           timestamp: message.timestamp,
@@ -1009,6 +1010,7 @@ export const piPlacedChat = async (
     context?: unknown;
     scheduled?: boolean;
     handoff?: boolean;
+    failover?: boolean;
   },
 ) => {
   const chats = await piChatsFor(session, hostBus);
@@ -1062,6 +1064,7 @@ export const piPlacedChat = async (
     visible: true,
     ...(run.scheduled || run.handoff ? {} : { steers: true }),
     placementRunId: run.placementRunId,
+    ...(run.failover ? { failover: true } : {}),
   });
 };
 
@@ -1151,5 +1154,6 @@ export const piChatRequest = async (
     ...(payload.locale ? { locale: payload.locale } : {}),
     ...(payload.timezone ? { timezone: payload.timezone } : {}),
     ...(request.send.followSender ? { followSender: true } : {}),
+    ...(request.send.followSender && request.send.failover ? { failover: true } : {}),
   });
 };

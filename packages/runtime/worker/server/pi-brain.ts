@@ -28,8 +28,11 @@ export const brainFor = (
   };
   return {
     read: () => call(),
-    set: async (host) => {
-      const record = await call({ method: "POST", body: JSON.stringify(host) });
+    set: async (host, options) => {
+      const record = await call({
+        method: "POST",
+        body: JSON.stringify(options?.failover ? { ...host, failover: true } : host),
+      });
       if (!record) throw new Error("The cloud did not record where Stella runs.");
       return record;
     },

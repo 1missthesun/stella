@@ -25,6 +25,15 @@ thread_local! {
     static KEYS: RefCell<HashMap<u32, (u32, String)>> = RefCell::new(HashMap::new());
     /// Fields hidden because something Rune draws covers them (a page, a drawer, a dialog).
     static COVERED: RefCell<std::collections::HashSet<u32>> = RefCell::new(Default::default());
+    /// Fields whose rect changed since the last cover check: a pick reads the last presented
+    /// frame, where a field that just moved wasn't yet, so they wait a frame.
+    static MOVED: RefCell<std::collections::HashSet<u32>> = RefCell::new(Default::default());
+    /// Each field's top-level layer (the window root's child it's drawn in) as a pick last found
+    /// it. Only another layer covers a field (a page, a drawer, a dialog, the launch splash):
+    /// within its own layer a pick can land on its parent while it grows or moves.
+    static PATHS: RefCell<HashMap<u32, String>> = RefCell::new(HashMap::new());
+    /// Consecutive cover checks that found each field covered; it hides at two.
+    static VOTES: RefCell<HashMap<u32, u8>> = RefCell::new(HashMap::new());
     /// Frames left to re-check covers after a commit, since a pick reads the last presented frame.
     static RECHECK: std::cell::Cell<u8> = const { std::cell::Cell::new(0) };
 }
@@ -135,8 +144,11 @@ pub fn place(window: u32, n: u32, key: &str, r: [f32; 4]) {
         let old = m.insert(n, r);
         old.is_none_or(|o| o.iter().zip(r.iter()).any(|(a, b)| (a - b).abs() > 0.01))
     });
-    if moved && !COVERED.with(|c| c.borrow().contains(&n)) {
-        send(json!({ "t": "place", "n": n, "window": window, "rect": r }));
+    if moved {
+        MOVED.with(|m| m.borrow_mut().insert(n));
+        if !COVERED.with(|c| c.borrow().contains(&n)) {
+            send(json!({ "t": "place", "n": n, "window": window, "rect": r }));
+        }
     }
     note_commit();
 }
@@ -168,9 +180,13 @@ pub fn check_covers<S: 'static>(tx: &mut rune::Tx) {
     }
     RECHECK.with(|c| c.set(left - 1));
     tx.wake_after(std::time::Duration::from_millis(16));
+    let moved: std::collections::HashSet<u32> = MOVED.with(|m| std::mem::take(&mut *m.borrow_mut()));
+    if !moved.is_empty() {
+        RECHECK.with(|c| c.set(c.get().max(2)));
+    }
     let fields: Vec<(u32, u32, String, [f32; 4])> = KEYS.with(|k| {
         let k = k.borrow();
-        RECTS.with(|r| r.borrow().iter().filter_map(|(n, rect)| k.get(n).map(|(w, key)| (*n, *w, key.clone(), *rect))).collect())
+        RECTS.with(|r| r.borrow().iter().filter(|(n, _)| !moved.contains(n)).filter_map(|(n, rect)| k.get(n).map(|(w, key)| (*n, *w, key.clone(), *rect))).collect())
     });
     for (n, window, key, r) in fields {
         tx.element_at(r[0] + r[2] / 2.0, r[1] + r[3] / 2.0, move |_s: &mut S, picked: Option<rune::Picked>, _tx: &mut rune::Tx| {
@@ -180,10 +196,31 @@ pub fn check_covers<S: 'static>(tx: &mut rune::Tx) {
                 RECHECK.with(|c| c.set(c.get().max(2)));
                 return;
             }
-            let covered = !picked.is_some_and(|p| picked_is(&p, &key));
+            let own = picked.as_ref().is_some_and(|p| picked_is(p, &key));
+            let layer = |p: &rune::Picked| p.path().split('/').nth(1).unwrap_or("").to_owned();
+            if let Some(p) = picked.as_ref().filter(|_| own) {
+                PATHS.with(|m| m.borrow_mut().insert(n, layer(p)));
+            }
+            let same_layer = picked.as_ref().is_some_and(|p| PATHS.with(|m| m.borrow().get(&n).is_some_and(|l| *l == layer(p))));
+            let hit = !own && !same_layer;
+            let votes = VOTES.with(|v| {
+                let mut v = v.borrow_mut();
+                let e = v.entry(n).or_insert(0);
+                *e = if hit { e.saturating_add(1) } else { 0 };
+                *e
+            });
+            let was_covered = COVERED.with(|c| c.borrow().contains(&n));
+            if hit && votes < 2 && !was_covered {
+                RECHECK.with(|c| c.set(c.get().max(1)));
+                return;
+            }
+            let covered = hit;
             let was = COVERED.with(|c| if covered { !c.borrow_mut().insert(n) } else { c.borrow_mut().remove(&n) });
             if covered == was {
                 return;
+            }
+            if std::env::var_os("STELLA_DEBUG_COVERS").is_some() {
+                eprintln!("stella-engine: field {n} ({key}) covered={covered} by {:?}", picked.as_ref().map(|p| (p.key().map(str::to_owned), p.path().to_owned())));
             }
             if covered {
                 send(json!({ "t": "hideField", "n": n }));
@@ -201,6 +238,9 @@ pub fn forget(n: u32) {
     HEIGHTS.with(|h| h.borrow_mut().remove(&n));
     KEYS.with(|k| k.borrow_mut().remove(&n));
     COVERED.with(|c| c.borrow_mut().remove(&n));
+    VOTES.with(|v| v.borrow_mut().remove(&n));
+    PATHS.with(|m| m.borrow_mut().remove(&n));
+    MOVED.with(|m| m.borrow_mut().remove(&n));
     if had {
         send(json!({ "t": "fieldGone", "n": n }));
     }

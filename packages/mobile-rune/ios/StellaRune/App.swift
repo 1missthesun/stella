@@ -97,6 +97,7 @@ final class App {
 
   /// Commands from TS (through the engine's `native` commands or `__native.post`).
   func command(_ m: [String: Any]) {
+    if Pickers.shared.handle(m) { return }
     let cmd = (m["cmd"] as? String) ?? (m["t"] as? String) ?? ""
     switch cmd {
     case "clipboard.writeText", "clipboard.writeHTML":

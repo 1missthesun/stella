@@ -56,6 +56,13 @@ pub fn route(v: Value) {
             crate::native::send(m);
             reply(rid, Ok(Value::Null));
         }
+        // What only the app can answer (its pickers, the clipboard's contents): the app replies
+        // to the rid itself, straight to TS (`{t:"reply", rid, ok, value}`).
+        "dialog.openFile" | "clipboard.readText" => {
+            let mut m = v.clone();
+            m["t"] = json!("cmd");
+            crate::native::send(m);
+        }
         "quit" | "menu.setApplicationMenu" | "tray.create" | "tray.setMenu" | "tray.setTooltip" | "tray.setIcon" | "tray.destroy" | "shortcut.register" | "shortcut.unregister" | "shortcut.unregisterAll" | "app.setAppUserModelId" => {
             reply(rid, Ok(Value::Null))
         }

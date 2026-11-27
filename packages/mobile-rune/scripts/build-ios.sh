@@ -47,7 +47,7 @@ xcrun --sdk "$sdk" swiftc -O "${swift_defines[@]}" -target "$swift_target" -sdk 
   -Xlinker -dead_strip \
   -framework UIKit -framework Metal -framework QuartzCore -framework JavaScriptCore -framework CoreText \
   -framework CoreGraphics -framework CoreVideo -framework CoreMedia -framework AVFoundation -framework IOSurface \
-  -framework Security -framework SafariServices -framework UserNotifications -framework AudioToolbox \
+  -framework Security -framework SafariServices -framework PhotosUI -framework Photos -framework UniformTypeIdentifiers -framework UserNotifications -framework AudioToolbox \
   -framework CoreFoundation -framework Foundation -framework SystemConfiguration -lc++ -liconv \
   -o "$app/StellaRune"
 cp "$here/ios/StellaRune/Info.plist" "$app/Info.plist"

@@ -92,13 +92,13 @@ export function NewTabMenu({ open, onOpenChange, anchorFill, emailDot, dot }: { 
         noWindowDrag
         w={26}
         h={26}
-        radius={7}
+        radius={13}
         center
         shrink={false}
         fill={open ? anchorFill.newOpen : undefined}
         hover={open ? anchorFill.newOpen : anchorFill.newHover}
         hoverGroup
-        focusRing={{ width: 2, offset: 0, color: t.c.ring, radius: 7 }}
+        focusRing={{ width: 2, offset: 0, color: t.c.ring, radius: 13 }}
         onPress={() => onOpenChange(!open)}
       >
         <box>

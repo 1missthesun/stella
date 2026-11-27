@@ -81,6 +81,12 @@ function StageEdge({ fill }: { fill: string }) {
   return <box absolute={{ left, top: -1 }} w={right - left} h={1} fill={fill} inert />;
 }
 
+/** The window behind a shown stage, up to its top, so the chat running under the glass top bar doesn't show around it. */
+function StageBackdrop({ visible, geo }: { visible: boolean; geo: Geometry }) {
+  const t = useTokens();
+  return <box absolute={{ left: 0, top: 0, right: 0, bottom: stageBottom(geo) }} fill={t.c.background} opacity={visible ? 1 : 0} motion={{ dur: visible ? 0.16 : 0.12 }} inert />;
+}
+
 const useDelayedHidden = (visible: boolean, ms: number) => {
   const [hidden, setHidden] = useState(!visible);
   useEffect(() => {
@@ -105,26 +111,29 @@ function TabStage({ visible }: { visible: boolean }) {
   const [opened, setOpened] = useState(visible);
   if ((visible || tabs.length > 0) && !opened) setOpened(true);
   return (
-    <col
-      id="workspace-stage"
-      absolute={stageInsets(geo)}
-      fill={t.c.background}
-      border={l.edge}
-      radius={STAGE_RADIUS}
-      pad={1}
-      opacity={visible ? 1 : 0}
-      motion={{ dur: visible ? 0.16 : 0.12 }}
-      hidden={hidden}
-      inert={!visible}
-      label={visible ? undefined : ""}
-    >
-      <col id="workspace-stage-body" grow={1} minH={0} clip={STAGE_RADIUS - 1}>
-        <RetainedSurface active={visible} grow={1}>
-          {opened ? <SidebarSectionBody /> : null}
-        </RetainedSurface>
+    <>
+      {hidden ? null : <StageBackdrop visible={visible} geo={geo} />}
+      <col
+        id="workspace-stage"
+        absolute={stageInsets(geo)}
+        fill={t.c.background}
+        border={l.edge}
+        radius={STAGE_RADIUS}
+        pad={1}
+        opacity={visible ? 1 : 0}
+        motion={{ dur: visible ? 0.16 : 0.12 }}
+        hidden={hidden}
+        inert={!visible}
+        label={visible ? undefined : ""}
+      >
+        <col id="workspace-stage-body" grow={1} minH={0} clip={STAGE_RADIUS - 1}>
+          <RetainedSurface active={visible} grow={1}>
+            {opened ? <SidebarSectionBody /> : null}
+          </RetainedSurface>
+        </col>
+        <StageEdge fill={t.c.background} />
       </col>
-      <StageEdge fill={t.c.background} />
-    </col>
+    </>
   );
 }
 
@@ -646,38 +655,41 @@ function DockedViewer({ item: docked, carried, bodies, hiddenForExclusiveTab }: 
       : { absolute: { left: shown.x, top: shown.y }, w: shown.width, h: shown.height };
 
   return (
-    <col
-      id="file-viewer-docked"
-      key={item ? "open" : "closed"}
-      role="dialog"
-      label={item?.title}
-      {...frame}
-      fill={t.c.background}
-      border={l.edge}
-      pad={1}
-      radius={STAGE_RADIUS}
-      clip={STAGE_RADIUS}
-      hidden={hidden}
-      inert={hidden}
-      enter={item ? { opacity: 0, y: 8, scale: 0.985, dur: 0.18 } : undefined}
-      motion={{ dur: 0.26 }}
-      instant={Boolean(held || live)}
-      onContextMenu={item ? (at) => itemMenu(item.id, at) : undefined}
-    >
-      {item ? (
-        <ViewerHeader
-          item={item}
-          placement={mode}
-          width={width}
-          onDrag={onHeaderDrag}
-          onDetach={detachable ? () => void popOutViewer(item.id, floatRect) : null}
-          onClose={() => fileViewer.close()}
-        />
-      ) : null}
-      <ViewerMain item={item} bodies={bodies} surface={DOCKED} wide={width - 2 >= WIDE_VIEWER} idBase="file-viewer-docked" />
-      {!stage ? RESIZE_EDGES.map((edge) => <box key={edge} id={`file-viewer-resize-${edge}`} {...edgeBox(edge)} cursor={edge === "n" || edge === "s" ? "nsResize" : edge === "e" || edge === "w" ? "ewResize" : edge === "ne" || edge === "sw" ? "neswResize" : "nwseResize"} onDrag={onResize(edge)} />) : null}
-      {stage ? <StageEdge fill={t.c.background} /> : null}
-    </col>
+    <>
+      {stage && item && !hidden ? <StageBackdrop visible geo={geo} /> : null}
+      <col
+        id="file-viewer-docked"
+        key={item ? "open" : "closed"}
+        role="dialog"
+        label={item?.title}
+        {...frame}
+        fill={t.c.background}
+        border={l.edge}
+        pad={1}
+        radius={STAGE_RADIUS}
+        clip={STAGE_RADIUS}
+        hidden={hidden}
+        inert={hidden}
+        enter={item ? { opacity: 0, y: 8, scale: 0.985, dur: 0.18 } : undefined}
+        motion={{ dur: 0.26 }}
+        instant={Boolean(held || live)}
+        onContextMenu={item ? (at) => itemMenu(item.id, at) : undefined}
+      >
+        {item ? (
+          <ViewerHeader
+            item={item}
+            placement={mode}
+            width={width}
+            onDrag={onHeaderDrag}
+            onDetach={detachable ? () => void popOutViewer(item.id, floatRect) : null}
+            onClose={() => fileViewer.close()}
+          />
+        ) : null}
+        <ViewerMain item={item} bodies={bodies} surface={DOCKED} wide={width - 2 >= WIDE_VIEWER} idBase="file-viewer-docked" />
+        {!stage ? RESIZE_EDGES.map((edge) => <box key={edge} id={`file-viewer-resize-${edge}`} {...edgeBox(edge)} cursor={edge === "n" || edge === "s" ? "nsResize" : edge === "e" || edge === "w" ? "ewResize" : edge === "ne" || edge === "sw" ? "neswResize" : "nwseResize"} onDrag={onResize(edge)} />) : null}
+        {stage ? <StageEdge fill={t.c.background} /> : null}
+      </col>
+    </>
   );
 }
 
@@ -830,15 +842,15 @@ function Viewers({ hiddenForExclusiveTab }: { hiddenForExclusiveTab: boolean }) 
 
   return (
     <>
-      {hasDocked ? <DockedViewer item={item} carried={carried} bodies={bodies} hiddenForExclusiveTab={hiddenForExclusiveTab} /> : null}
-      {detached.map(({ name, fileId: id }) => {
-        const shown = itemOf(id);
-        return shown && detachedWindows.has(name) ? (
-          <ViewerSurfaceContext key={name} value={name}>
-            <DetachedViewerFrame name={name} item={shown} bodies={bodies} />
-          </ViewerSurfaceContext>
-        ) : null;
-      })}
+        {hasDocked ? <DockedViewer item={item} carried={carried} bodies={bodies} hiddenForExclusiveTab={hiddenForExclusiveTab} /> : null}
+        {detached.map(({ name, fileId: id }) => {
+          const shown = itemOf(id);
+          return shown && detachedWindows.has(name) ? (
+            <ViewerSurfaceContext key={name} value={name}>
+              <DetachedViewerFrame name={name} item={shown} bodies={bodies} />
+            </ViewerSurfaceContext>
+          ) : null;
+        })}
     </>
   );
 }

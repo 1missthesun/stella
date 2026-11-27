@@ -18,7 +18,7 @@ const COLUMN_GAP = 8;
 const REACH_GAP = 12;
 const MARK_TRIGGER = 22 + 12;
 const CAPSULE_H = 32;
-const CAPSULE_PAD = 4;
+const CAPSULE_PAD = 3;
 
 /** `grid-template-columns: minmax(0,1fr) minmax(40px, min(30rem, max(40px, 40vw - 200px))) minmax(max-content,1fr)`. */
 function columns(width: number, rightContent: number) {
@@ -54,7 +54,7 @@ export const ShellTopBarFull = memo(function ShellTopBarFull({ onSignIn }: { onS
       onLayout={(r) => setWidth((w) => (Math.abs(w - r.w) < 0.5 ? w : r.w))}
     >
       <row id="shell-topbar-full-left" w={left + reach} mr={-reach} raise={1} h="full" align="center" gap={8} pl={padLeft} pr={12} minW={0} windowDrag>
-        <row h={CAPSULE_H} radius={CAPSULE_H / 2} px={CAPSULE_PAD} align="center" minW={0} fx={glass} windowDrag>
+        <row h={CAPSULE_H} radius={CAPSULE_H / 2} px={CAPSULE_PAD} align="center" minW={0} shrink fx={glass} windowDrag>
           <ShellTopBarTabs room={left + reach - padLeft - 12 - CAPSULE_PAD * 2} />
         </row>
       </row>

@@ -1321,7 +1321,7 @@
     "forgetBody": "このデバイスはそのコンピュータに接続しなくなります。チャットはそのコンピュータに残ります。",
     "computerChat": "{name} の Stella",
     "enter": {
-      "label": "ペアリングコード",
+      "label": "コード",
       "connect": "接続",
       "connecting": "接続中…"
     },

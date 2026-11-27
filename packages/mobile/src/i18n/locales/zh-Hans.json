@@ -1321,7 +1321,7 @@
     "forgetBody": "此设备将不再连接到它。聊天记录仍保留在那台电脑上。",
     "computerChat": "{name} 上的 Stella",
     "enter": {
-      "label": "配对代码",
+      "label": "代码",
       "connect": "连接",
       "connecting": "正在连接…"
     },

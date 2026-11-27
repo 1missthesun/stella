@@ -1384,7 +1384,7 @@
     "forgetBody": "Toto zařízení se k němu přestane připojovat. Chaty zůstanou na tom počítači.",
     "computerChat": "Stella na {name}",
     "enter": {
-      "label": "Párovací kód",
+      "label": "Kód",
       "connect": "Připojit",
       "connecting": "Připojování…"
     },

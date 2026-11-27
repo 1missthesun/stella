@@ -1321,7 +1321,7 @@
     "forgetBody": "Perangkat ini berhenti terhubung ke sana. Chat tetap ada di komputer itu.",
     "computerChat": "Stella di {name}",
     "enter": {
-      "label": "Kode pemasangan",
+      "label": "Kode",
       "connect": "Hubungkan",
       "connecting": "Menghubungkan…"
     },

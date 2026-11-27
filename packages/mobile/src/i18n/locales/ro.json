@@ -1363,7 +1363,7 @@
     "forgetBody": "Acest dispozitiv nu se mai conectează la el. Conversațiile rămân pe acel computer.",
     "computerChat": "Stella de pe {name}",
     "enter": {
-      "label": "Cod de asociere",
+      "label": "Cod",
       "connect": "Conectează",
       "connecting": "Se conectează…"
     },

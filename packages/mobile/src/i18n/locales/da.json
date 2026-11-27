@@ -1342,7 +1342,7 @@
     "forgetBody": "Denne enhed holder op med at forbinde til den. Chattene bliver på den computer.",
     "computerChat": "Stella på {name}",
     "enter": {
-      "label": "Parringskode",
+      "label": "Kode",
       "connect": "Forbind",
       "connecting": "Forbinder…"
     },

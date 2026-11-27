@@ -1342,7 +1342,7 @@
     "forgetBody": "Den här enheten slutar ansluta till den. Chattarna finns kvar på den datorn.",
     "computerChat": "Stella på {name}",
     "enter": {
-      "label": "Parkopplingskod",
+      "label": "Kod",
       "connect": "Anslut",
       "connecting": "Ansluter…"
     },

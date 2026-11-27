@@ -1342,7 +1342,7 @@
     "forgetBody": "Denne enheten slutter å koble til den. Chattene blir værende på den datamaskinen.",
     "computerChat": "Stella på {name}",
     "enter": {
-      "label": "Paringskode",
+      "label": "Kode",
       "connect": "Koble til",
       "connecting": "Kobler til …"
     },

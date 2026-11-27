@@ -1363,7 +1363,7 @@
     "forgetBody": "Este dispositivo deixa de se conectar a ele. As conversas continuam naquele computador.",
     "computerChat": "Stella de {name}",
     "enter": {
-      "label": "Código de pareamento",
+      "label": "Código",
       "connect": "Conectar",
       "connecting": "Conectando…"
     },

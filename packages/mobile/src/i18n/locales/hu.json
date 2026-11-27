@@ -1342,7 +1342,7 @@
     "forgetBody": "Ez az eszköz többé nem csatlakozik hozzá. A csevegések azon a számítógépen maradnak.",
     "computerChat": "Stella itt: {name}",
     "enter": {
-      "label": "Párosítási kód",
+      "label": "Kód",
       "connect": "Csatlakozás",
       "connecting": "Csatlakozás…"
     },

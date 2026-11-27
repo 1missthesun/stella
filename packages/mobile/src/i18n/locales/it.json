@@ -1363,7 +1363,7 @@
     "forgetBody": "Questo dispositivo smette di collegarsi. Le chat restano su quel computer.",
     "computerChat": "Stella su {name}",
     "enter": {
-      "label": "Codice di abbinamento",
+      "label": "Codice",
       "connect": "Collega",
       "connecting": "Collegamento…"
     },

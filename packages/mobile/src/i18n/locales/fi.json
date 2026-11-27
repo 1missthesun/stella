@@ -1342,7 +1342,7 @@
     "forgetBody": "Tämä laite lakkaa yhdistämästä siihen. Keskustelut jäävät sille tietokoneelle.",
     "computerChat": "Stella: {name}",
     "enter": {
-      "label": "Pariliitoskoodi",
+      "label": "Koodi",
       "connect": "Yhdistä",
       "connecting": "Yhdistetään…"
     },

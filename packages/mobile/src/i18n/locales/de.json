@@ -1342,7 +1342,7 @@
     "forgetBody": "Dieses Gerät verbindet sich nicht mehr damit. Die Chats bleiben auf diesem Computer.",
     "computerChat": "Stella auf {name}",
     "enter": {
-      "label": "Kopplungscode",
+      "label": "Code",
       "connect": "Verbinden",
       "connecting": "Wird verbunden…"
     },

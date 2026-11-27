@@ -1384,7 +1384,7 @@
     "forgetBody": "To urządzenie przestanie się z nim łączyć. Czaty zostaną na tamtym komputerze.",
     "computerChat": "Stella na {name}",
     "enter": {
-      "label": "Kod parowania",
+      "label": "Kod",
       "connect": "Połącz",
       "connecting": "Łączenie…"
     },

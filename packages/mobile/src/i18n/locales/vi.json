@@ -1321,7 +1321,7 @@
     "forgetBody": "Thiết bị này sẽ ngừng kết nối với máy đó. Các cuộc trò chuyện vẫn ở trên máy tính đó.",
     "computerChat": "Stella trên {name}",
     "enter": {
-      "label": "Mã ghép đôi",
+      "label": "Mã",
       "connect": "Kết nối",
       "connecting": "Đang kết nối…"
     },

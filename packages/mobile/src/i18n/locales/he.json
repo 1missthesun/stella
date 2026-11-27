@@ -1363,7 +1363,7 @@
     "forgetBody": "המכשיר הזה יפסיק להתחבר אליו. הצ׳אטים נשארים במחשב ההוא.",
     "computerChat": "Stella ב-{name}",
     "enter": {
-      "label": "קוד צימוד",
+      "label": "קוד",
       "connect": "התחברות",
       "connecting": "מתחבר…"
     },

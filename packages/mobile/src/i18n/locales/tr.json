@@ -1342,7 +1342,7 @@
     "forgetBody": "Bu cihaz artık ona bağlanmaz. Sohbetler o bilgisayarda kalır.",
     "computerChat": "{name} üzerindeki Stella",
     "enter": {
-      "label": "Eşleme kodu",
+      "label": "Kod",
       "connect": "Bağlan",
       "connecting": "Bağlanıyor…"
     },

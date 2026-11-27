@@ -1321,7 +1321,7 @@
     "forgetBody": "이 기기는 더 이상 그 컴퓨터에 연결하지 않습니다. 채팅은 그 컴퓨터에 남아 있습니다.",
     "computerChat": "{name}의 Stella",
     "enter": {
-      "label": "페어링 코드",
+      "label": "코드",
       "connect": "연결",
       "connecting": "연결 중…"
     },

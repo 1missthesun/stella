@@ -1363,7 +1363,7 @@
     "forgetBody": "Cet appareil ne s’y connectera plus. Ses conversations restent sur cet ordinateur.",
     "computerChat": "Stella sur {name}",
     "enter": {
-      "label": "Code d’association",
+      "label": "Code",
       "connect": "Connecter",
       "connecting": "Connexion…"
     },

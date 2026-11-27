@@ -46,7 +46,9 @@ export function HostWindow({ window: w, chrome, children }: { window: WindowSnap
     stella.host?.mounted(w.engineId);
     return () => stella.host?.unmounted(w.engineId);
   }, [w.engineId]);
-  const b = w.bounds;
+  // Bounds only open the window: setBounds reaches the engine itself, and passing later bounds
+  // would echo the window's own resizes back after newer ones.
+  const [b] = useState(w.bounds);
   return (
     <window
       id={w.engineId}

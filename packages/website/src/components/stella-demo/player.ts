@@ -30,11 +30,6 @@ export type DemoParts = {
   dockField: HTMLElement;
   dockForm: HTMLElement;
   dockSubmit: HTMLElement;
-  home: HTMLElement;
-  greeting: HTMLElement;
-  homeField: HTMLElement;
-  homeForm: HTMLElement;
-  homeSubmit: HTMLElement;
   menu?: HTMLElement;
   taskRow?: HTMLElement;
   taskLabel?: HTMLElement;
@@ -52,15 +47,6 @@ export type DemoPlayer = {
 };
 
 type Status = "idle" | "playing" | "paused" | "done";
-
-export const greetingFor = (date: Date) => {
-  const hour = date.getHours();
-  if (hour < 5) return "Good night";
-  if (hour < 12) return "Good morning";
-  if (hour < 17) return "Good afternoon";
-  if (hour < 21) return "Good evening";
-  return "Good night";
-};
 
 const SWAP_MS = 240;
 const SWAP_EASE = "cubic-bezier(0.22, 1, 0.36, 1)";
@@ -439,12 +425,7 @@ export function playDemo(steps: DemoStep[], parts: DemoParts, onStatus: (status:
     const now = new Date();
     p.divider.textContent = fmtTime(now);
     (p.divider.parentElement as HTMLElement).hidden = true;
-    p.greeting.textContent = greetingFor(now);
-    p.home.hidden = false;
-    p.home.classList.remove("full-body-main--home-leaving");
-    p.chatLayer.classList.add("full-body-chat-layer--hidden");
     setIndicator("vacated");
-    setField(p.homeField, p.homeForm, p.homeSubmit, "", false);
     setField(p.dockField, p.dockForm, p.dockSubmit, "", false);
     p.topLabel.hidden = true;
     p.topLabel.innerHTML = "";
@@ -473,10 +454,10 @@ export function playDemo(steps: DemoStep[], parts: DemoParts, onStatus: (status:
       return;
     }
     if ("you" in step) {
-      const home = firstSend;
-      const field = home ? p.homeField : p.dockField;
-      const form = home ? p.homeForm : p.dockForm;
-      const submit = home ? p.homeSubmit : p.dockSubmit;
+      const first = firstSend;
+      const field = p.dockField;
+      const form = p.dockForm;
+      const submit = p.dockSubmit;
       const text = step.you;
       const per = Math.max(PACE.typingMinCharMs, Math.min(PACE.typingMaxCharMs, PACE.typingTotalMs / Math.max(1, text.length)));
       let k = 0;
@@ -489,13 +470,8 @@ export function playDemo(steps: DemoStep[], parts: DemoParts, onStatus: (status:
       }
       t += PACE.holdBeforeSend;
       at(t, () => {
-        setField(field, form, submit, home ? text : "", false);
-        if (home) {
-          p.home.classList.add("full-body-main--home-leaving");
-          schedule(APP_TIMING.homeLeaveMs, () => (p.home.hidden = true));
-          p.chatLayer.classList.remove("full-body-chat-layer--hidden");
-          (p.divider.parentElement as HTMLElement).hidden = false;
-        }
+        setField(field, form, submit, "", false);
+        if (first) (p.divider.parentElement as HTMLElement).hidden = false;
         showRow(i);
         setIndicator("reserved");
       });

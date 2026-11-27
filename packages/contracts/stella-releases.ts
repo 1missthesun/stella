@@ -56,6 +56,22 @@ export const releaseDateLabel = (
 
 export const stellaReleases: readonly StellaRelease[] = [
   {
+    date: "2026-11-27",
+    title: "Start in the chat, with a much bigger Drive",
+    summary: "Stella now opens straight on your chat with a welcome message, files you send in a chat no longer need Drive space, and Drive holds up to 2 TB with no file limit.",
+    tags: ["Polish", "Fixes"],
+    highlights: [
+      "The first time you open Stella you land right in the chat. Stella's welcome message carries buttons for what it describes: connect Gmail or a plan you already pay for, get Stella for Chrome or the phone app, change how Stella looks, and watch the demos. The step-by-step setup is gone.",
+      "Files and screenshots you send in a chat no longer use your Drive, so they send even when the Drive is full or you're on Free.",
+      "Drive storage grows to 100 GB on Plus, 500 GB on Pro and 2 TB on Max (Free gets 2 GB), and there's no longer a limit on how many files it holds.",
+    ],
+    more: [
+      "An empty chat is just the chat, with the message box at the bottom, instead of a separate start screen.",
+      "Searching a long task's history is many times faster, and Stella's own database on your computer frees unused space so it stays small.",
+      { text: "The phone shows the same welcome message, with buttons you can reach with VoiceOver.", product: "Mobile" },
+    ],
+  },
+  {
     date: "2026-11-26",
     title: "Helpers no longer get stuck waiting",
     summary: "When a helper asks the task that started it a question, that task now hears it and answers, wherever each of them runs.",

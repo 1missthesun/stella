@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { Globe, LoaderCircle, LogIn, Mail, Palette, Play, Plug, Smartphone, type IconComponent } from "@/ui/icons";
 import {
   WELCOME_CLOSING,
   WELCOME_GREETING,
@@ -10,13 +11,48 @@ import { LegalDialog } from "@/global/legal/LegalDialog";
 import { ThemePicker } from "@/global/settings/ThemePicker";
 import { recordAnonymousCount } from "@/features/anonymous-counts/record-anonymous-count";
 import { useT } from "@/shared/i18n";
-import { useWelcomeActions } from "./use-welcome-actions";
+import { useWelcomeActions, type WelcomeAction } from "./use-welcome-actions";
 import { ChooseAiCard } from "./ChooseAiCard";
 import "./welcome.css";
 
 // Stella's first message. The words come from contracts so every client and
-// the model share them; each line carries buttons for what it describes, and
-// a button disappears once that thing is done.
+// the model share them; each point sits on its own row with buttons for what
+// it describes, and a button disappears once that thing is done.
+
+const ACTION_ICONS: Record<string, IconComponent> = {
+  extension: Globe,
+  gmail: Mail,
+  signin: LogIn,
+  phone: Smartphone,
+  plan: Plug,
+  theme: Palette,
+};
+
+function ActionButton({ action, item }: { action: WelcomeAction; item: string }) {
+  const Icon = action.busy ? LoaderCircle : action.demo ? Play : ACTION_ICONS[action.id];
+  const variant = action.primary ? " welcome-message__action--primary" : action.demo ? " welcome-message__action--demo" : "";
+  const button = (
+    <button
+      type="button"
+      className={`welcome-message__action${variant}`}
+      data-welcome-action={`${item}:${action.id}`}
+      disabled={action.busy}
+      onClick={action.run}
+    >
+      {Icon ? (
+        <Icon
+          className={action.busy ? "welcome-message__icon welcome-message__icon--busy" : "welcome-message__icon"}
+          size={action.demo ? 10 : 13}
+          strokeWidth={action.demo ? 2 : 1.8}
+          fill={action.demo && !action.busy ? "currentColor" : "none"}
+          aria-hidden
+        />
+      ) : null}
+      {action.label}
+    </button>
+  );
+  return action.theme ? <ThemePicker trigger={button} side="top" align="start" /> : button;
+}
 
 function LegalLine() {
   const t = useT();
@@ -68,43 +104,29 @@ export function WelcomeMessage() {
   return (
     <div className="welcome-message" data-testid="welcome-message">
       <ChooseAiDialog open={chooseAiOpen} onOpenChange={setChooseAiOpen} />
-      <div className="markdown">
-        <p>{WELCOME_GREETING}</p>
+      <div className="markdown welcome-message__body">
+        <p className="welcome-message__greeting">{WELCOME_GREETING}</p>
         <p>{WELCOME_LEAD}</p>
-        <ul>
+        <div className="welcome-message__points">
           {WELCOME_ITEMS.map((item) => {
             const actions = actionsFor(item.id);
             return (
-              <li key={item.id} data-welcome-item={item.id}>
-                <strong>{item.title}</strong> {item.body}
+              <div key={item.id} className="welcome-message__point" data-welcome-item={item.id}>
+                <p>
+                  <strong>{item.title}</strong> {item.body}
+                </p>
                 {actions.length > 0 ? (
-                  <span className="welcome-message__actions">
-                    {actions.map((action) => {
-                      const button = (
-                        <button
-                          key={action.id}
-                          type="button"
-                          className={`welcome-message__action${action.quiet ? "" : " welcome-message__action--primary"}`}
-                          data-welcome-action={`${item.id}:${action.id}`}
-                          disabled={action.busy}
-                          onClick={action.run}
-                        >
-                          {action.label}
-                        </button>
-                      );
-                      return action.theme ? (
-                        <ThemePicker key={action.id} trigger={button} side="top" align="start" />
-                      ) : (
-                        button
-                      );
-                    })}
-                  </span>
+                  <div className="welcome-message__actions">
+                    {actions.map((action) => (
+                      <ActionButton key={action.id} action={action} item={item.id} />
+                    ))}
+                  </div>
                 ) : null}
-              </li>
+              </div>
             );
           })}
-        </ul>
-        <p>{WELCOME_CLOSING}</p>
+        </div>
+        <p className="welcome-message__closing">{WELCOME_CLOSING}</p>
       </div>
       <LegalLine />
     </div>

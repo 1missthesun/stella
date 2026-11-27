@@ -70,6 +70,7 @@ import { acceptedUserMessageIds } from "@/features/chat/lib/accepted-user-messag
 import { noteChatHead } from "@stella/contracts/chat-head";
 import type { EventRecord } from "@stella/contracts/local-chat";
 import { isSilentAssistantChatEvent } from "@stella/contracts/chat-event-visibility";
+import { parseWelcomeMark } from "@stella/contracts/welcome-message";
 
 const composerOwner = viewAtom("composer.owner", "");
 const NO_NEWER_CLOUD_MESSAGES = () => false;
@@ -569,9 +570,31 @@ export function useFullShellChat({
     Boolean(activeConversationId) &&
     displayMessages.length > 0 &&
     isPlacingInitialScroll;
+  // A chat holding only Stella's welcome opens on its first line, not its
+  // end; the first message sent from there follows as usual.
+  const welcomeOnly =
+    displayMessages.length === 1 &&
+    Boolean(
+      parseWelcomeMark(
+        (displayMessages[0]?.payload?.metadata as { welcome?: unknown } | undefined)?.welcome,
+      ),
+    );
+  const welcomeOnlyRef = useRef(welcomeOnly);
+  welcomeOnlyRef.current = welcomeOnly;
+  useEffect(() => {
+    if (!welcomeOnly || isPlacingInitialScroll) return;
+    releaseFollow();
+    let frames = 0;
+    let frame = requestAnimationFrame(function toTop() {
+      void list.ref.current?.scrollToOffset({ offset: 0, animated: false });
+      frames += 1;
+      if (frames < 4) frame = requestAnimationFrame(toTop);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [activeConversationId, isPlacingInitialScroll, list.ref, releaseFollow, welcomeOnly]);
   const handleSend = useCallback(async () => {
     const shouldFollowSend =
-      getIsEffectivelyAtBottom() || getShouldFollowSend();
+      welcomeOnlyRef.current || getIsEffectivelyAtBottom() || getShouldFollowSend();
     const submittedConversationId = activeConversationId;
     const submittedMessage = composerMessageStore.getSnapshot();
     const submittedSelectedText = selectedText;

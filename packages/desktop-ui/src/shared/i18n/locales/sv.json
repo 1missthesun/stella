@@ -1040,22 +1040,7 @@
     },
     "localMode": {
       "banner": "Dina chattar stannar på den här datorn. Logga in för att använda Stella på mobilen och hålla allt synkat.",
-      "choiceBodyBoth": "Medan du använde Stella här utan konto: {messages} och {notes}. Om du lägger till dem hamnar de i ditt konto. Inget där ersätts.",
-      "choiceBodyChat": "Medan du använde Stella här utan konto: {messages}. Om du lägger till dem hamnar de i slutet av din chatt. Inget där ersätts.",
-      "choiceBodyMemory": "Medan du använde Stella här utan konto: {notes}. Om du lägger till dem kopieras de till ditt minne. Inget där ersätts.",
-      "choiceFailed": "Valet kunde inte sparas. Försök igen.",
-      "choiceTitle": "Lägga till det du gjorde utan konto?",
-      "keep": "Behåll dem bara på den här datorn",
-      "messages": {
-        "one": "1 meddelande",
-        "other": "{count} meddelanden"
-      },
       "needsAccount": "Det här körs i Stellas moln och kräver därför ett Stella-konto.",
-      "notes": {
-        "one": "1 minnesanteckning",
-        "other": "{count} minnesanteckningar"
-      },
-      "sync": "Lägg till i min chatt",
       "syncFailed": "Det gick inte att lägga till chatten i ditt konto. Den finns kvar på den här datorn.",
       "synced": "Chatten har lagts till i ditt konto."
     },

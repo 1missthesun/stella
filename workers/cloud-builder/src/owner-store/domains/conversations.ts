@@ -1,3 +1,4 @@
+import { Effect } from "effect";
 import { releasingStub } from "../../rpc-release.js";
 import type {
   ConversationCalls,
@@ -329,13 +330,11 @@ const conversationWelcomeJob: JobDef = {
 const settleWelcome = async (ctx: OwnerContext, conversationId: string): Promise<void> => {
   const jobId = welcomeJobId(conversationId);
   if (!ctx.db.one("SELECT 1 AS queued FROM owner_jobs WHERE id = ?", jobId)) return;
-  let timer: ReturnType<typeof setTimeout> | undefined;
-  const posted = await Promise.race([
-    postWelcome(ctx, conversationId),
-    new Promise<false>((resolve) => {
-      timer = setTimeout(() => resolve(false), WELCOME_INLINE_WAIT_MS);
-    }),
-  ]).finally(() => clearTimeout(timer));
+  const posted = await Effect.runPromise(
+    Effect.promise(() => postWelcome(ctx, conversationId)).pipe(
+      Effect.timeoutOrElse({ duration: WELCOME_INLINE_WAIT_MS, orElse: () => Effect.succeed(false) }),
+    ),
+  );
   if (posted) ctx.jobs.cancel(jobId);
 };
 

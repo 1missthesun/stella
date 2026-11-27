@@ -1040,22 +1040,7 @@
     },
     "localMode": {
       "banner": "Sohbetlerin bu bilgisayarda kalır. Stella'yı telefonunda kullanmak ve her şeyi eşitlenmiş tutmak için giriş yap.",
-      "choiceBodyBoth": "Stella'yı burada hesapsız kullanırken: {messages} ve {notes}. Eklersen hesabına geçerler. Oradaki hiçbir şey değiştirilmez.",
-      "choiceBodyChat": "Stella'yı burada hesapsız kullanırken: {messages}. Eklersen sohbetinin sonuna eklenirler. Oradaki hiçbir şey değiştirilmez.",
-      "choiceBodyMemory": "Stella'yı burada hesapsız kullanırken: {notes}. Eklersen belleğine kopyalanırlar. Oradaki hiçbir şey değiştirilmez.",
-      "choiceFailed": "Seçim kaydedilemedi. Tekrar dene.",
-      "choiceTitle": "Hesapsız yaptıkların eklensin mi?",
-      "keep": "Yalnızca bu bilgisayarda tut",
-      "messages": {
-        "one": "1 mesaj",
-        "other": "{count} mesaj"
-      },
       "needsAccount": "Bu Stella'nın bulutunda çalışır, bu yüzden bir Stella hesabı gerekir.",
-      "notes": {
-        "one": "1 bellek notu",
-        "other": "{count} bellek notu"
-      },
-      "sync": "Sohbetime ekle",
       "syncFailed": "Bu sohbet hesabına eklenemedi. Hâlâ bu bilgisayarda.",
       "synced": "Bu sohbet hesabına eklendi."
     },

@@ -1049,22 +1049,7 @@
     },
     "localMode": {
       "banner": "Conversațiile tale rămân pe acest computer. Conectează-te ca să folosești Stella pe telefon și să păstrezi totul sincronizat.",
-      "choiceBodyBoth": "Cât ai folosit Stella aici fără cont: {messages} și {notes}. Dacă le adaugi, ajung în contul tău. Nu se înlocuiește nimic.",
-      "choiceBodyChat": "Cât ai folosit Stella aici fără cont: {messages}. Dacă le adaugi, ajung la finalul conversației tale. Nu se înlocuiește nimic.",
-      "choiceBodyMemory": "Cât ai folosit Stella aici fără cont: {notes}. Dacă le adaugi, sunt copiate în memoria ta. Nu se înlocuiește nimic.",
-      "choiceFailed": "Alegerea nu a putut fi salvată. Încearcă din nou.",
-      "choiceTitle": "Adaugi ce ai făcut fără cont?",
-      "keep": "Păstrează-le doar pe acest computer",
-      "messages": {
-        "one": "1 mesaj",
-        "other": "{count} mesaje"
-      },
       "needsAccount": "Funcționează în cloudul Stella, deci are nevoie de un cont Stella.",
-      "notes": {
-        "one": "1 notă de memorie",
-        "other": "{count} note de memorie"
-      },
-      "sync": "Adaugă în conversația mea",
       "syncFailed": "Conversația nu a putut fi adăugată în contul tău. Este încă pe acest computer.",
       "synced": "Conversația a fost adăugată în contul tău."
     },

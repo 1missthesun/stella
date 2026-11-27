@@ -105,7 +105,7 @@ import type {
   DispatchPayload,
   DispatchSummary,
 } from "@stella/contracts/turn-plane/placement";
-import type { SqliteDatabase } from "@stella/node-shared/storage/shared.js";
+import { SqliteConnection, type SqliteDatabase } from "@stella/node-shared/storage/shared.js";
 import type { CloudSchedules } from "./cloud-schedules.js";
 import type { RuntimeHostHandler } from "./client-protocol.js";
 import type {
@@ -266,7 +266,7 @@ export class StellaRuntimeHost {
   claudeCodeLogin: { signedIn: boolean; at: number; pending?: Promise<void> } = { signedIn: false, at: 0 };
   planLogins: { providers: string[]; at: number; pending?: Promise<void> } = { providers: [], at: 0 };
   pendingDestinationHandoffs = new Map<string, { canceled: boolean }>();
-  hostDatabase: SqliteDatabase | null = null;
+  hostDatabase: SqliteConnection | null = null;
   constructor(options: StellaRuntimeHostOptions) {
     this.options = options;
     for (const [name, call] of Object.entries(appServiceCalls)) {
@@ -2181,8 +2181,10 @@ export class StellaRuntimeHost {
     this.deviceIdentity = await this.options.hostHandlers.getDeviceIdentity();
     const dbStartedAt = performance.now();
     const HostDatabase = loadSqliteDatabaseCtorSync();
-    const hostDatabase = new HostDatabase(
-      getDesktopDatabasePath(this.options.initializeParams.stellaDataDirPath),
+    const hostDatabase = new SqliteConnection(
+      new HostDatabase(
+        getDesktopDatabasePath(this.options.initializeParams.stellaDataDirPath),
+      ),
     );
     const dbInit = initializeDesktopDatabase(hostDatabase);
     getFileLogger()?.process("host.services-init.timing", {

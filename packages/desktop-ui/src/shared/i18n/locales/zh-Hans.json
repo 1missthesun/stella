@@ -1031,22 +1031,7 @@
     },
     "localMode": {
       "banner": "你的聊天保留在这台电脑上。登录后即可在手机上使用 Stella，并让一切保持同步。",
-      "choiceBodyBoth": "你在这里未登录使用 Stella 时：{messages}和{notes}。添加后会放入你的账号，不会替换任何内容。",
-      "choiceBodyChat": "你在这里未登录使用 Stella 时：{messages}。添加后会放在你的聊天末尾，不会替换任何内容。",
-      "choiceBodyMemory": "你在这里未登录使用 Stella 时：{notes}。添加后会复制到你的记忆中，不会替换任何内容。",
-      "choiceFailed": "无法保存该选择。请重试。",
-      "choiceTitle": "要添加你未登录时的内容吗？",
-      "keep": "只保留在这台电脑上",
-      "messages": {
-        "one": "1 条消息",
-        "other": "{count} 条消息"
-      },
       "needsAccount": "此功能在 Stella 云端运行，因此需要 Stella 账户。",
-      "notes": {
-        "one": "1 条记忆笔记",
-        "other": "{count} 条记忆笔记"
-      },
-      "sync": "添加到我的聊天",
       "syncFailed": "无法将这段聊天添加到你的账号。它仍在这台电脑上。",
       "synced": "这段聊天已添加到你的账号。"
     },

@@ -1058,22 +1058,7 @@
     },
     "localMode": {
       "banner": "Vaše chaty zůstávají v tomto počítači. Přihlaste se a používejte Stellu i v telefonu se vším synchronizovaným.",
-      "choiceBodyBoth": "Když jste tu používali Stellu bez účtu: {messages} a {notes}. Přidáním se přesunou do vašeho účtu. Nic se nenahradí.",
-      "choiceBodyChat": "Když jste tu používali Stellu bez účtu: {messages}. Přidáním se umístí na konec vašeho chatu. Nic se nenahradí.",
-      "choiceBodyMemory": "Když jste tu používali Stellu bez účtu: {notes}. Přidáním se zkopírují do vaší paměti. Nic se nenahradí.",
-      "choiceFailed": "Volbu se nepodařilo uložit. Zkuste to znovu.",
-      "choiceTitle": "Přidat, co jste dělali bez účtu?",
-      "keep": "Ponechat jen na tomto počítači",
-      "messages": {
-        "one": "1 zpráva",
-        "other": "zprávy: {count}"
-      },
       "needsAccount": "Běží to v cloudu Stelly, takže je potřeba účet Stella.",
-      "notes": {
-        "one": "1 poznámka v paměti",
-        "other": "poznámky v paměti: {count}"
-      },
-      "sync": "Přidat do mého chatu",
       "syncFailed": "Chat se nepodařilo přidat do účtu. Pořád je na tomto počítači.",
       "synced": "Chat byl přidán do vašeho účtu."
     },

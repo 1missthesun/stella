@@ -1,5 +1,6 @@
 import { MEDIA_MODELS } from "@stella/contracts/media-models";
 import { BUDGET_COVERS, INCLUDED_IN_EVERY_PLAN, PAID_BILLING_PLANS, PLAN_CATALOG, PLAN_ORDER, planPriceLabel } from "@/lib/plans";
+import { formatStorageSize } from "@stella/contracts/billing-plans";
 import { getSiteUrl } from "@/lib/site-url";
 
 export type ProductDoc = {
@@ -13,8 +14,6 @@ const abs = (path: string): string => new URL(path, getSiteUrl()).href;
 
 const docUrl = (slug: string): string => abs(`/docs/${slug}.md`);
 
-const gb = (bytes: number): string =>
-  bytes >= 1024 ** 3 ? `${Math.round(bytes / 1024 ** 3)} GB` : `${Math.round(bytes / 1024 ** 2)} MB`;
 
 const paidPlanList = (): string =>
   PAID_BILLING_PLANS.map((id) => `${PLAN_CATALOG[id].label} ${planPriceLabel(id)}`).join(", ");
@@ -25,7 +24,7 @@ const planNames = (): string => {
 };
 
 const driveSizes = (): string =>
-  PLAN_ORDER.map((id) => `${PLAN_CATALOG[id].label} ${gb(PLAN_CATALOG[id].limits.driveBytes)}`).join(", ");
+  PLAN_ORDER.map((id) => `${PLAN_CATALOG[id].label} ${formatStorageSize(PLAN_CATALOG[id].limits.driveBytes)}`).join(", ");
 
 const MODELS = (): string => `Stella is the app; the thinking comes from a model you choose. Any one of these is enough, and they mix freely.
 
@@ -94,9 +93,9 @@ const DEVICES_AND_CLOUD = (): string => `## Where Stella runs
 - ChatGPT, Claude Code, your API keys and Stella's models all work in the cloud.
 
 ## Stella Drive and files
-- Stella Drive is your file space in Stella's cloud: ${driveSizes()}. Files Stella makes in the cloud land there, and Drive links open on every device with previews for images, audio, video, PDFs and web pages.
+- Stella Drive is your file space in Stella's cloud: ${driveSizes()}. It is limited by total size, not by how many files you keep. Files Stella makes in the cloud land there, and Drive links open on every device with previews for images, audio, video, PDFs and web pages.
 - Files on a computer stay on it unless shared. A link to one opens from that computer on your other devices while it is on.
-- Attach files of any size to a message, from any device.
+- Attach files to a message from any device (up to 2 GB each from the phone or the web). Files sent in chats are kept with the chat, not counted against your Drive, and they send even when the Drive is full.
 
 ## What syncs
 Signed in: conversations (Settings › Privacy › Save chat history in the cloud; off keeps chats on that computer), memory, settings, saved logins (end-to-end encrypted, see ${docUrl("connectors-and-logins")}), custom skills, and Claude Code sessions.
@@ -245,7 +244,7 @@ const planLine = (id: (typeof PLAN_ORDER)[number]): string => {
   const extras = [
     plan.cloudContainers ? "tasks in the cloud" : "tasks on your own computers",
     plan.mediaGeneration ? "image, video, music and 3D" : null,
-    `${gb(plan.limits.driveBytes)} Drive`,
+    `${formatStorageSize(plan.limits.driveBytes)} Drive`,
   ].filter(Boolean);
   const what = id === "free"
     ? "the full app on your own ChatGPT, Claude or Gemini plan, API keys or local models, plus a small free trial of Stella's models"

@@ -1040,22 +1040,7 @@
     },
     "localMode": {
       "banner": "Your chats stay on this computer. Sign in to use Stella on your phone and keep everything in sync.",
-      "choiceBodyBoth": "While you used Stella here without an account: {messages} and {notes}. Adding puts them into your account. Nothing there is replaced.",
-      "choiceBodyChat": "While you used Stella here without an account: {messages}. Adding puts them at the end of your chat. Nothing there is replaced.",
-      "choiceBodyMemory": "While you used Stella here without an account: {notes}. Adding copies them into your Memory. Nothing there is replaced.",
-      "choiceFailed": "Couldn't save that choice. Try again.",
-      "choiceTitle": "Add what you did without an account?",
-      "keep": "Keep them on this computer only",
-      "messages": {
-        "one": "1 message",
-        "other": "{count} messages"
-      },
       "needsAccount": "This runs in Stella's cloud, so it needs a Stella account.",
-      "notes": {
-        "one": "1 Memory note",
-        "other": "{count} Memory notes"
-      },
-      "sync": "Add to my chat",
       "syncFailed": "Couldn't add this chat to your account. It's still on this computer.",
       "synced": "This chat was added to your account."
     },

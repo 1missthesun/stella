@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react
 import type { BillingStatus } from "@stella/contracts/backend/billing";
 import {
   PLAN_CATALOG,
+  formatStorageSize,
   PLAN_ORDER,
   isPaidBillingPlan,
   nextPlanUp,
@@ -86,11 +87,9 @@ export const planTagline = (plan: BillingPlan, t: Translate): string => t(`billi
 
 export const planIncludesLines = (plan: BillingPlan, t: Translate): string[] => {
   const def = PLAN_CATALOG[plan];
-  if (!def.interval) return [t("billing.v3.includes.voice"), t("billing.v3.includes.byok")];
-  return [
-    ...(def.mediaGeneration ? [t("billing.v3.includes.media")] : []),
-    t("billing.v3.includes.drive", { size: `${Math.round(def.limits.driveBytes / 1024 ** 3)} GB` }),
-  ];
+  const drive = t("billing.v3.includes.drive", { size: formatStorageSize(def.limits.driveBytes) });
+  if (!def.interval) return [t("billing.v3.includes.voice"), t("billing.v3.includes.byok"), drive];
+  return [...(def.mediaGeneration ? [t("billing.v3.includes.media")] : []), drive];
 };
 
 function Row({ label, hint, children }: { label: string; hint?: ReactNode; children: ReactNode }) {

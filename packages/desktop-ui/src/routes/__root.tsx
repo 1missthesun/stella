@@ -80,7 +80,7 @@ import { FeedbackDialogHost } from "@/shell/FeedbackDialogHost";
 import { PlanUsageDialogHost } from "@/shell/PlanUsageDialogHost";
 import { SelfHostPairScreen } from "@/global/self-host/SelfHostPairScreen";
 import { SignInScreen } from "@/global/auth/SignInScreen";
-import { SignedOutLocalChoice } from "@/global/local-mode/SignedOutLocalChoice";
+import { SignedOutLocalSync } from "@/global/local-mode/SignedOutLocalSync";
 import { SignOutDialog } from "@/global/auth/SignOutDialog";
 import { AccountSwitchGuard } from "@/global/local-mode/AccountSwitchGuard";
 import {
@@ -453,7 +453,7 @@ function RootLayout() {
     <>
       <SignOutDialog />
       <AccountSwitchGuard />
-      <SignedOutLocalChoice
+      <SignedOutLocalSync
         signedIn={authBootstrapStatus === "ready"}
         isPrivate={isPrivate}
         conversationId={conversationId}

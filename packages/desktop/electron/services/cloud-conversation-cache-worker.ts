@@ -1,14 +1,13 @@
 import { DatabaseSync } from "node:sqlite";
 import { parentPort, workerData } from "node:worker_threads";
-import type { SqliteDatabase } from "@stella/node-shared/storage/shared";
+import { applyConnectionPragmas } from "@stella/node-shared/storage/schema";
+import { SqliteConnection } from "@stella/node-shared/storage/shared";
 import { CloudConversationCacheStore } from "./cloud-conversation-cache-store.js";
 
 const port = parentPort;
 if (!port) throw new Error("Cloud cache worker requires a parent port.");
-const db = new DatabaseSync(
-  workerData.databasePath,
-) as unknown as SqliteDatabase;
-db.exec("PRAGMA busy_timeout = 5000; PRAGMA foreign_keys = ON;");
+const db = new SqliteConnection(new DatabaseSync(workerData.databasePath));
+applyConnectionPragmas(db);
 const store = new CloudConversationCacheStore(db);
 port.on("message", ({ id, operation, payload }) => {
   try {

@@ -169,6 +169,7 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
       app = next;
       const { kind, swap } = ui.lastLoad();
       const how = swap && kind !== "fresh" ? `${kind}, ${swap.evaluated} module${swap.evaluated === 1 ? "" : "s"}${swap.reason ? `: ${swap.reason}` : ""}` : kind;
+      if (kind === "refresh" && swap?.evaluated === 0) return true;
       if (kind === "refresh") {
         // The tree stays mounted and only re-renders: nothing to load, so nothing to hold.
         store.set((s) => ({ error: null, swaps: s.swaps + 1 }));

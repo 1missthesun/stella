@@ -59,11 +59,12 @@ const parseWrite = object({
   clear: optional(boolean()),
   changes,
   seed: optional(changes),
+  owner: optional(string({ min: 1, max: 200 })),
 });
 
 type Row = { key: string; value: string | null; bytes: number };
 
-const readState = (db: OwnerDbReader, id: string): ViewStorageState => {
+const readState = (db: OwnerDbReader, id: string, owner: string): ViewStorageState => {
   const head = db.one<{ seq: number }>("SELECT seq FROM view_storage_views WHERE view_id = ?", id);
   const values: Record<string, unknown> = {};
   for (const row of db.all<{ key: string; value: string }>(
@@ -76,13 +77,18 @@ const readState = (db: OwnerDbReader, id: string): ViewStorageState => {
       // A row is written only from parsed JSON; nothing to show for one that isn't.
     }
   }
-  return { viewId: id, seq: head?.seq ?? 0, values };
+  return { viewId: id, seq: head?.seq ?? 0, values, owner };
 };
 
 const encode = (value: unknown): string | null =>
   value === null || value === undefined ? null : JSON.stringify(value);
 
-const writeViewStorage = (ctx: OwnerContext, args: ViewStorageWrite): { seq: number } => {
+const writeViewStorage = (ctx: OwnerContext, args: ViewStorageWrite): { seq: number; owner: string } => {
+  // A device writes for the account it thinks it's in; a sign-in it hasn't heard of yet must not
+  // carry one account's values into another.
+  if (args.owner !== undefined && args.owner !== ctx.ownerId) {
+    throw new RpcError("CONFLICT", "This view's values belong to another account.", { reason: "view_storage_wrong_account", retryable: true });
+  }
   enforceOwnerRateLimit(ctx.db, ctx.now, "viewStorage.write", WRITE_RATE, "Too many view storage writes. Please wait a moment.");
   const apply = () => {
     const { db } = ctx;
@@ -101,7 +107,7 @@ const writeViewStorage = (ctx: OwnerContext, args: ViewStorageWrite): { seq: num
     for (const entry of args.changes) next.set(entry.key, encode(entry.value));
     if (next.size === 0) {
       const head = db.one<{ seq: number }>("SELECT seq FROM view_storage_views WHERE view_id = ?", args.viewId);
-      return { seq: head?.seq ?? 0 };
+      return { seq: head?.seq ?? 0, owner: ctx.ownerId };
     }
 
     let bytes = 0;
@@ -170,7 +176,7 @@ const writeViewStorage = (ctx: OwnerContext, args: ViewStorageWrite): { seq: num
         tombstones - MAX_TOMBSTONES,
       );
     }
-    return { seq };
+    return { seq, owner: ctx.ownerId };
   };
   return ctx.db.transaction ? ctx.db.transaction(apply) : apply();
 };
@@ -196,7 +202,7 @@ export const viewStorageDomain = {
   views: {
     "viewStorage.get": {
       parse: object({ viewId }),
-      read: (ctx, args) => readState(ctx.db, args.viewId),
+      read: (ctx, args) => readState(ctx.db, args.viewId, ctx.ownerId),
     },
   },
   purge: (ctx) => {

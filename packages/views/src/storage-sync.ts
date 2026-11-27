@@ -13,7 +13,9 @@
 //   seed: they fill only keys the server has never had.
 // - Everything is kept per account: switching accounts on a device parks the last account's views
 //   (their queued changes wait, on disk, for that account to sign in again) and opens the new
-//   account's own copies, so nothing one account wrote reaches another's store.
+//   account's own copies, so nothing one account wrote reaches another's store. The server stamps
+//   its answers with the owner and refuses a write meant for another one, so a sign-in that changes
+//   the device's token before its views hear of it can't cross values either.
 // - The server's order only goes forward, so a server seq behind one this device has heard means its
 //   data was reset (or wiped): the device takes the server's values from then on instead of waiting
 //   for a seq it will never see again.
@@ -280,8 +282,23 @@ export class SyncedViewStorage implements ViewStorage {
     this.unwatch = null;
   }
 
+  /** The owner id the account scope names (`account:<id>`), which the server stamps on its answers. */
+  private get owner(): string | undefined {
+    const at = this.account?.indexOf(":") ?? -1;
+    return at > 0 ? this.account!.slice(at + 1) || undefined : undefined;
+  }
+
+  /** Whether an answer is another account's: the device's sign-in changed before its views heard of it. */
+  private foreign(owner: string | undefined): boolean {
+    return owner !== undefined && this.owner !== undefined && owner !== this.owner;
+  }
+
   private heard(state: ViewStorageState) {
     if (!isMap(state?.values) || typeof state.seq !== "number") return;
+    if (this.foreign(state.owner)) {
+      this.log("ignored another account's values for a view", { viewId: this.viewId });
+      return;
+    }
     if (state.seq < this.seq) {
       // The server's order went back: its data was reset. Its values are the truth from here; the
       // writes it confirmed before the reset no longer say anything about its order.
@@ -340,6 +357,9 @@ export class SyncedViewStorage implements ViewStorage {
       ...(sentClear ? { clear: true } : {}),
       changes: [...sent].map(([key, value]) => ({ key, value })),
       ...(sentSeed ? { seed: Object.entries(sentSeed).map(([key, value]) => ({ key, value })) } : {}),
+      // The server refuses the write if it reaches another account (a sign-in this device's views
+      // haven't heard of yet); it stays queued for when they have.
+      ...(this.owner ? { owner: this.owner } : {}),
     };
     this.sending = true;
     this.lastSentAt = Date.now();

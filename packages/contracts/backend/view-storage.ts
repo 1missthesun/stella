@@ -30,6 +30,11 @@ export type ViewStorageWrite = {
    * and a later one doesn't overwrite what's already there.
    */
   seed?: ViewStorageChange[];
+  /**
+   * The account the device means to write to (its owner id). The server refuses a write that
+   * reaches another account, as when a device's sign-in changed before its views heard of it.
+   */
+  owner?: string;
 };
 
 export type ViewStorageState = {
@@ -37,12 +42,14 @@ export type ViewStorageState = {
   /** The newest write the server has applied to this view; 0 when it has none. */
   seq: number;
   values: Record<string, unknown>;
+  /** The account (owner id) these values belong to, so a device can refuse another account's. */
+  owner?: string;
 };
 
 export type ViewStorageCalls = {
   "viewStorage.write": {
     args: ViewStorageWrite;
-    result: { seq: number };
+    result: { seq: number; owner?: string };
   };
 };
 

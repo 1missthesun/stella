@@ -3,7 +3,7 @@
 //! that are typed on the device. The digits are a SPAKE2 password bound to both keys, so a
 //! look-alike on the network that relays the request still can't finish it.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -35,9 +35,10 @@ pub(crate) type Asking = mpsc::Sender<(String, oneshot::Sender<Result<Value, Str
 
 #[derive(Default)]
 pub(crate) struct Nearby {
-    watch: Option<tokio::task::JoinHandle<()>>,
+    watching: bool,
     pub found: HashMap<String, Value>,
     addrs: HashMap<String, EndpointAddr>,
+    probing: HashSet<String>,
 }
 
 pub async fn answer_info(inner: &Inner, conn: Connection, mut send: SendStream) {
@@ -158,67 +159,83 @@ pub fn list(inner: &Inner) -> Value {
     json!(list)
 }
 
-pub fn start(inner: &Arc<Inner>) -> Result<Value, String> {
-    let Some(mdns) = inner.mdns.clone() else { return Err("Nearby computers aren't available on this device.".into()) };
-    let mut nearby = lock(&inner.nearby);
-    if nearby.watch.as_ref().is_some_and(|w| !w.is_finished()) {
-        drop(nearby);
-        return Ok(list(inner));
-    }
-    let watcher = inner.clone();
-    nearby.watch = Some(tokio::spawn(async move {
-        let mut events = mdns.subscribe().await;
-        let mut probing: HashMap<EndpointId, tokio::task::JoinHandle<()>> = HashMap::new();
+/// Follows the computers mDNS sees for the node's whole life. The lookup tells a subscriber only
+/// about computers that are new or changed since it last saw them, so subscribing when a dialog opens
+/// would miss everything already on the network.
+pub fn track(inner: Arc<Inner>, mut events: impl tokio_stream::Stream<Item = DiscoveryEvent> + Unpin + Send + 'static) {
+    tokio::spawn(async move {
         while let Some(event) = events.next().await {
             match event {
                 DiscoveryEvent::Discovered { endpoint_info, .. } => {
                     let id = endpoint_info.endpoint_id;
-                    if id == watcher.endpoint.id() {
+                    if id == inner.endpoint.id() {
                         continue;
                     }
                     let addr = endpoint_info.into_endpoint_addr();
-                    {
-                        let mut nearby = lock(&watcher.nearby);
+                    let watching = {
+                        let mut nearby = lock(&inner.nearby);
                         nearby.addrs.insert(id.to_string(), addr.clone());
-                        if nearby.found.contains_key(&id.to_string()) {
-                            continue;
-                        }
+                        nearby.watching
+                    };
+                    if watching {
+                        spawn_probe(&inner, addr);
                     }
-                    if probing.get(&id).is_some_and(|p| !p.is_finished()) {
-                        continue;
-                    }
-                    let inner = watcher.clone();
-                    probing.insert(id, tokio::spawn(async move { probe(inner, addr).await }));
                 }
                 DiscoveryEvent::Expired { endpoint_id } => {
                     let id = endpoint_id.to_string();
                     let gone = {
-                        let mut nearby = lock(&watcher.nearby);
+                        let mut nearby = lock(&inner.nearby);
                         nearby.addrs.remove(&id);
                         nearby.found.remove(&id).is_some()
                     };
                     if gone {
-                        (watcher.emit)(json!({ "kind": "nearby", "id": id, "state": "lost" }));
+                        (inner.emit)(json!({ "kind": "nearby", "id": id, "state": "lost" }));
                     }
                 }
                 _ => {}
             }
         }
-    }));
-    drop(nearby);
+    });
+}
+
+fn spawn_probe(inner: &Arc<Inner>, addr: EndpointAddr) {
+    let id = addr.id.to_string();
+    {
+        let mut nearby = lock(&inner.nearby);
+        if nearby.found.contains_key(&id) || !nearby.probing.insert(id.clone()) {
+            return;
+        }
+    }
+    let inner = inner.clone();
+    tokio::spawn(async move {
+        probe(&inner, addr).await;
+        lock(&inner.nearby).probing.remove(&id);
+    });
+}
+
+pub fn start(inner: &Arc<Inner>) -> Result<Value, String> {
+    if inner.mdns.is_none() {
+        return Err("Nearby computers aren't available on this device.".into());
+    }
+    let known: Vec<EndpointAddr> = {
+        let mut nearby = lock(&inner.nearby);
+        nearby.watching = true;
+        nearby.addrs.values().cloned().collect()
+    };
+    for addr in known {
+        spawn_probe(inner, addr);
+    }
     Ok(list(inner))
 }
 
 pub fn stop(inner: &Inner) {
     let mut nearby = lock(&inner.nearby);
-    if let Some(watch) = nearby.watch.take() {
-        watch.abort();
-    }
+    nearby.watching = false;
     nearby.found.clear();
 }
 
 /// Asks a computer that showed up on the network for its name, and whether it pairs nearby devices.
-async fn probe(inner: Arc<Inner>, addr: EndpointAddr) {
+async fn probe(inner: &Arc<Inner>, addr: EndpointAddr) {
     let id = addr.id;
     let ask = async {
         let conn = inner.endpoint.connect(addr, PAIR_ALPN).await.map_err(|e| e.to_string())?;
@@ -237,7 +254,7 @@ async fn probe(inner: Arc<Inner>, addr: EndpointAddr) {
     let computer = json!({ "id": id.to_string(), "name": text("name", "Computer"), "platform": text("platform", "unknown") });
     let fresh = {
         let mut nearby = lock(&inner.nearby);
-        if nearby.watch.is_none() {
+        if !nearby.watching {
             return;
         }
         nearby.found.insert(id.to_string(), computer.clone()).is_none()

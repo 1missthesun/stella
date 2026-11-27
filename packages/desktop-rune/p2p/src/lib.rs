@@ -197,15 +197,20 @@ impl Node {
             .map_err(|e| format!("can't start the device link: {e}"))?;
         let (store, key) = store::Store::open(&config.data_dir)?;
         let port = config.port.or(store.peers.port).unwrap_or(0);
-        let (endpoint, mdns) = runtime.block_on(async {
-            match bind(&config, key.clone(), port).await {
-                Ok(endpoint) => Ok(endpoint),
+        let (endpoint, mdns, seen) = runtime.block_on(async {
+            let (endpoint, mdns) = match bind(&config, key.clone(), port).await {
+                Ok(bound) => bound,
                 Err(e) if port != 0 => {
                     eprintln!("stella-p2p: port {port} is taken ({e}); listening on another");
-                    bind(&config, key, 0).await
+                    bind(&config, key, 0).await?
                 }
-                Err(e) => Err(e),
-            }
+                Err(e) => return Err(e),
+            };
+            let seen = match &mdns {
+                Some(mdns) => Some(mdns.subscribe().await),
+                None => None,
+            };
+            Ok::<_, String>((endpoint, mdns, seen))
         })?;
         let inner = Arc::new(Inner {
             endpoint,
@@ -233,6 +238,10 @@ impl Node {
                 store.peers.port = bound;
                 let _ = store.save();
             }
+        }
+        if let Some(seen) = seen {
+            let _guard = runtime.enter();
+            nearby::track(inner.clone(), seen);
         }
         runtime.spawn(host::accept_loop(inner.clone()));
         Ok(Node { runtime, inner })

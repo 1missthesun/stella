@@ -3,6 +3,8 @@
 
 import type { P2pConfirmRequest, P2pNearbyComputer, P2pTransport } from "@stella/contracts/p2p";
 
+const byName = (list: P2pNearbyComputer[]) => [...list].sort((a, b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id));
+
 export const createNearbyStore = (transport: P2pTransport) => {
   let found: P2pNearbyComputer[] = [];
   const watchers = new Set<() => void>();
@@ -14,7 +16,7 @@ export const createNearbyStore = (transport: P2pTransport) => {
     if (event.kind !== "nearby" || event.state === "ended") return;
     if (event.state === "found") {
       const { kind: _kind, state: _state, ...computer } = event;
-      found = [...found.filter((c) => c.id !== computer.id), computer];
+      found = byName([...found.filter((c) => c.id !== computer.id), computer]);
     } else {
       found = found.filter((c) => c.id !== event.id);
     }
@@ -29,7 +31,7 @@ export const createNearbyStore = (transport: P2pTransport) => {
         void transport
           .command<P2pNearbyComputer[]>("nearby.start")
           .then((list) => {
-            found = list;
+            found = byName(list);
             notify();
           })
           .catch(() => undefined);

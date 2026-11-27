@@ -205,6 +205,7 @@ async function start() {
     ...(claudeLogin ? { CLAUDE_CONFIG_DIR: claudeConfigDir } : {}),
     ...(process.env.STELLA_P2P_NAME?.trim() ? { STELLA_P2P_NAME: process.env.STELLA_P2P_NAME.trim() } : {}),
     ...(process.env.STELLA_P2P_RELAY?.trim() ? { STELLA_P2P_RELAY: process.env.STELLA_P2P_RELAY.trim() } : {}),
+    ...(process.env.STELLA_P2P_RENDEZVOUS?.trim() ? { STELLA_P2P_RENDEZVOUS: process.env.STELLA_P2P_RENDEZVOUS.trim() } : {}),
     ...(process.env.STELLA_BACKEND_URL?.trim() ? { VITE_STELLA_BACKEND_URL: process.env.STELLA_BACKEND_URL.trim() } : {}),
     ...(minted ? { STELLA_DEV_HARNESS_SESSION_TOKEN: minted.sessionToken } : {}),
   });

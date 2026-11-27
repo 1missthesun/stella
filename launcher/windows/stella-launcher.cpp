@@ -324,6 +324,7 @@ struct Paths {
     wstring lockFile() const { return root + L"\\launcher.lock"; }
     wstring isolatedUserData() const { return root + L"\\user-data"; }
     wstring isolatedHome() const { return root + L"\\stella-home"; }
+    wstring hydrationFile() const { return root + L"\\hydration.json"; }
 
     static Paths resolve() {
         Paths p;
@@ -398,8 +399,14 @@ static bool loadServer(Server &out) {
     return ok;
 }
 
+// The hydration thread changes and saves the state while the supervisor may too.
+static std::recursive_mutex gStateLock;
+
 struct State {
     string bunLockHash, preparedHead, installedAt, caughtUpTo;
+    // Set while the app folder is a first install's app bundle (no git, no
+    // packages): the commit it was built from, which hydration checks out.
+    string bundleCommit;
 
     static State load() {
         State s;
@@ -410,11 +417,13 @@ struct State {
         if (const char *v = mj_get_string(json, "preparedHead")) s.preparedHead = v;
         if (const char *v = mj_get_string(json, "installedAt")) s.installedAt = v;
         if (const char *v = mj_get_string(json, "caughtUpTo")) s.caughtUpTo = v;
+        if (const char *v = mj_get_string(json, "bundleCommit")) s.bundleCommit = v;
         mj_free(json);
         return s;
     }
 
     void save() const {
+        std::lock_guard<std::recursive_mutex> lock(gStateLock);
         string out = "{";
         bool first = true;
         auto add = [&](const char *name, const string &value) {
@@ -425,6 +434,7 @@ struct State {
             first = false;
         };
         add("bunLockHash", bunLockHash);
+        add("bundleCommit", bundleCommit);
         add("caughtUpTo", caughtUpTo);
         add("installedAt", installedAt);
         add("preparedHead", preparedHead);
@@ -661,6 +671,10 @@ static HANDLE openNul() {
     return CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_EXISTING, 0, nullptr);
 }
 
+// Hydration's thread starts its commands below normal priority, behind the
+// open window (their children inherit it).
+static thread_local DWORD tChildPriority = 0;
+
 static CmdResult runCmd(const vector<wstring> &argv, const wstring &cwd, const Env &env, const wstring &outputFile = L"",
                         double timeoutSeconds = 0, const wstring &rawCmdline = L"", bool keepBackground = false) {
     CmdResult r;
@@ -693,7 +707,8 @@ static CmdResult runCmd(const vector<wstring> &argv, const wstring &cwd, const E
     PROCESS_INFORMATION pi;
     ZeroMemory(&pi, sizeof(pi));
     wstring cmdline = rawCmdline.empty() ? commandLine(argv) : rawCmdline;
-    bool started = createProcess(argv[0], cmdline, cwd, env, nul, outWrite, errWrite, CREATE_NO_WINDOW | CREATE_SUSPENDED, &pi);
+    bool started = createProcess(argv[0], cmdline, cwd, env, nul, outWrite, errWrite,
+                                 CREATE_NO_WINDOW | CREATE_SUSPENDED | tChildPriority, &pi);
     DWORD startError = GetLastError();
     if (outputFile.empty()) {
         CloseHandle(outWrite);
@@ -1184,6 +1199,9 @@ struct GitTool {
             if (kv.first != L"STELLA_GIT_BIN" && kv.first != L"LOCAL_GIT_DIRECTORY" && kv.first != L"STELLA_GIT_BASH")
                 env[kv.first] = kv.second;
         env[L"GIT_TERMINAL_PROMPT"] = L"0";
+        // An app folder without .git (a first install's app bundle, before
+        // hydration) must not find a repository above it.
+        env[L"GIT_CEILING_DIRECTORIES"] = P.root;
         for (auto &kv : extra) env[kv.first] = kv.second;
         vector<wstring> argv = {bin()};
         for (auto &a : args) argv.push_back(wide(a));
@@ -1236,9 +1254,19 @@ static Env baseEnvironment() {
     return env;
 }
 
+// Stella runs from a first install's app bundle this session: git and the
+// packages come in behind it (hydrateMain).
+static std::atomic<bool> gBundleStage{false};
+
 static Env electronEnvironment(const wstring &pipeName) {
     Env env = baseEnvironment();
     env[L"STELLA_LAUNCHER"] = L"1";
+    env.erase(L"STELLA_APP_HYDRATION");
+    if (gBundleStage) {
+        // What needs git or the packages waits on this file (app-hydration.ts).
+        env[L"STELLA_APP_HYDRATION"] = P.hydrationFile();
+        env[L"GIT_CEILING_DIRECTORIES"] = P.root;
+    }
     env[L"VITE_STELLA_BACKEND_URL"] = backendURL();
     env[L"STELLA_LAUNCHER_DATA_DIR"] = P.root;
     env[L"STELLA_LAUNCHER_VERSION"] = std::to_wstring(kLauncherVersion);
@@ -2311,18 +2339,28 @@ static bool showRunningLauncher() {
     return PostMessageW(search.found, WM_UI_ACTIVATE, 0, 0) != 0;
 }
 
+static wstring gitRoot() { return P.runtimes() + L"\\git-" + wide(kGitVersion); }
+
+// gGit names where PortableGit is (or, for a first install from the app
+// bundle, will be: hydration downloads it behind the open window), so set it
+// only once: the supervisor thread reads it while hydration runs.
+static void useGitAt(const wstring &root) {
+    if (!gGit || gGit->root != root) gGit.reset(new GitTool{root});
+}
+
 static bool adoptGit() {
-    GitTool git{P.runtimes() + L"\\git-" + wide(kGitVersion)};
-    if (!exists(git.bin())) return false;
-    gGit.reset(new GitTool(git));
+    wstring root = gitRoot();
+    if (!exists(root + L"\\cmd\\git.exe")) return false;
+    useGitAt(root);
     return true;
 }
 
-static void ensureGit() {
+// showProgress is false on hydration's thread (Stella already open).
+static void ensureGit(bool showProgress = true) {
     if (adoptGit()) return;
-    wstring root = P.runtimes() + L"\\git-" + wide(kGitVersion);
+    wstring root = gitRoot();
     const Asset &asset = kGitAssets[nativeArm64() ? 1 : 0];
-    progress("Getting things ready…", 0.02, 0.10);
+    if (showProgress) progress("Getting things ready…", 0.02, 0.10);
     LOG("install: downloading PortableGit %s from %s", kGitVersion, asset.url);
     mkdirs(P.runtimes());
     wstring archive = P.runtimes() + L"\\PortableGit-" + wide(kGitVersion) + L".7z.exe";
@@ -2490,6 +2528,9 @@ static bool engineRequested() {
 
 static bool isEngine(const wstring &exe) { return !gEngineBin.empty() && exe == gEngineBin; }
 
+static void installEngineAsset(const string &version, const string &url, const string &sha, const string &member,
+                               bool showProgress);
+
 // launcher.json "stellaEngine": {"version", "assets": {<platform>: {"url", "sha256", "member"?}}};
 // an asset without "member" is the bare binary, one with it is a zip holding it.
 // Also runs on a thread while dependencies install (startEnginePrefetch), with
@@ -2519,6 +2560,12 @@ static void installEngine(bool showProgress) {
         mj_free(json);
     }
     if (version.empty() || url.empty() || sha.empty()) fail("This version of Stella has no Rune engine for " + key + ".");
+    installEngineAsset(version, url, sha, member, showProgress);
+}
+
+// Downloads (unless it is already there) and, with showProgress, selects one stella-engine build.
+static void installEngineAsset(const string &version, const string &url, const string &sha, const string &member,
+                               bool showProgress) {
     wstring dir = P.runtimes() + L"\\stella-engine-" + wide(version);
     wstring bin = dir + L"\\stella-engine.exe";
     if (!exists(bin)) {
@@ -2591,6 +2638,9 @@ static DWORD parentProcessId(DWORD pid) {
     return parent;
 }
 
+// The app bundle the backend offers a first install (bootstrap's "bundle").
+static string gBundleManifest;
+
 static void bootstrapAccess(string &remote, string &token) {
     wstring base = backendURL();
     while (!base.empty() && base.back() == L'/') base.pop_back();
@@ -2600,6 +2650,10 @@ static void bootstrapAccess(string &remote, string &token) {
     if (r.status != 200) fail(format("The app source bootstrap returned HTTP %lu.", r.status));
     mj_value *json = mj_parse(r.body.data(), r.body.size());
     if (!json) fail("The app source bootstrap returned an unexpected body.");
+    {
+        const char *manifest = mj_get_string(mj_get(json, "bundle"), "manifest");
+        gBundleManifest = manifest ? manifest : "";
+    }
     const mj_value *body = mj_get(json, "upstream");
     if (!body) body = json;
     const char *rm = mj_get_string(body, "remote"), *tk = mj_get_string(body, "token");
@@ -3098,11 +3152,19 @@ static string signHead(const string &expected) {
 // name, and launcher runs are source runs.
 // With rune (the Rune engine starts instead) Electron is neither fetched nor
 // needed, and this returns "".
-static wstring prepare(bool rune) {
+// quiet is hydration's run (a thread, Stella already open from its app bundle
+// under Rune): no progress, and nothing to return but "".
+static wstring prepare(bool rune, bool quiet = false) {
     wstring app = P.app();
     string lockHash = sha256File(app + L"\\bun.lock");
-    if (S.bunLockHash != lockHash || !exists(app + L"\\node_modules\\electron\\package.json")) {
-        progress("Installing Stella…", 0.40, 0.82);
+    string knownLock, knownHead;
+    {
+        std::lock_guard<std::recursive_mutex> lock(gStateLock);
+        knownLock = S.bunLockHash;
+        knownHead = S.preparedHead;
+    }
+    if (knownLock != lockHash || !exists(app + L"\\node_modules\\electron\\package.json")) {
+        if (!quiet) progress("Installing Stella…", 0.40, 0.82);
         // install-deps.mjs (newer app sources) starts bun's cache from a
         // per-platform seed and fetches Electron and the prepare-install
         // helpers alongside; older sources get a plain bun install.
@@ -3117,25 +3179,30 @@ static wstring prepare(bool rune) {
         // baseEnvironment() strips the engine choice; install-deps.mjs skips
         // Electron and its bundle for Rune.
         if (rune) env[L"STELLA_LAUNCHER_ENGINE"] = L"rune";
+        // Stella is already up: what install-deps holds back for its start
+        // (Claude Code and Antigravity) can go now.
+        if (quiet) env[L"STELLA_APP_HYDRATION"] = P.hydrationFile();
         vector<wstring> argv = seeded ? vector<wstring>{gBunBin, installDeps}
                                       : vector<wstring>{gBunBin, L"install", L"--frozen-lockfile"};
         CmdResult r = runCmd(argv, app, env, P.installLog(), 30 * 60, L"", seeded);
         if (r.timedOut) fail("bun install timed out after 30 minutes:\n" + lastLines(r.err, 20));
         if (r.code != 0) fail(format("bun install failed (exit %lu):\n", r.code) + lastLines(r.err, 20));
         LOG("prepare: bun install finished in %ds", (int)((GetTickCount64() - started) / 1000));
+        std::lock_guard<std::recursive_mutex> lock(gStateLock);
         S.bunLockHash = lockHash;
         S.save();
     }
 
     string head = gGit->run({"rev-parse", "HEAD"}, app);
     wstring script = app + L"\\packages\\desktop\\scripts\\prepare-install.mjs";
-    if (S.preparedHead != head && exists(script)) {
-        progress("Finishing setup…", 0.82, 0.94);
+    if (knownHead != head && exists(script)) {
+        if (!quiet) progress("Finishing setup…", 0.82, 0.94);
         LOG("prepare: prepare-install.mjs for %s", short12(head).c_str());
         double timeout = envSeconds(L"STELLA_LAUNCHER_PREPARE_TIMEOUT_SECONDS", 10 * 60);
         try {
             CmdResult r = runCmd({gBunBin, script}, app, baseEnvironment(), P.installLog(), timeout);
             if (!r.timedOut && r.code == 0) {
+                std::lock_guard<std::recursive_mutex> lock(gStateLock);
                 S.preparedHead = head;
                 S.save();
             } else if (r.timedOut) {
@@ -3148,7 +3215,7 @@ static wstring prepare(bool rune) {
         }
     }
 
-    if (rune) return L"";
+    if (rune || quiet) return L"";
     wstring electron = app + L"\\node_modules\\electron\\dist\\electron.exe";
     wstring ensure = app + L"\\packages\\desktop\\scripts\\ensure-electron-binary.mjs";
     if (!exists(electron) && exists(ensure)) {
@@ -3496,6 +3563,7 @@ static void handlePrepared(const mj_value *message) {
     const char *lockHash = mj_get_string(message, "lockHash");
     const char *head = mj_get_string(message, "head");
     bool noted = false;
+    std::lock_guard<std::recursive_mutex> lock(gStateLock);
     try {
         if (lockHash) {
             string actual = sha256File(P.app() + L"\\bun.lock");
@@ -3563,11 +3631,14 @@ static void requestShutdown() {
 }
 
 static void refreshInstallInfo();
+static void hydrateStart();
+static bool hydrationRunning();
 
 static Outcome supervise(const wstring &electron) {
     const char *child = isEngine(electron) ? "stella-engine" : "Electron";
     string spawnedHead;
-    try { spawnedHead = gGit->run({"rev-parse", "HEAD"}, P.app()); } catch (const LauncherError &) {}
+    if (!gBundleStage)
+        try { spawnedHead = gGit->run({"rev-parse", "HEAD"}, P.app()); } catch (const LauncherError &) {}
     std::unique_ptr<ElectronProcess> process;
     try {
         process.reset(new ElectronProcess(electron, P.app(), P.electronLog()));
@@ -3594,6 +3665,7 @@ static Outcome supervise(const wstring &electron) {
                     ready = true;
                     readyAt = GetTickCount64();
                     LOG("supervisor: ready");
+                    if (gBundleStage) hydrateStart();
                     process->events.after(O.stableSeconds, "stable");
                     gUi->running();
                     if (O.selfTest) process->events.after(O.hold, "self-test-quit");
@@ -3636,6 +3708,9 @@ static Outcome supervise(const wstring &electron) {
                 } catch (const LauncherError &e) {
                     LOG("supervisor: could not mark known-good: %s", e.message.c_str());
                 }
+            } else if (name == "self-test-quit" && !quitRequested && hydrationRunning()) {
+                // A self-test proves the whole install, hydration included.
+                process->events.after(0.5, "self-test-quit");
             } else if ((name == "self-test-quit" || name == "shutdown") && !quitRequested) {
                 LOG("supervisor: %s asks %s to quit", name == "shutdown" ? "Shut down" : "self-test", child);
                 quitRequested = true;
@@ -3832,20 +3907,355 @@ static Choice recover(const string &reason, const vector<string> &output) {
 
 static void ensureTools() {
     for (auto &dir : {P.root, P.logs(), P.runtimes()}) mkdirs(dir);
-    if (!gGit) ensureGit();
+    ensureGit();
     if (!gSigner) gSigner.reset(new TreeSigner());
 }
 
 struct OutsideChangesFound {};
 static OutsideChanges gOutside;
 
-static wstring prepareForLaunch() {
-    if (!exists(P.app() + L"\\.git")) {
-        mkdirs(P.runtimes());
-        startBunPrefetch();
+// ---- First install from an app bundle (Rune) ----
+//
+// Stage 1 (before the window): download the app bundle (scripts/
+// build-app-bundle.mjs: the published tree plus the Rune host and UI boot
+// bundles, the runtime bytecode and React, without node_modules or .git)
+// while Bun and the engine download, unpack it and start Stella. Stage 2
+// (hydrateMain, once Stella is ready): fetch PortableGit, check the same
+// commit out in place, sign it, install the packages and prepare the install,
+// then mark hydration.json done; what in Stella needs git or the packages
+// waits on that file meanwhile. Without a bundle (none offered, Electron
+// forced, any step failing) a first install fetches git, clones and installs
+// before the window, as before.
+
+static bool isURL(const string &s) { return s.rfind("https://", 0) == 0 || s.rfind("http://", 0) == 0; }
+
+// A manifest entry's file is relative to the manifest unless it is a URL or an absolute path.
+static string bundleResolve(const string &manifest, const string &ref) {
+    if (isURL(ref) || ref[0] == '/' || ref[0] == '\\' || (ref.size() > 1 && ref[1] == ':')) return ref;
+    size_t slash = manifest.find_last_of(isURL(manifest) ? "/" : "/\\");
+    if (slash == string::npos) return ref;
+    return manifest.substr(0, slash) + (isURL(manifest) ? "/" : "\\") + ref;
+}
+
+// Windows' own bsdtar reads .tar.gz.
+static void extractTarGz(const wstring &archive, const wstring &dir) {
+    wstring tar = envVar(L"SystemRoot") + L"\\System32\\tar.exe";
+    mkdirs(dir);
+    CmdResult r = runCmd({tar, L"-xzf", archive, L"-C", dir}, L"", baseEnvironment(), L"", 600);
+    if (r.code != 0) fail(format("Could not unpack %s: %s", utf8(archive).c_str(), trim(r.err).c_str()));
+}
+
+// Defender and the indexer briefly hold files just written; a rename right
+// after waits them out.
+static bool moveWithRetry(const wstring &from, const wstring &to) {
+    for (int attempt = 0; attempt < 40; attempt++) {
+        if (MoveFileExW(from.c_str(), to.c_str(), 0)) return true;
+        DWORD error = GetLastError();
+        if (error != ERROR_ACCESS_DENIED && error != ERROR_SHARING_VIOLATION) return false;
+        Sleep(250);
     }
-    ensureTools();
+    return false;
+}
+
+// The engine named in the app bundle's manifest (the bundle's own launcher.json pin), fetched
+// beside the bundle rather than after it; ensureEngine joins it.
+static void startBundleEnginePrefetch(const mj_value *engine) {
+    const char *version = mj_get_string(engine, "version"), *url = mj_get_string(engine, "url");
+    const char *sha = mj_get_string(engine, "sha256"), *member = mj_get_string(engine, "member");
+    if (!O.engineBin.empty() || gEnginePrefetch.valid() || !version || !url || !sha) return;
+    string v = version, u = url, s = sha, m = member ? member : "";
+    auto done = std::make_shared<std::promise<void>>();
+    gEnginePrefetch = done->get_future().share();
+    std::thread([v, u, s, m, done]() {
+        try {
+            installEngineAsset(v, u, s, m, false);
+        } catch (const LauncherError &e) {
+            LOG("install: early stella-engine download failed (%s); trying again", e.message.c_str());
+        } catch (...) {
+            LOG("install: early stella-engine download failed; trying again");
+        }
+        done->set_value();
+    }).detach();
+}
+
+// Stage 1's download: leaves P.app() holding the bundle and S.bundleCommit set.
+static void bundleInstall(const string &manifest) {
+    string text;
+    if (isURL(manifest)) {
+        HttpResponse r = http(wide(manifest), L"GET", string(), L"");
+        if (r.status != 200) fail(format("could not fetch the app bundle manifest %s (HTTP %lu)", manifest.c_str(), r.status));
+        text = r.body;
+    } else if (!readFile(wide(manifest), text)) {
+        fail("could not read the app bundle manifest " + manifest);
+    }
+    mj_value *json = mj_parse(text.data(), text.size());
+    if (!json) fail("could not read the app bundle manifest " + manifest);
+    string key = enginePlatformKey();
+    const mj_value *platform = mj_get(mj_get(json, "platforms"), key.c_str());
+    const char *commitV = mj_get_string(json, "commit");
+    const char *fileV = mj_get_string(platform, "url");
+    if (!fileV) fileV = mj_get_string(platform, "file");
+    const char *shaV = mj_get_string(platform, "sha256");
+    if (!commitV || !fileV || !shaV) {
+        mj_free(json);
+        fail("the app bundle manifest has no " + key + " bundle");
+    }
+    string commit = commitV, url = bundleResolve(manifest, fileV), sha = shaV;
+    startBundleEnginePrefetch(mj_get(platform, "engine"));
+    mj_free(json);
+
+    ULONGLONG started = GetTickCount64();
+    progress("Downloading Stella…", 0.05, 0.60);
+    LOG("install: app bundle %s from %s", short12(commit).c_str(), url.c_str());
+    wstring archive = P.runtimes() + L"\\app-bundle.tar.gz";
+    wstring staging = P.appStaging();
+    try {
+        if (isURL(url)) {
+            download(url, archive, sha);
+        } else {
+            if (!CopyFileW(wide(url).c_str(), archive.c_str(), FALSE)) fail("could not copy the app bundle " + url);
+            if (_stricmp(sha256File(archive).c_str(), sha.c_str()) != 0) fail("Checksum mismatch for " + url + ".");
+        }
+        ULONGLONG unpacking = GetTickCount64();
+        removeTree(staging);
+        mkdirs(P.installRoot());
+        extractTarGz(archive, staging);
+        LOG("install: unpacked the app bundle in %.1fs", (GetTickCount64() - unpacking) / 1000.0);
+        if (!moveWithRetry(staging, P.app()))
+            fail(format("could not move the app into place (error %lu)", GetLastError()));
+    } catch (...) {
+        removeTree(staging);
+        DeleteFileW(archive.c_str());
+        throw;
+    }
+    DeleteFileW(archive.c_str());
+    {
+        std::lock_guard<std::recursive_mutex> lock(gStateLock);
+        S = State();
+        S.installedAt = isoNow();
+        S.bundleCommit = commit;
+        S.save();
+    }
+    LOG("install: app bundle in place in %.1fs", (GetTickCount64() - started) / 1000.0);
+}
+
+static std::atomic<bool> gHydrating{false}, gHydrateFinished{false};
+static std::mutex gHydrationLock;
+static string gHydrateStep = "pending";
+
+static void hydrationWrite(const string &status, const string *error = nullptr) {
+    std::lock_guard<std::mutex> lock(gHydrationLock);
+    char *qStatus = mj_quote(status.c_str()), *qStep = mj_quote(gHydrateStep.c_str());
+    string body = format("{\"status\":%s,\"pid\":%lu,\"step\":%s", qStatus, GetCurrentProcessId(), qStep);
+    if (error) {
+        char *qError = mj_quote(error->c_str());
+        body += string(",\"error\":") + qError;
+        free(qError);
+    }
+    body += "}\n";
+    free(qStatus);
+    free(qStep);
+    writeFileAtomic(P.hydrationFile(), body);
+}
+
+static void hydrationStep(const char *step) {
+    {
+        std::lock_guard<std::mutex> lock(gHydrationLock);
+        gHydrateStep = step;
+    }
+    hydrationWrite("running");
+    LOG("hydrate: %s", step);
+}
+
+// Stage 2: PortableGit, the git checkout of the bundle's commit, its signature, the packages.
+static void hydrate(bool rune) {
+    wstring app = P.app(), gitDir = app + L"\\.git-hydrate", finalDir = app + L"\\.git";
+    string branch = O.sourceRef.empty() ? kUpstreamBranch : O.sourceRef;
+    string commit;
+    {
+        std::lock_guard<std::recursive_mutex> lock(gStateLock);
+        commit = S.bundleCommit;
+    }
+    if (commit.empty()) fail("no app bundle to hydrate");
+    bool placed = false;
+    try {
+        hydrationStep("git");
+        ensureGit(false);
+        string remote;
+        vector<std::pair<wstring, wstring>> auth;
+        if (!O.source.empty()) {
+            remote = O.source;
+        } else {
+            string token;
+            bootstrapAccess(remote, token);
+            auth = {{L"GIT_CONFIG_COUNT", L"2"},
+                    {L"GIT_CONFIG_KEY_0", L"http.extraHeader"},
+                    {L"GIT_CONFIG_VALUE_0", wide("Authorization: Bearer " + token)},
+                    {L"GIT_CONFIG_KEY_1", L"protocol.version"},
+                    {L"GIT_CONFIG_VALUE_1", L"1"}};
+        }
+        string gd = utf8(gitDir), wt = utf8(app);
+        auto hgit = [&](vector<string> args) {
+            vector<string> full = {"--git-dir", gd, "--work-tree", wt};
+            full.insert(full.end(), args.begin(), args.end());
+            return gGit->run(full, app);
+        };
+        removeTree(gitDir);
+        hgit({"init", "-q"});
+        // As cloneSource: an LF working tree whatever PortableGit's system
+        // autocrlf says, or every file reads as changed.
+        hgit({"config", "core.autocrlf", "false"});
+        hgit({"config", "core.longpaths", "true"});
+        hgit({"symbolic-ref", "HEAD", string("refs/heads/") + kUpstreamBranch});
+        hgit({"remote", "add", kUpstreamRemoteName, remote});
+        {
+            ULONGLONG started = GetTickCount64();
+            gGit->run({"--git-dir", gd, "fetch", "-q", "--no-tags", kUpstreamRemoteName,
+                       "+refs/heads/" + branch + ":refs/remotes/" + kUpstreamRemoteName + "/" + branch},
+                      app, auth);
+            LOG("hydrate: fetched %s in %.1fs", branch.c_str(), (GetTickCount64() - started) / 1000.0);
+        }
+        if (gGit->raw({"--git-dir", gd, "cat-file", "-e", commit + "^{commit}"}, app).code != 0) {
+            // The branch moved past the bundle's commit without keeping it: ask for it by name.
+            gGit->run({"--git-dir", gd, "fetch", "-q", "--no-tags", kUpstreamRemoteName, commit}, app, auth);
+        }
+        hgit({"update-ref", string("refs/heads/") + kUpstreamBranch, commit});
+        hgit({"config", string("branch.") + kUpstreamBranch + ".remote", kUpstreamRemoteName});
+        hgit({"config", string("branch.") + kUpstreamBranch + ".merge", string("refs/heads/") + kUpstreamBranch});
+        // The index from the commit, against the files already there.
+        hgit({"reset", "-q"});
+        string status = hgit({"status", "--porcelain=v1", "--untracked-files=no"});
+        if (!status.empty()) fail("the app bundle differs from " + short12(commit) + ": " + status.substr(0, 300));
+        if (!moveWithRetry(gitDir, finalDir)) fail(format("could not move .git into place (error %lu)", GetLastError()));
+        placed = true;
+        // init with --work-tree records it; a clone does not.
+        gGit->raw({"config", "--unset", "core.worktree"}, app);
+
+        hydrationStep("sign");
+        if (!gSigner) gSigner.reset(new TreeSigner());
+        signHead(commit);
+        // A signed checkout: from here on the launcher treats it as installed,
+        // and installs what is missing before the window if this run stops.
+        {
+            std::lock_guard<std::recursive_mutex> lock(gStateLock);
+            S.bundleCommit.clear();
+            S.save();
+        }
+        placed = false;
+
+        hydrationStep("packages");
+        prepare(rune, true);
+    } catch (...) {
+        removeTree(gitDir);
+        // An unsigned checkout would read as changed outside Stella.
+        if (placed) removeTree(finalDir);
+        throw;
+    }
+}
+
+static void hydrateMain() {
+    ULONGLONG started = GetTickCount64();
+    // Behind the open window: never ahead of it for the CPU.
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+    tChildPriority = BELOW_NORMAL_PRIORITY_CLASS;
+    try {
+        hydrate(true);
+        {
+            std::lock_guard<std::mutex> lock(gHydrationLock);
+            gHydrateStep = "done";
+        }
+        hydrationWrite("done");
+        LOG("hydrate: done in %.1fs", (GetTickCount64() - started) / 1000.0);
+    } catch (const LauncherError &e) {
+        string step;
+        {
+            std::lock_guard<std::mutex> lock(gHydrationLock);
+            step = gHydrateStep;
+        }
+        LOG("hydrate: failed at %s: %s", step.c_str(), e.message.c_str());
+        hydrationWrite("failed", &e.message);
+    } catch (...) {
+        string error = "unexpected error";
+        LOG("hydrate: failed: %s", error.c_str());
+        hydrationWrite("failed", &error);
+    }
+    gHydrateFinished = true;
+}
+
+static bool hydrationRunning() { return gHydrating && !gHydrateFinished; }
+
+static void hydrateStart() {
+    if (gHydrating.exchange(true)) return;
+    std::thread(hydrateMain).detach();
+}
+
+// Electron chosen by hand (engineRequested's flag, environment or <root>\electron-engine):
+// a first install then clones, since the app bundle is for Rune.
+static bool electronForced() {
+    if (!O.engine.empty()) return O.engine != L"rune";
+    if (!O.engineBin.empty()) return false;
+    return exists(P.root + L"\\electron-engine");
+}
+
+static wstring prepareForLaunch() {
+    for (auto &dir : {P.root, P.logs(), P.runtimes()}) mkdirs(dir);
+    if (!exists(P.app() + L"\\.git")) startBunPrefetch();
     followServerFile();
+    if (!exists(P.app() + L"\\.git") && !exists(P.app()) && !electronForced()) {
+        // A first install: from the app bundle when there is one.
+        string manifest = trim(utf8(envVar(L"STELLA_LAUNCHER_BUNDLE_MANIFEST")));
+        if (manifest.empty() && O.source.empty()) {
+            try {
+                string remote, token;
+                bootstrapAccess(remote, token);
+                manifest = gBundleManifest;
+            } catch (const LauncherError &e) {
+                LOG("install: bootstrap failed (%s)", e.message.c_str());
+            }
+        }
+        if (!manifest.empty()) {
+            try {
+                bundleInstall(manifest);
+            } catch (const LauncherError &e) {
+                LOG("install: the app bundle failed (%s); cloning instead", e.message.c_str());
+            }
+        }
+    }
+    string bundleCommit;
+    {
+        std::lock_guard<std::recursive_mutex> lock(gStateLock);
+        bundleCommit = S.bundleCommit;
+    }
+    if (!exists(P.app() + L"\\.git") && !bundleCommit.empty() && exists(P.app())) {
+        if (!gSigner) gSigner.reset(new TreeSigner());
+        startEnginePrefetch();
+        if (engineRequested()) {
+            // Rune opens from the bundle; hydration (PortableGit included)
+            // follows once it is up. gGit already names where PortableGit
+            // goes, so Stella's environment points there from the start.
+            ensureBun();
+            ensureEngine();
+            useGitAt(gitRoot());
+            gBundleStage = true;
+            if (!gHydrating) {
+                {
+                    std::lock_guard<std::mutex> lock(gHydrationLock);
+                    gHydrateStep = "pending";
+                }
+                hydrationWrite("pending");
+            }
+            LOG("install: starting stella-engine %s from the app bundle %s; hydrating once Stella is up",
+                gEngineVersion.c_str(), short12(bundleCommit).c_str());
+            return gEngineBin;
+        }
+        // Electron needs the packages: hydrate before the window.
+        LOG("install: Electron starts here; hydrating the app bundle first");
+        progress("Installing Stella…", 0.40, 0.90);
+        ensureBun();
+        hydrate(false);
+    }
+    gBundleStage = false;
+    ensureTools();
     if (!exists(P.app() + L"\\.git")) {
         cloneSource();
         signHead("");

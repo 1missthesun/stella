@@ -207,7 +207,9 @@ these props. Types are in `host/rune-jsx/props.ts` (`FxLayer`, `Glass`, `Lightin
   behind the element (images, text, content scrolling under it), with a bevelled rim catching the
   light and a contact shadow. Keys: `bevel` (14), `depth` (16), `dispersion` (0.14),
   `magnification` (1.04), `presence` (1), `frost` 0..1 and `frostSigma` (18), `shadow` (0.35),
-  `rim` (1.6), `lightAngle` (radians, -2.09), `tint` + `tintAmount`, `veil` (0..1: mixes the
+  `rim` (1.6), `lightAngle` (radians, -2.09), `saturation` (1: of what shows through, before the
+  tint; Apple's regular glass is about 1.6), `perceptual` (false: true mixes `saturation` and
+  `veil` in sRGB, as UIKit does, so tints measured from iOS carry over), `tint` + `tintAmount`, `veil` (0..1: mixes the
   body toward `tint` so labels stay legible), `merge: {x,y,w,h,radius}` + `unionK` (22) + `morph`
   (a second shape it flows into, in the element's points).
 - Adaptive dimming: `adapt` (0..1, default 0, off) measures what is behind the glass on every

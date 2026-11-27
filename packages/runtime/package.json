@@ -73,6 +73,7 @@
     "@stella/agent": "workspace:*",
     "@stella/contracts": "workspace:*",
     "@stella/node-shared": "workspace:*",
+    "@stella/views": "workspace:*",
     "ajv": "^8.20.0",
     "croner": "^10.0.1",
     "effect": "4.0.0",

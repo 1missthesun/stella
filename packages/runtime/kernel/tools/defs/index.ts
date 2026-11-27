@@ -12,6 +12,7 @@ import { editTool } from "./edit.js";
 import { createExecCommandTool } from "./exec-command.js";
 import { grepTool } from "./grep.js";
 import { createHtmlTool } from "./html.js";
+import { createViewTool, hostRendersViews } from "./view.js";
 import { createDriveTool } from "./drive.js";
 import { createDriveTransferTools } from "./drive-transfer.js";
 import { createImageGenTool } from "./image-gen.js";
@@ -121,6 +122,9 @@ export const buildBuiltinTools = (
         : {}),
     }),
   );
+  if (hostRendersViews()) {
+    tools.push(createViewTool({ stellaDataDir: options.stellaDataDir }));
+  }
   tools.push(
     createMapTool({
       ...(options.getCloudBackendAuth

@@ -3964,5 +3964,43 @@
       "title": "Stella is on your phone too",
       "detail": "Get the app to message Stella and check on your tasks when you're away from this computer."
     }
+  },
+  "devices": {
+    "title": "Devices",
+    "more": "More for {name}",
+    "unpair": "Unpair",
+    "forget": "Forget",
+    "unpairTitle": "Unpair {name}?",
+    "unpairBody": "It disconnects right away and needs a new code to connect again.",
+    "forgetTitle": "Forget {name}?",
+    "forgetBody": "This device stops connecting to it. Its chats stay on that computer.",
+    "computerChat": "{name}'s Stella",
+    "pair": {
+      "intro": "Scan this with Stella on your phone, or paste the code into Stella on another computer. It connects straight to this computer, with no account, and works once.",
+      "copy": "Copy code"
+    },
+    "enter": {
+      "title": "Use another computer's Stella",
+      "intro": "On that computer, open Settings › Account › Connect a device, then paste its code here.",
+      "label": "Pairing code",
+      "connect": "Connect",
+      "connecting": "Connecting…"
+    },
+    "status": {
+      "connected": "Connected",
+      "lastSeen": "Last seen {time}",
+      "notYet": "Not connected yet",
+      "online": "Online",
+      "onlineRelay": "Online through a relay",
+      "offline": "Asleep or offline",
+      "connecting": "Connecting…",
+      "unpaired": "No longer paired"
+    },
+    "chat": {
+      "offline": "{name} is asleep or offline. Reconnects automatically.",
+      "connecting": "Connecting to {name}…",
+      "unpaired": "{name} unpaired this device.",
+      "back": "Back to this computer"
+    }
   }
 }

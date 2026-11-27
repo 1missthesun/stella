@@ -4021,5 +4021,43 @@
       "title": "Stella este și pe telefonul tău",
       "detail": "Descarcă aplicația ca să-i scrii Stellei și să-ți urmărești sarcinile când nu ești la acest computer."
     }
+  },
+  "devices": {
+    "title": "Dispozitive",
+    "more": "Mai multe pentru {name}",
+    "unpair": "Anulează asocierea",
+    "forget": "Uită",
+    "unpairTitle": "Anulezi asocierea cu {name}?",
+    "unpairBody": "Se deconectează imediat și va avea nevoie de un cod nou pentru a se reconecta.",
+    "forgetTitle": "Uiți {name}?",
+    "forgetBody": "Acest dispozitiv nu se mai conectează la el. Conversațiile rămân pe acel computer.",
+    "computerChat": "Stella de pe {name}",
+    "pair": {
+      "intro": "Scanează asta cu Stella pe telefon sau lipește codul în Stella pe alt computer. Se conectează direct la acest computer, fără cont, și funcționează o singură dată.",
+      "copy": "Copiază codul"
+    },
+    "enter": {
+      "title": "Folosește Stella de pe alt computer",
+      "intro": "Pe acel computer, deschide Setări › Cont › Conectează un dispozitiv, apoi lipește codul aici.",
+      "label": "Cod de asociere",
+      "connect": "Conectează",
+      "connecting": "Se conectează…"
+    },
+    "status": {
+      "connected": "Conectat",
+      "lastSeen": "Văzut {time}",
+      "notYet": "Încă neconectat",
+      "online": "Online",
+      "onlineRelay": "Online printr-un releu",
+      "offline": "În repaus sau offline",
+      "connecting": "Se conectează…",
+      "unpaired": "Nu mai este asociat"
+    },
+    "chat": {
+      "offline": "{name} este în repaus sau offline. Se reconectează automat.",
+      "connecting": "Se conectează la {name}…",
+      "unpaired": "{name} a anulat asocierea cu acest dispozitiv.",
+      "back": "Înapoi la acest computer"
+    }
   }
 }

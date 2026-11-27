@@ -3964,5 +3964,43 @@
       "title": "Stella staat ook op je telefoon",
       "detail": "Download de app om Stella berichten te sturen en je taken te volgen als je niet achter deze computer zit."
     }
+  },
+  "devices": {
+    "title": "Apparaten",
+    "more": "Meer voor {name}",
+    "unpair": "Ontkoppelen",
+    "forget": "Vergeten",
+    "unpairTitle": "{name} ontkoppelen?",
+    "unpairBody": "De verbinding wordt meteen verbroken. Opnieuw verbinden kan alleen met een nieuwe code.",
+    "forgetTitle": "{name} vergeten?",
+    "forgetBody": "Dit apparaat maakt er geen verbinding meer mee. De chats blijven op die computer.",
+    "computerChat": "Stella op {name}",
+    "pair": {
+      "intro": "Scan dit met Stella op je telefoon of plak de code in Stella op een andere computer. Die maakt rechtstreeks verbinding met deze computer, zonder account, en werkt één keer.",
+      "copy": "Code kopiëren"
+    },
+    "enter": {
+      "title": "Stella van een andere computer gebruiken",
+      "intro": "Open op die computer Instellingen › Account › Apparaat verbinden en plak de code hier.",
+      "label": "Koppelcode",
+      "connect": "Verbinden",
+      "connecting": "Verbinden…"
+    },
+    "status": {
+      "connected": "Verbonden",
+      "lastSeen": "Laatst gezien {time}",
+      "notYet": "Nog niet verbonden",
+      "online": "Online",
+      "onlineRelay": "Online via een relay",
+      "offline": "In slaapstand of offline",
+      "connecting": "Verbinden…",
+      "unpaired": "Niet meer gekoppeld"
+    },
+    "chat": {
+      "offline": "{name} is in slaapstand of offline. Maakt automatisch opnieuw verbinding.",
+      "connecting": "Verbinden met {name}…",
+      "unpaired": "{name} heeft dit apparaat ontkoppeld.",
+      "back": "Terug naar deze computer"
+    }
   }
 }

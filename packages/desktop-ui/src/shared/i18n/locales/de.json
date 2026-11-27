@@ -3964,5 +3964,43 @@
       "title": "Stella gibt es auch auf deinem Handy",
       "detail": "Hol dir die App, um Stella zu schreiben und deine Aufgaben im Blick zu behalten, wenn du nicht an diesem Computer bist."
     }
+  },
+  "devices": {
+    "title": "Geräte",
+    "more": "Mehr für {name}",
+    "unpair": "Entkoppeln",
+    "forget": "Vergessen",
+    "unpairTitle": "{name} entkoppeln?",
+    "unpairBody": "Die Verbindung wird sofort getrennt. Für eine neue Verbindung ist ein neuer Code nötig.",
+    "forgetTitle": "{name} vergessen?",
+    "forgetBody": "Dieses Gerät verbindet sich nicht mehr damit. Die Chats bleiben auf diesem Computer.",
+    "computerChat": "Stella auf {name}",
+    "pair": {
+      "intro": "Scanne dies mit Stella auf deinem Handy oder füge den Code in Stella auf einem anderen Computer ein. Die Verbindung geht direkt zu diesem Computer, ohne Konto, und funktioniert einmal.",
+      "copy": "Code kopieren"
+    },
+    "enter": {
+      "title": "Stella eines anderen Computers nutzen",
+      "intro": "Öffne auf diesem Computer Einstellungen › Konto › Gerät verbinden und füge den Code hier ein.",
+      "label": "Kopplungscode",
+      "connect": "Verbinden",
+      "connecting": "Wird verbunden…"
+    },
+    "status": {
+      "connected": "Verbunden",
+      "lastSeen": "Zuletzt gesehen {time}",
+      "notYet": "Noch nicht verbunden",
+      "online": "Online",
+      "onlineRelay": "Online über ein Relay",
+      "offline": "Im Ruhezustand oder offline",
+      "connecting": "Wird verbunden…",
+      "unpaired": "Nicht mehr gekoppelt"
+    },
+    "chat": {
+      "offline": "{name} ist im Ruhezustand oder offline. Verbindet sich automatisch wieder.",
+      "connecting": "Verbindung mit {name}…",
+      "unpaired": "{name} hat dieses Gerät entkoppelt.",
+      "back": "Zurück zu diesem Computer"
+    }
   }
 }

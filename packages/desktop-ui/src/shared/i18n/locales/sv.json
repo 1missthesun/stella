@@ -3964,5 +3964,43 @@
       "title": "Stella finns i din telefon också",
       "detail": "Hämta appen för att skriva till Stella och hålla koll på dina uppgifter när du inte sitter vid den här datorn."
     }
+  },
+  "devices": {
+    "title": "Enheter",
+    "more": "Mer för {name}",
+    "unpair": "Koppla från",
+    "forget": "Glöm",
+    "unpairTitle": "Koppla från {name}?",
+    "unpairBody": "Anslutningen bryts direkt och en ny kod behövs för att ansluta igen.",
+    "forgetTitle": "Glöm {name}?",
+    "forgetBody": "Den här enheten slutar ansluta till den. Chattarna finns kvar på den datorn.",
+    "computerChat": "Stella på {name}",
+    "pair": {
+      "intro": "Skanna det här med Stella i telefonen eller klistra in koden i Stella på en annan dator. Den ansluter direkt till den här datorn, utan konto, och fungerar en gång.",
+      "copy": "Kopiera kod"
+    },
+    "enter": {
+      "title": "Använd en annan dators Stella",
+      "intro": "Öppna Inställningar › Konto › Anslut en enhet på den datorn och klistra in koden här.",
+      "label": "Parkopplingskod",
+      "connect": "Anslut",
+      "connecting": "Ansluter…"
+    },
+    "status": {
+      "connected": "Ansluten",
+      "lastSeen": "Senast sedd {time}",
+      "notYet": "Inte ansluten än",
+      "online": "Online",
+      "onlineRelay": "Online via ett relä",
+      "offline": "I viloläge eller offline",
+      "connecting": "Ansluter…",
+      "unpaired": "Inte längre parkopplad"
+    },
+    "chat": {
+      "offline": "{name} är i viloläge eller offline. Ansluter igen automatiskt.",
+      "connecting": "Ansluter till {name}…",
+      "unpaired": "{name} kopplade från den här enheten.",
+      "back": "Tillbaka till den här datorn"
+    }
   }
 }

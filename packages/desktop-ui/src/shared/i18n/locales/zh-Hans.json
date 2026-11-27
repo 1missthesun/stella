@@ -3905,5 +3905,43 @@
       "title": "Stella 也在你的手机上",
       "detail": "获取 App，离开这台电脑时也能给 Stella 发消息、查看任务进展。"
     }
+  },
+  "devices": {
+    "title": "设备",
+    "more": "{name} 的更多选项",
+    "unpair": "取消配对",
+    "forget": "移除",
+    "unpairTitle": "要取消与 {name} 的配对吗？",
+    "unpairBody": "它会立即断开，之后需要新的代码才能重新连接。",
+    "forgetTitle": "要移除 {name} 吗？",
+    "forgetBody": "此设备将不再连接到它。聊天记录仍保留在那台电脑上。",
+    "computerChat": "{name} 上的 Stella",
+    "pair": {
+      "intro": "用手机上的 Stella 扫描，或将代码粘贴到另一台电脑上的 Stella 中。它会直接连接到这台电脑，无需账户，且只能使用一次。",
+      "copy": "复制代码"
+    },
+    "enter": {
+      "title": "使用另一台电脑上的 Stella",
+      "intro": "在那台电脑上打开「设置 › 账户 › 连接设备」，然后把代码粘贴到这里。",
+      "label": "配对代码",
+      "connect": "连接",
+      "connecting": "正在连接…"
+    },
+    "status": {
+      "connected": "已连接",
+      "lastSeen": "上次在线 {time}",
+      "notYet": "尚未连接",
+      "online": "在线",
+      "onlineRelay": "通过中继在线",
+      "offline": "睡眠或离线",
+      "connecting": "正在连接…",
+      "unpaired": "已不再配对"
+    },
+    "chat": {
+      "offline": "{name} 处于睡眠或离线状态，会自动重新连接。",
+      "connecting": "正在连接到 {name}…",
+      "unpaired": "{name} 已取消与此设备的配对。",
+      "back": "返回这台电脑"
+    }
   }
 }

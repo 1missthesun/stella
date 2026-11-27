@@ -17,6 +17,7 @@ import { CloudBoundary } from "@/features/cloud/CloudBoundary";
 import { SessionsCard } from "./SessionsCard";
 import { PasskeysCard } from "./PasskeysCard";
 import { ServerSettingsCard } from "../../global/self-host/ServerSettingsCard";
+import { DevicesCard } from "../../global/devices/DevicesCard";
 import { useSelfHostedServer } from "@/platform/backend/server-discovery";
 import { useCurrentUser } from "@/global/auth/hooks/use-current-user";
 import { onPhone } from "../../shell/phone";
@@ -209,6 +210,7 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
           </SettingsRow>
         )}
       </SettingsCard>
+      <DevicesCard />
       {hasConnectedAccount ? (
         <CloudBoundary>
           <SessionsCard />

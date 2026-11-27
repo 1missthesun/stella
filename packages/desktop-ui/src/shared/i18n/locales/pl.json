@@ -4078,5 +4078,43 @@
       "title": "Stella jest też na Twoim telefonie",
       "detail": "Pobierz aplikację, aby pisać do Stelli i śledzić swoje zadania, gdy nie siedzisz przy tym komputerze."
     }
+  },
+  "devices": {
+    "title": "Urządzenia",
+    "more": "Więcej dla {name}",
+    "unpair": "Rozłącz parowanie",
+    "forget": "Zapomnij",
+    "unpairTitle": "Rozłączyć parowanie z {name}?",
+    "unpairBody": "Połączenie zostanie od razu zerwane, a ponowne połączenie będzie wymagać nowego kodu.",
+    "forgetTitle": "Zapomnieć {name}?",
+    "forgetBody": "To urządzenie przestanie się z nim łączyć. Czaty zostaną na tamtym komputerze.",
+    "computerChat": "Stella na {name}",
+    "pair": {
+      "intro": "Zeskanuj to w Stelli na telefonie albo wklej kod w Stelli na innym komputerze. Połączy się bezpośrednio z tym komputerem, bez konta, i zadziała raz.",
+      "copy": "Kopiuj kod"
+    },
+    "enter": {
+      "title": "Użyj Stelli z innego komputera",
+      "intro": "Na tamtym komputerze otwórz Ustawienia › Konto › Połącz urządzenie i wklej tutaj kod.",
+      "label": "Kod parowania",
+      "connect": "Połącz",
+      "connecting": "Łączenie…"
+    },
+    "status": {
+      "connected": "Połączono",
+      "lastSeen": "Ostatnio widziane {time}",
+      "notYet": "Jeszcze nie połączono",
+      "online": "Online",
+      "onlineRelay": "Online przez przekaźnik",
+      "offline": "Uśpiony lub offline",
+      "connecting": "Łączenie…",
+      "unpaired": "Już nie sparowano"
+    },
+    "chat": {
+      "offline": "{name} jest uśpiony lub offline. Połączy się ponownie automatycznie.",
+      "connecting": "Łączenie z {name}…",
+      "unpaired": "{name} rozłączył parowanie z tym urządzeniem.",
+      "back": "Wróć do tego komputera"
+    }
   }
 }

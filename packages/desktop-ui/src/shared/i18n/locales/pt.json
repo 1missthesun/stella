@@ -4021,5 +4021,43 @@
       "title": "A Stella também está no seu celular",
       "detail": "Baixe o app para mandar mensagens à Stella e acompanhar suas tarefas quando estiver longe deste computador."
     }
+  },
+  "devices": {
+    "title": "Dispositivos",
+    "more": "Mais para {name}",
+    "unpair": "Desemparelhar",
+    "forget": "Esquecer",
+    "unpairTitle": "Desemparelhar {name}?",
+    "unpairBody": "Ele é desconectado na hora e precisará de um novo código para se conectar de novo.",
+    "forgetTitle": "Esquecer {name}?",
+    "forgetBody": "Este dispositivo deixa de se conectar a ele. As conversas continuam naquele computador.",
+    "computerChat": "Stella de {name}",
+    "pair": {
+      "intro": "Escaneie com o Stella no seu celular ou cole o código no Stella em outro computador. A conexão é direta com este computador, sem conta, e funciona uma vez.",
+      "copy": "Copiar código"
+    },
+    "enter": {
+      "title": "Usar o Stella de outro computador",
+      "intro": "Nesse computador, abra Ajustes › Conta › Conectar um dispositivo e cole o código aqui.",
+      "label": "Código de pareamento",
+      "connect": "Conectar",
+      "connecting": "Conectando…"
+    },
+    "status": {
+      "connected": "Conectado",
+      "lastSeen": "Visto {time}",
+      "notYet": "Ainda não conectado",
+      "online": "Online",
+      "onlineRelay": "Online por um relay",
+      "offline": "Em repouso ou offline",
+      "connecting": "Conectando…",
+      "unpaired": "Não está mais emparelhado"
+    },
+    "chat": {
+      "offline": "{name} está em repouso ou offline. Reconecta automaticamente.",
+      "connecting": "Conectando a {name}…",
+      "unpaired": "{name} desemparelhou este dispositivo.",
+      "back": "Voltar a este computador"
+    }
   }
 }

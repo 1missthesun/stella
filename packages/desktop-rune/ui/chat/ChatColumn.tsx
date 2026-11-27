@@ -3,6 +3,7 @@ import { ConnectorConnectCard } from "@/app/chat/ConnectorConnectCard";
 import { UsageLimitChatCard } from "@/features/chat/UsageLimitChatCard";
 import { SafeguardChatCard } from "@/features/chat/SafeguardChatCard";
 import { ComposerNotice } from "@/app/chat/ComposerNotice";
+import { ComputerLinkNotice } from "./ComputerLinkNotice";
 import { CloudBrowserInterventionCard } from "@/features/cloud/CloudBrowserInterventionCard";
 import { CloudConnectorConnectCard } from "@/features/cloud/CloudConnectorConnectCard";
 import { UserAskList } from "@/features/user-ask/UserAskList";
@@ -76,6 +77,7 @@ const StoreBackedComposer = memo(function StoreBackedComposer({ messageStore, ..
 const AboveComposerCards = memo(function AboveComposerCards({ conversationId, onLayout }: { conversationId: string | null; onLayout: (r: Layout) => void }) {
   return (
     <col w="full" onLayout={onLayout}>
+      <ComputerLinkNotice conversationId={conversationId} />
       <ConnectorConnectCard conversationId={conversationId} />
       <CloudConnectorConnectCard conversationId={conversationId} />
       <CloudBrowserInterventionCard conversationId={conversationId} />

@@ -66,6 +66,10 @@ export const createViewTool = (options: ViewToolOptions): ToolDefinition => {
           title,
           createdAt,
           bytes: Buffer.byteLength(source, "utf8"),
+          // The whole view travels with the turn, so the user's other devices (the phone) run
+          // the newest version of each slug locally even when this computer is offline.
+          source,
+          ...(args.data !== undefined ? { data: args.data } : {}),
           ...(problems.length > 0 ? { problems } : {}),
           ...(run?.renderMs != null ? { renderMs: run.renderMs } : {}),
         },

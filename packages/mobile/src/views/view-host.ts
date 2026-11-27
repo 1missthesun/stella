@@ -7,12 +7,13 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { AppState } from "react-native";
 import { ViewSession, type ViewSnapshot, type ViewStorage } from "@stella/views/session";
 import type { ViewTheme } from "@stella/views/protocol";
-import { viewFileName, viewKey } from "@stella/views/paths";
+import { viewFileName, viewIdentityFromPath, viewKey } from "@stella/views/paths";
 import { ViewStorageSync, backendViewStorageRemote, normalizeViewStorageRecord, syncedViewId, viewSlugFromPath, type ViewStorageDisk } from "@stella/views/storage-sync";
 import { getBackendClient } from "../lib/backend";
 import type { ChatMessage, ChatViewRef } from "../types";
 import { nativeViewVm } from "./native-vm";
 import { viewCapabilities } from "./view-capabilities";
+import { onViewsAccount, viewsAccount } from "./views-account";
 
 const KEEP_ALIVE_MS = 60_000;
 
@@ -123,38 +124,56 @@ const legacyPhoneStorage = async (file: string): Promise<Record<string, unknown>
   }
 };
 
+/** Per account (records from before that are keyed by the view id alone, `v1`). */
+const syncedKey = (viewId: string, account: string | null) => (account === null ? `stella-views:synced:v1:${viewId}` : `stella-views:synced:v2:${account}:${viewId}`);
 const syncedDisk: ViewStorageDisk = {
-  read: async (viewId) => {
+  read: async (viewId, account) => {
     try {
-      return normalizeViewStorageRecord(JSON.parse((await AsyncStorage.getItem(`stella-views:synced:v1:${viewId}`)) ?? "null"));
+      return normalizeViewStorageRecord(JSON.parse((await AsyncStorage.getItem(syncedKey(viewId, account))) ?? "null"));
     } catch {
       return null;
     }
   },
-  write: (viewId, record) => AsyncStorage.setItem(`stella-views:synced:v1:${viewId}`, JSON.stringify(record)),
+  write: (viewId, record, account) => AsyncStorage.setItem(syncedKey(viewId, account), JSON.stringify(record)),
 };
 
-/** Views' storage, synced through Stella Cloud as `<conversationId>/<slug>` (packages/views/src/storage-sync.ts). */
+/** Views' storage, synced through Stella Cloud as `<conversationId>/<slug>` (packages/views/src/storage-sync.ts), per account. */
 const sync = new ViewStorageSync(syncedDisk, (message, detail) => console.warn(`[views] ${message}`, detail));
-let syncConnected = false;
+let remote: ReturnType<typeof backendViewStorageRemote> | null | undefined;
+let listening = false;
 
+/** Points views' storage at the signed-in account; on a switch, the running views restart on the new account's values. */
 const connectSync = () => {
-  if (syncConnected) return;
-  try {
-    sync.setRemote(backendViewStorageRemote(getBackendClient()));
-    syncConnected = true;
+  const account = viewsAccount();
+  if (account === undefined) return;
+  if (remote === undefined) {
+    try {
+      remote = backendViewStorageRemote(getBackendClient());
+    } catch {
+      // No backend configured (a build without one): views keep their storage on the phone.
+      remote = null;
+    }
+  }
+  if (!listening) {
+    listening = true;
     // Back in front (often back online too): replay what's queued instead of waiting out a retry.
     AppState.addEventListener("change", (state) => {
       if (state === "active") sync.retryNow();
     });
-  } catch {
-    // No backend configured (a build without one): views keep their storage on the phone.
+  }
+  if (sync.connect(account, account ? remote : null) && entries.size > 0) {
+    for (const entry of entries.values()) entry.dispose();
+    entries.clear();
+    generation += 1;
+    for (const listener of newestListeners) listener();
   }
 };
+onViewsAccount(connectSync);
 
-/** A view's storage: synced when the conversation names it, else on the phone alone. */
+/** A view's storage: synced when the conversation (or the view's own path) names it, else on the phone alone. */
 function viewStorage(file: string, ref: ChatViewRef): ViewStorage {
-  const viewId = scope ? syncedViewId(scope, ref.slug || viewSlugFromPath(file)) : null;
+  const named = viewIdentityFromPath(file);
+  const viewId = named ? syncedViewId(named.conversationId, named.slug) : scope ? syncedViewId(scope, ref.slug || viewSlugFromPath(file)) : null;
   if (!viewId) return phoneStorage(file);
   connectSync();
   return sync.storage(viewId, () => legacyPhoneStorage(file));

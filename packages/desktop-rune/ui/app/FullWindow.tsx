@@ -27,6 +27,7 @@ import { FullShell } from "../shell/FullShell";
 import { LaunchSplash } from "../shell/LaunchSplash";
 import { useNotificationToastSpace } from "../features/notifications/NotificationBell";
 import { UpdateTransitionLayer, useUpdateTransitionAppLook } from "../shell/update-transition/UpdateTransitionLayer";
+import { ViewsAccountBridge } from "../views/ViewsAccountBridge";
 
 const RemoteExecutionConsentLayer = mounted(import.meta.glob("../replace/global/execution/RemoteExecutionConsentLayer.tsx", { eager: true }), "RemoteExecutionConsentLayer", Nothing);
 const DeviceWorkOfferLayer = mounted(import.meta.glob("../replace/global/execution/DeviceWorkOfferLayer.tsx", { eager: true }), "DeviceWorkOfferLayer", Nothing);
@@ -96,6 +97,7 @@ function App() {
         {platformCapabilities.nativeBridges ? <TelemetryPreferenceBridge /> : null}
         <CloudHomeSyncBridge />
         <UserAskEventsLayer />
+        <ViewsAccountBridge />
         {platformCapabilities.nativeBridges ? <RemoteExecutionConsentLayer /> : null}
         {platformCapabilities.nativeBridges ? <DeviceWorkOfferLayer /> : null}
         {platformCapabilities.nativeBridges ? <SavedValuesDeviceLayer /> : null}

@@ -10,7 +10,20 @@ import { basename, dirname, isAbsolute, join } from "node:path";
 import { ViewSession, type ViewCapabilities, type ViewRun, type ViewSnapshot, type ViewStorage, type ViewVm } from "@stella/views/session";
 import type { ViewMessage, ViewPost, ViewTheme } from "@stella/views/protocol";
 import { latestConversationViews, type ConversationView, type ViewToolEvent } from "@stella/views/conversation";
-import { isViewPath, viewDataPath as dataPathFor, viewHostMarkerPath, viewKey as hash, viewSourceHash, viewStatusPath, viewTitle as titleFor, type ViewHostMarker, type ViewStatusFile } from "@stella/views/files";
+import {
+  isViewPath,
+  viewDataPath as dataPathFor,
+  viewHostMarkerPath,
+  viewIdentityFromPath,
+  viewIdentityIndexPath,
+  viewKey as hash,
+  viewSourceHash,
+  viewStatusPath,
+  viewTitle as titleFor,
+  type ViewHostMarker,
+  type ViewIdentityIndex,
+  type ViewStatusFile,
+} from "@stella/views/files";
 import {
   MovableViewStorage,
   ViewStorageSync,
@@ -20,6 +33,7 @@ import {
   viewSlugFromPath,
   type ViewStorageBackend,
   type ViewStorageDisk,
+  type ViewStorageRemote,
 } from "@stella/views/storage-sync";
 import type { engine as BridgeEngine, onEngineEvent as BridgeOn } from "../bridge";
 import { mainContext } from "../services/main-context";
@@ -170,13 +184,24 @@ function fileStorage(filePath: string): ViewStorage {
   };
 }
 
-/** Synced views' storage on this computer: one file per view, named by its synced id. */
+/**
+ * Synced views' storage on this computer: one file per view, named by its synced id, in a folder per
+ * account (`views/synced/a-<hash>/`). Records from before they were kept per account sit in
+ * `views/synced/` itself.
+ */
 const syncedDisk = (): ViewStorageDisk => {
-  const fileFor = (viewId: string) => join(dataDir(), "views", "synced", `${viewId.split("/").pop()!.replace(/[^\w.-]+/gu, "_").slice(0, 60)}-${hash(viewId)}.json`);
+  const fileFor = (viewId: string, account: string | null) =>
+    join(dataDir(), "views", "synced", ...(account === null ? [] : [`a-${hash(account)}`]), `${viewId.split("/").pop()!.replace(/[^\w.-]+/gu, "_").slice(0, 60)}-${hash(viewId)}.json`);
   return {
-    read: async (viewId) => normalizeViewStorageRecord(readJsonFile(fileFor(viewId))),
-    write: async (viewId, record) => writeJsonFile(fileFor(viewId), record),
+    read: async (viewId, account) => normalizeViewStorageRecord(readJsonFile(fileFor(viewId, account))),
+    write: async (viewId, record, account) => writeJsonFile(fileFor(viewId, account), record),
   };
+};
+
+/** A view's synced id from its path, for a view in a chat's own folder (`outputs/views/<conversation>/<slug>.view.tsx`). */
+const viewIdFromPath = (filePath: string): string | null => {
+  const named = viewIdentityFromPath(filePath);
+  return named ? syncedViewId(named.conversationId, named.slug) : null;
 };
 
 /**
@@ -185,9 +210,10 @@ const syncedDisk = (): ViewStorageDisk => {
  * elsewhere) still finds its storage: by path, and by source, which a moved file keeps.
  */
 function identityIndex() {
-  const file = join(dataDir(), "views", "identity.json");
+  // The `view` tool reads it too, to keep a chat's view from before views had a folder per chat at its old path.
+  const file = viewIdentityIndexPath(dataDir());
   const LIMIT = 2000;
-  type Index = { byPath: Record<string, string>; bySource: Record<string, string> };
+  type Index = ViewIdentityIndex;
   let index: Index | null = null;
   let timer: ReturnType<typeof setTimeout> | null = null;
   const read = (): Index => {
@@ -214,6 +240,8 @@ function identityIndex() {
   };
   return {
     lookup(filePath: string, source: string | null): string | null {
+      const named = viewIdFromPath(filePath);
+      if (named) return named;
       const { byPath, bySource } = read();
       return byPath[filePath] ?? (source ? (bySource[viewSourceHash(source)] ?? null) : null);
     },
@@ -458,6 +486,12 @@ export function createViewsHost(engine: Engine, on: On) {
   const known = new Map<string, ConversationView>();
   const scanned = new WeakMap<readonly ViewToolEvent[], Map<string, ConversationView>>();
   const sync = new ViewStorageSync(syncedDisk(), (message, detail) => console.error(`[views] ${message}:`, detail instanceof Error ? detail.message : (detail ?? "")));
+  const remotes = new WeakMap<ViewStorageBackend, ViewStorageRemote>();
+  const remoteFor = (client: ViewStorageBackend): ViewStorageRemote => {
+    let remote = remotes.get(client);
+    if (!remote) remotes.set(client, (remote = backendViewStorageRemote(client)));
+    return remote;
+  };
   const identities = identityIndex();
   /** Which conversation each message's views were last bound to, so a new message doesn't rebind the others. */
   const bound = new WeakMap<readonly ViewToolEvent[], string>();
@@ -621,6 +655,7 @@ export function createViewsHost(engine: Engine, on: On) {
   const outputs = join(dataDir(), "outputs", "views");
   const preOpen = (name: string) => {
     if (!isViewPath(name)) return;
+    // `<slug>.view.tsx` (a view from before chats had folders), or `<conversation>/<slug>.view.tsx`.
     const filePath = join(outputs, name);
     if (entries.has(filePath) || !existsSync(filePath)) return;
     const entry = open(filePath, lastTheme, CARD_VIEWPORT);
@@ -631,7 +666,7 @@ export function createViewsHost(engine: Engine, on: On) {
   };
   try {
     mkdirSync(outputs, { recursive: true });
-    watch(outputs, (_event, name) => {
+    watch(outputs, { recursive: true }, (_event, name) => {
       if (name) preOpen(String(name));
     });
     const marker = viewHostMarkerPath(dataDir());
@@ -702,7 +737,8 @@ export function createViewsHost(engine: Engine, on: On) {
         if (!conversationId || bound.get(events) === conversationId) continue;
         bound.set(events, conversationId);
         for (const view of views.values()) {
-          const viewId = syncedViewId(conversationId, view.slug ?? viewSlugFromPath(view.filePath));
+          // A view in a chat's own folder is named by its path; an older one learns its id from the chat.
+          const viewId = viewIdFromPath(view.filePath) ?? syncedViewId(conversationId, view.slug ?? viewSlugFromPath(view.filePath));
           if (!viewId) continue;
           const entry = entries.get(view.filePath);
           identities.remember(view.filePath, viewId, entry?.lastSource ?? view.source);
@@ -710,16 +746,27 @@ export function createViewsHost(engine: Engine, on: On) {
         }
       }
     },
-    /** The signed-in account's backend, which views' storage syncs through; null while signed out. */
-    connectBackend(client: ViewStorageBackend | null) {
-      sync.setRemote(client ? backendViewStorageRemote(client) : null);
+    /**
+     * The signed-in account (`account`, e.g. `account:<userId>`) and its backend, which views'
+     * storage syncs through; a null client while signed out. Each account keeps its own copy of every
+     * view's storage: after a switch, open views move onto the new account's.
+     */
+    connectBackend(client: ViewStorageBackend | null, account?: string | null) {
+      const remote = client ? remoteFor(client) : null;
+      if (account === undefined) return sync.setRemote(remote);
+      if (!sync.connect(client ? account : null, remote)) return;
+      for (const entry of entries.values()) {
+        if (!entry.viewId) continue;
+        const filePath = entry.filePath;
+        void entry.storage.move(sync.storage(entry.viewId, async () => readLegacy(filePath)));
+      }
     },
     /** Which synced view the file is, and whether everything changed here reached the server. */
-    syncState: (filePath: string): { viewId: string | null; connected: boolean; synced: boolean } | null => {
+    syncState: (filePath: string): { viewId: string | null; account: string | null; connected: boolean; synced: boolean } | null => {
       const entry = entries.get(filePath);
       if (!entry) return null;
-      const target = entry.storage.target as { synced?: boolean };
-      return { viewId: entry.viewId, connected: sync.connected, synced: target.synced ?? true };
+      const target = entry.storage.target as { synced?: boolean; account?: string | null };
+      return { viewId: entry.viewId, account: target.account ?? null, connected: sync.connected, synced: target.synced ?? true };
     },
     /** What a view's capabilities did that its surfaces should say (a share copied); returns the release. */
     onNotice(listener: (notice: ViewNotice) => void): () => void {

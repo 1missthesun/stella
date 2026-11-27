@@ -11,6 +11,12 @@
 //   that changed reaches the running view as a storage message, as another tab's change does.
 // - A view's values from before it synced (its old storage, kept by file path) are sent once as a
 //   seed: they fill only keys the server has never had.
+// - Everything is kept per account: switching accounts on a device parks the last account's views
+//   (their queued changes wait, on disk, for that account to sign in again) and opens the new
+//   account's own copies, so nothing one account wrote reaches another's store.
+// - The server's order only goes forward, so a server seq behind one this device has heard means its
+//   data was reset (or wiped): the device takes the server's values from then on instead of waiting
+//   for a seq it will never see again.
 import { VIEW_STORAGE_LIMITS, type ViewStorageState, type ViewStorageWrite } from "@stella/contracts/backend/view-storage";
 import type { ViewStorage } from "./session";
 
@@ -47,10 +53,15 @@ export type ViewStorageRecord = {
   seq: number;
 };
 
-/** Where a device keeps its synced views (a folder, IndexedDB, the phone's storage). */
+/**
+ * Where a device keeps its synced views (a folder, IndexedDB, the phone's storage), per account.
+ * `account` null is where records lived before they were kept per account (still read once, as the
+ * starting point of a view's first record under an account: a view's id names one conversation, so
+ * one account).
+ */
 export type ViewStorageDisk = {
-  read(viewId: string): Promise<ViewStorageRecord | null>;
-  write(viewId: string, record: ViewStorageRecord): Promise<void>;
+  read(viewId: string, account: string | null): Promise<ViewStorageRecord | null>;
+  write(viewId: string, record: ViewStorageRecord, account: string | null): Promise<void>;
 };
 
 /** `<conversationId>/<slug>`: the same on every device, wherever the view's file is. */
@@ -127,6 +138,8 @@ export class SyncedViewStorage implements ViewStorage {
 
   constructor(
     readonly viewId: string,
+    /** The account these values belong to (null: no account known yet). */
+    readonly account: string | null,
     private readonly disk: ViewStorageDisk,
     legacy: () => Promise<Record<string, unknown> | null>,
     private readonly log: Log = () => {},
@@ -137,7 +150,8 @@ export class SyncedViewStorage implements ViewStorage {
   private async open(legacy: () => Promise<Record<string, unknown> | null>) {
     let record: ViewStorageRecord | null = null;
     try {
-      record = await this.disk.read(this.viewId);
+      record = await this.disk.read(this.viewId, this.account);
+      if (!record && this.account !== null) record = await this.disk.read(this.viewId, null);
     } catch (error) {
       this.log("couldn't read a view's saved storage", error);
     }
@@ -268,7 +282,12 @@ export class SyncedViewStorage implements ViewStorage {
 
   private heard(state: ViewStorageState) {
     if (!isMap(state?.values) || typeof state.seq !== "number") return;
-    if (state.seq < this.confirmed || state.seq < this.seq) return;
+    if (state.seq < this.seq) {
+      // The server's order went back: its data was reset. Its values are the truth from here; the
+      // writes it confirmed before the reset no longer say anything about its order.
+      this.log("a view's synced storage was reset on the server; taking its values", { viewId: this.viewId, seq: state.seq, had: this.seq });
+      this.confirmed = 0;
+    } else if (state.seq < this.confirmed) return;
     const next: Record<string, unknown> = this.clearing ? {} : { ...state.values };
     if (this.seed) for (const [key, value] of Object.entries(this.seed)) if (!(key in next)) next[key] = value;
     for (const [key, value] of this.pending) {
@@ -333,7 +352,7 @@ export class SyncedViewStorage implements ViewStorage {
         // The server won't ever take this batch (too big, malformed): drop it, and let the next
         // snapshot bring this device back to the server's values.
         this.log("the server refused a view storage write", error);
-        this.confirm(sent, sentClear, sentSeed, this.confirmed);
+        this.confirm(sent, sentClear, sentSeed, null);
       } else {
         this.retryTimer = setTimeout(() => {
           this.retryTimer = null;
@@ -352,11 +371,21 @@ export class SyncedViewStorage implements ViewStorage {
     } else this.kick();
   }
 
-  private confirm(sent: Map<string, unknown>, sentClear: number, sentSeed: Record<string, unknown> | null, seq: number) {
+  /** Drops what a write carried from the queue; `seq` is the server's for it, null when it refused the write. */
+  private confirm(sent: Map<string, unknown>, sentClear: number, sentSeed: Record<string, unknown> | null, seq: number | null) {
     for (const [key, value] of sent) if (this.pending.has(key) && Object.is(this.pending.get(key), value)) this.pending.delete(key);
     if (sentClear && this.clearing && this.clears === sentClear) this.clearing = false;
     if (sentSeed && this.seed === sentSeed) this.seed = null;
-    this.confirmed = Math.max(this.confirmed, seq);
+    if (seq === null) {
+      // Refused: nothing about the server's order.
+    } else if (seq < Math.max(this.seq, this.confirmed)) {
+      // A write lands after everything this device has heard of (one that changed nothing answers
+      // with the current seq), so a seq behind that means the server's order started over (its
+      // data was reset): follow the new order.
+      this.log("a view's synced storage was reset on the server", { viewId: this.viewId, seq, had: Math.max(this.seq, this.confirmed) });
+      this.seq = 0;
+      this.confirmed = seq;
+    } else this.confirmed = Math.max(this.confirmed, seq);
     this.save();
   }
 
@@ -382,7 +411,7 @@ export class SyncedViewStorage implements ViewStorage {
         ...(this.seed ? { seed: this.seed } : {}),
         seq: this.seq,
       };
-      void this.disk.write(this.viewId, record).catch((error: unknown) => this.log("couldn't save a view's storage", error));
+      void this.disk.write(this.viewId, record, this.account).catch((error: unknown) => this.log("couldn't save a view's storage", error));
     }, SAVE_DELAY_MS);
   }
 
@@ -392,14 +421,18 @@ export class SyncedViewStorage implements ViewStorage {
     clearTimeout(this.saveTimer);
     this.saveTimer = null;
     return this.disk
-      .write(this.viewId, {
-        v: 1,
-        values: this.values,
-        pending: Object.fromEntries(this.pending),
-        ...(this.clearing ? { clear: true } : {}),
-        ...(this.seed ? { seed: this.seed } : {}),
-        seq: this.seq,
-      })
+      .write(
+        this.viewId,
+        {
+          v: 1,
+          values: this.values,
+          pending: Object.fromEntries(this.pending),
+          ...(this.clearing ? { clear: true } : {}),
+          ...(this.seed ? { seed: this.seed } : {}),
+          seq: this.seq,
+        },
+        this.account,
+      )
       .catch((error: unknown) => this.log("couldn't save a view's storage", error));
   }
 }
@@ -407,6 +440,8 @@ export class SyncedViewStorage implements ViewStorage {
 /** Every synced view on this device, and the one connection to the owner's store they share. */
 export class ViewStorageSync {
   private remote: ViewStorageRemote | null = null;
+  private account: string | null = null;
+  /** By account, then view id: each account's views are its own. */
   private stores = new Map<string, SyncedViewStorage>();
 
   constructor(
@@ -414,29 +449,54 @@ export class ViewStorageSync {
     private readonly log: Log = () => {},
   ) {}
 
-  /** The connection to use (the signed-in account's backend), or null while signed out. */
+  private key = (account: string | null, viewId: string) => `${account ?? ""}\n${viewId}`;
+
+  /**
+   * The signed-in account and its backend. A null `account` (signed out) keeps the last account's
+   * views here, unsynced, until an account signs in. Another account than before parks the last
+   * one's views (unsynced, their queued changes kept) and `storage()` hands out the new account's;
+   * returns true then, so a host moves its open views onto them.
+   */
+  connect(account: string | null, remote: ViewStorageRemote | null): boolean {
+    const next = account ?? this.account;
+    const switched = next !== this.account;
+    const live = account === null ? null : remote;
+    if (!switched && live === this.remote) return false;
+    for (const store of this.stores.values()) store.setRemote(store.account === next ? live : null);
+    this.account = next;
+    this.remote = live;
+    return switched;
+  }
+
+  /** The connection to use for the current account (null while signed out). */
   setRemote(remote: ViewStorageRemote | null): void {
     if (remote === this.remote) return;
     this.remote = remote;
-    for (const store of this.stores.values()) store.setRemote(remote);
+    for (const store of this.stores.values()) if (store.account === this.account) store.setRemote(remote);
   }
 
   /** The network is back (or the app came to the front): replay queued changes now. */
   retryNow(): void {
-    for (const store of this.stores.values()) store.retryNow();
+    for (const store of this.stores.values()) if (store.account === this.account) store.retryNow();
   }
 
   get connected(): boolean {
     return this.remote !== null;
   }
 
-  /** The synced storage of `viewId`; `legacy` reads what the view kept before it synced. */
+  /** The account whose views `storage()` hands out. */
+  get currentAccount(): string | null {
+    return this.account;
+  }
+
+  /** The current account's synced storage of `viewId`; `legacy` reads what the view kept before it synced. */
   storage(viewId: string, legacy: () => Promise<Record<string, unknown> | null> = async () => null): SyncedViewStorage {
-    let store = this.stores.get(viewId);
+    const key = this.key(this.account, viewId);
+    let store = this.stores.get(key);
     if (!store) {
-      store = new SyncedViewStorage(viewId, this.disk, legacy, this.log);
+      store = new SyncedViewStorage(viewId, this.account, this.disk, legacy, this.log);
       store.setRemote(this.remote);
-      this.stores.set(viewId, store);
+      this.stores.set(key, store);
     }
     return store;
   }

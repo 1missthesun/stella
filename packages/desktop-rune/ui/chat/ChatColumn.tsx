@@ -1,6 +1,5 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { ConnectorConnectCard } from "@/app/chat/ConnectorConnectCard";
-import { backendClient } from "@/platform/backend/backend-client";
 import { UsageLimitChatCard } from "@/features/chat/UsageLimitChatCard";
 import { SafeguardChatCard } from "@/features/chat/SafeguardChatCard";
 import { ComposerNotice } from "@/app/chat/ComposerNotice";
@@ -196,9 +195,6 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
   useEffect(() => {
     globalThis.stella.views?.offerMessages?.(liveMessages, conversationId);
   }, [liveMessages, conversationId]);
-  useEffect(() => {
-    globalThis.stella.views?.connectBackend?.(backendClient);
-  }, []);
   const messages = useDeferredChatMessages(liveMessages, isUserScrolling, conversationId);
   const assistantReplyPeek = useAssistantReplyPeek({ messages, isFollowingLatest, isNearBottom });
 

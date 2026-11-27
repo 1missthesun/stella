@@ -7,9 +7,9 @@
 import { ViewSession, type ViewSnapshot } from "@stella/views/session";
 import type { ViewTheme } from "@stella/views/protocol";
 import { latestConversationViews, type ConversationView, type ViewToolEvent } from "@stella/views/conversation";
-import { isViewPath, viewFileName, viewKey, viewTitle } from "@stella/views/paths";
+import { isViewPath, viewFileName, viewIdentityFromPath, viewKey, viewTitle } from "@stella/views/paths";
 import { browserCapabilities } from "./capabilities";
-import { MovableViewStorage, ViewStorageSync, backendViewStorageRemote, syncedViewId, viewSlugFromPath, type ViewStorageBackend } from "@stella/views/storage-sync";
+import { MovableViewStorage, ViewStorageSync, backendViewStorageRemote, syncedViewId, viewSlugFromPath, type ViewStorageBackend, type ViewStorageRemote } from "@stella/views/storage-sync";
 import { browserStorage, browserSyncedDisk, legacyBrowserStorage } from "./storage";
 import { createWasmVm, preloadViews } from "./wasm-vm";
 
@@ -43,6 +43,12 @@ export function createWebViewsHost() {
   const identities = new Map<string, string>();
   const sync = new ViewStorageSync(browserSyncedDisk(), (message, detail) => console.warn(`[views] ${message}`, detail));
   if (typeof window !== "undefined") window.addEventListener("online", () => sync.retryNow());
+  const remotes = new WeakMap<ViewStorageBackend, ViewStorageRemote>();
+  const remoteFor = (client: ViewStorageBackend): ViewStorageRemote => {
+    let remote = remotes.get(client);
+    if (!remote) remotes.set(client, (remote = backendViewStorageRemote(client)));
+    return remote;
+  };
   const syncedStorage = (filePath: string, viewId: string) => sync.storage(viewId, () => legacyBrowserStorage(viewKey(filePath)));
   const bind = (entry: Entry, viewId: string) => {
     if (entry.viewId === viewId) return;
@@ -83,7 +89,8 @@ export function createWebViewsHost() {
       return existing;
     }
     const view = known.get(filePath);
-    const viewId = identities.get(filePath) ?? null;
+    const named = viewIdentityFromPath(filePath);
+    const viewId = identities.get(filePath) ?? (named ? syncedViewId(named.conversationId, named.slug) : null);
     const storage = new MovableViewStorage(viewId ? syncedStorage(filePath, viewId) : browserStorage(viewKey(filePath)));
     const session = new ViewSession({
       id: viewKey(filePath),
@@ -167,15 +174,23 @@ export function createWebViewsHost() {
         e.source = null;
         apply(e);
       }),
-    /** The signed-in account's backend, which views' storage syncs through; null while signed out. */
-    connectBackend(client: ViewStorageBackend | null) {
-      sync.setRemote(client ? backendViewStorageRemote(client) : null);
+    /**
+     * The signed-in account (`account:<userId>`) and its backend, which views' storage syncs
+     * through; a null client while signed out. Each account keeps its own copy of every view's
+     * storage: after a switch, open views move onto the new account's.
+     */
+    connectBackend(client: ViewStorageBackend | null, account: string | null) {
+      if (!sync.connect(client ? account : null, client ? remoteFor(client) : null)) return;
+      for (const entry of entries.values()) {
+        if (!entry.viewId) continue;
+        void entry.storage.move(syncedStorage(entry.filePath, entry.viewId));
+      }
     },
-    syncState: (filePath: string): { viewId: string | null; connected: boolean; synced: boolean } | null => {
+    syncState: (filePath: string): { viewId: string | null; account: string | null; connected: boolean; synced: boolean } | null => {
       const entry = entries.get(filePath);
       if (!entry) return null;
-      const target = entry.storage.target as { synced?: boolean };
-      return { viewId: entry.viewId, connected: sync.connected, synced: target.synced ?? true };
+      const target = entry.storage.target as { synced?: boolean; account?: string | null };
+      return { viewId: entry.viewId, account: target.account ?? null, connected: sync.connected, synced: target.synced ?? true };
     },
     /** The views a conversation carries (its messages' `view` tool results): the newest of each runs. */
     offerMessages(messages: readonly Message[], conversationId?: string | null) {
@@ -190,7 +205,9 @@ export function createWebViewsHost() {
         }
         for (const view of views.values()) {
           any = true;
-          const viewId = conversationId ? syncedViewId(conversationId, view.slug ?? viewSlugFromPath(view.filePath)) : null;
+          // A view in a chat's own folder is named by its path; an older one by the chat that made it.
+          const named = viewIdentityFromPath(view.filePath);
+          const viewId = named ? syncedViewId(named.conversationId, named.slug) : conversationId ? syncedViewId(conversationId, view.slug ?? viewSlugFromPath(view.filePath)) : null;
           if (viewId) identities.set(view.filePath, viewId);
           offer(view);
           const entry = entries.get(view.filePath);

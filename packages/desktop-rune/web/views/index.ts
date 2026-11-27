@@ -17,7 +17,7 @@ const load = (): Promise<WebViewsHost> =>
   (loading ??= import("./views-host").then(
     (m) => {
       host = m.createWebViewsHost();
-      host.connectBackend(backend);
+      if (account !== undefined) host.connectBackend(backend, account);
       return host;
     },
     (error: unknown) => {
@@ -32,6 +32,8 @@ const carriesView = (messages: readonly Message[]) =>
 
 let pending: { messages: readonly Message[]; conversationId: string | null } | null = null;
 let backend: ViewStorageBackend | null = null;
+/** Not told yet: undefined. */
+let account: string | null | undefined;
 
 export const webViews = {
   isViewPath,
@@ -71,10 +73,11 @@ export const webViews = {
   },
   reload: (filePath: string) => host?.reload(filePath),
   syncState: (filePath: string) => host?.syncState(filePath) ?? null,
-  /** The signed-in account's backend, which views' storage syncs through. */
-  connectBackend(client: ViewStorageBackend | null) {
+  /** The signed-in account (`account:<userId>`) and its backend, which views' storage syncs through. */
+  connectBackend(client: ViewStorageBackend | null, signedIn?: string | null) {
     backend = client;
-    host?.connectBackend(client);
+    account = signedIn ?? null;
+    host?.connectBackend(client, account);
   },
   /** The views a conversation carries (its messages' `view` tool results): the newest of each runs. */
   offerMessages(messages: readonly Message[], conversationId?: string | null) {

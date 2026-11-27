@@ -136,8 +136,9 @@ export const legacyBrowserStorage = (viewKey: string): Promise<Record<string, un
     () => null,
   );
 
-/** Synced views' storage in this browser. */
+/** Synced views' storage in this browser, per account (records from before that are keyed by the view id alone). */
+const syncedKey = (viewId: string, account: string | null) => (account === null ? viewId : `${account}\n${viewId}`);
 export const browserSyncedDisk = (): ViewStorageDisk => ({
-  read: async (viewId) => normalizeViewStorageRecord(await readFrom(SYNCED, viewId)),
-  write: (viewId, record) => write(viewId, record, SYNCED),
+  read: async (viewId, account) => normalizeViewStorageRecord(await readFrom(SYNCED, syncedKey(viewId, account))),
+  write: (viewId, record, account) => write(syncedKey(viewId, account), record, SYNCED),
 });

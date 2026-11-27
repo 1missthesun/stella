@@ -15,11 +15,13 @@ import { AiTab } from "../../../desktop-rune/ui/settings/tabs/AiTab";
 import { usePhoneInsets, type PhoneInsets } from "./insets";
 import { PHONE_TABS, phoneNav, usePhoneNav, type PhoneTab } from "./nav";
 import { tabIcon } from "./icons";
+import { PhoneViewScreen } from "./ViewScreen";
 
 // The phone's navigation over the shared Stella UI, in place of the desktop's top bar (the phone
 // build swaps `ui/shell/ShellTopBarFull` for this): round glass buttons at the top (account at
 // the start, chat settings at the end) around Stella's activity, the bottom bar's tabs (Chat,
-// Schedule, Apps, Files) as a floating Liquid Glass capsule, the tab pages, and the two drawers.
+// Schedule, Apps, Files) as a floating Liquid Glass capsule, the tab pages, the two drawers, and
+// the full-screen page an opened Stella View shows in (ViewScreen.tsx).
 
 /** packages/mobile's top bar: 44pt round buttons, 10pt from the edges. */
 export const PHONE_TOPBAR_H = 52;
@@ -68,6 +70,8 @@ function GlassButton({ id, icon, label, onPress, iconSize = 19 }: { id: string; 
     </AdaptiveGlass>
   );
 }
+
+const ViewBackButton = ({ id, label, onPress }: { id: string; label: string; onPress: () => void }) => <GlassButton id={id} icon={Icons.stella.ChevronLeft} label={label} onPress={onPress} iconSize={21} />;
 
 const TITLE_KEYS: Record<Exclude<PhoneTab, "chat">, string> = { schedule: "Schedule", apps: "Apps", files: "Files" };
 
@@ -231,6 +235,7 @@ export const ShellTopBarFull = memo(function PhoneChrome(_props: { onSignIn?: ()
       <TabPages insets={insets} tab={tab} />
       <TopBar width={width} insets={insets} tab={tab} onWidth={(w) => setWidth((old) => (Math.abs(old - w) < 0.5 ? old : w))} />
       <BottomBar insets={insets} tab={tab} />
+      <PhoneViewScreen width={width} insets={insets} raise={SHEET_RAISE + 2} BackButton={ViewBackButton} />
       <AccountDrawer open={drawer === "account"} width={drawerWidth(width)} insets={insets} />
       <ChatSettingsDrawer open={drawer === "chat-settings"} width={drawerWidth(width)} insets={insets} />
     </>

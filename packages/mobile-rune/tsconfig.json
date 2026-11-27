@@ -7,6 +7,12 @@
       ],
       "@/*": [
         "../desktop-ui/src/*"
+      ],
+      "@stella/views/*": [
+        "../views/src/*"
+      ],
+      "@stella/contracts/*": [
+        "../contracts/*"
       ]
     },
     "typeRoots": [

@@ -66,6 +66,12 @@ pub fn route(v: Value) {
         "quit" | "menu.setApplicationMenu" | "tray.create" | "tray.setMenu" | "tray.setTooltip" | "tray.setIcon" | "tray.destroy" | "shortcut.register" | "shortcut.unregister" | "shortcut.unregisterAll" | "app.setAppUserModelId" => {
             reply(rid, Ok(Value::Null))
         }
+        // Stella Views' programs run on threads of their own (the desktop's views.rs).
+        "views.start" | "views.deliver" | "views.stop" | "views.pause" | "views.resume" => crate::views::command(&cmd, rid, &v),
+        "views.frame" => {
+            crate::view_frames::want();
+            reply(rid, Ok(Value::Null));
+        }
         "view.restore" => {
             let marked: Vec<u32> = engine::read(|e| e.windows.iter().filter(|(_, s)| s.swap_view.is_some()).map(|(w, _)| *w).collect());
             for w in marked {

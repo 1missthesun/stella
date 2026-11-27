@@ -34,14 +34,18 @@ type Entry = {
 
 type Message = { toolEvents?: readonly ViewToolEvent[] };
 
-const asWeb = (theme: ViewTheme): ViewTheme => (theme.platform === "web" ? theme : { ...theme, platform: "web" });
-
 export type WebViewsHostOptions = {
   /** Narrows the browser's capabilities (a shared view on stella.sh has no Stella to ask or chat to send to). */
   capabilities?: (browser: ViewCapabilities) => ViewCapabilities;
+  /** What views are told they run on ("web" here; the Rune phone, which runs this host over its own engine, says "ios" or "android"). */
+  platform?: ViewTheme["platform"];
+  /** The views' frame clock (the browser's animation frames by default). */
+  requestFrame?: (fn: (time: number) => void) => void;
 };
 
 export function createWebViewsHost(options: WebViewsHostOptions = {}) {
+  const platform = options.platform ?? "web";
+  const asWeb = (theme: ViewTheme): ViewTheme => (theme.platform === platform ? theme : { ...theme, platform });
   const entries = new Map<string, Entry>();
   /** The newest version of each view the conversations shown so far carry. */
   const known = new Map<string, ConversationView>();
@@ -74,9 +78,11 @@ export function createWebViewsHost(options: WebViewsHostOptions = {}) {
   });
   const caps = options.capabilities ? options.capabilities(browserCaps) : browserCaps;
   const now = () => performance.now();
-  const requestFrame = (fn: (time: number) => void) => {
-    requestAnimationFrame(() => fn(now()));
-  };
+  const requestFrame =
+    options.requestFrame ??
+    ((fn: (time: number) => void) => {
+      requestAnimationFrame(() => fn(now()));
+    });
 
   const apply = (entry: Entry) => {
     if (entry.preview !== undefined) {

@@ -26,7 +26,8 @@ try {
   (globalThis as any).stella = { store, useStore: makeUseStore(store), command, now, engine, on: onEngineEvent, windowPortal, pressedByKeys, views: createPhoneViews(), phone: { env, post: (m: object) => __native.post(JSON.stringify(m)) } };
   render(createElement(app.Root), { t0: performance.timeOrigin + (t0 - __native.now()) + performance.now() });
   console.info(`[phone] first render ${(__native.now() - t0).toFixed(1)} ms after app start`);
-  if (env.env.STELLA_PHONE_UI !== "probe") startPush();
+  // Dev launches can pass STELLA_PUSH=0 to leave notifications alone (no permission prompt).
+  if (env.env.STELLA_PHONE_UI !== "probe" && env.env.STELLA_PUSH !== "0") startPush();
 } catch (e) {
   console.error("[phone] boot failed", e);
 }

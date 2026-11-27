@@ -40,14 +40,19 @@ rm -rf "$app"
 mkdir -p "$app/fonts"
 sdk_path="$(xcrun --sdk "$sdk" --show-sdk-path)"
 swift_defines=(); [[ $profile == dist ]] || swift_defines=(-D STELLA_DEV)
+# Push (aps-environment) and Sign in with Apple are entitlements. The simulator reads them from
+# the binary's __entitlements section, as Xcode builds it (an ad-hoc signature that carries them
+# is refused at launch); a device build signs them in with a real identity.
+entitlements="$here/ios/StellaRune/StellaRune.entitlements"
+link_entitlements=(); [[ $sdk == iphonesimulator ]] && link_entitlements=(-Xlinker -sectcreate -Xlinker __TEXT -Xlinker __entitlements -Xlinker "$entitlements")
 xcrun --sdk "$sdk" swiftc -O "${swift_defines[@]}" -target "$swift_target" -sdk "$sdk_path" \
   -import-objc-header "$here/engine/include/stella_mobile_engine.h" \
   "$here"/ios/StellaRune/*.swift \
   "$lib" \
-  -Xlinker -dead_strip \
+  -Xlinker -dead_strip "${link_entitlements[@]}" \
   -framework UIKit -framework Metal -framework QuartzCore -framework JavaScriptCore -framework CoreText \
   -framework CoreGraphics -framework CoreVideo -framework CoreMedia -framework AVFoundation -framework IOSurface \
-  -framework Security -framework SafariServices -framework PhotosUI -framework Photos -framework UniformTypeIdentifiers -framework UserNotifications -framework AudioToolbox \
+  -framework Security -framework SafariServices -framework PhotosUI -framework Photos -framework UniformTypeIdentifiers -framework UserNotifications -framework AudioToolbox -framework AuthenticationServices -framework StoreKit \
   -framework CoreFoundation -framework Foundation -framework SystemConfiguration -lc++ -liconv \
   -o "$app/StellaRune"
 cp "$here/ios/StellaRune/Info.plist" "$app/Info.plist"

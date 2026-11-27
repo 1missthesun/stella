@@ -39,6 +39,9 @@ process.env.VITE_STELLA_WEB_BUILD = "1";
 process.env.VITE_STELLA_MOBILE_RUNE = "1";
 process.env.STELLA_UI_BASE_URL = "./";
 
+// The Expo project the backend sends push through (the RN app's), for the phone's Expo push token.
+const easProjectId = process.env.STELLA_MOBILE_EAS_PROJECT_ID ?? (JSON.parse(fs.readFileSync(path.join(REPO, "packages", "mobile", "app.json"), "utf8")) as { expo?: { extra?: { eas?: { projectId?: string } } } }).expo?.extra?.eas?.projectId ?? "";
+
 const resolveFrom = (spec: string, dir: string) => Bun.resolveSync(spec, dir);
 const WEB_SHIMS = path.join(RUNE, "web", "shims");
 const SHIMS: Record<string, string> = {
@@ -107,7 +110,8 @@ const mobilePlugin: BunPlugin = {
       if (!a.path.startsWith("@/") && !a.importer.startsWith(DESKTOP_UI_SRC + path.sep)) return undefined;
       const file = resolveSpecifier(a.path, a.importer);
       const replacement = file && replacementFor(file, a.importer);
-      return replacement ? { path: replacement } : undefined;
+      // desktop-rune's own stand-ins (ui/replace/…) can have a phone one in turn.
+      return replacement ? { path: replacementOf(replacement) ?? replacement } : undefined;
     });
     // Rune elements are the engine's own host elements: `rune-jsx` is React's JSX runtime, as the desktop host's tsconfig.build.json makes it.
     build.onResolve({ filter: /^rune-jsx\/jsx-(dev-)?runtime$/ }, (a) => ({ path: resolveFrom(a.path.replace(/^rune-jsx/, "react"), UI_ROOT) }));
@@ -151,7 +155,7 @@ const result = await Bun.build({
   minify: minify ? { whitespace: true, syntax: true, identifiers: false } : false,
   sourcemap: "none",
   naming: { entry: "app.[ext]" },
-  define: { "process.env.NODE_ENV": JSON.stringify("production"), "import.meta.hot": "undefined", "import.meta.dir": "__native.env.resources", "import.meta.dirname": "__native.env.resources", "import.meta.url": JSON.stringify("file:///app/app.js") },
+  define: { "process.env.NODE_ENV": JSON.stringify("production"), "process.env.STELLA_EAS_PROJECT_ID": JSON.stringify(easProjectId), "import.meta.hot": "undefined", "import.meta.dir": "__native.env.resources", "import.meta.dirname": "__native.env.resources", "import.meta.url": JSON.stringify("file:///app/app.js") },
   plugins: [namespaceFix, mobilePlugin, viteCompat],
   throw: false,
 });

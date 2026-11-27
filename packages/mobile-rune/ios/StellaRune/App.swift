@@ -97,7 +97,7 @@ final class App {
 
   /// Commands from TS (through the engine's `native` commands or `__native.post`).
   func command(_ m: [String: Any]) {
-    if Pickers.shared.handle(m) { return }
+    if Pickers.shared.handle(m) || Push.shared.handle(m) || Mic.shared.handle(m) || SignIn.shared.handle(m) || Store.shared.handle(m) { return }
     let cmd = (m["cmd"] as? String) ?? (m["t"] as? String) ?? ""
     switch cmd {
     case "clipboard.writeText", "clipboard.writeHTML":
@@ -168,10 +168,20 @@ final class RootController: UIViewController {
 final class AppDelegate: UIResponder, UIApplicationDelegate {
   var window: UIWindow?
   func application(_ app: UIApplication, didFinishLaunchingWithOptions opts: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+    Push.shared.setUp()
     let w = UIWindow(frame: UIScreen.main.bounds)
     window = w
     App.shared.boot(in: w)
+    Store.shared.start()
     return true
+  }
+
+  func application(_ app: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken token: Data) {
+    Push.shared.didRegister(token)
+  }
+
+  func application(_ app: UIApplication, didFailToRegisterForRemoteNotificationsWithError error: Error) {
+    Push.shared.didFail(error)
   }
 
   func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {

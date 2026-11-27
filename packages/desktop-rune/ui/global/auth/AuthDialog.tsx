@@ -8,6 +8,7 @@ import { accountLabel, useAccountHint } from "@/global/auth/hooks/use-account-hi
 import { useAuthBootstrapState } from "@/global/auth/BackendAuthProvider";
 import { RememberedAccountSignIn } from "./RememberedAccountSignIn";
 import { dropAfterSignIn } from "@/global/auth/sign-in-then";
+import { nativeSignIn, type NativeSignInResult } from "./native-sign-in";
 import {
   applyAndVerifyAccountSessionToken,
   startBrowserGoogleSignIn,
@@ -191,6 +192,7 @@ export function AuthMethods({ loginHint }: { loginHint?: string | null } = {}) {
         <T {...tx(s.authDialogHero)} w="full" {...s.authDialogHeadline}>{t("global.auth.welcomeTitle")}</T>
         <T {...tx(s.authDialogHero)} w="full" {...s.authDialogSub}>{t("global.auth.welcomeSub")}</T>
       </col>
+      {nativeSignIn?.apple ? <AppleAuthButton signIn={nativeSignIn.apple} /> : null}
       <GoogleAuthButton loginHint={accountHint} />
       <PasskeyAuthButton />
       <row {...s.authDialogMethodDivider}>
@@ -214,6 +216,11 @@ function GoogleAuthButton({ loginHint }: { loginHint?: string | null }) {
     setIsSigningIn(true);
 
     try {
+      if (nativeSignIn) {
+        const result = await nativeSignIn.google(loginHint);
+        if ("error" in result) setError(result.error);
+        return;
+      }
       if (!window.electronAPI) {
         let result: SocialSignInResult | undefined;
         try {
@@ -277,7 +284,40 @@ function GoogleAuthButton({ loginHint }: { loginHint?: string | null }) {
   );
 }
 
-/** Passkeys bind to the auth domain, so this only offers itself in the web shell. */
+/** Sign in with Apple, where the platform has it (the phone); App Review wants it beside Google. */
+function AppleAuthButton({ signIn }: { signIn: () => Promise<NativeSignInResult> }) {
+  const s = useAuthDialog();
+  const t = useT();
+  const [isSigningIn, setIsSigningIn] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSignIn = useCallback(async () => {
+    setError(null);
+    setIsSigningIn(true);
+    try {
+      const result = await signIn();
+      if ("error" in result) setError(result.error);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : t("mobile.login.appleCompleteFailed"));
+    } finally {
+      setIsSigningIn(false);
+    }
+  }, [signIn, t]);
+
+  return (
+    <col {...s.authDialogGoogleWrap}>
+      <Press id="auth-apple" {...s.authDialogGoogle} {...s.authDialogApple} onPress={handleSignIn} disabled={isSigningIn} {...(isSigningIn ? s.authDialogGoogleDisabled : null)}>
+        <icon svg={APPLE_LOGO} name="auth/apple" view={18} size={18} color={s.authDialogApple.color} inert />
+        {isSigningIn ? t("mobile.login.openingApple") : t("mobile.login.continueWithApple")}
+      </Press>
+      {error ? <T w="full" {...s.authDialogError}>{error}</T> : null}
+    </col>
+  );
+}
+
+const APPLE_LOGO = '<path fill="currentColor" d="M14.38 9.55c-.02-2.08 1.7-3.09 1.78-3.14-.97-1.42-2.48-1.61-3.01-1.63-1.27-.13-2.5.75-3.14.75-.65 0-1.64-.73-2.7-.71-1.38.02-2.67.82-3.38 2.08-1.46 2.53-.37 6.25 1.03 8.3.7 1 1.52 2.12 2.6 2.08 1.05-.04 1.44-.67 2.7-.67s1.62.67 2.72.65c1.13-.02 1.85-1.01 2.52-2.03.8-1.15 1.13-2.28 1.14-2.34-.03-.01-2.24-.86-2.26-3.34ZM12.32 3.43c.56-.7.94-1.65.84-2.61-.82.04-1.85.57-2.43 1.25-.52.61-.99 1.6-.87 2.52.93.07 1.88-.47 2.46-1.16Z"/>';
+
+/** Passkeys bind to the auth domain, so this only offers itself in the web shell (not the phone app, which signs in natively). */
 function PasskeyAuthButton() {
   const s = useAuthDialog();
   const t = useT();
@@ -301,7 +341,7 @@ function PasskeyAuthButton() {
     }
   }, [t]);
 
-  if (window.electronAPI) return null;
+  if (window.electronAPI || nativeSignIn) return null;
 
   return (
     <col {...s.authDialogGoogleWrap}>

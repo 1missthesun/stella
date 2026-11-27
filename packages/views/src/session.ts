@@ -109,6 +109,8 @@ export class ViewSession {
   private unsubscribeStorage: (() => void) | null = null;
   /** Storage changes heard while no run was there to take them (one is starting), newest per key. */
   private storageWhileStarting = new Map<string, unknown>();
+  /** The run started from the last one's state, and should start fresh instead if that state breaks it. */
+  private freshIfStateBreaks = false;
   readonly logs: ViewLog[] = [];
 
   constructor(options: ViewSessionOptions) {
@@ -144,8 +146,12 @@ export class ViewSession {
     for (const listener of this.listeners) listener(this.snapshot);
   }
 
-  /** Loads a source, or swaps a running view to a new one, keeping its state. */
-  async load(source: string, fileName = this.fileName): Promise<void> {
+  /**
+   * Loads a source, or swaps a running view to a new one, keeping its state. With
+   * `freshIfStateBreaks` (an earlier version the user restored, whose hooks may not fit what the
+   * newer one left), a swap that fails before its first tree starts the source again from scratch.
+   */
+  async load(source: string, fileName = this.fileName, options: { freshIfStateBreaks?: boolean } = {}): Promise<void> {
     if (this.disposed) return;
     if (source === this.source && fileName === this.fileName && this.run) return;
     this.loadStartedAt = this.options.now();
@@ -163,6 +169,7 @@ export class ViewSession {
     const restore = this.run ? await this.saveState() : undefined;
     if (this.disposed || this.source !== source) return;
     this.view = compiled.view;
+    this.freshIfStateBreaks = Boolean(options.freshIfStateBreaks && restore);
     await this.start(compiled.view, restore ?? undefined);
   }
 
@@ -213,6 +220,7 @@ export class ViewSession {
           exit: (exit) => {
             if (token !== this.runToken) return;
             this.run = null;
+            if (exit.kind === "failed" && firstTree && this.retryFresh()) return;
             if (exit.kind === "failed") this.publish({ status: "failed", problem: problemOf("run", exit.message ?? "The view stopped", undefined, view) });
             else if (exit.kind === "finished") this.publish({ status: "stopped" });
           },
@@ -237,9 +245,18 @@ export class ViewSession {
     }
   }
 
+  /** Starts the source again without the carried state, once, when a swap asked for that. */
+  private retryFresh(): boolean {
+    if (!this.freshIfStateBreaks) return false;
+    this.freshIfStateBreaks = false;
+    void this.restart();
+    return true;
+  }
+
   private onPost(post: ViewPost, view: CompiledView, firstTree: boolean) {
     switch (post.t) {
       case "render": {
+        if (firstTree) this.freshIfStateBreaks = false;
         const elapsed = this.options.now() - this.loadStartedAt;
         const next: Partial<ViewSnapshot> = { status: "running", tree: post.tree, rev: this.snapshot.rev + 1 };
         if (firstTree) {
@@ -262,6 +279,10 @@ export class ViewSession {
         this.log(post.level, post.text);
         return;
       case "error":
+        if (firstTree && this.retryFresh()) {
+          this.log("warn", `${post.phase}: ${post.message} (with the state it carried over; starting it fresh)`);
+          return;
+        }
         const problem = problemOf(post.phase, post.message, post.stack, view);
         // Before its first tree the view has nothing to show: it failed, rather than still loading.
         this.publish(this.snapshot.tree || this.snapshot.status !== "loading" ? { problem } : { status: "failed", problem });
@@ -362,6 +383,7 @@ export class ViewSession {
   /** Starts the current source again from scratch (after a crash, or "Restart"). */
   async restart(): Promise<void> {
     if (!this.view) return;
+    this.freshIfStateBreaks = false;
     this.loadStartedAt = this.options.now();
     await this.start(this.view);
   }

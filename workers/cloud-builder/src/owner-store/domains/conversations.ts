@@ -25,7 +25,7 @@ import {
   VIEW_CARD_MAX_DATA_BYTES,
   VIEW_CARD_MAX_SOURCE_BYTES,
   VIEW_CARD_TYPE,
-  viewCardTurnId,
+  viewCardGroup,
 } from "@stella/contracts/view-card";
 import { empty, json, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
@@ -477,9 +477,10 @@ const publishViewArgs = object({
   source: string({ min: 1, max: VIEW_CARD_MAX_SOURCE_BYTES }),
   data: optional(json({ maxBytes: VIEW_CARD_MAX_DATA_BYTES })),
   createdAt: number({ min: 0 }),
+  restoredFrom: optional(number({ min: 0 })),
 });
 
-/** Puts a task's view into the user's chat as a view card, so the phone and web show it too. */
+/** Puts a task's view (or the user's restore of one) into the user's chat as a view card, so every device shows it. */
 const publishView = async (ctx: OwnerContext, args: PublishViewArgs): Promise<{ posted: boolean }> => {
   if (!isLiveConversation(ctx.db, args.conversationId)) {
     throw new RpcError("NOT_FOUND", "That conversation doesn't exist.");
@@ -491,7 +492,7 @@ const publishView = async (ctx: OwnerContext, args: PublishViewArgs): Promise<{ 
   const posted = await ctx.host.postConversationCard({
     conversationId: args.conversationId,
     ownerGeneration: snapshot.ownerGeneration,
-    sourceTurnId: viewCardTurnId(card.agentId, card.slug),
+    sourceTurnId: viewCardGroup(card),
     card,
   });
   return { posted };

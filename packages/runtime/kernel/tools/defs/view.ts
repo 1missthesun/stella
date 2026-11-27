@@ -4,7 +4,7 @@ import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import { BackendClient } from "@stella/contracts/backend/client";
 import { compileView, lintView } from "@stella/views/compile";
 import { iconProblems } from "@stella/views/icons";
-import { awaitViewStatus, liveViewHost, readViewStatus, viewDataPath, viewFilePathFor } from "@stella/views/files";
+import { awaitViewStatus, liveViewHost, readViewRestoreMark, readViewStatus, tellViewRestore, viewDataPath, viewFilePathFor, viewSourceHash } from "@stella/views/files";
 import type { ToolContext, ToolDefinition } from "../types.js";
 import { htmlCanvasSlug } from "./html-def.js";
 import { VIEW_TOOL_DESCRIPTION, VIEW_TOOL_NAME, VIEW_TOOL_PARAMETERS } from "./view-def.js";
@@ -65,6 +65,28 @@ export const cloudSessionViewPublisher =
     }
   };
 
+const utcClock = (ms: number) => new Date(ms).toISOString().slice(0, 16).replace("T", " ") + " UTC";
+
+/**
+ * The user restored an earlier version of this view after the caller last saw it, so the caller's
+ * whole-file source would undo the restore: say so once, with the file as it is now, and save
+ * nothing. (The orchestrator usually learns of a restore from its conversation already; this
+ * covers a restore it hasn't read yet, and tasks.)
+ */
+async function restoredSinceLastCall(dataDir: string, filePath: string, source: string, context: ToolContext) {
+  const mark = await readViewRestoreMark(dataDir, filePath);
+  if (!mark) return null;
+  const who = context.agentType === AGENT_IDS.ORCHESTRATOR ? "orchestrator" : (context.agentId ?? context.agentType ?? "task");
+  if (mark.told.includes(who)) return null;
+  const current = await fs.readFile(filePath, "utf8").catch(() => null);
+  if (current === null || viewSourceHash(current) !== mark.source || viewSourceHash(source) === mark.source) return null;
+  await tellViewRestore(dataDir, filePath, mark.createdAt, who);
+  // An error, so no device takes this call's source as a new version of the view.
+  return {
+    error: `Not saved: the user restored this view to its version from ${utcClock(mark.restoredFrom)} (at ${utcClock(mark.createdAt)}), after the version your source is based on, so saving it would undo their restore. The file now holds the restored version:\n\n\`\`\`tsx\n${current}\n\`\`\`\n\nTo change the view, call view again with the whole file built on that source.`,
+  };
+}
+
 export const createViewTool = (options: ViewToolOptions): ToolDefinition => {
   const { stellaDataDir } = options;
   return {
@@ -82,6 +104,8 @@ export const createViewTool = (options: ViewToolOptions): ToolDefinition => {
       const slug = htmlCanvasSlug(typeof args.slug === "string" ? args.slug.trim() : "", title);
       // Each chat keeps its views in a folder of its own, so the same slug in two chats is two views.
       const filePath = await viewFilePathFor(stellaDataDir, context.conversationId, slug);
+      const restored = await restoredSinceLastCall(stellaDataDir, filePath, source, context);
+      if (restored) return restored;
       await fs.mkdir(path.dirname(filePath), { recursive: true });
       if (args.data !== undefined) {
         const dataPath = viewDataPath(filePath);

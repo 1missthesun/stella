@@ -1,8 +1,8 @@
 // Where a view's files live, shared by every process that touches one: the host that runs it (it
 // writes the live status) and the agent tool that writes it (it reads that status back). Node only.
-import { readFile } from "node:fs/promises";
+import { mkdir, readFile, rename, stat, writeFile } from "node:fs/promises";
 import { tmpdir, userInfo } from "node:os";
-import { join } from "node:path";
+import { dirname, isAbsolute, join } from "node:path";
 
 export { VIEW_FILE_RE, conversationViewRelPath, isViewPath, viewDataPath, viewIdentityFromPath, viewKey, viewSourceHash, viewTitle } from "./paths";
 import { conversationViewRelPath, viewKey, viewSourceHash } from "./paths";
@@ -97,4 +97,79 @@ export async function viewFilePathFor(dataDir: string, conversationId: string | 
     // No views opened here yet.
   }
   return join(dataDir, ...conversationViewRelPath(id, slug).split("/"));
+}
+
+/**
+ * The newest restore applied to a view's file on this computer, kept beside the views' data: it
+ * makes a restore from another device land once (and not over a newer edit), and tells the `view`
+ * tool when an agent's next call would undo it without knowing (`told` names who already knows).
+ */
+export type ViewRestoreMark = {
+  filePath: string;
+  /** The restore's own version (`createdAt`), so the same restore lands once. */
+  createdAt: number;
+  /** The `createdAt` of the version it brought back. */
+  restoredFrom: number;
+  /** `viewSourceHash` of the restored source. */
+  source: string;
+  told: string[];
+};
+
+export const viewRestoreMarkPath = (dataDir: string, filePath: string): string => join(dataDir, "views", "restores", `${viewKey(filePath)}.json`);
+
+export const readViewRestoreMark = async (dataDir: string, filePath: string): Promise<ViewRestoreMark | null> => {
+  try {
+    const mark = JSON.parse(await readFile(viewRestoreMarkPath(dataDir, filePath), "utf8")) as ViewRestoreMark;
+    return mark && mark.filePath === filePath && typeof mark.createdAt === "number" ? { ...mark, told: Array.isArray(mark.told) ? mark.told : [] } : null;
+  } catch {
+    return null;
+  }
+};
+
+const writeAtomic = async (file: string, text: string) => {
+  await mkdir(dirname(file), { recursive: true });
+  const tmp = `${file}.${process.pid}.${Date.now().toString(36)}.tmp`;
+  await writeFile(tmp, text, "utf8");
+  await rename(tmp, file);
+};
+
+export const writeViewRestoreMark = (dataDir: string, mark: ViewRestoreMark): Promise<void> => writeAtomic(viewRestoreMarkPath(dataDir, mark.filePath), JSON.stringify(mark));
+
+/** Notes that `who` (an agent, or "orchestrator") knows about the view's latest restore. */
+export async function tellViewRestore(dataDir: string, filePath: string, createdAt: number, who: string): Promise<void> {
+  const mark = await readViewRestoreMark(dataDir, filePath);
+  if (!mark || mark.createdAt !== createdAt || mark.told.includes(who)) return;
+  await writeViewRestoreMark(dataDir, { ...mark, told: [...mark.told, who] });
+}
+
+/**
+ * Puts a restored version into the view's file on this computer, when the file is here and nothing
+ * newer was written to it since the restore was made. Whole-file rename, so an open view never reads
+ * half a file (its host sees the change and swaps, keeping state).
+ */
+export async function applyViewRestore(
+  dataDir: string,
+  restore: { filePath: string; source: string; createdAt: number; restoredFrom: number; told?: string },
+): Promise<"written" | "current" | "newer" | "missing"> {
+  const { filePath, source, createdAt, restoredFrom } = restore;
+  if (!isAbsolute(filePath)) return "missing";
+  let current: string;
+  let modifiedAt: number;
+  try {
+    [current, modifiedAt] = await Promise.all([readFile(filePath, "utf8"), stat(filePath).then((s) => s.mtimeMs)]);
+  } catch {
+    return "missing";
+  }
+  const mark = await readViewRestoreMark(dataDir, filePath);
+  const told = restore.told ? [restore.told] : [];
+  if (mark?.createdAt === createdAt) {
+    if (restore.told) await tellViewRestore(dataDir, filePath, createdAt, restore.told);
+    return "current";
+  }
+  // An older restore (a newer one landed already), or one made before the file's latest write.
+  if ((mark && mark.createdAt > createdAt) || modifiedAt > createdAt) return "newer";
+  const next: ViewRestoreMark = { filePath, createdAt, restoredFrom, source: viewSourceHash(source), told };
+  if (current !== source) await writeAtomic(filePath, source);
+  await writeViewRestoreMark(dataDir, next);
+  return current === source ? "current" : "written";
 }

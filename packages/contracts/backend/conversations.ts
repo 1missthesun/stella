@@ -34,7 +34,7 @@ export type ConversationCalls = {
     result: OwnerIdentity & { conversationId: string };
   };
   "data.export": { args: Record<string, never>; result: DataExport };
-  /** A task's view, put into the user's chat so every device shows it (`@stella/contracts/view-card`). */
+  /** A task's view, or the user's restore of an earlier version, put into the user's chat so every device shows it (`@stella/contracts/view-card`). */
   "conversations.publishView": { args: PublishViewArgs; result: { posted: boolean } };
 };
 
@@ -48,6 +48,8 @@ export type PublishViewArgs = {
   source: string;
   data?: unknown;
   createdAt: number;
+  /** A restore (by `VIEW_RESTORE_AUTHOR`): the `createdAt` of the version it brings back. */
+  restoredFrom?: number;
 };
 
 export type ConversationViews = {

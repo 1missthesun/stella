@@ -5,6 +5,9 @@
 // (any `name="value"` looks like a secret to it), which leaves a result's copy of the source broken.
 import { isViewPath } from "./paths";
 
+/** Who made a version: Stella's own `view` call, a task's view card, or the user restoring an earlier one. */
+export type ViewAuthor = { kind: "stella" } | { kind: "task"; agentId: string; title?: string } | { kind: "restore"; from: number };
+
 /** The newest version of one view the conversation carries. */
 export type ConversationView = {
   filePath: string;
@@ -15,6 +18,17 @@ export type ConversationView = {
   data?: unknown;
   /** When the newest source was written (the tool's `createdAt`, else the event's time). */
   createdAt: number;
+  /** Who wrote the newest source. */
+  by?: ViewAuthor;
+};
+
+/** The author a `view` result names (a task's card and a restore carry theirs in the details). */
+export const viewAuthorOf = (details: Record<string, unknown>): ViewAuthor => {
+  if (typeof details.restoredFrom === "number" && Number.isFinite(details.restoredFrom)) return { kind: "restore", from: details.restoredFrom };
+  if (typeof details.agentId === "string" && details.agentId) {
+    return { kind: "task", agentId: details.agentId, ...(typeof details.agentTitle === "string" && details.agentTitle ? { title: details.agentTitle } : {}) };
+  }
+  return { kind: "stella" };
 };
 
 /** The loose shape of a tool result event (desktop events, and the web's journal records alike). */
@@ -52,6 +66,7 @@ export function viewFromToolEvent(event: ViewToolEvent, call?: Record<string, un
     filePath,
     source,
     createdAt,
+    by: viewAuthorOf(details),
     ...(typeof details.slug === "string" ? { slug: details.slug } : {}),
     ...(typeof details.title === "string" ? { title: details.title } : typeof call?.title === "string" ? { title: call.title } : {}),
     hasData: "data" in from,

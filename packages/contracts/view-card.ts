@@ -4,6 +4,9 @@
 // clients read it exactly like one of Stella's calls (same file path, slug, title and source).
 // Every edit posts a newer card; all of one task's cards for a view share one group, so the view
 // stays one live card where it first appeared.
+// The user restoring an earlier version posts a card too (`restoredFrom`, by `VIEW_RESTORE_AUTHOR`),
+// so a restore is a new latest version: history is never rewritten, and the restore can be undone.
+// Each restore is its own group, so it shows where it happened.
 
 export const VIEW_CARD_TYPE = "view";
 
@@ -21,13 +24,22 @@ export type ViewCard = {
   /** The newest data the task gave with this version, when it gave any. */
   data?: unknown;
   createdAt: number;
-  /** The task that made it. */
+  /** The task that made it; `VIEW_RESTORE_AUTHOR` for the user's restore. */
   agentId: string;
   agentTitle?: string;
+  /** A restore: the `createdAt` of the earlier version it brings back. */
+  restoredFrom?: number;
 };
+
+/** The author of a restore card: the user, bringing back an earlier version. */
+export const VIEW_RESTORE_AUTHOR = "user";
 
 /** The journal group (turn id) of one task's cards for one view. */
 export const viewCardTurnId = (agentId: string, slug: string): string => `view:${agentId}:${slug}`;
+
+/** The journal group of a card: its task's group, or a restore's own. */
+export const viewCardGroup = (card: Pick<ViewCard, "agentId" | "slug" | "createdAt" | "restoredFrom">): string =>
+  card.restoredFrom !== undefined ? `view:${VIEW_RESTORE_AUTHOR}:${card.slug}:${card.createdAt}` : viewCardTurnId(card.agentId, card.slug);
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -46,6 +58,8 @@ export const parseViewCard = (raw: unknown): ViewCard | null => {
   if (!filePath || !slug || !title || !source || !agentId || createdAt === null) return null;
   if (!/\.view\.(tsx|ts|jsx|js)$/iu.test(filePath)) return null;
   const agentTitle = text(raw.agentTitle, 200);
+  const restoredFrom = typeof raw.restoredFrom === "number" && Number.isFinite(raw.restoredFrom) ? raw.restoredFrom : undefined;
+  if (restoredFrom !== undefined && agentId !== VIEW_RESTORE_AUTHOR) return null;
   return {
     type: VIEW_CARD_TYPE,
     filePath,
@@ -56,6 +70,7 @@ export const parseViewCard = (raw: unknown): ViewCard | null => {
     createdAt,
     agentId,
     ...(agentTitle ? { agentTitle } : {}),
+    ...(restoredFrom !== undefined ? { restoredFrom } : {}),
   };
 };
 
@@ -89,6 +104,44 @@ export const viewCardToolEvents = (
       createdAt: card.createdAt,
       agentId: card.agentId,
       ...(card.agentTitle ? { agentTitle: card.agentTitle } : {}),
+      ...(card.restoredFrom !== undefined ? { restoredFrom: card.restoredFrom } : {}),
     },
   },
+});
+
+const clock = (ms: number): string => {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getUTCFullYear()}-${pad(d.getUTCMonth() + 1)}-${pad(d.getUTCDate())} ${pad(d.getUTCHours())}:${pad(d.getUTCMinutes())} UTC`;
+};
+
+/**
+ * A restore as the orchestrator reads it in the conversation (desktop and cloud import it like a
+ * reminder): its own `view` calls hold the version it last wrote, so it learns which source is
+ * current now. The chat shows the card itself, not this message.
+ */
+export const viewRestoreAssistantMessage = (card: ViewCard, createdAtMs: number) => ({
+  role: "assistant" as const,
+  content: [
+    {
+      type: "text" as const,
+      text:
+        `[The user restored the view "${card.title}" (slug "${card.slug}", ${card.filePath}) to its version from ${clock(card.restoredFrom ?? card.createdAt)}, ` +
+        `so this is its current source, newer than any earlier view call for it:]\n\n\`\`\`tsx\n${card.source}\n\`\`\``,
+    },
+  ],
+  api: "stella-view-restore",
+  provider: "stella",
+  model: "view-restore",
+  usage: {
+    input: 0,
+    output: 0,
+    cacheRead: 0,
+    cacheWrite: 0,
+    totalTokens: 0,
+    cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 },
+  },
+  stopReason: "stop" as const,
+  timestamp: createdAtMs,
+  viewRestore: { slug: card.slug, filePath: card.filePath, createdAt: card.createdAt, restoredFrom: card.restoredFrom ?? card.createdAt },
 });

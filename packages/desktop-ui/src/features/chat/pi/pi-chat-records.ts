@@ -101,7 +101,7 @@ export const projectPiChat = (state: Pick<PiChatState, "entries" | "requestIds" 
       records.push({ ...base, role: "assistant", hidden: false, payload: message as unknown as Record<string, unknown> });
     } else if (turn.hidden || (message.role === "assistant" && message.stella?.hidden)) {
       continue;
-    } else if (message.role === "assistant" && ("reminder" in message || "welcome" in message)) {
+    } else if (message.role === "assistant" && ("reminder" in message || "welcome" in message || "viewRestore" in message)) {
       continue;
     } else if (entry.kind === "pi.assistant" && message.role === "assistant") {
       records.push({ ...base, role: "assistant", hidden: false, payload: message as unknown as Record<string, unknown> });

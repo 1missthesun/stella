@@ -37,6 +37,7 @@ mod text_services;
 mod trim;
 mod tree;
 mod view;
+mod views;
 #[cfg(feature = "webview")]
 mod webview;
 #[cfg(feature = "webview")]

@@ -7,7 +7,7 @@ import { translateNow } from "@/shared/i18n";
 import { showToast } from "@/ui/toast";
 import { Icon, Icons } from "../kit";
 import { Press, T, tx } from "../kit/compat";
-import { useAppsSection } from "../global/shared/apps-section.styles";
+import { appsRowIconSize, useAppsSection } from "../global/shared/apps-section.styles";
 import { useViewIcon } from "../views/ViewRenderer";
 import { openIndexedView } from "./open-indexed-view";
 
@@ -33,7 +33,7 @@ function ViewCard({ view }: { view: IndexedView }) {
       ]) as unknown as (at: { x: number; y: number }) => void}
     >
       <Press id={`apps-view-${view.id.replace(/[^\w-]/gu, "_").slice(-60)}`} text={tx(s.appsSectionCard)} {...s.appsSectionCardOpen} label={view.title} title={view.conversationTitle ?? undefined} onPress={() => open(view)}>
-        <Icon icon={icon} size={16} strokeWidth={1.7} color={s.appsSectionCardIcon.color} />
+        <Icon icon={icon} size={appsRowIconSize()} strokeWidth={1.7} color={s.appsSectionCardIcon.color} />
         <T {...tx(s.appsSectionCard, s.appsSectionCardOpen)} {...s.appsSectionCardLabel}>
           {view.title}
         </T>

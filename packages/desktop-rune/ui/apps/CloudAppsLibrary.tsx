@@ -1,5 +1,5 @@
 import { AppWindowMac, LoaderCircle, Press, T, tx } from "../kit/compat";
-import { useAppsSection } from "../global/shared/apps-section.styles";
+import { appsRowIconSize, useAppsSection } from "../global/shared/apps-section.styles";
 import { usePrimitives } from "../global/shared/primitives.styles";
 import { contextMenu } from "@/platform/context-menu";
 import { translateNow } from "@/shared/i18n";
@@ -46,7 +46,7 @@ export function CloudAppsLibrary({ state, heading = "Apps" }: { state: CloudApps
               ],
             ]) as unknown as (at: { x: number; y: number }) => void}>
             <Press text={tx(s.appsSectionCard)} {...s.appsSectionCardOpen} onPress={() => openCloudAppPanel(app)}>
-              <AppWindowMac {...s.appsSectionCardIcon} size={16} strokeWidth={1.7} color={s.appsSectionCardIcon.color} />
+              <AppWindowMac {...s.appsSectionCardIcon} size={appsRowIconSize()} strokeWidth={1.7} color={s.appsSectionCardIcon.color} />
               <T {...tx(s.appsSectionCard, s.appsSectionCardOpen)} {...s.appsSectionCardLabel}>{app.title}</T>
             </Press>
           </row>

@@ -1,5 +1,6 @@
-/* Stella's welcome message: an ordinary assistant message whose points sit on
-   hairline-separated rows, each with one family of small buttons. */
+/* Stella's welcome message: an ordinary assistant message whose points are
+   rows separated by space, each with at most one small button on its right
+   (under the text when the message is narrow). */
 
 .welcome-message {
   --welcome-hairline: color-mix(in srgb, var(--chat-assistant-bubble-text, var(--foreground)) 11%, transparent);
@@ -17,34 +18,49 @@
   font-weight: var(--chat-text-strong-weight, 600);
 }
 
+/* One grid for every row, so all the text ends at the same edge and the
+   buttons share a right-hand column as wide as the widest of them. */
 .welcome-message__points {
-  display: flex;
-  flex-direction: column;
-  margin-top: 12px;
-  border-top: 1px solid var(--welcome-hairline);
+  container-type: inline-size;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  column-gap: 24px;
+  row-gap: 14px;
+  margin-top: 14px;
 }
 
 .welcome-message__point {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 10px 0;
-  border-bottom: 1px solid var(--welcome-hairline);
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: center;
 }
 
 .welcome-message__point > p {
+  grid-column: 1;
+  min-width: 0;
   margin: 0;
 }
 
-.welcome-message__body .welcome-message__closing {
-  margin-top: 12px;
+.welcome-message__point > :not(p) {
+  grid-column: 2;
+  justify-self: end;
 }
 
-.welcome-message__actions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 6px;
+@container (max-width: 500px) {
+  .welcome-message__point {
+    grid-template-columns: minmax(0, 1fr);
+    row-gap: 8px;
+  }
+
+  .welcome-message__point > :not(p) {
+    grid-column: 1;
+    justify-self: start;
+  }
+}
+
+.welcome-message__body .welcome-message__closing {
+  margin-top: 14px;
 }
 
 .welcome-message__action {

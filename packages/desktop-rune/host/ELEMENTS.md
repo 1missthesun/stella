@@ -220,9 +220,11 @@ these props. Types are in `host/rune-jsx/props.ts` (`FxLayer`, `Glass`, `Lightin
 - Morphing: `morphFrom: "id"` (or `true`: the element's `anchor.to`) grows the glass out of that
   element's shape when it mounts, lensing the whole way, and shrinks it back into it when it's
   removed: the engine keeps the element on screen, inert, until the glass is home (at most 3 s).
-  The source's own glass hides while the morph holds it. The element's children fade in once the
-  glass has grown most of the way and fade out at once on removal, so give the element itself no
-  `enter`/`exit`. `morphMotion: { dur, bounce }` is the spring (0.5 s, 0.18); Reduce Motion skips
+  The source's own glass hides while the morph holds it. The element's children, border and
+  shadows fade in once the glass has grown most of the way and fade out at once on removal (the
+  element keeps its size meanwhile), so give the element itself no `enter`/`exit`. The glass is
+  clipped as the element's children are, so a menu that scrolls puts `scrollY` on an inner `col`
+  rather than on the morphing element. `morphMotion: { dur, bounce }` is the spring (0.5 s, 0.18); Reduce Motion skips
   it. A menu anchored to its button:
   `<col anchor={{ to: "plus", side: "top" }} fx={{ glass: { …recipe, morphFrom: true } }}>`.
   `demo/gallery/GlassMorph.tsx` shows a menu, a group and a sliding tab pill

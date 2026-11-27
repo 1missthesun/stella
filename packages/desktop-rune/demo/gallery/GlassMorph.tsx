@@ -19,7 +19,7 @@ const ITEMS = ["Add photos & files", "Take screenshot", "Record screen", "Connec
 function Menu({ close }: { close: () => void }) {
   return (
     <col id="plus-menu" anchor={{ to: "plus", side: "top", align: "start", gap: 10 }} raise={10000} modal={{ clickOutside: true }} onDismiss={close}
-      w={240} pad={6} gap={2} radius={22} fx={{ glass: { ...GLASS, morphFrom: true, morphMotion: { dur: 0.5 * SLOW, bounce: 0.18 } } }}>
+      w={240} pad={6} gap={2} radius={22} border="#ffffff2e" shadows={[{ x: 0, y: 12, blur: 36, spread: -6, color: "rgba(0,0,0,0.45)" }]} fx={{ glass: { ...GLASS, morphFrom: true, morphMotion: { dur: 0.5 * SLOW, bounce: 0.18 } } }}>
       {ITEMS.map((label) => (
         <row key={label} h={40} px={12} align="center" radius={14} hover="#ffffff1f" onPress={close}>
           <text size={14} weight={500} color={INK}>{label}</text>

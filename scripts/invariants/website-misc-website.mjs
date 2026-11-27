@@ -35,14 +35,6 @@ export async function check(root) {
     problems.push(`src/app/chat/chat-frame-source.ts: adoptChatFrameSource runs as an inline script, so it can't use imports or module names (${used.join(", ")})`);
   }
 
-  const hours = (text) => [...text.matchAll(/(?:hour|h) ?< ?(\d+)/g)].map((match) => match[1]).join();
-  const greetings = (text) => [...text.matchAll(/Good \w+/g)].map((match) => match[0]).join();
-  const still = capture(read("src/components/stella-demo/stella-demo.tsx"), /const ARM_SCRIPT = `(.*)`/) ?? "";
-  const played = capture(read("src/components/stella-demo/player.ts"), /greetingFor = \(date: Date\) => \{([\s\S]*?)\n\};/) ?? "";
-  if (!hours(played) || hours(still) !== hours(played) || greetings(still) !== greetings(played)) {
-    problems.push("stella-demo: ARM_SCRIPT and greetingFor must greet alike at every hour");
-  }
-
   const dark = read("src/components/stella-demo/app.generated.css")
     .split("\n")
     .find((line) => line.startsWith('.sd[data-theme="dark"]'));

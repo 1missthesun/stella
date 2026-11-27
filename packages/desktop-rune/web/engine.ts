@@ -111,6 +111,7 @@ export const webEngine: Engine = {
     hide: async () => {},
     close: async () => {},
     minimize: async () => {},
+    restore: async () => {},
     maximize: async () => {},
     unmaximize: async () => {},
     toggleMaximize: async () => {},

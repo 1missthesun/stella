@@ -349,6 +349,11 @@ pub fn run(st: &mut Win, tx: &mut Tx, rid: Option<u64>, v: Value) {
             "window.center" => tx.center_window(),
             "window.focus" => handle(st).ok_or("window not open")?.focus(),
             "window.show" => handle(st).ok_or("window not open")?.show(),
+            "window.restore" => {
+                let h = handle(st).ok_or("window not open")?;
+                h.show();
+                h.focus();
+            }
             "window.hide" => handle(st).ok_or("window not open")?.hide(),
             "window.close" => {
                 let node = window_node(st);

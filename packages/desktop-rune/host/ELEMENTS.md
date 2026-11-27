@@ -429,7 +429,7 @@ that takes, and share it.
 
 ## Engine API (`engine` in `host/bridge.ts`)
 
-- `window.*`: focus, show, hide, close, minimize, maximize, unmaximize, toggleMaximize,
+- `window.*`: focus, show, hide, close, minimize, restore, maximize, unmaximize, toggleMaximize,
   setFullScreen, center, setTitle, setAlwaysOnTop, setBounds, getBounds, isMaximized
 - `webview.state(target)`: why a native view shows or hides (rect, fits its scroll viewport, the
   overlays covering it)

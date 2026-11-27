@@ -346,7 +346,7 @@ export class BrowserWindow extends BaseWindow {
       mode,
       url,
       title: this.state.title,
-      visible: this.state.visible && !this.state.minimized,
+      visible: this.state.visible,
       focusable: this.state.focusable,
       alwaysOnTop: this.state.alwaysOnTop,
       opacity: this.state.opacity,
@@ -403,10 +403,10 @@ export class BrowserWindow extends BaseWindow {
       case "blur": this.state.focused = false; this.webContents.markFocused(false); this.emit("blur"); break;
       case "resize": this.emit("resize"); this.emit("resized"); break;
       case "move": this.emit("move"); this.emit("moved"); break;
-      case "maximize": this.state.maximized = true; this.emit("maximize"); break;
-      case "unmaximize": this.state.maximized = false; this.emit("unmaximize"); break;
-      case "minimize": this.state.minimized = true; this.emit("minimize"); break;
-      case "restore": this.state.minimized = false; this.emit("restore"); break;
+      case "maximize": if (!this.state.maximized) { this.state.maximized = true; this.emit("maximize"); } break;
+      case "unmaximize": if (this.state.maximized) { this.state.maximized = false; this.emit("unmaximize"); } break;
+      case "minimize": if (!this.state.minimized) { this.state.minimized = true; this.emit("minimize"); } break;
+      case "restore": if (this.state.minimized) { this.state.minimized = false; this.emit("restore"); } break;
       case "enter-full-screen": this.state.fullscreen = true; this.emit("enter-full-screen"); break;
       case "leave-full-screen": this.state.fullscreen = false; this.emit("leave-full-screen"); break;
       case "show": this.state.visible = true; this.emit("show"); break;
@@ -574,7 +574,12 @@ export class BrowserWindow extends BaseWindow {
   moveTop() { this.focus(); }
   moveAbove() {}
   minimize() { this.set({ minimized: true }); this.engineCall("minimize", (e, id) => e.window.minimize(id)); this.emit("minimize"); }
-  restore() { this.set({ minimized: false }); this.engineCall("show", (e, id) => e.window.show(id)); this.emit("restore"); }
+  restore() {
+    const was = this.state.minimized;
+    this.set({ visible: true, minimized: false });
+    this.engineCall("restore", (e, id) => e.window.restore(id));
+    if (was) this.emit("restore");
+  }
   maximize() { this.set({ maximized: true }); this.engineCall("maximize", (e, id) => e.window.maximize(id)); this.emit("maximize"); }
   unmaximize() { this.set({ maximized: false }); this.engineCall("unmaximize", (e, id) => e.window.unmaximize(id)); this.emit("unmaximize"); }
   setFullScreen(on: boolean) { this.set({ fullscreen: on }); this.engineCall("setFullScreen", (e, id) => e.window.setFullScreen(id, on)); this.emit(on ? "enter-full-screen" : "leave-full-screen"); }

@@ -66,7 +66,7 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
                 cx.zoom(k);
             }
             if let Some(h) = n.props.titlebar {
-                let mut t = rune::Titlebar::new(h);
+                let mut t = titlebar(h);
                 if let Some([x, y]) = n.props.traffic_lights {
                     t = t.traffic_lights(x, y);
                 }
@@ -137,6 +137,7 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
 
 thread_local! {
     static SEEN: std::cell::RefCell<HashMap<u32, (bool, bool, bool)>> = std::cell::RefCell::new(HashMap::new());
+    static MINIMIZED: std::cell::RefCell<HashMap<u32, bool>> = std::cell::RefCell::new(HashMap::new());
     static SYSTEM_DARK: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
     static ACCENT: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
 }
@@ -287,9 +288,24 @@ const DEFAULT_BAND: f32 = if cfg!(target_os = "macos") { 28.0 } else { 32.0 };
 pub fn decorate_main(app: rune::App<Win>, p: &Props) -> rune::App<Win> {
     let app = decorate(app, p);
     if p.titlebar.is_none() && !p.frameless && p.kind.as_deref() != Some("overlay") {
-        app.titlebar(rune::Titlebar::new(DEFAULT_BAND))
+        app.titlebar(titlebar(DEFAULT_BAND))
     } else {
         app
+    }
+}
+
+/// On Windows Stella's windows are frameless in Electron (`frame: false`) and draw their own
+/// window controls, so the band keeps its drag, snap and resize edges but shows no caption buttons.
+fn titlebar(height: f32) -> rune::Titlebar {
+    rune::Titlebar::new(height).controls(!cfg!(windows))
+}
+
+/// Electron's `minimize` and `restore` events, for a minimize or restore the window's own
+/// controls, the taskbar or a shortcut made.
+fn visibility(s: &mut Win, shown: bool, _tx: &mut Tx) {
+    let minimized = !shown && engine::read(|e| e.windows.get(&s.node).and_then(|w| w.handle.as_ref()).and_then(|h| h.placement())).is_some_and(|p| p.minimized);
+    if MINIMIZED.with(|m| m.borrow_mut().insert(s.node, minimized)).unwrap_or(false) != minimized {
+        window_event(s.node, if minimized { "minimize" } else { "restore" }, json!({}));
     }
 }
 
@@ -303,9 +319,9 @@ fn default_band(s: &Win, cx: &Cx<Win>) -> Option<f32> {
 }
 
 pub fn decorate(app: rune::App<Win>, p: &Props) -> rune::App<Win> {
-    let mut app = app.on_close_request(close_request);
+    let mut app = app.on_close_request(close_request).on_visibility(visibility);
     if let Some(h) = p.titlebar {
-        app = app.titlebar(rune::Titlebar::new(h));
+        app = app.titlebar(titlebar(h));
     }
     if let Some([x, y]) = p.traffic_lights {
         app = app.chrome(rune::Chrome { traffic_lights: Some((x, y)), ..rune::Chrome::DEFAULT });

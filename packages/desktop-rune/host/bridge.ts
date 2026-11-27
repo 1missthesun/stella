@@ -263,6 +263,7 @@ export const engine = {
     hide: (id: string) => win(id, "hide"),
     close: (id: string) => win(id, "close"),
     minimize: (id: string) => win(id, "minimize"),
+    restore: (id: string) => win(id, "restore"),
     maximize: (id: string) => win(id, "maximize"),
     unmaximize: (id: string) => win(id, "unmaximize"),
     toggleMaximize: (id: string) => win(id, "toggleMaximize"),

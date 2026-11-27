@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ESNext", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+    "jsxImportSource": "rune-jsx",
+    "paths": {
+      "rune-jsx/*": ["./host/rune-jsx/*"],
+      "@/*": ["../desktop-ui/src/*"]
+    },
+    "strict": true,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "allowImportingTsExtensions": true,
+    "noEmit": true,
+    "types": ["bun"]
+  },
+  "files": ["host/vite-env.d.ts"],
+  "include": [
+    "host/**/*.ts",
+    "host/**/*.tsx",
+    "ui/**/*.ts",
+    "ui/**/*.tsx",
+    "demo/**/*.ts",
+    "demo/**/*.tsx",
+    "scripts/**/*.ts",
+    "web/**/*.ts",
+    "web/**/*.tsx",
+    "../desktop-ui/src/shared/types/electron.d.ts"
+  ],
+  "exclude": ["node_modules", ".hot"]
+}

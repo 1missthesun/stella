@@ -1,0 +1,28 @@
+import { mixOklch, sheet } from "../../theme";
+
+export const useAiAccounts = sheet((c) => ({
+  aiProviderHead: { mb: 10, align: "center", justify: "between", gap: 12 },
+  aiPrimary: { align: "center", gap: 16, minH: 36 },
+  aiPrimaryText: { grow: 1, shrink: true, minW: 0 },
+  aiPrimaryName: { size: 16, weight: 600, em: -0.018, color: c.textStrong, truncate: true, nowrap: true },
+  aiPrimaryNameEmpty: { weight: 500, color: c.textWeak },
+  aiPrimaryMeta: { mt: 3, wrap: true, align: "center", rowGap: 2, gap: 12, size: 13, lh: 1.45, color: c.textWeak },
+  aiPrimaryStatus: { align: "center", gap: 10 },
+  aiInUse: { align: "center", gap: 7, size: 14, weight: 600, em: -0.01, color: c.textStrong, nowrap: true },
+  aiInUseDot: { w: 6, h: 6, radius: 9999, fill: c.primary },
+  aiNote: { mt: 10, align: "center", gap: 12, size: 13.5, lh: 1.45, color: c.textWeak },
+  aiNoteText: { grow: 1, shrink: true, minW: 0 },
+  aiLink: { pad: 0, align: "center", gap: 4, size: 13, color: c.textWeak, underline: true, cursor: "pointer", hoverColor: c.textStrong },
+  aiProviderMore: { pad: 0, mt: 14, mb: 3, align: "center", gap: 6, size: 13.5, weight: 500, color: c.textWeak, cursor: "pointer", hoverColor: c.textStrong },
+  aiProviderChevron: { motion: { dur: 0.15 } },
+  aiProviderDetails: { pl: 18, mt: 14, gap: 18 },
+  aiDetailsGroupLabel: { mb: 4, size: 12.5, weight: 600, color: c.textWeaker },
+  aiRow: { py: 5, align: "center", gap: 14, minH: 40 },
+  aiRowText: { grow: 1, shrink: true, minW: 0 },
+  aiRowName: { size: 14.5, weight: 600, em: -0.012, color: c.textStrong, truncate: true, nowrap: true },
+  aiRowMeta: { mt: 1, size: 12.5, color: c.textWeak },
+  aiRowControls: { align: "center", gap: 10 },
+  aiDetailsAdd: { mt: 6, gap: 8, align: "center" },
+  aiLegal: { gap: 18, size: 13.5 },
+  aiProviderPlain_aiPrimaryName: { size: 16 },
+}));

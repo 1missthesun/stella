@@ -1,0 +1,26 @@
+{
+  "name": "@stella/desktop-rune",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "engine:build": "cd engine && cargo build --release",
+    "start": "./scripts/launch.sh",
+    "typecheck": "bun scripts/typecheck.ts",
+    "icons": "bun --tsconfig-override=../desktop-ui/tsconfig.app.json scripts/gen-icons.ts",
+    "icons:check": "bun --tsconfig-override=../desktop-ui/tsconfig.app.json scripts/gen-icons.ts --check"
+  },
+  "dependencies": {
+    "@stella/contracts": "workspace:*",
+    "@stella/theme": "workspace:*",
+    "react": "^19.3.0",
+    "react-reconciler": "0.34.0",
+    "remark-gfm": "^4.0.1",
+    "remark-parse": "^11.0.0",
+    "unified": "^11.0.5"
+  },
+  "devDependencies": {
+    "@types/bun": "^1.4.4",
+    "@types/react-reconciler": "0.32.3"
+  }
+}

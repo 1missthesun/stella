@@ -13,6 +13,7 @@ import {
   readBackendAccountEpoch,
   subscribeBackendAccount,
 } from "./backend-client";
+import { useViewFixture, VIEW_FIXTURE_LOADING } from "./view-fixtures";
 
 export type BackendViewState<T> =
   | { status: "loading"; value: T | undefined; error: undefined }
@@ -62,6 +63,12 @@ export function useBackendView<K extends ViewName>(
     );
   }, [view, stableArgs, epoch, keepPreviousValue]);
 
+  const fixture = useViewFixture(view);
+  if (fixture !== undefined && stableArgs !== "skip") {
+    return fixture === VIEW_FIXTURE_LOADING
+      ? LOADING
+      : { status: "ready", value: fixture as ViewResult<K>, error: undefined };
+  }
   return state;
 }
 

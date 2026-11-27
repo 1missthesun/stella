@@ -13,6 +13,7 @@
 #include <dwmapi.h>
 #include <objbase.h>
 #include <sddl.h>
+#include <tlhelp32.h>
 #include <shellapi.h>
 #include <shlobj.h>
 #include <shlwapi.h>
@@ -464,6 +465,8 @@ struct Options {
     string sourceRef;
     wstring backend;
     wstring localBun;
+    wstring engine = envVar(L"STELLA_LAUNCHER_ENGINE");
+    wstring engineBin = envVar(L"STELLA_LAUNCHER_ENGINE_BIN");
     double hold = 0;
     Choice recoveryChoice = Choice::None;
     wstring captureDir;
@@ -495,6 +498,7 @@ static const char *kUsage =
     "                  [--backend <url>] [--bun <path>] [--hold <seconds>]\n"
     "                  [--recovery-choice return|retry|quit] [--capture-dir <dir>]\n"
     "                  [--start [--show]] [--after <pid>]\n"
+    "                  [--engine electron|rune] [--engine-bin <path>]\n"
     "       Stella.exe --version\n"
     "\n"
     "Environment: STELLA_LAUNCHER_ROOT (install root, for testing),\n"
@@ -503,7 +507,9 @@ static const char *kUsage =
     "STELLA_LAUNCHER_READY_TIMEOUT_SECONDS, STELLA_LAUNCHER_PREPARE_TIMEOUT_SECONDS,\n"
     "STELLA_LAUNCHER_INSTALL_DIR (instead of %LOCALAPPDATA%\\Programs\\Stella),\n"
     "STELLA_LAUNCHER_UPDATE_URL, STELLA_LAUNCHER_UPDATE_DELAY_SECONDS and\n"
-    "STELLA_LAUNCHER_UPDATE_SKIP_SIGNATURE=1 (with an update URL; for testing).\n";
+    "STELLA_LAUNCHER_UPDATE_SKIP_SIGNATURE=1 (with an update URL; for testing),\n"
+    "STELLA_LAUNCHER_ENGINE=rune or the file <root>\\rune-engine (start the Rune engine instead of Electron),\n"
+    "STELLA_LAUNCHER_ENGINE_BIN (a local stella-engine.exe; implies rune).\n";
 
 static void parseOptions() {
     int argc = 0;
@@ -528,6 +534,8 @@ static void parseOptions() {
         else if (a == L"--show") O.show = true;
         else if (a == L"--after") O.after = wcstoul(value().c_str(), nullptr, 10);
         else if (a == L"--bun") O.localBun = value();
+        else if (a == L"--engine") O.engine = value();
+        else if (a == L"--engine-bin") O.engineBin = value();
         else if (a == L"--hold") O.hold = _wtof(value().c_str());
         else if (a == L"--capture-dir") O.captureDir = value();
         else if (a == L"--recovery-choice") {
@@ -1204,7 +1212,8 @@ static Env baseEnvironment() {
          {L"STELLA_LAUNCHER_KEY_FILE", L"STELLA_LAUNCHER_ROOT", L"ELECTRON_RUN_AS_NODE", L"STELLA_V2_DEV_DATA_DIR",
           L"STELLA_APP_DIR", L"STELLA_RUNTIME_STATE_DIR", L"STELLA_DEV_RESTART_REQUEST_FILE",
           L"STELLA_DEV_USER_QUIT_REQUEST_FILE", L"STELLA_ELECTRON_DEV_RUNNER_PID", L"STELLA_ELECTRON_READY_FILE",
-          L"NODE_OPTIONS", L"STELLA_LAUNCHER_PIPE"})
+          L"NODE_OPTIONS", L"STELLA_LAUNCHER_PIPE", L"STELLA_LAUNCHER_ENGINE", L"STELLA_LAUNCHER_ENGINE_BIN",
+          L"STELLA_RUNE_ROOT", L"STELLA_RUNE_BUN", L"STELLA_RUNE_SERVICES"})
         env.erase(key);
     if (!(P.isolated && usesTestKey))
         for (const wchar_t *key : {L"STELLA_DEV_HARNESS", L"STELLA_DEV_HARNESS_STORAGE_KEY", L"STELLA_V2_DEV_USER_DATA_DIR",
@@ -2446,6 +2455,119 @@ static void joinBunPrefetch() {
     if (gBunPrefetch.valid()) gBunPrefetch.wait();
 }
 
+static wstring gEngineBin;
+static string gEngineVersion;
+
+static bool engineRequested() {
+    if (!O.engine.empty()) return O.engine == L"rune";
+    if (!O.engineBin.empty()) return true;
+    return exists(P.root + L"\\rune-engine");
+}
+
+static bool isEngine(const wstring &exe) { return !gEngineBin.empty() && exe == gEngineBin; }
+
+// launcher.json "stellaEngine": {"version", "assets": {<platform>: {"url", "sha256", "member"?}}};
+// an asset without "member" is the bare binary, one with it is a zip holding it.
+// Also runs on a thread while dependencies install (startEnginePrefetch), with
+// showProgress false, so nothing here may touch the UI then.
+static void installEngine(bool showProgress) {
+    string key = bunPlatformKey();
+    if (key == "win-x64-baseline") key = "win-x64";
+    wstring host = P.app() + L"\\packages\\desktop-rune\\host\\main.tsx";
+    if (!exists(host)) fail("This version of Stella has no Rune app (" + utf8(host) + " is missing).");
+    if (!O.engineBin.empty()) {
+        if (!showProgress) return;
+        if (!exists(O.engineBin)) fail(utf8(O.engineBin) + " is not a stella-engine.");
+        gEngineBin = O.engineBin;
+        gEngineVersion = "local";
+        return;
+    }
+    string version, url, sha, member;
+    string manifest;
+    if (readFile(P.app() + L"\\packages\\desktop\\launcher.json", manifest)) {
+        mj_value *json = mj_parse(manifest.data(), manifest.size());
+        const mj_value *engine = mj_get(json, "stellaEngine");
+        const mj_value *asset = mj_get(mj_get(engine, "assets"), key.c_str());
+        auto field = [](const mj_value *v, const char *name) { const char *s = mj_get_string(v, name); return string(s ? s : ""); };
+        version = field(engine, "version");
+        url = field(asset, "url");
+        sha = field(asset, "sha256");
+        member = field(asset, "member");
+        mj_free(json);
+    }
+    if (version.empty() || url.empty() || sha.empty()) fail("This version of Stella has no Rune engine for " + key + ".");
+    wstring dir = P.runtimes() + L"\\stella-engine-" + wide(version);
+    wstring bin = dir + L"\\stella-engine.exe";
+    if (!exists(bin)) {
+        if (showProgress) progress("Getting things ready…", 0.30, 0.40);
+        LOG("install: downloading stella-engine %s from %s", version.c_str(), url.c_str());
+        mkdirs(dir);
+        wstring downloaded = P.runtimes() + L"\\.stella-engine-" + wide(version) + L".download";
+        download(url, downloaded, sha);
+        if (!member.empty()) {
+            wstring staging = P.runtimes() + L"\\.stella-engine-" + wide(version) + L".partial";
+            removeTree(staging);
+            extractZip(downloaded, staging);
+            wstring memberPath = staging + L"\\" + wide(member);
+            std::replace(memberPath.begin(), memberPath.end(), L'/', L'\\');
+            if (!MoveFileExW(memberPath.c_str(), bin.c_str(), MOVEFILE_REPLACE_EXISTING))
+                fail("stella-engine's archive has no " + member + ".");
+            removeTree(staging);
+            DeleteFileW(downloaded.c_str());
+        } else if (!MoveFileExW(downloaded.c_str(), bin.c_str(), MOVEFILE_REPLACE_EXISTING)) {
+            fail(format("could not install stella-engine (error %lu)", GetLastError()));
+        }
+        LOG("install: stella-engine %s ready", version.c_str());
+    }
+    if (!showProgress) return;
+    gEngineBin = bin;
+    gEngineVersion = version;
+}
+
+// A first install fetches the engine while dependencies install. It starts
+// once the source is verified, since the engine's URL and checksum come from
+// that source's launcher.json, and is joined before the launch. Detached, so a
+// launcher that quits mid-download never waits on it.
+static std::shared_future<void> gEnginePrefetch;
+
+static void startEnginePrefetch() {
+    if (!O.engineBin.empty() || gEnginePrefetch.valid() || !engineRequested()) return;
+    auto done = std::make_shared<std::promise<void>>();
+    gEnginePrefetch = done->get_future().share();
+    std::thread([done]() {
+        try {
+            installEngine(false);
+        } catch (const LauncherError &e) {
+            LOG("install: early stella-engine download failed (%s); trying again", e.message.c_str());
+        } catch (...) {
+            LOG("install: early stella-engine download failed; trying again");
+        }
+        done->set_value();
+    }).detach();
+}
+
+static void joinEnginePrefetch() {
+    if (!gEnginePrefetch.valid()) return;
+    gEnginePrefetch.wait();
+    gEnginePrefetch = {};
+}
+
+static void ensureEngine() {
+    joinEnginePrefetch();
+    installEngine(true);
+}
+
+static DWORD parentProcessId(DWORD pid) {
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) return 0;
+    PROCESSENTRY32W entry = {sizeof(entry)};
+    DWORD parent = 0;
+    for (BOOL more = Process32FirstW(snapshot, &entry); more; more = Process32NextW(snapshot, &entry))
+        if (entry.th32ProcessID == pid) { parent = entry.th32ParentProcessID; break; }
+    CloseHandle(snapshot);
+    return parent;
+}
+
 static void bootstrapAccess(string &remote, string &token) {
     wstring base = backendURL();
     while (!base.empty() && base.back() == L'/') base.pop_back();
@@ -2951,7 +3073,9 @@ static string signHead(const string &expected) {
 
 // Electron keeps its own name: it decides app.isPackaged from the executable's
 // name, and launcher runs are source runs.
-static wstring prepare() {
+// With rune (the Rune engine starts instead) Electron is neither fetched nor
+// needed, and this returns "".
+static wstring prepare(bool rune) {
     wstring app = P.app();
     string lockHash = sha256File(app + L"\\bun.lock");
     if (S.bunLockHash != lockHash || !exists(app + L"\\node_modules\\electron\\package.json")) {
@@ -2967,6 +3091,9 @@ static wstring prepare() {
         Env env = baseEnvironment();
         env[L"STELLA_SKIP_BROWSER_HYDRATE"] = L"1";
         env[L"STELLA_SKIP_OFFICE_HYDRATE"] = L"1";
+        // baseEnvironment() strips the engine choice; install-deps.mjs skips
+        // Electron and its bundle for Rune.
+        if (rune) env[L"STELLA_LAUNCHER_ENGINE"] = L"rune";
         vector<wstring> argv = seeded ? vector<wstring>{gBunBin, installDeps}
                                       : vector<wstring>{gBunBin, L"install", L"--frozen-lockfile"};
         CmdResult r = runCmd(argv, app, env, P.installLog(), 30 * 60, L"", seeded);
@@ -2998,7 +3125,20 @@ static wstring prepare() {
         }
     }
 
+    if (rune) return L"";
     wstring electron = app + L"\\node_modules\\electron\\dist\\electron.exe";
+    wstring ensure = app + L"\\packages\\desktop\\scripts\\ensure-electron-binary.mjs";
+    if (!exists(electron) && exists(ensure)) {
+        // Dependencies installed for Rune have no Electron binary; fetch it
+        // now that Electron starts instead.
+        progress("Getting things ready…", 0.90, 0.96);
+        LOG("prepare: Electron is missing; running ensure-electron-binary.mjs");
+        try {
+            runCmd({gBunBin, ensure}, app, baseEnvironment(), P.installLog(), 10 * 60);
+        } catch (const LauncherError &e) {
+            LOG("prepare: ensure-electron-binary.mjs could not run: %s", e.message.c_str());
+        }
+    }
     if (!exists(electron)) fail("Electron is not installed (missing " + utf8(electron) + ").");
     return electron;
 }
@@ -3145,8 +3285,18 @@ public:
         HANDLE nul = openNul();
         PROCESS_INFORMATION pi;
         ZeroMemory(&pi, sizeof(pi));
-        bool ok = createProcess(exe, commandLine({exe, app}), app, electronEnvironment(pipeName_), nul, outWrite, outWrite, 0,
-                                &pi);
+        engine_ = isEngine(exe);
+        Env env = electronEnvironment(pipeName_);
+        if (engine_) {
+            env[L"STELLA_LAUNCHER_ENGINE"] = L"rune";
+            env[L"STELLA_RUNE_SERVICES"] = L"1";
+            env[L"STELLA_RUNE_ROOT"] = app + L"\\packages\\desktop-rune";
+            env.erase(L"BUN_RUNTIME_TRANSPILER_CACHE_PATH");
+            env[L"MIMALLOC_PURGE_DELAY"] = L"0";
+            if (!gBunBin.empty()) env[L"STELLA_RUNE_BUN"] = gBunBin;
+        }
+        bool ok = createProcess(exe, engine_ ? commandLine({exe}) : commandLine({exe, app}), app, env, nul, outWrite, outWrite,
+                                0, &pi);
         DWORD error = GetLastError();
         CloseHandle(outWrite);
         CloseHandle(nul);
@@ -3158,7 +3308,7 @@ public:
         CloseHandle(pi.hThread);
         process_ = pi.hProcess;
         pid_ = pi.dwProcessId;
-        LOG("supervisor: spawned Electron pid %lu", pid_);
+        LOG("supervisor: spawned %s pid %lu", engine_ ? "stella-engine" : "Electron", pid_);
 
         std::thread([capture = output, outRead]() {
             char buf[16384];
@@ -3230,6 +3380,7 @@ private:
     wstring pipeName_;
     HANDLE pipe_ = INVALID_HANDLE_VALUE, process_ = nullptr, writeEvent_ = nullptr, stopEvent_ = nullptr;
     DWORD pid_ = 0;
+    bool engine_ = false;
     std::mutex writeLock_, exitLock_;
     bool connected_ = false, exited_ = false;
     vector<std::thread> threads_;
@@ -3268,7 +3419,9 @@ private:
             else if (error == ERROR_IO_PENDING) connected = waitIo(&ov, &n);
         }
         ULONG client = 0;
-        if (connected && GetNamedPipeClientProcessId(pipe_, &client) && client != pid_) {
+        // Under stella-engine the client is the engine's TS host, a direct child.
+        if (connected && GetNamedPipeClientProcessId(pipe_, &client) && client != pid_ &&
+            !(engine_ && parentProcessId(client) == pid_)) {
             LOG("channel: refused a client that isn't Electron (pid %lu)", client);
             connected = false;
         }
@@ -3389,6 +3542,7 @@ static void requestShutdown() {
 static void refreshInstallInfo();
 
 static Outcome supervise(const wstring &electron) {
+    const char *child = isEngine(electron) ? "stella-engine" : "Electron";
     string spawnedHead;
     try { spawnedHead = gGit->run({"rev-parse", "HEAD"}, P.app()); } catch (const LauncherError &) {}
     std::unique_ptr<ElectronProcess> process;
@@ -3430,11 +3584,11 @@ static Outcome supervise(const wstring &electron) {
                 mj_get_number(message, "code", &code);
                 announced = true;
                 announcedCode = (DWORD)code;
-                LOG("supervisor: Electron is exiting with %lu", announcedCode);
+                LOG("supervisor: %s is exiting with %lu", child, announcedCode);
                 process->events.after(10, "exit-grace");
             } else if (op && !strcmp(op, "failed")) {
                 const char *reason = mj_get_string(message, "reason");
-                LOG("supervisor: Electron reported failure: %s", reason ? reason : "unknown");
+                LOG("supervisor: %s reported failure: %s", child, reason ? reason : "unknown");
                 if (!pending) {
                     pending = true;
                     pendingReason = string("Stella reported a problem: ") + (reason ? reason : "unknown");
@@ -3460,15 +3614,15 @@ static Outcome supervise(const wstring &electron) {
                     LOG("supervisor: could not mark known-good: %s", e.message.c_str());
                 }
             } else if ((name == "self-test-quit" || name == "shutdown") && !quitRequested) {
-                LOG("supervisor: %s asks Electron to quit", name == "shutdown" ? "Shut down" : "self-test");
+                LOG("supervisor: %s asks %s to quit", name == "shutdown" ? "Shut down" : "self-test", child);
                 quitRequested = true;
                 process->send("{\"op\":\"quit\"}");
                 process->events.after(30, "quit-timeout");
             } else if (name == "quit-timeout" && !announced) {
-                LOG("supervisor: Electron did not quit in time; terminating");
+                LOG("supervisor: %s did not quit in time; terminating", child);
                 process->terminate();
             } else if (name == "exit-grace") {
-                LOG("supervisor: Electron's teardown is still running 10s after it announced its exit; terminating");
+                LOG("supervisor: %s's teardown is still running 10s after it announced its exit; terminating", child);
                 teardownForced = true;
                 process->forceKill();
             }
@@ -3476,11 +3630,11 @@ static Outcome supervise(const wstring &electron) {
             Sleep(300);
             vector<string> output = process->output->lastLines();
             string detail = format("exit %lu", event.code);
-            LOG("supervisor: Electron exited (%s)", detail.c_str());
+            LOG("supervisor: %s exited (%s)", child, detail.c_str());
             if (pending) return {OutcomeKind::Failed, 0, detail, pendingReason, output};
             if (announced && teardownForced)
-                LOG("supervisor: Electron's teardown did not finish; its announced exit %lu stands but cleanup is incomplete",
-                    announcedCode);
+                LOG("supervisor: %s's teardown did not finish; its announced exit %lu stands but cleanup is incomplete",
+                    child, announcedCode);
             DWORD code = announced ? announcedCode : event.code;
             if (code == kRelaunchExitCode) return {OutcomeKind::Relaunch, 0, detail, string(), output};
             if (quitRequested && code != 0)
@@ -3686,8 +3840,14 @@ static wstring prepareForLaunch() {
         LOG("catch-up: %s", e.message.c_str());
     }
     refreshInstallInfo();
+    startEnginePrefetch();
     ensureBun();
-    return prepare();
+    bool rune = engineRequested();
+    wstring electron = prepare(rune);
+    if (!rune) return electron;
+    ensureEngine();
+    LOG("launcher: starting stella-engine %s (%s) instead of Electron", gEngineVersion.c_str(), utf8(gEngineBin).c_str());
+    return gEngineBin;
 }
 
 static int run() {

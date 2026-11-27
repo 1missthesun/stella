@@ -1,0 +1,14 @@
+        <col id="now-card" w="full" mt={10} mb={2} pad={12} gap={10} radius={12} fill={t.raised} border={t.borderWeak} enter="rise">
+          <row w="full" justify="between" align="center">
+            <text size={12} weight={600} color={t.textStrong}>Now</text>
+            <text size={11.5} color={t.textWeaker}>2 running</text>
+          </row>
+          {[["Booking dinner in Lisbon", "70%"], ["Renaming 38 screenshots", "35%"]].map(([label, done], i) => (
+            <col key={label} id={`now-${i}`} w="full" gap={6}>
+              <text size={12.5} color={t.text} truncate>{label}</text>
+              <box w="full" h={4} radius={2} fill={t.inset}>
+                <box w={done as `${number}%`} h={4} radius={2} fill={t.primary} layout={0.4} />
+              </box>
+            </col>
+          ))}
+        </col>

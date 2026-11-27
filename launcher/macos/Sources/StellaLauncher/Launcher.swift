@@ -14,8 +14,15 @@ struct Options {
     var recoveryChoice: RecoveryChoice?
     var captureDir: URL?
     var localBun: String?
+    var engine: String? = Options.nonEmpty("STELLA_LAUNCHER_ENGINE")
+    var engineBin: String? = Options.nonEmpty("STELLA_LAUNCHER_ENGINE_BIN")
     var readyTimeout: TimeInterval = Options.seconds("STELLA_LAUNCHER_READY_TIMEOUT_SECONDS", 90)
     var stableSeconds: TimeInterval = Options.seconds("STELLA_LAUNCHER_STABLE_SECONDS", 60)
+
+    static func nonEmpty(_ name: String) -> String? {
+        guard let value = ProcessInfo.processInfo.environment[name], !value.isEmpty else { return nil }
+        return value
+    }
 
     static func seconds(_ name: String, _ fallback: TimeInterval) -> TimeInterval {
         guard let raw = ProcessInfo.processInfo.environment[name], let value = TimeInterval(raw), value > 0 else {
@@ -47,6 +54,7 @@ final class Launcher {
     private var git: GitTool?
     private var signer: TreeSigner?
     private var runtimes: Runtimes?
+    private var engine: (bin: URL, version: String)?
     private var recoveryCount = 0
     private var identityRetry: String?
     private var crashTimes: [Date] = []
@@ -285,7 +293,7 @@ final class Launcher {
             state = LauncherState()
             state.installedAt = ISO8601DateFormatter().string(from: Date())
             state.save(paths)
-            ElectronIdentity.prefetch(paths: paths, env: env)
+            if !engineRequested { ElectronIdentity.prefetch(paths: paths, env: env) }
         }
 
         if let changes = try signer.outsideChanges(git: git, app: paths.app) {
@@ -293,13 +301,28 @@ final class Launcher {
             throw OutsideChangesFound(changes: changes)
         }
         log("verify: HEAD signed and clean")
+        let rune = engineRequested
+        if rune && options.engineBin == nil { Install.prefetchEngine(paths: paths) }
 
         let (bun, bunVersion) = try Install.ensureBun(
             paths: paths, baseEnv: env, localBun: options.localBun, progress: status)
         let runtimes = Runtimes(bunBin: bun, bunVersion: bunVersion, git: git)
         self.runtimes = runtimes
-        return try Prepare.run(paths: paths, runtimes: runtimes, env: baseEnvironment(),
-                               state: &state, progress: status)
+        let electron = try Prepare.run(paths: paths, runtimes: runtimes, env: baseEnvironment(),
+                                       rune: rune, state: &state, progress: status)
+        engine = nil
+        if rune {
+            let engine = try Install.ensureEngine(paths: paths, localBin: options.engineBin, progress: status)
+            log("launcher: starting stella-engine \(engine.version) (\(engine.bin.path)) instead of Electron")
+            self.engine = engine
+        }
+        return electron
+    }
+
+    private var engineRequested: Bool {
+        if let engine = options.engine { return engine == "rune" }
+        if options.engineBin != nil { return true }
+        return FileManager.default.fileExists(atPath: paths.root.appendingPathComponent("rune-engine").path)
     }
 
     private func tools() throws -> (GitTool, TreeSigner) {
@@ -336,7 +359,9 @@ final class Launcher {
         var stripped = ["STELLA_LAUNCHER_KEY_FILE", "STELLA_LAUNCHER_ROOT", "ELECTRON_RUN_AS_NODE",
                         "STELLA_V2_DEV_DATA_DIR", "STELLA_APP_DIR", "STELLA_RUNTIME_STATE_DIR",
                         "STELLA_DEV_RESTART_REQUEST_FILE", "STELLA_DEV_USER_QUIT_REQUEST_FILE",
-                        "STELLA_ELECTRON_DEV_RUNNER_PID", "STELLA_ELECTRON_READY_FILE", "NODE_OPTIONS"]
+                        "STELLA_ELECTRON_DEV_RUNNER_PID", "STELLA_ELECTRON_READY_FILE", "NODE_OPTIONS",
+                        "STELLA_LAUNCHER_ENGINE", "STELLA_LAUNCHER_ENGINE_BIN", "STELLA_RUNE_ROOT", "STELLA_RUNE_BUN",
+                        "STELLA_RUNE_SERVICES"]
         let harness = ["STELLA_DEV_HARNESS", "STELLA_DEV_HARNESS_STORAGE_KEY", "STELLA_V2_DEV_USER_DATA_DIR",
                        "STELLA_REMOTE_DEBUG_PORT", "STELLA_DEV_HARNESS_SESSION_TOKEN"]
         if !(paths.isolated && usesTestKey) { stripped += harness }
@@ -392,17 +417,30 @@ final class Launcher {
     private func supervise(electronApp: URL) -> Outcome {
         guard let git, let signer else { return .failed("The launcher is not set up.", []) }
         let spawnedHead = (try? git.run(["rev-parse", "HEAD"], cwd: paths.app)) ?? ""
+        let child = engine == nil ? "Electron" : "stella-engine"
         let process: ElectronProcess
         do {
-            process = try ElectronProcess(
-                executable: electronApp.appendingPathComponent("Contents/MacOS/Electron"),
-                // Stella doesn't use AppKit window restoration. Skipping it
-                // keeps launch independent of the persistent-UI service, whose
-                // XPC call at launch can block Electron's main thread forever.
-                args: [paths.app.path, "-ApplePersistenceIgnoreState", "YES"],
-                cwd: paths.app,
-                env: electronEnvironment(),
-                logFile: paths.electronLog)
+            if let engine {
+                var env = electronEnvironment()
+                env["STELLA_LAUNCHER_ENGINE"] = "rune"
+                env["STELLA_RUNE_SERVICES"] = "1"
+                env.removeValue(forKey: "BUN_RUNTIME_TRANSPILER_CACHE_PATH")
+                env["MIMALLOC_PURGE_DELAY"] = "0"
+                env["STELLA_RUNE_ROOT"] = paths.app.appendingPathComponent("packages/desktop-rune").path
+                if let runtimes { env["STELLA_RUNE_BUN"] = runtimes.bunBin.path }
+                process = try ElectronProcess(
+                    executable: engine.bin, args: [], cwd: paths.app, env: env, logFile: paths.electronLog, isEngine: true)
+            } else {
+                process = try ElectronProcess(
+                    executable: electronApp.appendingPathComponent("Contents/MacOS/Electron"),
+                    // Stella doesn't use AppKit window restoration. Skipping it
+                    // keeps launch independent of the persistent-UI service, whose
+                    // XPC call at launch can block Electron's main thread forever.
+                    args: [paths.app.path, "-ApplePersistenceIgnoreState", "YES"],
+                    cwd: paths.app,
+                    env: electronEnvironment(),
+                    logFile: paths.electronLog)
+            }
         } catch {
             return .failed("Stella could not be started: \(error)", [])
         }
@@ -451,11 +489,11 @@ final class Launcher {
                 case "exiting":
                     let code = (message["code"] as? NSNumber)?.int32Value ?? 0
                     announcedExit = code
-                    log("supervisor: Electron is exiting with \(code)")
+                    log("supervisor: \(child) is exiting with \(code)")
                     process.after(10, "exit-grace")
                 case "failed":
                     let reason = (message["reason"] as? String) ?? "unknown"
-                    log("supervisor: Electron reported failure: \(reason)")
+                    log("supervisor: \(child) reported failure: \(reason)")
                     if pending == nil {
                         pending = ("Stella reported a problem: \(reason)", process.output.lastLines)
                         process.terminate()
@@ -477,15 +515,15 @@ final class Launcher {
                         log("supervisor: could not mark known-good: \(error)")
                     }
                 case "self-test-quit", "shutdown":
-                    log("supervisor: \(name == "shutdown" ? "Shut down" : "self-test") asks Electron to quit")
+                    log("supervisor: \(name == "shutdown" ? "Shut down" : "self-test") asks \(child) to quit")
                     quitRequested = true
                     process.send(["op": "quit"])
                     process.after(30, "quit-timeout")
                 case "quit-timeout" where announcedExit == nil:
-                    log("supervisor: Electron did not quit in time; terminating")
+                    log("supervisor: \(child) did not quit in time; terminating")
                     process.terminate()
                 case "exit-grace":
-                    log("supervisor: Electron's teardown is still running 10s after it announced its exit; terminating")
+                    log("supervisor: \(child)'s teardown is still running 10s after it announced its exit; terminating")
                     teardownForced = true
                     process.terminate()
                 default:
@@ -493,14 +531,14 @@ final class Launcher {
                 }
             case let .exited(code, signal):
                 if !process.drainOutputAfterExit() {
-                    log("supervisor: Electron's output pipe is still held open by processes it started")
+                    log("supervisor: \(child)'s output pipe is still held open by processes it started")
                 }
                 let output = process.output.lastLines
                 let detail = signal != 0 ? "signal \(signal)" : "exit \(code)"
-                log("supervisor: Electron exited (\(detail))")
+                log("supervisor: \(child) exited (\(detail))")
                 if let pending { return .failed(pending.0, output) }
                 if let announcedExit, teardownForced {
-                    log("supervisor: Electron's teardown did not finish; its announced exit \(announcedExit) stands but cleanup is incomplete")
+                    log("supervisor: \(child)'s teardown did not finish; its announced exit \(announcedExit) stands but cleanup is incomplete")
                 }
                 let code = announcedExit ?? (signal == 0 ? code : -1)
                 let signal = announcedExit != nil ? 0 : signal

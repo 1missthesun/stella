@@ -12,8 +12,9 @@ export async function check(root) {
     problems.push(`${INDEX_CSS} must keep an @source for Streamdown's dist, or Tailwind emits none of the utilities its markup uses`);
   } else {
     const dir = path.resolve(path.join(root, path.dirname(INDEX_CSS)), path.dirname(source));
-    if (path.relative(root, dir) !== DIST || !existsSync(dir)) {
-      problems.push(`${INDEX_CSS} @source "${source}" must resolve to ${DIST} (it resolves to ${path.relative(root, dir)})`);
+    const resolved = path.relative(root, dir).split(path.sep).join("/");
+    if (resolved !== DIST || !existsSync(dir)) {
+      problems.push(`${INDEX_CSS} @source "${source}" must resolve to ${DIST} (it resolves to ${resolved})`);
     }
   }
 

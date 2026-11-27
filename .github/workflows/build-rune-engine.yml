@@ -1,0 +1,409 @@
+name: Build Rune Engine
+
+on:
+  push:
+    branches: ["rune/**"]
+    paths:
+      - "packages/desktop-rune/**"
+      - "launcher/**"
+      - ".github/workflows/build-rune-engine.yml"
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: "Cargo profile"
+        type: choice
+        options: [dist, release]
+        default: dist
+
+permissions:
+  contents: read
+
+concurrency:
+  group: build-rune-engine-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+  PROFILE: ${{ inputs.profile || 'dist' }}
+
+jobs:
+  engine:
+    name: engine (${{ matrix.platform }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - platform: linux-x64
+            runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - platform: linux-arm64
+            runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - platform: darwin-arm64
+            runner: macos-15
+            target: aarch64-apple-darwin
+          - platform: darwin-x64
+            runner: macos-15
+            target: x86_64-apple-darwin
+          - platform: win-x64
+            runner: windows-2025
+            target: x86_64-pc-windows-msvc
+            exe: .exe
+          - platform: win-arm64
+            runner: windows-11-arm
+            target: aarch64-pc-windows-msvc
+            exe: .exe
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    defaults:
+      run:
+        shell: bash
+        working-directory: packages/desktop-rune/engine
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: packages/desktop-rune
+
+      # Rune is a git dependency on a private repo; RUNE_DEPLOY_KEY is a read-only deploy key on it.
+      - name: Rune access
+        env:
+          RUNE_DEPLOY_KEY: ${{ secrets.RUNE_DEPLOY_KEY }}
+        run: |
+          set -euo pipefail
+          temp="${RUNNER_TEMP//\\//}"
+          key="$temp/rune_deploy_key"
+          (umask 077 && printf '%s\n' "$RUNE_DEPLOY_KEY" > "$key")
+          echo "GIT_SSH_COMMAND=ssh -i $key -o IdentitiesOnly=yes -o StrictHostKeyChecking=accept-new" >> "$GITHUB_ENV"
+          git config --global url."ssh://git@github.com/1missthesun/rune".insteadOf "https://github.com/1missthesun/rune"
+
+      - name: Linux build dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config \
+            libgtk-3-dev libwebkit2gtk-4.1-dev libsoup-3.0-dev libjavascriptcoregtk-4.1-dev \
+            libfontconfig-dev libxkbcommon-dev libwayland-dev libasound2-dev \
+            libgstreamer1.0-dev libgstreamer-plugins-base1.0-dev
+
+      - name: Rust toolchain
+        run: |
+          rustup toolchain install --profile minimal
+          rustup target add ${{ matrix.target }}
+          rustc --version
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: packages/desktop-rune/engine
+          key: ${{ matrix.target }}-${{ env.PROFILE }}
+          cache-on-failure: true
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          start=$(date +%s)
+          cargo build --locked --profile "$PROFILE" --target ${{ matrix.target }}
+          echo "BUILD_SECONDS=$(( $(date +%s) - start ))" >> "$GITHUB_ENV"
+
+      - name: Name and measure the binary
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/engine"
+          mkdir -p "$out"
+          name="stella-engine-${{ matrix.platform }}${{ matrix.exe }}"
+          cp "target/${{ matrix.target }}/$PROFILE/stella-engine${{ matrix.exe }}" "$out/$name"
+          cd "$out"
+          if command -v sha256sum >/dev/null; then sha256sum "$name" > "$name.sha256"; else shasum -a 256 "$name" > "$name.sha256"; fi
+          bytes=$(wc -c < "$name" | tr -d ' ')
+          gzipped=$(gzip -9 -c "$name" | wc -c | tr -d ' ')
+          echo "{\"platform\":\"${{ matrix.platform }}\",\"profile\":\"$PROFILE\",\"bytes\":$bytes,\"gzip\":$gzipped,\"buildSeconds\":$BUILD_SECONDS,\"sha\":\"$GITHUB_SHA\"}" > "$name.json"
+          cat "$name.json"
+          {
+            echo "### stella-engine ${{ matrix.platform }} ($PROFILE)"
+            echo "| bytes | MiB | gzip MiB | build s |"
+            echo "|---:|---:|---:|---:|"
+            echo "| $bytes | $(awk "BEGIN{printf \"%.1f\", $bytes/1048576}") | $(awk "BEGIN{printf \"%.1f\", $gzipped/1048576}") | $BUILD_SECONDS |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Linux shared libraries
+        if: runner.os == 'Linux'
+        run: ldd "$RUNNER_TEMP/engine/stella-engine-${{ matrix.platform }}" | tee -a "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: stella-engine-${{ matrix.platform }}
+          path: ${{ runner.temp }}/engine/
+          if-no-files-found: error
+
+      - name: Remove the Rune key
+        if: always()
+        run: rm -f "${RUNNER_TEMP//\\//}/rune_deploy_key"
+
+  linux-launch:
+    name: launch (linux-x64, Xvfb + lavapipe)
+    needs: engine
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: stella-engine-linux-x64
+          path: ${{ runner.temp }}/engine
+
+      - name: Runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb xauth imagemagick mesa-vulkan-drivers \
+            libvulkan1 libgtk-3-0t64 libwebkit2gtk-4.1-0 libxkbcommon-x11-0 unzip \
+            gstreamer1.0-plugins-base gstreamer1.0-plugins-good gstreamer1.0-plugins-bad gstreamer1.0-pulseaudio gstreamer1.0-nice gstreamer1.0-tools \
+            libasound2t64 libasound2-plugins pulseaudio
+          pulseaudio --start --exit-idle-time=-1
+          pactl load-module module-remap-source master="$(pactl get-default-sink).monitor" source_name=ci_mic source_properties=device.description=CI-Mic >/dev/null
+          pactl set-default-source ci_mic
+          pactl info | grep -E "Server Name|Default Sink|Default Source"
+
+      - name: Bun
+        run: |
+          set -euo pipefail
+          url=$(jq -r '.bun.assets["linux-x64"].url' packages/desktop/launcher.json)
+          curl -fsSL -o "$RUNNER_TEMP/bun.zip" "$url"
+          unzip -q "$RUNNER_TEMP/bun.zip" -d "$RUNNER_TEMP"
+          echo "BUN=$RUNNER_TEMP/bun-linux-x64/bun" >> "$GITHUB_ENV"
+          ELECTRON_SKIP_BINARY_DOWNLOAD=1 "$RUNNER_TEMP/bun-linux-x64/bun" install --frozen-lockfile \
+            --filter ./ --filter @stella/desktop --filter @stella/desktop-ui --filter @stella/desktop-rune --filter @stella/runtime
+
+      - name: Launch and screenshot
+        env:
+          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.json
+        run: |
+          set -euo pipefail
+          engine="$RUNNER_TEMP/engine/stella-engine-linux-x64"
+          chmod +x "$engine"
+          out="$RUNNER_TEMP/launch"
+          mkdir -p "$out"
+          engine_pid=""
+          Xvfb :93 -screen 0 1320x860x24 -nolisten tcp &
+          xvfb=$!
+          trap 'kill $engine_pid $xvfb 2>/dev/null || true' EXIT
+          for _ in $(seq 100); do [ -e /tmp/.X11-unix/X93 ] && break; sleep 0.05; done
+          t0=$(date +%s%3N)
+          DISPLAY=:93 STELLA_RUNE_T0="$t0" STELLA_RUNE_ROOT="$GITHUB_WORKSPACE/packages/desktop-rune" STELLA_RUNE_BUN="$BUN" \
+            STELLA_RUNE_METRICS="$out/metrics.jsonl" STELLA_RUNE_W=1280 STELLA_RUNE_H=820 \
+            "$engine" > "$out/engine.log" 2>&1 &
+          engine_pid=$!
+          for _ in $(seq 300); do
+            grep -q '"first_content_frame"' "$out/metrics.jsonl" 2>/dev/null && break
+            kill -0 "$engine_pid" 2>/dev/null || { cat "$out/engine.log"; exit 1; }
+            sleep 0.1
+          done
+          grep -m1 '"first_content_frame"' "$out/metrics.jsonl" | tee -a "$GITHUB_STEP_SUMMARY" || { echo "no first_content_frame in 30 s"; tail -n 60 "$out/engine.log"; exit 1; }
+          sleep 2
+          kill -0 "$engine_pid" || { cat "$out/engine.log"; exit 1; }
+          DISPLAY=:93 import -window root "$out/screen.png"
+          ps -o rss=,vsz= -p "$engine_pid" | awk '{print "engine RSS MiB:", $1/1024}' | tee -a "$GITHUB_STEP_SUMMARY"
+          head -c 4000 "$out/metrics.jsonl" || true
+          tail -n 40 "$out/engine.log"
+
+      - name: Services session (audio playback, voice media page)
+        env:
+          VK_ICD_FILENAMES: /usr/share/vulkan/icd.d/lvp_icd.json
+          XVFB: /usr/bin/Xvfb
+          STELLA_RUNE_RUN: ci
+        working-directory: packages/desktop-rune
+        run: |
+          set -euo pipefail
+          out="$RUNNER_TEMP/launch"
+          export BIN="$RUNNER_TEMP/engine/stella-engine-linux-x64"
+          trap '"$BUN" scripts/session.ts stop || true; cp /tmp/sr-ci/host.log "$out/services-host.log" 2>/dev/null || true' EXIT
+          "$BUN" scripts/session.ts start --account signed-out | tail -n 5
+          audio='const a = new Audio("/sounds/message-chime.mp3"); a.volume = 0.5; const t0 = performance.now();
+            const ended = new Promise((resolve, reject) => { a.onended = () => resolve(performance.now() - t0); a.onerror = () => reject(new Error(a.error?.message ?? "error")); setTimeout(() => reject(new Error("no ended in 15 s")), 15000); });
+            await a.play(); const playingMs = performance.now() - t0; const endedMs = await ended;
+            const devices = (await navigator.mediaDevices.enumerateDevices()).map((d) => `${d.kind}: ${d.label}`);
+            return { playingMs, endedMs, devices };'
+          "$BUN" scripts/session.ts eval "$audio" | tee "$out/audio.json"
+          jq -r '"audio: playing after \(.value.playingMs|floor) ms, ended after \(.value.endedMs|floor) ms (message-chime.mp3 is 0.68 s); devices \(.value.devices)"' "$out/audio.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          jq -e '.ok and .value.endedMs > 600' "$out/audio.json" >/dev/null
+          media='const m = stella.host.media; const t0 = performance.now(); const release = await m.use(); const readyMs = performance.now() - t0; const caps = m.caps;
+            let mic; try { const got = await m.invoke("acquireSharedMicrophone"); await m.invoke("releaseMicrophone", [got.lease, { immediate: true }]); mic = "granted"; } catch (error) { mic = String(error && error.message || error); }
+            release(); return { readyMs, caps, mic };'
+          "$BUN" scripts/session.ts eval "$media" | tee "$out/media-page.json"
+          jq -r '"media page (WebKitGTK): \(.value // .error)"' "$out/media-page.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          jq -e '.ok and .value.caps.secureContext and .value.caps.getUserMedia and .value.caps.audioContext and .value.caps.mediaSource and .value.mic == "granted"' "$out/media-page.json" >/dev/null
+          ls -l /usr/bin/chromium /usr/bin/chromium-browser /usr/bin/google-chrome /snap/bin/chromium 2>&1 | tee "$out/chromium-candidates.txt" || true
+          "$BUN" scripts/session.ts eval "$(cat scripts/ci/voice-check.js)" | tee "$out/voice-chromium.json"
+          jq -e '.ok' "$out/voice-chromium.json" >/dev/null || { sleep 8; "$BUN" scripts/session.ts eval "process.env.STELLA_RUNE_CHROMIUM = \"/usr/bin/google-chrome\"; $(cat scripts/ci/voice-check.js)" | tee "$out/voice-chromium.json"; echo "voice: the first Chromium failed, retried with google-chrome" | tee -a "$GITHUB_STEP_SUMMARY"; }
+          jq -r '.value // .error | "voice (Chromium): host \(.host), ready \(.readyMs|floor) ms, \(.memory), loop \(.loop | tojson), sink inputs: \(.sinkInputs)"' "$out/voice-chromium.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          voice_pid=$(jq -r '.value.stats.pid' "$out/voice-chromium.json")
+          sleep 8
+          if kill -0 "$voice_pid" 2>/dev/null; then echo "voice Chromium $voice_pid still running 8 s after release" | tee -a "$GITHUB_STEP_SUMMARY"; exit 1; fi
+          echo "voice Chromium $voice_pid stopped after the session" | tee -a "$GITHUB_STEP_SUMMARY"
+          jq -e '.ok and .value.host == "chromium" and .value.caps.rtc and .value.caps.secureContext and .value.loop.state.b == "connected" and (.value.loop.candidates.a | length) > 0 and .value.loop.inbound.bytes > 0 and .value.loop.remoteRms > 0.001' "$out/voice-chromium.json" >/dev/null
+          lib=$(ldconfig -p | awk '/libwebkit2gtk-4.1.so.0 /{print $NF; exit}')
+          { echo "webkit: $lib"; echo "RTCPeerConnection strings: $(strings "$lib" | grep -c RTCPeerConnection || true)";
+            gst-inspect-1.0 webrtcbin >/dev/null 2>&1 && echo "gst webrtcbin: yes" || echo "gst webrtcbin: no";
+            pactl list short sources; } | tee "$out/webkit-media-env.txt" || true
+          probe='const w = new electron.BrowserWindow({ width: 320, height: 240 }); await w.loadURL("https://example.com/");
+            const r = await w.webContents.executeJavaScript(`(async () => ({ rtc: typeof RTCPeerConnection, secure: isSecureContext, devices: (await navigator.mediaDevices.enumerateDevices()).map((d) => d.kind + ":" + d.label) }))()`);
+            w.destroy(); return r;'
+          "$BUN" scripts/session.ts eval "$probe" | tee "$out/webview-probe.json" || true
+          sleep 65
+          "$BUN" scripts/session.ts eval "$media" | tee "$out/media-page-after-probe.json" || true
+          jq -r '"media page again, after a web window closed: \(.value // .error)"' "$out/media-page-after-probe.json" | tee -a "$GITHUB_STEP_SUMMARY" || true
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stella-engine-linux-x64-launch
+          path: ${{ runner.temp }}/launch/
+          if-no-files-found: ignore
+
+  windows-launch:
+    name: launch (win-x64, WebView2)
+    needs: engine
+    runs-on: windows-2025
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: stella-engine-win-x64
+          path: ${{ runner.temp }}/engine
+
+      - name: Bun
+        run: |
+          set -euo pipefail
+          url=$(jq -r '.bun.assets["win-x64"].url' packages/desktop/launcher.json)
+          curl -fsSL -o "$RUNNER_TEMP/bun.zip" "$url"
+          pwsh -NoProfile -Command "Expand-Archive -Path '$RUNNER_TEMP/bun.zip' -DestinationPath '$RUNNER_TEMP/bun'"
+          bun=$(find "$RUNNER_TEMP/bun" -name bun.exe | head -n1)
+          echo "BUN=$bun" >> "$GITHUB_ENV"
+          ELECTRON_SKIP_BINARY_DOWNLOAD=1 "$bun" install --frozen-lockfile \
+            --filter ./ --filter @stella/desktop --filter @stella/desktop-ui --filter @stella/desktop-rune --filter @stella/runtime
+
+      - name: Native helpers (meeting_capture, stella_show)
+        shell: pwsh
+        working-directory: packages/native
+        run: ./build.ps1
+
+      - name: Services session (window, audio, WebView2 media page)
+        timeout-minutes: 20
+        env:
+          STELLA_RUNE_RUN: ci
+        working-directory: packages/desktop-rune
+        run: |
+          set -uo pipefail
+          out="$RUNNER_TEMP/launch"
+          mkdir -p "$out"
+          export BIN="$RUNNER_TEMP/engine/stella-engine-win-x64.exe"
+          run_dir=$(cygpath -u "$("$BUN" scripts/session.ts dir)")
+          ev() { echo "== $(date +%T) eval $2" >&2; timeout 300 "$BUN" scripts/session.ts eval "$1"; }
+          trap 'echo "== $(date +%T) stop" >&2; timeout 120 "$BUN" scripts/session.ts stop || echo "session stop failed or timed out" | tee -a "$GITHUB_STEP_SUMMARY"; cp "$run_dir/host.log" "$out/services-host.log" 2>/dev/null || true; cp "$run_dir/metrics.jsonl" "$out/metrics.jsonl" 2>/dev/null || true; find "$run_dir" -name "runtime.log*" -exec cp {} "$out/" \; 2>/dev/null || true' EXIT
+          echo "== $(date +%T) start" >&2
+          timeout 300 "$BUN" scripts/session.ts start --account signed-out | tee "$out/start.json"
+          jq -e '.ready' "$out/start.json" >/dev/null || { echo "session did not get ready"; tail -n 120 "$run_dir/host.log"; exit 1; }
+          sleep 3
+          grep -m1 '"first_content_frame"' "$run_dir/metrics.jsonl" | tee -a "$GITHUB_STEP_SUMMARY" || true
+          timeout 60 "$BUN" scripts/session.ts shot "$out/window.png" || echo "engine screenshot failed" | tee -a "$GITHUB_STEP_SUMMARY"
+          pwsh -NoProfile -File scripts/ci/desktop-shot.ps1 -Png "$(cygpath -w "$out/desktop.png")" -List "$(cygpath -w "$out/windows.txt")" || true
+          audio='const a = new Audio("/sounds/message-chime.mp3"); a.volume = 0.5; const t0 = performance.now();
+            const ended = new Promise((resolve, reject) => { a.onended = () => resolve(performance.now() - t0); a.onerror = () => reject(new Error(a.error?.message ?? "error")); setTimeout(() => reject(new Error("no ended in 15 s")), 15000); });
+            await a.play(); const playingMs = performance.now() - t0; const endedMs = await ended;
+            const devices = (await navigator.mediaDevices.enumerateDevices()).map((d) => `${d.kind}: ${d.label}`);
+            return { playingMs, endedMs, devices };'
+          ev "$audio" audio | tee "$out/audio.json"
+          jq -r '"audio: \(.value // .error)"' "$out/audio.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          ev "$(cat scripts/ci/media-webview-check.js)" media-page | tee "$out/media-page.json"
+          jq -r '"media page (WebView2): \(.value // .error | tojson)"' "$out/media-page.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          ev 'const w = new electron.BrowserWindow({ width: 640, height: 420, show: true }); await w.loadURL("https://example.com/"); await new Promise((r) => setTimeout(r, 1500));
+            const r = await w.webContents.executeJavaScript(`({ title: document.title, rtc: typeof RTCPeerConnection, secure: isSecureContext })`); return r;' web-window | tee "$out/web-window.json"
+          ev 'const w = new electron.BrowserWindow({ width: 440, height: 560, show: false }); await w.loadURL("https://example.com/");
+            const page = await Promise.race([w.webContents.executeJavaScript(`({ title: document.title, w: innerWidth, h: innerHeight })`), new Promise((r) => setTimeout(() => r("no answer in 20 s"), 20000))]);
+            const r = { page, visible: w.isVisible() }; w.close(); return r;' hidden-window | tee "$out/hidden-window.json"
+          jq -r '"hidden window (WebView2): \(.value // .error | tojson)"' "$out/hidden-window.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          diag='const m = stella.host.media; const use = m.use().then((release) => { release(); return "ready"; }, (e) => String(e?.message ?? e));
+            await new Promise((r) => setTimeout(r, 8000));
+            const state = await stella.engine.webview.state(m.elementId).catch((e) => `state failed: ${e.message}`);
+            return { wanted: m.wanted(), state, use: await use };'
+          ev "$diag" media-diag | tee "$out/media-page-diag.json"
+          ev "$(cat scripts/ci/capture-check.js)" capture | tee "$out/capture.json"
+          jq -r '"capture: \(.value // .error | tojson)"' "$out/capture.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          mp4=$(jq -r '.value.capture.stopped.file // empty' "$out/capture.json"); [ -n "$mp4" ] && cp "$(cygpath -u "$mp4")" "$out/capture.mp4" || true
+          jpg=$(jq -r '.value.capture.firstFrame // empty' "$out/capture.json"); [ -n "$jpg" ] && cp "$(cygpath -u "$jpg")" "$out/capture-frame.jpg" || true
+          ev "$(cat scripts/ci/meeting-show-check.js)" meeting-show | tee "$out/meeting-show.json"
+          jq -r '"meeting capture and Show Stella: \(.value // .error | tojson)"' "$out/meeting-show.json" | tee -a "$GITHUB_STEP_SUMMARY"
+          find "$run_dir/data" \( -path "*meetings*" -o -path "*captures*" \) -type f -printf "%s %p\n" | tee "$out/meeting-show-files.txt" || true
+          ps -W | grep -iE "stella-engine|bun|msedgewebview2" | tee "$out/processes.txt" || true
+          jq -e '.ok and .value.endedMs > 600' "$out/audio.json" >/dev/null && echo "audio ok" || echo "AUDIO FAILED" | tee -a "$GITHUB_STEP_SUMMARY"
+          status=0
+          jq -e '.ok and .value.capture.bytes > 10000 and .value.capture.frames > 0' "$out/capture.json" >/dev/null && echo "capture ok" || { echo "CAPTURE FAILED" | tee -a "$GITHUB_STEP_SUMMARY"; status=1; }
+          jq -e '.ok and (.value.hookEvents.mousemove // 0) > 0 and (.value.hookEvents.keydown // 0) > 0' "$out/capture.json" >/dev/null && echo "input hook ok" || { echo "INPUT HOOK FAILED" | tee -a "$GITHUB_STEP_SUMMARY"; status=1; }
+          jq -e '.ok and .value.caps.rtc and .value.caps.secureContext and .value.loop.state == "connected" and .value.loop.inbound.bytes > 0' "$out/media-page.json" >/dev/null && echo "media page ok" || { echo "MEDIA PAGE FAILED" | tee -a "$GITHUB_STEP_SUMMARY"; status=1; }
+          jq -e '.ok and .value.page.title == "Example Domain" and .value.visible == false' "$out/hidden-window.json" >/dev/null && echo "hidden window ok" || { echo "HIDDEN WINDOW FAILED" | tee -a "$GITHUB_STEP_SUMMARY"; status=1; }
+          exit $status
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: stella-engine-win-x64-launch
+          path: ${{ runner.temp }}/launch/
+          if-no-files-found: ignore
+
+  launchers:
+    name: launcher compiles (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: linux
+            runner: ubuntu-24.04
+          - os: windows
+            runner: ubuntu-24.04
+          - os: macos
+            runner: macos-15
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 1
+          sparse-checkout: |
+            launcher
+            packages/desktop/build
+
+      - name: Linux
+        if: matrix.os == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends build-essential pkg-config libgtk-3-dev libwebkit2gtk-4.1-dev libssl-dev libsecret-1-dev
+          launcher/linux/build.sh
+          launcher/linux/build/stella-launcher --help | grep -- --engine
+
+      - name: Windows (MinGW-w64)
+        if: matrix.os == 'windows'
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends g++-mingw-w64-x86-64 binutils-mingw-w64-x86-64 curl unzip
+          launcher/windows/build.sh
+
+      - name: macOS
+        if: matrix.os == 'macos'
+        run: launcher/macos/build.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launcher-rune-optin-${{ matrix.os }}
+          path: |
+            launcher/linux/build/stella-launcher
+            launcher/windows/build/Stella.exe
+            launcher/macos/build/Stella.app
+          if-no-files-found: error

@@ -515,6 +515,8 @@ typedef struct {
     char *source_ref;
     char *backend;
     char *local_bun;
+    char *engine;
+    char *engine_bin;
     double hold;
     Choice recovery_choice;
     char *capture_dir;
@@ -555,12 +557,15 @@ static const char *USAGE =
     "usage: stella-launcher [--start [--show]] [--version] [--self-test] [--source <path|git url>]\n"
     "                       [--source-ref <ref>] [--backend <url>] [--bun <path>] [--hold <seconds>]\n"
     "                       [--recovery-choice return|retry|quit] [--capture-dir <dir>]\n"
+    "                       [--engine electron|rune] [--engine-bin <path>]\n"
     "\n"
     "Environment: STELLA_LAUNCHER_ROOT (install root, for testing),\n"
     "STELLA_LAUNCHER_KEY_FILE (0600 PEM instead of the Secret Service),\n"
     "STELLA_LAUNCHER_BACKEND_URL (wins over <root>/server.json), STELLA_LAUNCHER_STABLE_SECONDS,\n"
     "STELLA_LAUNCHER_READY_TIMEOUT_SECONDS, STELLA_LAUNCHER_PREPARE_TIMEOUT_SECONDS,\n"
-    "STELLA_LAUNCHER_PACKAGED=1 (a distribution package provides the menu entry and icon).\n";
+    "STELLA_LAUNCHER_PACKAGED=1 (a distribution package provides the menu entry and icon),\n"
+    "STELLA_LAUNCHER_ENGINE=rune or the file <root>/rune-engine (start the Rune engine instead of Electron),\n"
+    "STELLA_LAUNCHER_ENGINE_BIN (a local stella-engine binary; implies rune).\n";
 
 static void parse_options(int argc, char **argv) {
     int i;
@@ -568,6 +573,11 @@ static void parse_options(int argc, char **argv) {
     O.backend = backend && *backend ? xstrdup(backend) : NULL;
     O.ready_timeout = env_seconds("STELLA_LAUNCHER_READY_TIMEOUT_SECONDS", 90);
     O.stable_seconds = env_seconds("STELLA_LAUNCHER_STABLE_SECONDS", 60);
+    {
+        const char *engine = getenv("STELLA_LAUNCHER_ENGINE"), *engine_bin = getenv("STELLA_LAUNCHER_ENGINE_BIN");
+        if (engine && *engine) O.engine = xstrdup(engine);
+        if (engine_bin && *engine_bin) O.engine_bin = xstrdup(engine_bin);
+    }
     for (i = 1; i < argc; i++) {
         const char *a = argv[i];
 #define VALUE() (i + 1 < argc ? argv[++i] : (fprintf(stderr, "%s needs a value\n%s", a, USAGE), exit(64), (char *)NULL))
@@ -578,6 +588,8 @@ static void parse_options(int argc, char **argv) {
         else if (!strcmp(a, "--source-ref")) O.source_ref = xstrdup(VALUE());
         else if (!strcmp(a, "--backend")) { free(O.backend); O.backend = xstrdup(VALUE()); }
         else if (!strcmp(a, "--bun")) O.local_bun = xstrdup(VALUE());
+        else if (!strcmp(a, "--engine")) { free(O.engine); O.engine = xstrdup(VALUE()); }
+        else if (!strcmp(a, "--engine-bin")) { free(O.engine_bin); O.engine_bin = xstrdup(VALUE()); }
         else if (!strcmp(a, "--hold")) O.hold = strtod(VALUE(), NULL);
         else if (!strcmp(a, "--capture-dir")) O.capture_dir = xstrdup(VALUE());
         else if (!strcmp(a, "--recovery-choice")) {
@@ -1864,7 +1876,10 @@ static StrList base_environment(void) {
                               "STELLA_V2_DEV_DATA_DIR", "STELLA_APP_DIR", "STELLA_RUNTIME_STATE_DIR",
                               "STELLA_DEV_RESTART_REQUEST_FILE", "STELLA_DEV_USER_QUIT_REQUEST_FILE",
                               "STELLA_ELECTRON_DEV_RUNNER_PID", "STELLA_ELECTRON_READY_FILE", "NODE_OPTIONS",
-                              "WEBKIT_DISABLE_DMABUF_RENDERER", "STELLA_LAUNCHER_RTTIME_RELAUNCHED", NULL};
+                              "WEBKIT_DISABLE_DMABUF_RENDERER", "STELLA_LAUNCHER_RTTIME_RELAUNCHED",
+                              "STELLA_LAUNCHER_ENGINE", "STELLA_LAUNCHER_ENGINE_BIN", "STELLA_RUNE_ROOT", "STELLA_RUNE_BUN",
+                              "STELLA_RUNE_SERVICES",
+                              NULL};
     const char *harness[] = {"STELLA_DEV_HARNESS", "STELLA_DEV_HARNESS_STORAGE_KEY", "STELLA_V2_DEV_USER_DATA_DIR",
                              "STELLA_REMOTE_DEBUG_PORT", "STELLA_DEV_HARNESS_SESSION_TOKEN", NULL};
     const char *key_file = getenv("STELLA_LAUNCHER_KEY_FILE");
@@ -2164,6 +2179,125 @@ out:
     return rc;
 }
 
+static char *g_engine_bin;
+static char *g_engine_version;
+
+static int engine_requested(void) {
+    char *flag;
+    int on;
+    if (O.engine) return !strcmp(O.engine, "rune");
+    if (O.engine_bin) return 1;
+    flag = xasprintf("%s/rune-engine", P.root);
+    on = file_exists(flag);
+    free(flag);
+    return on;
+}
+
+/* launcher.json "stellaEngine": {"version", "assets": {<platform>: {"url", "sha256", "member"?}}};
+ * an asset without "member" is the bare binary, one with it is a zip holding it.
+ * Also run on a thread while dependencies install (engine_prefetch), with
+ * show_progress 0, so nothing here may touch the UI then. */
+static int install_engine(int show_progress) {
+    const char *key = strcmp(platform_key(), "linux-x64-baseline") ? platform_key() : "linux-x64";
+    char *manifest_path = xasprintf("%s/packages/desktop/launcher.json", P.app);
+    char *manifest = read_file(manifest_path, NULL);
+    mj_value *json = manifest ? mj_parse(manifest, strlen(manifest)) : NULL;
+    const mj_value *engine = mj_get(json, "stellaEngine");
+    const mj_value *asset = mj_get(mj_get(engine, "assets"), key);
+    const char *version = mj_get_string(engine, "version");
+    const char *url = mj_get_string(asset, "url"), *sha = mj_get_string(asset, "sha256");
+    const char *member = mj_get_string(asset, "member");
+    char *host = xasprintf("%s/packages/desktop-rune/host/main.tsx", P.app);
+    char *dir = NULL, *bin = NULL;
+    int rc = -1;
+    free(manifest_path);
+    free(manifest);
+    if (!file_exists(host)) {
+        set_error("This version of Stella has no Rune app (%s is missing).", host);
+        goto out;
+    }
+    if (O.engine_bin) {
+        if (!is_executable(O.engine_bin)) { set_error("%s is not an executable stella-engine.", O.engine_bin); goto out; }
+        free(g_engine_bin); g_engine_bin = xstrdup(O.engine_bin);
+        free(g_engine_version); g_engine_version = xstrdup("local");
+        rc = 0;
+        goto out;
+    }
+    if (!version || !url || !sha) {
+        set_error("This version of Stella has no Rune engine for %s.", key);
+        goto out;
+    }
+    dir = xasprintf("%s/stella-engine-%s", P.runtimes, version);
+    bin = xasprintf("%s/stella-engine", dir);
+    if (!is_executable(bin)) {
+        char *download_path = xasprintf("%s/.stella-engine-%s.download", P.runtimes, version);
+        if (show_progress) progress_show("Getting things ready…", 0.30, 0.40);
+        LOG("install: downloading stella-engine %s from %s", version, url);
+        mkdirs(dir, 0755);
+        if (download(url, download_path, sha) != 0) { free(download_path); goto out; }
+        if (member) {
+            char *staging = xasprintf("%s/.stella-engine-%s.partial", P.runtimes, version);
+            char *member_path = xasprintf("%s/%s", staging, member);
+            remove_tree(staging);
+            int unpacked = extract_zip(download_path, staging) == 0;
+            if (!unpacked || rename(member_path, bin) != 0) {
+                if (unpacked) set_error("stella-engine's archive has no %s.", member);
+                free(member_path); free(staging); unlink(download_path); free(download_path);
+                goto out;
+            }
+            remove_tree(staging);
+            unlink(download_path);
+            free(member_path); free(staging);
+        } else if (rename(download_path, bin) != 0) {
+            set_error("Could not install stella-engine: %s", strerror(errno));
+            free(download_path);
+            goto out;
+        }
+        free(download_path);
+        chmod(bin, 0755);
+        LOG("install: stella-engine %s ready", version);
+    }
+    if (show_progress) {
+        free(g_engine_bin); g_engine_bin = xstrdup(bin);
+        free(g_engine_version); g_engine_version = xstrdup(version);
+    }
+    rc = 0;
+out:
+    mj_free(json);
+    free(host);
+    free(dir);
+    free(bin);
+    return rc;
+}
+
+/* A first install fetches the engine while dependencies install. It starts
+ * once the cloned source is verified, since the engine's URL and checksum
+ * come from that source's launcher.json, and is joined before the launch. */
+static pthread_t g_engine_prefetch;
+static int g_engine_prefetching;
+
+static void *engine_prefetch_main(void *arg) {
+    (void)arg;
+    if (install_engine(0) != 0) LOG("install: early stella-engine download failed (%s); trying again", last_error());
+    return NULL;
+}
+
+static void start_engine_prefetch(void) {
+    if (O.engine_bin || g_engine_prefetching || !engine_requested()) return;
+    if (pthread_create(&g_engine_prefetch, NULL, engine_prefetch_main, NULL) == 0) g_engine_prefetching = 1;
+}
+
+static void join_engine_prefetch(void) {
+    if (!g_engine_prefetching) return;
+    pthread_join(g_engine_prefetch, NULL);
+    g_engine_prefetching = 0;
+}
+
+static int ensure_engine(void) {
+    join_engine_prefetch();
+    return install_engine(1);
+}
+
 static int bootstrap_access(char **remote, char **token) {
     char *base = xstrdup(backend_url()), *url;
     char *argv[12];
@@ -2303,7 +2437,9 @@ static void install_desktop_entry(void) {
     free(installed);
 }
 
-static char *prepare(void) {
+/* Returns Electron's binary. With rune set (the Rune engine starts instead)
+ * Electron is neither fetched nor needed, and this returns "". */
+static char *prepare(int rune) {
     char *lock = xasprintf("%s/bun.lock", P.app);
     char *lock_hash = sha256_file(lock);
     char *electron_pkg = xasprintf("%s/node_modules/electron/package.json", P.app);
@@ -2328,6 +2464,9 @@ static char *prepare(void) {
         LOG("prepare: %s (lock %.12s)", seeded ? "install-deps.mjs" : "bun install --frozen-lockfile", lock_hash);
         env_set(&env, "STELLA_SKIP_BROWSER_HYDRATE", "1");
         env_set(&env, "STELLA_SKIP_OFFICE_HYDRATE", "1");
+        /* base_environment() strips the engine choice; install-deps.mjs
+         * skips Electron and its bundle for Rune. */
+        if (rune) env_set(&env, "STELLA_LAUNCHER_ENGINE", "rune");
         if (run_cmd(argv, P.app, env.items, P.install_log, 30 * 60, &r) != 0) {
             sl_free(&env);
             free(install_deps);
@@ -2373,6 +2512,25 @@ static char *prepare(void) {
         sl_free(&env);
     }
 
+    if (rune) {
+        result = xstrdup("");
+        goto out;
+    }
+    if (!is_executable(electron)) {
+        /* Dependencies installed for Rune have no Electron binary; fetch it
+         * now that Electron starts instead. */
+        char *ensure = xasprintf("%s/packages/desktop/scripts/ensure-electron-binary.mjs", P.app);
+        if (file_exists(ensure)) {
+            StrList env = base_environment();
+            char *argv[] = {g_bun_bin, ensure, NULL};
+            CmdResult r;
+            progress_show("Getting things ready…", 0.90, 0.96);
+            LOG("prepare: Electron is missing; running ensure-electron-binary.mjs");
+            if (run_cmd(argv, P.app, env.items, P.install_log, 10 * 60, &r) == 0) cmd_free(&r);
+            sl_free(&env);
+        }
+        free(ensure);
+    }
     if (!is_executable(electron)) {
         set_error("Electron is not installed (missing %s).", electron);
         goto out;
@@ -2514,10 +2672,21 @@ static Electron *electron_spawn(const char *executable, char **err) {
     e->chan = pair[0];
 
     sl_push(&argv, executable);
-    sl_push(&argv, P.app);
-    if (!sandbox_usable(executable)) {
-        LOG("supervisor: no usable Chromium sandbox here; starting Electron with --no-sandbox");
-        sl_push(&argv, "--no-sandbox");
+    if (g_engine_bin && !strcmp(executable, g_engine_bin)) {
+        char *rune_root = xasprintf("%s/packages/desktop-rune", P.app);
+        env_set(&env, "STELLA_LAUNCHER_ENGINE", "rune");
+        env_set(&env, "STELLA_RUNE_SERVICES", "1");
+        env_set(&env, "STELLA_RUNE_ROOT", rune_root);
+        env_unset(&env, "BUN_RUNTIME_TRANSPILER_CACHE_PATH");
+        env_set(&env, "MIMALLOC_PURGE_DELAY", "0");
+        if (g_bun_bin) env_set(&env, "STELLA_RUNE_BUN", g_bun_bin);
+        free(rune_root);
+    } else {
+        sl_push(&argv, P.app);
+        if (!sandbox_usable(executable)) {
+            LOG("supervisor: no usable Chromium sandbox here; starting Electron with --no-sandbox");
+            sl_push(&argv, "--no-sandbox");
+        }
     }
 
     posix_spawn_file_actions_init(&fa);
@@ -2548,7 +2717,8 @@ static Electron *electron_spawn(const char *executable, char **err) {
         return NULL;
     }
     e->out = outp[0];
-    LOG("supervisor: spawned Electron pid %d", (int)e->pid);
+    LOG("supervisor: spawned %s pid %d", g_engine_bin && !strcmp(executable, g_engine_bin) ? "stella-engine" : "Electron",
+        (int)e->pid);
     return e;
 }
 
@@ -2664,6 +2834,7 @@ static Outcome supervise(const char *electron_bin) {
     int quit_requested = 0, announced = 0, announced_code = 0, exited = 0;
 
     memset(&result, 0, sizeof(result));
+    const char *child = g_engine_bin && !strcmp(electron_bin, g_engine_bin) ? "stella-engine" : "Electron";
     spawned_head = GIT("rev-parse", "HEAD");
     if (!spawned_head) spawned_head = xstrdup("");
     e = electron_spawn(electron_bin, &err);
@@ -2731,11 +2902,11 @@ static Outcome supervise(const char *electron_bin) {
                         mj_get_number(msg, "code", &code);
                         announced = 1;
                         announced_code = (int)code;
-                        LOG("supervisor: Electron is exiting with %d", announced_code);
+                        LOG("supervisor: %s is exiting with %d", child, announced_code);
                         timers[T_EXIT_GRACE] = now_seconds() + 10;
                     } else if (op && !strcmp(op, "failed")) {
                         const char *reason = mj_get_string(msg, "reason");
-                        LOG("supervisor: Electron reported failure: %s", reason ? reason : "unknown");
+                        LOG("supervisor: %s reported failure: %s", child, reason ? reason : "unknown");
                         if (!pending_reason) {
                             pending_reason = xasprintf("Stella reported a problem: %s", reason ? reason : "unknown");
                             electron_terminate(e);
@@ -2777,19 +2948,19 @@ static Outcome supervise(const char *electron_bin) {
                 }
                 break;
             case T_SELF_TEST_QUIT:
-                LOG("supervisor: self-test asks Electron to quit");
+                LOG("supervisor: self-test asks %s to quit", child);
                 quit_requested = 1;
                 electron_send(e, "{\"op\":\"quit\"}\n");
                 timers[T_QUIT_TIMEOUT] = now + 30;
                 break;
             case T_QUIT_TIMEOUT:
                 if (!announced) {
-                    LOG("supervisor: Electron did not quit in time; terminating");
+                    LOG("supervisor: %s did not quit in time; terminating", child);
                     electron_terminate(e);
                 }
                 break;
             case T_EXIT_GRACE:
-                LOG("supervisor: Electron's teardown is still running 10s after it announced its exit; terminating");
+                LOG("supervisor: %s's teardown is still running 10s after it announced its exit; terminating", child);
                 result.teardown_forced = 1;
                 electron_terminate(e);
                 break;
@@ -2810,7 +2981,7 @@ static Outcome supervise(const char *electron_bin) {
                 fcntl(e->out, F_SETFL, O_NONBLOCK);
                 while ((n = read(e->out, buf, sizeof(buf))) > 0 || (n < 0 && errno == EINTR))
                     if (n > 0) output_append(e, buf, (size_t)n);
-                if (n < 0) LOG("supervisor: Electron's output pipe is still held open by processes it started");
+                if (n < 0) LOG("supervisor: %s's output pipe is still held open by processes it started", child);
             }
         }
     }
@@ -2820,7 +2991,7 @@ static Outcome supervise(const char *electron_bin) {
         int sig = WIFSIGNALED(e->status) ? WTERMSIG(e->status) : 0;
         char *detail = sig ? xasprintf("signal %d", sig) : xasprintf("exit %d", code);
         StrList output = output_last_lines(e);
-        LOG("supervisor: Electron exited (%s)", detail);
+        LOG("supervisor: %s exited (%s)", child, detail);
         g_current = NULL;
         electron_free(e);
         result.output = output;
@@ -2831,7 +3002,7 @@ static Outcome supervise(const char *electron_bin) {
             goto done;
         }
         if (announced && result.teardown_forced) {
-            LOG("supervisor: Electron's teardown did not finish; its announced exit %d stands but cleanup is incomplete",
+            LOG("supervisor: %s's teardown did not finish; its announced exit %d stands but cleanup is incomplete", child,
                 announced_code);
         }
         if (announced) { code = announced_code; sig = 0; }
@@ -3233,7 +3404,15 @@ static Command recover(const char *reason, const StrList *output) {
 
 static OutsideChanges g_outside;
 
+static char *prepare_for_launch_steps(void);
+
 static char *prepare_for_launch(void) {
+    char *result = prepare_for_launch_steps();
+    join_engine_prefetch();
+    return result;
+}
+
+static char *prepare_for_launch_steps(void) {
     char *git_dir;
     int found;
     mkdirs(P.root, 0755);
@@ -3272,8 +3451,17 @@ static char *prepare_for_launch(void) {
         return NULL;
     }
     LOG("verify: HEAD signed and clean");
+    start_engine_prefetch();
     if (ensure_bun() != 0) return NULL;
-    return prepare();
+    {
+        int rune = engine_requested();
+        char *electron = prepare(rune);
+        if (!electron || !rune) return electron;
+        free(electron);
+        if (ensure_engine() != 0) return NULL;
+        LOG("launcher: starting stella-engine %s (%s) instead of Electron", g_engine_version, g_engine_bin);
+        return xstrdup(g_engine_bin);
+    }
 }
 
 static int launcher_run(void) {

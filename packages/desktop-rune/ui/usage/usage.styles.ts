@@ -1,0 +1,75 @@
+import { font, mixOklch, sheet } from "../theme";
+
+/** desktop-ui's usage.css container queries, by the screen's inline size. */
+export type UsageLayout = { narrow: boolean; wide: boolean };
+
+export const usageLayout = (width: number): UsageLayout => ({
+  narrow: width > 0 && width <= 460,
+  wide: width >= 680,
+});
+
+export const useUsage = sheet((c, t) => {
+  const line = mixOklch(c.foreground, 7, "transparent");
+  const textAction = { py: 5, px: 8, my: -5, mx: -8, gap: 6, align: "center", justify: "center", shrink: false, radius: 7, color: c.interactive, size: 13.5, weight: 600, em: -0.01, motion: { dur: 0.12 }, hover: mixOklch(c.foreground, 6, "transparent") } as const;
+  return {
+    usageLine: { fill: line },
+    usageScreen: { w: "full", pt: 18, pb: 28, align: "stretch" },
+    usageScreenText: { family: "sans", em: -0.02, color: c.foreground },
+    usageHeader: { w: "full", mb: 16, gap: 14, align: "center", justify: "between" },
+    usageHeaderNarrow: { align: "stretch" },
+    usageHeaderText: { grow: 1, shrink: true, minW: 0, color: c.textWeak, size: 13, lh: 1.5 },
+    usageTextAction: textAction,
+    usageRefreshing: { opacity: 0.6 },
+    usageRefreshNarrow: { selfAlign: "start" },
+    usageFiltersWrap: { w: "full", gap: 12, pb: 18 + 1, mb: 20, border: line, borderSides: [0, 0, 1, 0], align: "stretch" },
+    usageRangePicker: { align: "center", gap: 20, rowGap: 20, wrap: true },
+    usageRangeItem: { pt: 2, vertical: true, align: "center", color: c.textWeak, size: 14.5, weight: 600, em: -0.015, nowrap: true, motion: { dur: 0.14 }, hoverColor: c.textBase },
+    usageRangeItemActive: { color: c.textStrong, hoverColor: c.textStrong },
+    usageRangeDot: { mt: 5, w: 5, h: 5, radius: 999, fill: c.primary, motion: { dur: 0.14 } },
+    usageFilters: { w: "full", gap: 8, rowGap: 8 },
+    usageFilterTrigger: { h: 32, fill: "#00000000", border: line, size: 12.5 },
+    usageSelection: { w: "full", mb: 18, pt: 12, pb: 12 + 1, gap: 10, align: "start", border: line, borderSides: [0, 0, 1, 0] },
+    usageSelectionWide: { align: "center", justify: "between", gap: 16 },
+    usageSelectionInfo: { shrink: true, minW: 0, maxW: "full", gap: 8, rowGap: 8, align: "center", wrap: true },
+    usageSelectionInfoWide: { wrap: false },
+    usageSelectionKind: { color: c.textWeak, size: 11, weight: 600, nowrap: true },
+    usageSelectionName: { shrink: true, minW: 0, truncate: true, nowrap: true, weight: 700 },
+    usageSelectionId: { w: "full", truncate: true, nowrap: true, color: c.textWeak, size: 11, mono: true },
+    usageSelectionIdWide: { w: undefined, grow: 1, shrink: true, minW: 0 },
+    usageWarning: { w: "full", mb: 18, pt: 12, pb: 12 + 1, border: line, borderSides: [0, 0, 1, 0], color: c.textWeak, size: 13 },
+    usageState: { w: "full", minH: 300, gap: 8, align: "center", justify: "center" },
+    usageStateText: { color: c.textWeak, textAlign: "center" },
+    usageStateTitle: { color: c.textStrong, size: 17, weight: 600, em: -0.02, textAlign: "center" },
+    usageSummary: { w: "full", gap: 24, rowGap: 16, pb: 22 + 1, border: line, borderSides: [0, 0, 1, 0] },
+    usageSummaryItem: { gap: 4, minW: 0, align: "start" },
+    usageSummaryLabel: { color: c.textWeak, size: 12.5, weight: 500 },
+    usageSummaryValue: { family: font.display, size: 24, weight: 700, lh: 1.1, em: -0.03, features: "'tnum' 1", color: c.textStrong },
+    usageSummaryNote: { color: c.textWeaker, size: 12, features: "'tnum' 1" },
+    usagePanel: { w: "full", pt: 22 + 1, border: line, borderSides: [1, 0, 0, 0], align: "stretch" },
+    usagePanelAfterSummary: { pt: 22, borderSides: [0, 0, 0, 0] },
+    usagePanelHeading: { w: "full", mb: 12, gap: 16, align: "start", justify: "between" },
+    usagePanelTitle: { color: c.textStrong, size: 16, weight: 600, em: -0.02 },
+    usagePanelDescription: { mt: 3, color: c.textWeak, size: 12.5, lh: 1.45 },
+    usageChart: { w: "full", mb: 8 },
+    usageChartTick: { family: "sans", size: 10.5, color: c.textWeak },
+    usageChartTooltip: { py: 9, px: 11, gap: 3, border: c.border, radius: 10, fill: c.popover, shadows: t.shadow.lg },
+    usageChartTooltipText: { color: c.textWeak, size: 11.5 },
+    usageChartTooltipTitle: { mb: 2, color: c.foreground, size: 11.5, weight: 700 },
+    usageTableScroll: { w: "full", scrollX: true },
+    usageTableLine: { border: line, borderSides: [0, 0, 1, 0] },
+    usageTableRowHover: { hover: mixOklch(c.foreground, 2.5, "transparent") },
+    usageTableHead: { px: 10, justify: "center", color: c.textWeak, size: 11.5, weight: 500, nowrap: true },
+    usageTableCell: { px: 10, justify: "center", size: 12, nowrap: true, features: "'tnum' 1" },
+    usageThreadLink: { py: 2, gap: 2, minW: 190, maxW: 320, align: "start" },
+    usageThreadLinkKind: { color: c.textWeak, size: 11, weight: 600, nowrap: true },
+    usageThreadLinkName: { maxW: "full", truncate: true, nowrap: true, color: c.textStrong, size: 12, weight: 600 },
+    usageThreadLinkId: { color: c.textWeaker, size: 10, nowrap: true },
+    usageCallThread: { py: 2, color: c.textStrong, size: 12 },
+    usageCallProvider: { mb: 1, maxW: 260, truncate: true, nowrap: true, color: c.textWeak, size: 10.5 },
+    usageCallModel: { maxW: 260, truncate: true, nowrap: true, size: 12, weight: 700 },
+    usageCallApi: { mt: 1, maxW: 260, truncate: true, nowrap: true, color: c.textWeaker, size: 10 },
+    usageCallStopFailed: { color: c.destructive },
+    usageTableMore: { w: "full", pt: 12, pb: 4, align: "start" },
+    usageTableNote: { mt: 8, color: c.textWeak, size: 12 },
+  };
+});

@@ -209,6 +209,8 @@ function fromOklcha(c: Oklcha): Rgba {
 }
 
 const POWERLESS_CHROMA = 1e-4;
+/** Chromium's CSS `color-mix(in oklch, …)` treats an sRGB colour's hue as missing below this chroma (#38383a mixes with #0a84ff at #0a84ff's hue). */
+export const CSS_POWERLESS_CHROMA = 0.02;
 
 /**
  * `color-mix(in srgb, a <weightA>%, b)` — premultiplied-alpha interpolation of
@@ -235,7 +237,7 @@ export function mixSrgb(a: Rgba, b: Rgba, weightA: number): Rgba {
  * the shorter arc, and a missing/powerless hue (fully transparent or
  * achromatic input) inherits the other color's hue.
  */
-export function mixOklch(a: Rgba, b: Rgba, weightA: number): Rgba {
+export function mixOklch(a: Rgba, b: Rgba, weightA: number, powerlessChroma = POWERLESS_CHROMA): Rgba {
   const pA = Math.max(0, Math.min(1, weightA));
   const pB = 1 - pA;
   const A = toOklcha(a);
@@ -245,8 +247,8 @@ export function mixOklch(a: Rgba, b: Rgba, weightA: number): Rgba {
   const wa = (A.a * pA) / alpha;
   const wb = (B.a * pB) / alpha;
 
-  const hueMissingA = A.a <= 0 || A.c < POWERLESS_CHROMA;
-  const hueMissingB = B.a <= 0 || B.c < POWERLESS_CHROMA;
+  const hueMissingA = A.a <= 0 || A.c < powerlessChroma;
+  const hueMissingB = B.a <= 0 || B.c < powerlessChroma;
   let h: number;
   if (hueMissingA && hueMissingB) h = 0;
   else if (hueMissingA) h = B.h;
@@ -270,8 +272,8 @@ export function mixSrgbCss(a: string, pct: number, b: string): string {
   return formatColor(mixSrgb(parseColorOr(a), parseColorOr(b), pct / 100));
 }
 
-export function mixOklchCss(a: string, pct: number, b: string): string {
-  return formatColor(mixOklch(parseColorOr(a), parseColorOr(b), pct / 100));
+export function mixOklchCss(a: string, pct: number, b: string, powerlessChroma = POWERLESS_CHROMA): string {
+  return formatColor(mixOklch(parseColorOr(a), parseColorOr(b), pct / 100, powerlessChroma));
 }
 
 export function relativeOklch(

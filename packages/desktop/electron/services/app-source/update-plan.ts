@@ -14,13 +14,27 @@ export const restartsRuntime = (paths: string[]) =>
   paths.some(
     (file) => file === LAUNCHER_MANIFEST || RUNTIME_PREFIXES.some((prefix) => file.startsWith(prefix)),
   );
-export const relaunches = (paths: string[]) =>
-  installs(paths) ||
-  paths.some((file) => file === LAUNCHER_MANIFEST || file.startsWith(RESTART_PREFIX));
+const runsOnRune = () => process.env.STELLA_LAUNCHER_ENGINE === "rune";
+const restartPrefixes = () =>
+  runsOnRune() ? [RESTART_PREFIX, "packages/desktop-rune/host/"] : [RESTART_PREFIX];
+export const relaunches = (paths: string[]) => {
+  const prefixes = restartPrefixes();
+  return (
+    installs(paths) ||
+    paths.some((file) => file === LAUNCHER_MANIFEST || prefixes.some((prefix) => file.startsWith(prefix)))
+  );
+};
 
-const INTERFACE_PREFIX = "packages/desktop-ui/src/";
-export const interfaceOnly = (paths: string[]) =>
-  paths.length > 0 && !installs(paths) && paths.every((file) => file.startsWith(INTERFACE_PREFIX));
+const interfacePrefixes = () =>
+  runsOnRune() ? ["packages/desktop-ui/src/", "packages/desktop-rune/ui/"] : ["packages/desktop-ui/src/"];
+export const interfaceOnly = (paths: string[]) => {
+  const prefixes = interfacePrefixes();
+  return (
+    paths.length > 0 &&
+    !installs(paths) &&
+    paths.every((file) => prefixes.some((prefix) => file.startsWith(prefix)))
+  );
+};
 
 export type UpdatePlan =
   | { kind: "none" }

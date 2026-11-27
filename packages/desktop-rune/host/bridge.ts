@@ -1,0 +1,491 @@
+// The TS side of the bridge to the Rune engine. Host → engine: length-prefixed binary frames
+// (one React commit = one frame) on STELLA_RUNE_BRIDGE_OUT_FD. Engine → host: JSON lines on
+// STELLA_RUNE_BRIDGE_IN_FD. Protocol and element reference: host/ELEMENTS.md.
+
+import { writeSync } from "node:fs";
+
+export const now = () => performance.timeOrigin + performance.now();
+
+const OP = { CREATE: 1, PROPS: 2, APPEND: 4, INSERT: 5, REMOVE: 6, COMMIT: 9, CMD: 10, BLOB: 11, FREE_BLOB: 12 } as const;
+
+const enc = new TextEncoder();
+let buf = new Uint8Array(1 << 16);
+let view = new DataView(buf.buffer);
+let len = 4;
+
+function ensure(n: number) {
+  if (len + n <= buf.length) return;
+  let size = buf.length * 2;
+  while (size < len + n) size *= 2;
+  const next = new Uint8Array(size);
+  next.set(buf.subarray(0, len));
+  buf = next;
+  view = new DataView(buf.buffer);
+}
+const u8 = (v: number) => { ensure(1); buf[len++] = v; };
+const u32 = (v: number) => { ensure(4); view.setUint32(len, v, true); len += 4; };
+const f64 = (v: number) => { ensure(8); view.setFloat64(len, v, true); len += 8; };
+function bytes(b: Uint8Array) { ensure(b.length); buf.set(b, len); len += b.length; }
+
+export const stats = { frames: 0, bytes: 0, ops: 0 };
+
+export const ops = {
+  create(id: number, type: string) { const t = enc.encode(type); u8(OP.CREATE); u32(id); u8(t.length); bytes(t); stats.ops++; },
+  props(id: number, json: string) { const j = enc.encode(json); u8(OP.PROPS); u32(id); u32(j.length); bytes(j); stats.ops++; },
+  append(parent: number, child: number) { u8(OP.APPEND); u32(parent); u32(child); stats.ops++; },
+  insert(parent: number, child: number, before: number) { u8(OP.INSERT); u32(parent); u32(child); u32(before); stats.ops++; },
+  remove(parent: number, child: number) { u8(OP.REMOVE); u32(parent); u32(child); stats.ops++; },
+  cmd(v: unknown) { const j = enc.encode(JSON.stringify(v)); u8(OP.CMD); u32(j.length); bytes(j); stats.ops++; },
+  blob(id: number, data: Uint8Array) { u8(OP.BLOB); u32(id); u32(data.length); bytes(data); stats.ops++; },
+  freeBlob(id: number) { u8(OP.FREE_BLOB); u32(id); stats.ops++; },
+};
+
+/** What the next commit answers: which engine event (ack), when the work started (t0), and kind (1 = hot swap). */
+export const commitCtx = { ack: 0, t0: 0, kind: 0 };
+let generation = 0;
+
+let outFd = -1;
+function fdOut(): number {
+  if (outFd < 0) outFd = Number(process.env.STELLA_RUNE_BRIDGE_OUT_FD ?? 1);
+  return outFd;
+}
+
+function writeAll(frame: Uint8Array) {
+  const fd = fdOut();
+  let off = 0;
+  while (off < frame.length) off += writeSync(fd, frame, off, frame.length - off);
+}
+
+/** Length prefix plus a COMMIT op (u8 op, u32 generation, u32 ack, f64 t0, u8 kind). */
+const EMPTY_COMMIT_FRAME = 4 + 18;
+let held: Uint8Array[] | null = null;
+let heldAt = 0;
+let task: Uint8Array[] | null = null;
+function write(frame: Uint8Array) {
+  if (task) return void task.push(frame.slice());
+  if (!held) return writeAll(frame);
+  held.push(frame.slice());
+  if (frame.length > EMPTY_COMMIT_FRAME) heldAt = now();
+}
+
+/** Frames as one: their ops back to back under one length prefix. */
+function joinFrames(q: Uint8Array[]): Uint8Array {
+  const body = q.reduce((n, f) => n + f.length - 4, 0);
+  const all = new Uint8Array(body + 4);
+  new DataView(all.buffer).setUint32(0, body, true);
+  let at = 4;
+  for (const f of q) { all.set(f.subarray(4), at); at += f.length - 4; }
+  return all;
+}
+
+/**
+ * Collects every frame written until this task's microtasks run and sends them as one frame, which
+ * the engine applies in a single poll. A commit is followed in the same task by the commits its
+ * layout effects cause (desktop-ui stamps a message's arrival that way, so its entrance starts a
+ * commit after the row is drawn); a browser paints only after them, and so does the engine now.
+ */
+export function joinTask() {
+  if (task) return;
+  task = [];
+  queueMicrotask(() => {
+    const q = task!;
+    task = null;
+    if (!q.length) return;
+    const frame = q.length === 1 ? q[0]! : joinFrames(q);
+    write(frame);
+  });
+}
+
+/** Keeps every frame back (in order) until `releaseFrames`, so the engine goes on showing what it has. */
+export function holdFrames() { held ??= []; heldAt = now(); }
+/** When the last frame carrying ops was held. */
+export const lastHeldAt = () => heldAt;
+/** Sends the held frames' ops as one frame, which the engine applies in a single poll. */
+export function releaseFrames() {
+  const q = held;
+  held = null;
+  if (!q?.length) return;
+  writeAll(joinFrames(q));
+}
+
+/** Whether ops are waiting for the next frame. */
+export const opsPending = () => len > 4;
+
+/** Seals the pending ops as one frame and writes it. */
+export function flushFrame(commit = true) {
+  if (commit) {
+    u8(OP.COMMIT); u32(++generation); u32(commitCtx.ack); f64(commitCtx.t0 || now()); u8(commitCtx.kind);
+    commitCtx.ack = 0; commitCtx.t0 = 0; commitCtx.kind = 0;
+  }
+  if (len === 4) return;
+  view.setUint32(0, len - 4, true);
+  write(buf.subarray(0, len));
+  stats.frames++; stats.bytes += len;
+  len = 4;
+}
+
+/** Sends an imperative command right away, outside a commit. */
+export function command(v: Record<string, unknown>) {
+  ops.cmd(v);
+  flushFrame(false);
+}
+
+let nextRid = 1;
+const pending = new Map<number, { resolve: (v: any) => void; reject: (e: Error) => void }>();
+
+/** Sends a command and resolves with the engine's reply. */
+export function request<T = void>(cmd: string, args: Record<string, unknown> = {}): Promise<T> {
+  const rid = nextRid++;
+  return new Promise<T>((resolve, reject) => {
+    pending.set(rid, { resolve, reject });
+    command({ ...args, cmd, rid });
+  });
+}
+
+let nextBlob = 1;
+/** Hands bytes (an image, a PNG, a response body) to the engine; refer to them as `blob:<id>`. */
+export function blob(data: Uint8Array): number {
+  const id = nextBlob++;
+  ops.blob(id, data);
+  flushFrame(false);
+  return id;
+}
+export function freeBlob(id: number) { ops.freeBlob(id); flushFrame(false); }
+
+// ---------------------------------------------------------------- events
+
+export type Mods = { mod: boolean; shift: boolean; alt: boolean; ctrl: boolean; meta: boolean };
+export type Rect = { x: number; y: number; width: number; height: number };
+export type Display = { id: number; label?: string; primary: boolean; scaleFactor: number; bounds: Rect; workArea: Rect };
+
+/** An element event, delivered to the element's `on*` prop by the reconciler. */
+export type ElementEvent = { t: "ev"; n: number; e: string; seq: number; at: number; input?: number; [k: string]: unknown };
+
+export type WindowEventKind =
+  | "close-requested" | "closed" | "focus" | "blur" | "resize" | "maximize" | "unmaximize"
+  | "enter-full-screen" | "leave-full-screen";
+
+export type EngineEvent =
+  | ElementEvent
+  | { t: "reply"; rid: number; ok: boolean; value?: unknown; error?: string }
+  | { t: "window"; id: string | null; n: number; kind: WindowEventKind; w?: number; h?: number }
+  | { t: "menu"; id: string }
+  | { t: "tray"; id: string; kind: "click" | "menu"; item?: string }
+  | { t: "shortcut"; accelerator: string; accel: string }
+  | { t: "notification"; id: string | null; action: string; reply?: string | null }
+  | { t: "appearance"; dark: boolean; accentColor?: string }
+  /** A link the system opened with the app (macOS Apple Event; Windows/Linux the launch's own `stella://` arguments). Later launches' links come through the host's single-instance lock. */
+  | { t: "open-url"; url: string }
+  | { t: "rec"; result: unknown }
+  | { t: "swapfx"; stage: "run" | "none" }
+  /** A window's selection settled (a drag, double/triple-click, shift-extend or select-all released) with its line boxes' union in window points as scrolled, or cleared. */
+  | { t: "selection"; window: string | null; n: number; text: string; rect: SelectionRect }
+  | { t: "selection"; window: string | null; n: number; cleared: true }
+  | { t: "capture"; id: string; kind: "frame"; at: number; path: string }
+  /** A global input event in uiohook's shape (see engine/src/inputhook.rs). */
+  | ({ t: "inputhook"; type: InputHookType } & InputHookEvent)
+  | { t: "audio"; id: string; kind: "ended" | "error"; message?: string }
+  | { t: "mic"; gen: number; kind: "live" | "audio" | "ended" | "failed"; ms?: number; pcm?: string; message?: string };
+
+export type SelectionRect = { x: number; y: number; w: number; h: number };
+
+export type InputHookType = "mousemove" | "mousedown" | "mouseup" | "wheel" | "keydown" | "keyup";
+export type InputHookEvent = {
+  x: number;
+  y: number;
+  time: number;
+  shiftKey: boolean;
+  ctrlKey: boolean;
+  altKey: boolean;
+  metaKey: boolean;
+  button?: number;
+  clicks?: number;
+  keycode?: number;
+  rawcode?: number;
+  rotation?: number;
+  direction?: number;
+  amount?: number;
+};
+
+type EventOf<T extends EngineEvent["t"]> = Extract<EngineEvent, { t: T }>;
+const listeners = new Map<string, Set<(e: any) => void>>();
+
+/** Subscribes to engine events of one type; returns an unsubscribe function. */
+export function onEngineEvent<T extends EngineEvent["t"]>(t: T, fn: (e: EventOf<T>) => void): () => void {
+  let set = listeners.get(t);
+  if (!set) listeners.set(t, (set = new Set()));
+  set.add(fn);
+  return () => set!.delete(fn);
+}
+
+let elementDispatch: (e: ElementEvent) => void = () => {};
+/** The reconciler routes element events to `on*` props. */
+export function setElementDispatch(fn: (e: ElementEvent) => void) { elementDispatch = fn; }
+
+function dispatch(e: EngineEvent) {
+  if (e.t === "reply") {
+    const p = pending.get(e.rid);
+    if (!p) return;
+    pending.delete(e.rid);
+    if (e.ok) p.resolve(e.value); else p.reject(new Error(e.error ?? "engine command failed"));
+    return;
+  }
+  if (e.t === "ev") elementDispatch(e);
+  const set = listeners.get(e.t);
+  if (set) for (const fn of set) { try { fn(e); } catch (err) { console.error("[bridge] listener failed", err); } }
+}
+
+/** Reads engine events until the engine closes the pipe, then exits. */
+export async function listen(extra?: (e: EngineEvent) => void) {
+  const inFd = Number(process.env.STELLA_RUNE_BRIDGE_IN_FD ?? 0);
+  const stream = inFd === 0 ? Bun.stdin.stream() : Bun.file(inFd).stream();
+  const dec = new TextDecoder();
+  let rest = "";
+  for await (const chunk of stream) {
+    rest += dec.decode(chunk, { stream: true });
+    let nl: number;
+    while ((nl = rest.indexOf("\n")) >= 0) {
+      const line = rest.slice(0, nl);
+      rest = rest.slice(nl + 1);
+      if (!line) continue;
+      let e: EngineEvent;
+      try { e = JSON.parse(line); } catch (err) { console.error("[bridge] bad event", line, err); continue; }
+      dispatch(e);
+      extra?.(e);
+    }
+  }
+  process.exit(0);
+}
+
+// ---------------------------------------------------------------- typed engine API
+
+export type MenuItem = {
+  id?: string; label?: string; type?: "normal" | "separator" | "checkbox" | "radio" | "submenu";
+  enabled?: boolean; checked?: boolean; visible?: boolean; accelerator?: string; role?: string; submenu?: MenuItem[];
+};
+export type FileFilter = { name: string; extensions: string[] };
+export type DialogOptions = { title?: string; defaultPath?: string; filters?: FileFilter[]; window?: string };
+export type ClipboardRead = { text: string; html: string | null; files: string[]; image: string | null; formats: string[] };
+export type WindowBounds = { x: number; y: number; width: number; height: number; scaleFactor: number; maximized: boolean; minimized: boolean; fullScreen: boolean };
+export type ElementInfo = { key: string | null; path: string; role: string; label: string | null; text: string | null; rect: [number, number, number, number]; opacity: number; focused: boolean; focusable: boolean; inert: boolean; exiting: boolean; fill: string; textColor: string | null };
+export type FrameShot = { path: string; width: number; height: number; scale: number };
+export type FrameRecording = { dir: string; frames: number; asked: number; fps: number; errors: string[] };
+/** A Rune script event (`--script` format): move/down/up/tap/double-click/drag/scroll/wheel/key/type/paste/ime/drop_files… */
+export type CaptureSource = { id: string; name: string; display_id: string; thumbnail: string | null };
+export type CaptureStart = {
+  id: string; sourceId: string; width: number; height: number; fps: number; file: string; framesDir: string;
+  frameIntervalMs: number; frameEdge: number; jpegQuality: number; microphone: boolean;
+};
+
+export type InputEvent = Record<string, unknown> & { type?: string; t?: number };
+
+/**
+ * The engine API over `request` and `command`. The host's is `engine`; the draft preview's
+ * (services/draft-preview.ts) names its own window in every command.
+ */
+export function engineApi(request: <T = void>(cmd: string, args?: Record<string, unknown>) => Promise<T>, command: (v: Record<string, unknown>) => void) {
+  const win = <T = void>(id: string, cmd: string, args: Record<string, unknown> = {}) => request<T>(`window.${cmd}`, { ...args, window: id });
+
+  return {
+    request, command, blob, freeBlob,
+    window: {
+      focus: (id: string) => win(id, "focus"),
+      show: (id: string) => win(id, "show"),
+      hide: (id: string) => win(id, "hide"),
+      close: (id: string) => win(id, "close"),
+      minimize: (id: string) => win(id, "minimize"),
+      restore: (id: string) => win(id, "restore"),
+      maximize: (id: string) => win(id, "maximize"),
+      unmaximize: (id: string) => win(id, "unmaximize"),
+      toggleMaximize: (id: string) => win(id, "toggleMaximize"),
+      setFullScreen: (id: string, on: boolean) => win(id, "setFullScreen", { on }),
+      center: (id: string) => win(id, "center"),
+      setTitle: (id: string, title: string) => win(id, "setTitle", { title }),
+      setAlwaysOnTop: (id: string, on: boolean) => win(id, "setAlwaysOnTop", { on }),
+      setBounds: (id: string, b: Partial<Rect>) => win(id, "setBounds", b),
+      getBounds: (id: string) => win<WindowBounds>(id, "getBounds"),
+      isMaximized: async (id: string) => (await win<WindowBounds>(id, "getBounds")).maximized,
+      isFocused: (id: string) => request<boolean>("window.isFocused", { window: id }),
+    },
+    clipboard: {
+      read: (window?: string) => request<ClipboardRead>("clipboard.read", { window }),
+      readText: async () => (await request<ClipboardRead>("clipboard.read")).text,
+      readHTML: async () => (await request<ClipboardRead>("clipboard.read")).html ?? "",
+      readFiles: async () => (await request<ClipboardRead>("clipboard.read")).files,
+      /** MIME types on the clipboard: text/plain, text/html, text/uri-list (files), image/png. */
+      availableFormats: async () => (await request<ClipboardRead>("clipboard.read")).formats,
+      /** The clipboard image as PNG bytes, or null. */
+      readImage: async (): Promise<Uint8Array | null> => {
+        const { image } = await request<ClipboardRead>("clipboard.read");
+        return image ? new Uint8Array(await Bun.file(image).arrayBuffer()) : null;
+      },
+      writeText: (text: string) => request("clipboard.writeText", { text }),
+      writeHTML: (html: string, text = "") => request("clipboard.writeHTML", { html, text }),
+      writeImage: (png: Uint8Array) => { const id = blob(png); return request("clipboard.writeImage", { blob: id }).finally(() => freeBlob(id)); },
+    },
+    dialog: {
+      openFile: (o: DialogOptions & { multi?: boolean; directory?: boolean } = {}) => request<string[] | null>("dialog.openFile", o),
+      openFolder: (o: DialogOptions = {}) => request<string[] | null>("dialog.openFolder", o),
+      saveFile: (o: DialogOptions = {}) => request<string | null>("dialog.saveFile", o),
+    },
+    notify: (n: { id: string; title: string; body?: string; icon?: string; silent?: boolean; actions?: { id: string; label: string }[] }) => request("notify", n),
+    app: {
+      /** The app badge: macOS shows `label` on the Dock icon ("3", "99+"; null or "" clears it); Windows shows the count over the main window's taskbar button. Resolves false where nothing shows it (Linux). */
+      setBadge: (label: string | null, count?: number, description?: string) => request<boolean>("app.setBadge", { label: label ?? "", count, description }),
+      /** Windows: the process's AppUserModelID, which toasts post under; nothing elsewhere. */
+      setAppUserModelId: (id: string) => request("app.setAppUserModelId", { id }),
+    },
+    menu: {
+      /** A native pop-up menu at a window point, or under an element (`anchor` = its `id`). Resolves with the picked id. */
+      popup: (items: MenuItem[], at: { window?: string; x?: number; y?: number; anchor?: string }) =>
+        request<string | null>("menu.popup", { items, window: at.window, x: at.x, y: at.y, target: at.anchor }),
+      /** The macOS menu bar from an Electron-style template (top-level submenus; `role: "appMenu"` is the app menu). Picks arrive as `menu` events. A no-op off macOS. */
+      setApplicationMenu: (items: MenuItem[] | null) => request("menu.setApplicationMenu", { items: items ?? [] }),
+    },
+    tray: {
+      /** Resolves with the tray's id (`id`, or a generated one). `icon` is a PNG path or PNG bytes. */
+      create: (t: { id?: string; title?: string; icon: string | Uint8Array; tooltip?: string; template?: boolean; menu?: MenuItem[] | null }) => {
+        const b = typeof t.icon === "string" ? undefined : blob(t.icon);
+        const p = request<string>("tray.create", { ...t, menu: t.menu ?? [], icon: typeof t.icon === "string" ? t.icon : undefined, blob: b });
+        return b ? p.finally(() => freeBlob(b)) : p;
+      },
+      setMenu: (id: string, menu: MenuItem[] | null) => request("tray.setMenu", { id, menu: menu ?? [] }),
+      setTooltip: (id: string, tooltip: string) => request("tray.setTooltip", { id, tooltip }),
+      setIcon: (id: string, icon: string | Uint8Array) => {
+        const b = typeof icon === "string" ? undefined : blob(icon);
+        const p = request("tray.setIcon", { id, icon: typeof icon === "string" ? icon : undefined, blob: b });
+        return b ? p.finally(() => freeBlob(b)) : p;
+      },
+      destroy: (id: string) => request("tray.destroy", { id }),
+    },
+    shortcut: {
+      register: (accelerator: string) => request<boolean>("shortcut.register", { accelerator }),
+      unregister: (accelerator: string) => request("shortcut.unregister", { accelerator }),
+      unregisterAll: () => request("shortcut.unregisterAll"),
+    },
+    screen: {
+      displays: () => request<Display[]>("screen.displays"),
+      /** The primary display (the first one when none says primary). */
+      primary: async () => {
+        const all = await request<Display[]>("screen.displays");
+        const d = all.find((x) => x.primary) ?? all[0];
+        if (!d) throw new Error("no displays");
+        return d;
+      },
+      /** Rejects: Rune reports the pointer only inside its own windows. */
+      cursorPoint: () => request<{ x: number; y: number }>("screen.cursorPoint"),
+    },
+    appearance: { get: () => request<{ dark: boolean; accentColor?: string }>("appearance.get") },
+    /** Screen capture (ScreenCaptureKit on macOS, Windows.Graphics.Capture on Windows). */
+    capture: {
+      sources: (o: { types: string[]; thumbnailSize?: { width: number; height: number } }) => request<CaptureSource[]>("capture.sources", o),
+      start: (o: CaptureStart) => request<{ startedAt: number; microphone: boolean; width: number; height: number }>("capture.start", o),
+      stop: (id: string) => request<{ file: string | null; mimeType?: string; frames: number; pcm: string | null; pcmStartAt: number | null; pcmRate: number }>("capture.stop", { id }),
+    },
+    /** Audio file playback (Linux and Windows; macOS plays through AVFoundation in the host). */
+    audio: {
+      play: (o: { id: string; path: string; volume: number; device: string | null }) =>
+        request<{ device: string | null; sampleRate: number; channels: number; duration: number | null }>("audio.play", o),
+      control: (o: { id: string; op: string; value?: unknown }) => request<{ playing: boolean }>("audio.control", o),
+      devices: () => request<Array<{ deviceId: string; kind: "audioinput" | "audiooutput"; label: string; groupId: string }>>("audio.devices"),
+    },
+    /** The default microphone as 16 kHz mono s16le, for dictation (Linux, Windows): `mic` events per generation. */
+    mic: {
+      start: (gen: number) => command({ cmd: "mic.start", gen }),
+      stop: (gen: number) => command({ cmd: "mic.stop", gen }),
+    },
+    /** Global input listening for the `uiohook-napi` module (macOS CGEventTap, Windows low-level hooks; rejects elsewhere or without Input Monitoring). */
+    inputHook: {
+      start: () => request<{ started: boolean }>("inputhook.start"),
+      stop: () => request<{ stopped: boolean }>("inputhook.stop"),
+    },
+    shell: {
+      openExternal: (url: string) => request("shell.openExternal", { url }),
+      /** Resolves "" on success, else the error (Electron's contract). */
+      openPath: (path: string) => request("shell.openPath", { path }).then(() => "", (e: Error) => e.message),
+      showItemInFolder: (path: string) => request("shell.showItemInFolder", { path }),
+    },
+    fonts: (f: { files: string[]; sans?: string; mono?: string }) => request<{ loaded: number; errors: string[] }>("fonts", f),
+    /** Overrides a window's background (default: the first window). */
+    background: (color: string, window?: string) => request("bg", { color, window }),
+    /** Makes the next commits' colour changes spring over `dur` seconds (theme switches); 0 turns it off. */
+    colorMotion: (dur: number) => request("colorMotion", { dur }),
+    scroll: {
+      to: (target: string, y: number | "end", o: { x?: number; animate?: boolean; spring?: number } = {}) => request("scrollTo", { target, y, ...o }),
+      intoView: (target: string) => request("scrollIntoView", { target }),
+      page: (target: string, pages: number) => request("scrollPage", { target, pages }),
+      stop: (target: string) => request("stopScroll", { target }),
+      /** Lands the element keyed `key` (`"row/mark"` for a mark inside a row, mounted or not) `at` points below the top of `target`'s viewport. Instant. */
+      toKey: (target: string, key: string, at = 0) => request("scrollKeyTo", { target, key, at }),
+      /** Holds `key` where it shows on screen across the next commit (a header that collapses its section). */
+      keepOnScreen: (key: string) => request("keepOnScreen", { target: key, key }),
+    },
+    selection: {
+      /** The text selected in a window (its `selectionGroup` or selectable texts), as copying takes it; null when nothing is. */
+      get: (window?: string) => request<{ text: string; rect?: SelectionRect } | null>("selection.get", { window }),
+      /** Copies the window's selection; false when nothing is selected. */
+      copy: async (window?: string) => {
+        const s = await request<{ text: string } | null>("selection.get", { window });
+        if (!s) return false;
+        await request("clipboard.writeText", { text: s.text, window });
+        return true;
+      },
+      /** macOS dictionary look-up of the selection; false where the platform has none (it isn't wired on macOS yet either). */
+      lookUp: (window?: string) => request<boolean>("selection.lookUp", { window }),
+    },
+    focus: (target: string, ring = false) => request("focus", { target, ring }),
+    blur: (window?: string) => request("blur", { window }),
+    input: {
+      get: (target: string) => request<{ value: string; start: number; end: number }>("input.get", { target }),
+      set: (target: string, value: string, sel?: { start: number; end: number }) => request("input.set", { target, value, ...sel }),
+      select: (target: string, start: number, end: number) => request("input.select", { target, start, end }),
+    },
+    media: {
+      play: (target: string) => request("media.play", { target }),
+      pause: (target: string) => request("media.pause", { target }),
+      seek: (target: string, time: number) => request("media.seek", { target, time }),
+      state: (target: string) =>
+        request<{ time: number; duration: number | null; playing: boolean; buffered: [number, number][]; error: string | null }>("media.state", { target }),
+      /** A clip's length and, with `poster`, a cover-cropped JPEG frame written to `poster.out`. */
+      probe: (path: string, poster?: { width: number; height: number; out: string }) =>
+        request<{ duration: number; size: { width: number; height: number } | null; poster: string | null }>("media.probe", { path, poster }),
+    },
+    webview: {
+      post: (target: string, data: unknown, origin?: string) => request("webview.post", { target, data, origin }),
+      eval: (target: string, js: string) => request("webview.eval", { target, js }),
+      load: (target: string, url: string) => request("webview.load", { target, url }),
+      loadHtml: (target: string, html: string) => request("webview.loadHtml", { target, html }),
+      reload: (target: string) => request("webview.reload", { target }),
+      back: (target: string) => request("webview.back", { target }),
+      forward: (target: string) => request("webview.forward", { target }),
+      focus: (target: string) => request("webview.focus", { target }),
+      blur: (target: string) => request("webview.blur", { target }),
+      zoom: (target: string, factor: number) => request("webview.zoom", { target, factor }),
+      /** Every page prefers this color scheme (the app's), as Chromium gives an iframe its owner's. */
+      colorScheme: (dark: boolean) => request("webview.colorScheme", { dark }),
+      url: (target: string) => request<string | null>("webview.url", { target }),
+      /** Why a native view shows or hides: its rect, whether it fits its scroll viewport (`clip`), and the overlays covering it. */
+      state: (target: string) =>
+        request<{ rect: number[]; shown: boolean; covered: boolean; covering: { node: number; rect: number[] }[]; fits: boolean; clip: { node: number; rect: number[] | null } | null }>("webview.state", { target }),
+      /** Answers a custom-scheme `request` event. */
+      respond: (rid: number, r: { status?: number; headers?: Record<string, string>; body?: string | Uint8Array }) => {
+        const b = r.body instanceof Uint8Array ? blob(r.body) : undefined;
+        const p = request("webview.respond", { req: rid, status: r.status, headers: r.headers, body: typeof r.body === "string" ? r.body : undefined, blob: b });
+        return b ? p.finally(() => freeBlob(b)) : p;
+      },
+    },
+    control: {
+      /** Replays real input in a window through Rune's input paths (Rune script events). */
+      input: (events: InputEvent[], window?: string) => request("control.input", { events, window }),
+      /** Every element Rune drew in a window: keys, roles, labels, text, rects, focus. */
+      elements: (window?: string, key?: string) => request<ElementInfo[]>("control.elements", { window, key }),
+      /** Writes the window's next presented frame to `path` as a PNG, in physical pixels. */
+      screenshot: (path: string, window?: string) => request<FrameShot>("control.screenshot", { path, window }),
+      /** Writes the window's presented frames to `dir/frame-NNNNN.png` at `fps` for `seconds`. */
+      record: (dir: string, o: { fps?: number; seconds?: number; window?: string } = {}) => request<FrameRecording>("control.record", { dir, ...o }),
+    },
+    quit: () => command({ cmd: "quit" }),
+  };
+}
+
+export const engine = engineApi(request, command);

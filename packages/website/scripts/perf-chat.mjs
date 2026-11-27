@@ -304,11 +304,16 @@ const launchBrowser = async (chromePath, port, gpu) => {
         await Promise.race([cdp.send("Browser.close"), sleep(3000)]);
       } catch {}
       ws.close();
+      const exited = proc.exitCode !== null ? Promise.resolve() : new Promise((resolve) => proc.once("exit", resolve));
       proc.kill();
-      fs.rmSync(userDir, { recursive: true, force: true });
+      await Promise.race([exited, sleep(5000)]);
+      fs.rmSync(userDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 200 });
     },
   };
 };
+
+const COMPOSER_FIELD = 'textarea.chat-composer-textarea, [data-rid^="composer-input:"] > textarea, #stella-static-home textarea';
+const APP_COMPOSER_FIELD = '#root textarea.chat-composer-textarea, #root [data-rid^="composer-input:"] > textarea';
 
 const probe = (token) => `(() => {
   if (!location.pathname.startsWith("/chat-app/")) return;
@@ -337,7 +342,7 @@ const probe = (token) => `(() => {
   };
   try { Object.defineProperty(window, "__REACT_DEVTOOLS_GLOBAL_HOOK__", { value: hook, configurable: true }); } catch (e) {}
   window.__pbComposer = () => {
-    for (const field of document.querySelectorAll("textarea.chat-composer-textarea")) {
+    for (const field of document.querySelectorAll(${JSON.stringify(COMPOSER_FIELD)})) {
       if (field.disabled || field.offsetParent === null) continue;
       const r = field.getBoundingClientRect();
       if (document.elementFromPoint(r.left + Math.min(40, r.width / 2), r.top + r.height / 2) === field) return field;
@@ -359,7 +364,7 @@ const probe = (token) => `(() => {
     if (document.querySelector(".shell-topbar-full, .shell-topbar")) mark("shell");
     if (window.__pbComposer()) mark("composer");
     const shellGone = !document.getElementById("stella-static-home") || document.getElementById("stella-static-home").dataset.leaving;
-    if (shellGone && [...document.querySelectorAll("#root textarea.chat-composer-textarea")].some((t) => !t.disabled && t.offsetParent !== null && !t.closest("[inert]"))) mark("appComposer");
+    if (shellGone && [...document.querySelectorAll(${JSON.stringify(APP_COMPOSER_FIELD)})].some((t) => !t.disabled && t.offsetParent !== null && !t.closest("[inert]"))) mark("appComposer");
     const splash = document.getElementById("stella-launch");
     if (!splash || splash.dataset.exiting === "true") mark("splashExit");
     if ("composer" in pb.marks && "splashExit" in pb.marks) mark("typeable");
@@ -585,7 +590,7 @@ const measureEarlyTyping = async (page, navigate, opts) => {
   const state = await page.evaluate(`(() => {
     const w = ${WIN(opts)};
     const active = w.document.activeElement;
-    const field = [...w.document.querySelectorAll("#root textarea.chat-composer-textarea")].find((t) => !t.disabled && t.offsetParent !== null && !t.closest("[inert]"));
+    const field = [...w.document.querySelectorAll(${JSON.stringify(APP_COMPOSER_FIELD)})].find((t) => !t.disabled && t.offsetParent !== null && !t.closest("[inert]"));
     return { value: field ? field.value : null, focused: Boolean(field && active === field), caret: field ? field.selectionStart : null };
   })()`);
   const value = state.value ?? "";

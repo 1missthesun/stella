@@ -11,6 +11,7 @@ let usage = """
 usage: StellaLauncher [--start [--show]] [--version] [--self-test] [--source <path|git url>]
                       [--source-ref <ref>] [--backend <url>] [--bun <path>] [--hold <seconds>]
                       [--recovery-choice return|retry|quit] [--capture-dir <dir>]
+                      [--engine electron|rune] [--engine-bin <path>]
 
 --start starts Stella right away with the window hidden (a launcher taking
 over after an update), and --show keeps the window up while it does;
@@ -23,7 +24,10 @@ server Stella picked), STELLA_LAUNCHER_STABLE_SECONDS,
 STELLA_LAUNCHER_READY_TIMEOUT_SECONDS, STELLA_LAUNCHER_UPDATE_URL (check this
 launcher/stable/ instead, even for a local build or a test root),
 STELLA_LAUNCHER_UPDATE_DELAY_SECONDS, STELLA_LAUNCHER_UPDATE_REQUIREMENT (with
-STELLA_LAUNCHER_UPDATE_URL only: the code requirement an update must meet).
+STELLA_LAUNCHER_UPDATE_URL only: the code requirement an update must meet),
+STELLA_LAUNCHER_ENGINE=rune or the file <root>/rune-engine (start the Rune
+engine instead of Electron), STELLA_LAUNCHER_ENGINE_BIN (a local
+stella-engine binary; implies rune).
 """
 
 func parseOptions() -> Options {
@@ -47,6 +51,8 @@ func parseOptions() -> Options {
         case "--source-ref": options.sourceRef = value(arg)
         case "--backend": options.backend = value(arg)
         case "--bun": options.localBun = value(arg)
+        case "--engine": options.engine = value(arg)
+        case "--engine-bin": options.engineBin = value(arg)
         case "--hold": options.hold = TimeInterval(value(arg)) ?? 0
         case "--capture-dir": options.captureDir = URL(fileURLWithPath: value(arg))
         case "--recovery-choice":

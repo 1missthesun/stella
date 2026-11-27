@@ -2,10 +2,13 @@ import CryptoKit
 import Foundation
 
 enum Prepare {
+    /// With rune (the Rune engine starts instead) Electron's signed app is
+    /// neither fetched nor needed, and the result's app is unused.
     static func run(
         paths: LauncherPaths,
         runtimes: Runtimes,
         env: [String: String],
+        rune: Bool,
         state: inout LauncherState,
         progress: (String) -> Void
     ) throws -> ElectronIdentity.Resolved {
@@ -24,6 +27,9 @@ enum Prepare {
             var installEnv = env
             installEnv["STELLA_SKIP_BROWSER_HYDRATE"] = "1"
             installEnv["STELLA_SKIP_OFFICE_HYDRATE"] = "1"
+            // baseEnvironment() strips the engine choice; install-deps.mjs
+            // skips Electron and its bundle for Rune.
+            if rune { installEnv["STELLA_LAUNCHER_ENGINE"] = "rune" }
             let result = try Shell.run(runtimes.bunBin.path,
                                        seeded ? [installDeps.path] : ["install", "--frozen-lockfile"],
                                        cwd: app, env: installEnv, outputFile: paths.installLog,
@@ -53,6 +59,7 @@ enum Prepare {
             }
         }
 
+        if rune { return ElectronIdentity.Resolved(app: paths.app, pendingVersion: nil) }
         return try ElectronIdentity.ensure(paths: paths, env: env, progress: progress)
     }
 

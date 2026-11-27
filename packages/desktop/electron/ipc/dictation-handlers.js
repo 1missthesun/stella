@@ -79,7 +79,7 @@ export const registerDictationHandlers = (options) => {
     const activeDictationSources = new Set();
     const uiState = (key) => options.getUiState?.(key) ?? null;
     const capture = new MicrophoneCapture(() => {
-        if (process.platform !== "darwin")
+        if (process.platform !== "darwin" && process.env.STELLA_LAUNCHER_ENGINE !== "rune")
             return false;
         if (app.commandLine.hasSwitch("use-fake-device-for-media-stream"))
             return false;

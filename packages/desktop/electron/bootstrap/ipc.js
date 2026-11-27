@@ -537,7 +537,7 @@ export const registerBootstrapIpcHandlers = (context, resetFlows) => {
             log: (event, data) => getMainLogger()?.process(event, data),
             beforeAction: assertHeadSigned,
             afterApply: signHead,
-            onPushed: (cwd) => buildAndUploadWebRenderer(cwd, {
+            onForkCurrent: (cwd) => buildAndUploadWebRenderer(cwd, {
                 getBackendUrl: () => services.authService.getBackendUrl(),
                 getAuthToken: () => services.authService.getAuthToken(),
                 log: (event, data) => getMainLogger()?.process(event, data),

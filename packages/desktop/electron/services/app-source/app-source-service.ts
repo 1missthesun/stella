@@ -118,7 +118,8 @@ type AppSourceServiceOptions = {
   getBackendUrl: () => string | null;
   getAuthToken: TokenProvider;
   log: (event: string, data: Record<string, unknown>) => void;
-  onPushed?: (cwd: string) => void | Promise<void>;
+  /** The fork holds this checkout's HEAD: just pushed there, or found there when the fork is fetched (at launch). */
+  onForkCurrent?: (cwd: string) => void | Promise<void>;
   afterApply?: (cwd: string) => void | Promise<void>;
   beforeAction?: (cwd: string) => void | Promise<void>;
   coverRenderer?: () => Promise<CoveredWindow | null>;
@@ -2883,6 +2884,7 @@ export class AppSourceService {
     let pushed = false;
     if (forkTip === head || (await isAncestor(cwd, head, forkTip))) {
       this.notShared = null;
+      if (forkTip === head) this.forkCurrent(cwd);
     } else if (!(await isAncestor(cwd, forkTip, head))) {
       this.shareLater(cwd, fork);
     } else {
@@ -2894,20 +2896,23 @@ export class AppSourceService {
       );
       await git(cwd, ["update-ref", ref, head]);
       pushed = true;
-      const onPushed = this.options.onPushed;
-      if (onPushed) {
-        void Promise.resolve()
-          .then(() => onPushed(cwd))
-          .catch((error) => {
-            this.options.log("app-source.on-pushed-failed", {
-              message: errorMessage(error),
-            });
-          });
-      }
+      this.forkCurrent(cwd);
     }
     if ((await this.pushChangeTags(cwd, fork, ref)) || pushed) {
       this.reportForkPush(await git(cwd, ["rev-parse", ref]));
     }
+  }
+
+  private forkCurrent(cwd: string) {
+    const onForkCurrent = this.options.onForkCurrent;
+    if (!onForkCurrent) return;
+    void Promise.resolve()
+      .then(() => onForkCurrent(cwd))
+      .catch((error) => {
+        this.options.log("app-source.on-fork-current-failed", {
+          message: errorMessage(error),
+        });
+      });
   }
 
   private shareLater(cwd: string, fork: ForkAccess) {

@@ -5,7 +5,7 @@ import { ensurePatchedDeps } from "./check-patched-deps.mjs";
 
 const repoRoot = path.resolve(import.meta.dirname, "..");
 
-const desktop = ["./", "@stella/desktop", "@stella/desktop-ui"];
+const desktop = ["./", "@stella/desktop", "@stella/desktop-ui", "@stella/desktop-rune"];
 const KINDS = {
   runtime: { filters: ["@stella/runtime", "@stella/agent"], omitPeer: true },
   backend: {

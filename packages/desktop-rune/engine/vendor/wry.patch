@@ -1,0 +1,36 @@
+diff -ruN a/src/webkitgtk/mod.rs b/src/webkitgtk/mod.rs
+--- a/src/webkitgtk/mod.rs
++++ b/src/webkitgtk/mod.rs
+@@ -731,6 +731,8 @@
+ 
+       if let (Some(webview), Some(js)) = (webview.upgrade(), msg.js_value()) {
+         let uri = webview.uri().map(|u| u.to_string()).unwrap_or_default();
++        // A data: or about:blank page's URL isn't an http::Uri; its messages still count.
++        let uri = http::Uri::try_from(uri).unwrap_or_default();
+         match Request::builder().uri(uri).body(js.to_string()) {
+           Ok(request) => ipc_handler(request),
+           Err(_error) => {
+diff -ruN a/src/webview2/mod.rs b/src/webview2/mod.rs
+--- a/src/webview2/mod.rs
++++ b/src/webview2/mod.rs
+@@ -1024,6 +1024,8 @@
+           #[cfg(feature = "tracing")]
+           let _span = tracing::info_span!(parent: None, "wry::ipc::handle").entered();
+ 
++          // A data: or about:blank page's URL isn't an http::Uri; its messages still count.
++          let url = http::Uri::try_from(url).unwrap_or_default();
+           match Request::builder().uri(url).body(js) {
+             Ok(request) => ipc_handler(request),
+             Err(_error) => {
+diff -ruN a/src/wkwebview/class/wry_web_view_delegate.rs b/src/wkwebview/class/wry_web_view_delegate.rs
+--- a/src/wkwebview/class/wry_web_view_delegate.rs
++++ b/src/wkwebview/class/wry_web_view_delegate.rs
+@@ -56,6 +56,8 @@
+             CStr::from_ptr(url_utf8).to_str(),
+             CStr::from_ptr(js_utf8).to_str(),
+           ) {
++            // A data: or about:blank page's URL isn't an http::Uri; its messages still count.
++            let url = http::Uri::try_from(url).unwrap_or_default();
+             if let Ok(r) = Request::builder().uri(url).body(js.to_string()) {
+               ipc_handler(r);
+             } else {

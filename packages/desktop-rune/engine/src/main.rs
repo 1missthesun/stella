@@ -1,0 +1,371 @@
+//! stella-engine: a compiled Rune engine whose whole app is TypeScript in one Bun process.
+//!
+//! The binary knows nothing about Stella's screens. It spawns the Bun host (`host/main.tsx`),
+//! reads length-prefixed binary frames of tree mutations and commands from it, keeps a retained
+//! mirror tree, and turns that tree into Rune `El`s per window on each commit. Layout, text,
+//! scrolling, hover, springs and painting stay native; only state changes cross the bridge.
+//! Events go back to the host as JSON lines. The protocol is in `host/ELEMENTS.md`.
+
+#![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
+
+mod audio;
+mod backdrop;
+mod capture;
+mod inputhook;
+mod commands;
+mod control;
+#[cfg(target_os = "linux")]
+mod desktop_fonts;
+mod display_watch;
+mod engine;
+mod fx;
+mod input;
+mod keys;
+mod look_up;
+mod markdown;
+mod media;
+mod metrics;
+mod mic;
+mod props;
+mod protocol;
+mod services;
+mod style;
+mod surface;
+mod swap_view;
+mod swapfx;
+mod text;
+mod text_services;
+mod trim;
+mod tree;
+mod view;
+#[cfg(feature = "webview")]
+mod webview;
+#[cfg(feature = "webview")]
+mod webview_look;
+#[cfg(all(target_os = "linux", feature = "webview"))]
+mod webview_input;
+#[cfg(all(target_os = "linux", feature = "webview"))]
+mod xwayland_scale;
+mod windows;
+
+use std::process::{Child, Command, Stdio};
+use std::sync::{Arc, Mutex, mpsc};
+
+use rune::{App, Waker};
+
+use crate::metrics::METRICS;
+use crate::windows::Win;
+
+struct Boot {
+    rx: mpsc::Receiver<protocol::Msg>,
+    to_host: Box<dyn std::io::Write>,
+    child: Child,
+    waker: Arc<Mutex<Option<Waker>>>,
+}
+
+/// On Unix the bridge gets its own pipes (host fd 4 → engine frames, engine → host fd 5) so
+/// anything the host or its children print on stdout can't corrupt it; an inherited fd 3 (the
+/// launcher's socket) passes through untouched. Windows uses the host's stdio for now.
+#[cfg(unix)]
+fn spawn_host(cmd: &mut Command) -> (Child, Box<dyn std::io::Read + Send>, Box<dyn std::io::Write>) {
+    use std::os::fd::{AsFd, AsRawFd};
+    use std::os::unix::process::CommandExt;
+    let (from_host, host_out) = std::io::pipe().expect("bridge pipe");
+    let (host_in, to_host) = std::io::pipe().expect("bridge pipe");
+    let (out_fd, in_fd) = (host_out.as_raw_fd(), host_in.as_raw_fd());
+    let stderr = std::io::stderr().as_fd().try_clone_to_owned().expect("dup stderr");
+    cmd.env("STELLA_RUNE_BRIDGE_OUT_FD", "4").env("STELLA_RUNE_BRIDGE_IN_FD", "5").stdin(Stdio::null()).stdout(Stdio::from(stderr));
+    // SAFETY: only async-signal-safe fcntl/dup2 calls between fork and exec. Both ends move
+    // above 9 first so neither is clobbered when it already sits on 4 or 5.
+    unsafe {
+        cmd.pre_exec(move || {
+            let hi_out = libc::fcntl(out_fd, libc::F_DUPFD, 10);
+            let hi_in = libc::fcntl(in_fd, libc::F_DUPFD, 10);
+            if hi_out < 0 || hi_in < 0 || libc::dup2(hi_out, 4) < 0 || libc::dup2(hi_in, 5) < 0 {
+                return Err(std::io::Error::last_os_error());
+            }
+            libc::close(hi_out);
+            libc::close(hi_in);
+            libc::setpgid(0, 0);
+            #[cfg(target_os = "linux")]
+            libc::prctl(libc::PR_SET_PDEATHSIG, libc::SIGTERM);
+            Ok(())
+        });
+    }
+    let child = cmd.spawn().unwrap_or_else(|e| panic!("could not start the TS host: {e}"));
+    HOST_GROUP.store(child.id() as i32, std::sync::atomic::Ordering::Relaxed);
+    end_host_on_signals();
+    drop(host_out);
+    drop(host_in);
+    (child, Box::new(from_host), Box::new(to_host))
+}
+
+/// The host's process group: the host and everything it starts (Bun workers, build children).
+#[cfg(unix)]
+static HOST_GROUP: std::sync::atomic::AtomicI32 = std::sync::atomic::AtomicI32::new(0);
+
+#[cfg(unix)]
+pub fn end_host_group() {
+    let g = HOST_GROUP.load(std::sync::atomic::Ordering::Relaxed);
+    if g > 0 {
+        // SAFETY: signals a process group this process created.
+        unsafe { libc::killpg(g, libc::SIGTERM) };
+    }
+}
+
+/// The host's own deadline for main's quit on a signal (`SIGNAL_QUIT_DEADLINE_MS`).
+#[cfg(unix)]
+const HOST_QUIT_GRACE: std::time::Duration = std::time::Duration::from_secs(8);
+
+/// The host runs main's own quit on SIGTERM (before-quit cleanups, the runtime told to quit);
+/// it is killed only if that outlasts `HOST_QUIT_GRACE`.
+pub fn end_host(mut c: std::process::Child) {
+    #[cfg(unix)]
+    {
+        end_host_group();
+        let until = std::time::Instant::now() + HOST_QUIT_GRACE;
+        while std::time::Instant::now() < until {
+            if !matches!(c.try_wait(), Ok(None)) {
+                return;
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+    }
+    let _ = c.kill();
+    let _ = c.wait();
+}
+
+#[cfg(unix)]
+const QUIT_SIGNALS: [libc::c_int; 3] = [libc::SIGTERM, libc::SIGINT, libc::SIGHUP];
+
+/// Leaves the quit signals to `end_host_on_signals`' thread: called first in `main`, so every
+/// thread the process starts blocks them too.
+#[cfg(unix)]
+fn block_quit_signals() {
+    // SAFETY: plain sigset calls on a local set, then the calling thread's mask.
+    unsafe {
+        let mut set: libc::sigset_t = std::mem::zeroed();
+        libc::sigemptyset(&mut set);
+        for sig in QUIT_SIGNALS {
+            libc::sigaddset(&mut set, sig);
+        }
+        libc::pthread_sigmask(libc::SIG_BLOCK, &set, std::ptr::null_mut());
+    }
+}
+
+/// A launcher's terminate (SIGTERM), Ctrl+C or a closed terminal gives the host's whole group
+/// the same grace as a quit (`HOST_QUIT_GRACE`), then kills what is left and exits. The wait runs
+/// on its own thread, so the windows keep answering the compositor (no "not responding" prompt)
+/// and close as soon as the host has quit.
+#[cfg(unix)]
+fn end_host_on_signals() {
+    let spawned = std::thread::Builder::new().name("stella-quit-signals".into()).spawn(|| {
+        // SAFETY: sigwait on a local set of the signals every thread blocks.
+        let sig = unsafe {
+            let mut set: libc::sigset_t = std::mem::zeroed();
+            libc::sigemptyset(&mut set);
+            for sig in QUIT_SIGNALS {
+                libc::sigaddset(&mut set, sig);
+            }
+            let mut sig: libc::c_int = 0;
+            libc::sigwait(&set, &mut sig);
+            sig
+        };
+        let g = HOST_GROUP.load(std::sync::atomic::Ordering::Relaxed);
+        if g > 0 {
+            // SAFETY: signals the process group this process created.
+            unsafe { libc::killpg(g, libc::SIGTERM) };
+            let until = std::time::Instant::now() + HOST_QUIT_GRACE;
+            // The host leads its group (pid = group id); reaping it here ends the wait as soon as
+            // it has quit, and what it leaves behind in the group is killed below.
+            // SAFETY: a non-blocking wait on this process's own child.
+            while std::time::Instant::now() < until && unsafe { libc::waitpid(g, std::ptr::null_mut(), libc::WNOHANG) } == 0 {
+                std::thread::sleep(std::time::Duration::from_millis(10));
+            }
+            // SAFETY: as above.
+            unsafe { libc::killpg(g, libc::SIGKILL) };
+        }
+        std::process::exit(128 + sig);
+    });
+    if let Err(e) = spawned {
+        eprintln!("stella-engine: no quit-signal thread: {e}");
+    }
+}
+
+#[cfg(not(unix))]
+fn spawn_host(cmd: &mut Command) -> (Child, Box<dyn std::io::Read + Send>, Box<dyn std::io::Write>) {
+    cmd.stdin(Stdio::piped()).stdout(Stdio::piped());
+    let mut child = cmd.spawn().unwrap_or_else(|e| panic!("could not start the TS host: {e}"));
+    let out = child.stdout.take().expect("piped stdout");
+    let inp = child.stdin.take().expect("piped stdin");
+    (child, Box::new(out), Box::new(inp))
+}
+
+fn spawn_ts() -> Boot {
+    let root = std::env::var("STELLA_RUNE_ROOT").unwrap_or_else(|_| {
+        let exe = std::env::current_exe().ok();
+        exe.and_then(|p| p.ancestors().nth(4).map(|p| p.to_string_lossy().into_owned())).unwrap_or_else(|| ".".into())
+    });
+    let bun = std::env::var("STELLA_RUNE_BUN").unwrap_or_else(|_| "bun".into());
+    let host = format!("{root}/host/main.tsx");
+    let mut cmd = Command::new(&bun);
+    cmd.arg(&host).args(std::env::args_os().skip(1)).current_dir(&root).stderr(Stdio::inherit());
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        // TCC prompts name the responsible app: only a bundled engine (Stella.app) may ask.
+        if cfg!(target_os = "macos") && std::env::var_os("STELLA_RUNE_MEDIA_PROMPTS").is_none() && exe.to_string_lossy().contains(".app/Contents/MacOS/") {
+            cmd.env("STELLA_RUNE_MEDIA_PROMPTS", "1");
+        }
+    }
+    let (child, from_host, to_host) = spawn_host(&mut cmd);
+    let (tx, rx) = mpsc::channel();
+    let waker: Arc<Mutex<Option<Waker>>> = Arc::new(Mutex::new(None));
+    let w2 = waker.clone();
+    std::thread::Builder::new().name("ts-bridge".into()).spawn(move || protocol::read_loop(from_host, tx, w2)).expect("bridge thread");
+    Boot { rx, to_host, child, waker }
+}
+
+/// Linux: native child WebViews need an X11 parent, so with webviews built in the engine runs on
+/// X11 (XWayland under a Wayland session) unless `STELLA_RUNE_BACKEND=wayland`.
+#[cfg(all(target_os = "linux", feature = "webview"))]
+fn linux_backend() {
+    let want = std::env::var("STELLA_RUNE_BACKEND").unwrap_or_default();
+    if want != "wayland" && std::env::var_os("DISPLAY").is_some() {
+        let scale = std::env::var_os("WINIT_X11_SCALE_FACTOR").is_none().then(xwayland_scale::desktop_scale).flatten();
+        // SAFETY: before any thread that reads the environment starts.
+        unsafe {
+            if let Some(scale) = scale { std::env::set_var("WINIT_X11_SCALE_FACTOR", scale.to_string()); }
+            std::env::remove_var("WAYLAND_DISPLAY");
+            std::env::set_var("GDK_BACKEND", "x11");
+        }
+    }
+}
+
+/// The main window comes on screen with the host's first content, which shows it
+/// (`apply_window_props`), not with the empty frame before it; or a second after launch when
+/// the host has sent none.
+#[cfg(target_os = "macos")]
+fn hidden_until_content(mut options: rune::WindowOptions, p: &props::Props) -> rune::WindowOptions {
+    if p.visible.is_some() {
+        return options;
+    }
+    options.visible = false;
+    std::thread::spawn(|| {
+        std::thread::sleep(std::time::Duration::from_secs(1));
+        if !windows::MAIN_BOUND.load(std::sync::atomic::Ordering::Acquire)
+            && let Some(app) = services::APP.get()
+        {
+            app.show();
+        }
+    });
+    options
+}
+
+fn main() {
+    trim::init();
+    #[cfg(unix)]
+    block_quit_signals();
+    metrics::mark_process_start();
+    #[cfg(target_os = "linux")]
+    let desktop_fonts = desktop_fonts::start();
+    #[cfg(target_os = "macos")]
+    rune::text::set_fallback_base(Some("Lucida Grande"));
+    #[cfg(all(target_os = "linux", feature = "webview"))]
+    linux_backend();
+    // Electron Stella's Wayland app_id is the root package name, so window rules and docks match both.
+    #[cfg(target_os = "linux")]
+    {
+        rune::set_app_id("stella-v2");
+        // Chromium names the AT-SPI application after argv[0], and the launcher runs Electron's own binary.
+        rune::set_accessibility_app_name("electron");
+        let _ = rune_notify::register(&rune_notify::Identity::new("stella", "Stella"));
+    }
+    // Electron Stella's AppUserModelID (STELLA_WINDOWS_APP_USER_MODEL_ID), taken before any window
+    // opens so the windows group under the launcher's Start-menu shortcut, which also names the toasts.
+    #[cfg(windows)]
+    if rune_notify::adopt(&rune_notify::Identity::new("com.stella.app", "Stella")).is_ok() {
+        // Electron writes its own shortcut for the id with a toast activator class, which then
+        // takes the toasts' clicks: serve that class here, as Electron does, so they reach Stella.
+        std::thread::spawn(|| {
+            for clsid in rune_notify::shortcut_activators() {
+                let _ = rune_notify::serve_activations(&clsid);
+            }
+        });
+    }
+    // Start the TS host before the window and GPU: Bun boots while Rune prewarms the GPU.
+    let boot = spawn_ts();
+    display_watch::start();
+    engine::set_out(boot.to_host);
+    engine::with(|e| {
+        e.rx = Some(boot.rx);
+        e.child = Some(boot.child);
+        e.main_waker = boot.waker;
+    });
+    let w = std::env::var("STELLA_RUNE_W").ok().and_then(|v| v.parse().ok()).unwrap_or(1280.0);
+    let h = std::env::var("STELLA_RUNE_H").ok().and_then(|v| v.parse().ok()).unwrap_or(820.0);
+    let main_props: props::Props = std::env::var("STELLA_RUNE_WINDOW")
+        .ok()
+        .and_then(|j| serde_json::from_str(&j).map_err(|e| eprintln!("stella-engine: STELLA_RUNE_WINDOW: {e}")).ok())
+        .unwrap_or_default();
+    let mut p = main_props.clone();
+    if p.w.is_none() {
+        p.w = Some(props::Size::Pt(w));
+        p.h = Some(props::Size::Pt(h));
+    }
+    if p.title.is_none() {
+        p.title = Some("Stella".into());
+    }
+    let mut spec = windows::app_spec(&p);
+    spec.min_size = p.min_size.map(|[w, h]| (w, h)).or(Some((480.0, 600.0)));
+    // Electron's globalShortcut takes a bare key (Show Stella's Escape discard).
+    let app = App::new(spec).init(|| Win { node: 0, main: true, inputs: Default::default(), bg: None }).keep_running().allow_unmodified_shortcuts();
+    let options = windows::options(&p);
+    #[cfg(target_os = "macos")]
+    let options = hidden_until_content(options, &p);
+    let app = windows::decorate_main(app, &p).window_options(options);
+    #[cfg(target_os = "linux")]
+    let app = {
+        let desktop = desktop_fonts::wait(&desktop_fonts, std::time::Duration::from_millis(250));
+        rune::text::set_fallback_base(desktop.ui_family.as_deref());
+        let scale = std::env::var("WINIT_X11_SCALE_FACTOR").ok().and_then(|s| s.parse().ok()).unwrap_or(1.0);
+        let (mode, why) = desktop_fonts::smoothing(&desktop, scale);
+        eprintln!("stella-engine: text {mode:?} ({why}, system-ui {:?})", desktop.ui_family);
+        app.font_smoothing(mode)
+    };
+    #[cfg(target_os = "macos")]
+    let app = app.font_smoothing(windows::font_smoothing(None));
+    let schemes = std::env::var("STELLA_RUNE_URL_SCHEMES").unwrap_or_else(|_| "stella".into());
+    rune::url_schemes(schemes.split(',').map(str::trim).filter(|s| !s.is_empty()));
+    let app = app.on_open_url(|_s: &mut Win, url: &str, _tx| engine::send(serde_json::json!({ "t": "open-url", "url": url })));
+    let _ = services::APP.set(app.handle());
+    // Electron opens the full window centred in the primary work area (full-window.js) when no
+    // place is given; the system's default would cascade it.
+    let centre = std::cell::Cell::new(p.position.is_none());
+    app.on_window(move |h| {
+        if centre.replace(false) {
+            windows::centre_in_work_area(h);
+        }
+        let h = h.clone();
+        engine::with(|e| {
+            e.main_handle = Some(h.clone());
+            if let Some(n) = e.main_node
+                && let Some(slot) = e.windows.get_mut(&n)
+            {
+                slot.handle = Some(h);
+            }
+        });
+    })
+    .on_frame_encoded(|f| METRICS.lock().unwrap_or_else(|e| e.into_inner()).on_frame(f))
+    .on_frame_presented(|p| METRICS.lock().unwrap_or_else(|e| e.into_inner()).on_presented(p))
+    .on_quit(|_s: &mut Win, _| {
+        if let Some(c) = engine::with(|e| e.child.take()) {
+            end_host(c);
+        }
+    })
+    .run();
+}

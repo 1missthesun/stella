@@ -163,6 +163,80 @@ enum Install {
         return (bin, version)
     }
 
+    /// launcher.json "stellaEngine": {"version", "assets": {<platform>: {"url", "sha256", "member"?}}};
+    /// an asset without "member" is the bare binary, one with it is a zip holding it.
+    static func ensureEngine(paths: LauncherPaths, localBin: String?, progress: (String) -> Void) throws -> (bin: URL, version: String) {
+        let fm = FileManager.default
+        let host = paths.app.appendingPathComponent("packages/desktop-rune/host/main.tsx")
+        guard fm.fileExists(atPath: host.path) else {
+            throw LauncherError("This version of Stella has no Rune app (\(host.path) is missing).")
+        }
+        if let localBin {
+            guard fm.isExecutableFile(atPath: localBin) else { throw LauncherError("\(localBin) is not an executable stella-engine.") }
+            return (URL(fileURLWithPath: localBin), "local")
+        }
+        engineLock.lock()
+        defer { engineLock.unlock() }
+        return try installEngine(paths: paths, progress: progress)
+    }
+
+    private static let engineLock = NSLock()
+
+    /// A first install fetches the engine while dependencies install. It
+    /// starts once the source is verified, since the engine's URL and checksum
+    /// come from that source's launcher.json; ensureEngine waits on
+    /// engineLock for it.
+    static func prefetchEngine(paths: LauncherPaths) {
+        let ready = DispatchSemaphore(value: 0)
+        Thread.detachNewThread {
+            engineLock.lock()
+            ready.signal()
+            defer { engineLock.unlock() }
+            do {
+                _ = try installEngine(paths: paths, progress: { _ in })
+            } catch {
+                log("install: early stella-engine download failed (\(error)); trying again")
+            }
+        }
+        ready.wait()
+    }
+
+    private static func installEngine(paths: LauncherPaths, progress: (String) -> Void) throws -> (bin: URL, version: String) {
+        let fm = FileManager.default
+        let manifest = paths.app.appendingPathComponent("packages/desktop/launcher.json")
+        guard let data = try? Data(contentsOf: manifest),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let engine = json["stellaEngine"] as? [String: Any],
+              let version = engine["version"] as? String,
+              let entry = (engine["assets"] as? [String: Any])?[Pins.platformKey] as? [String: Any],
+              let rawURL = entry["url"] as? String, let url = URL(string: rawURL),
+              let sha = entry["sha256"] as? String
+        else { throw LauncherError("This version of Stella has no Rune engine for \(Pins.platformKey).") }
+        let dir = paths.runtimes.appendingPathComponent("stella-engine-\(version)")
+        let bin = dir.appendingPathComponent("stella-engine")
+        if fm.isExecutableFile(atPath: bin.path) { return (bin, version) }
+        progress("Getting things ready…")
+        log("install: downloading stella-engine \(version) from \(rawURL)")
+        try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+        let downloaded = paths.runtimes.appendingPathComponent(".stella-engine-\(version).download")
+        try Net.download(url, to: downloaded, sha256: sha)
+        try? fm.removeItem(at: bin)
+        if let member = entry["member"] as? String {
+            let staging = paths.runtimes.appendingPathComponent(".stella-engine-\(version).partial")
+            try? fm.removeItem(at: staging)
+            let unzip = try Shell.run("/usr/bin/ditto", ["-x", "-k", downloaded.path, staging.path], env: [:])
+            guard unzip.code == 0 else { throw LauncherError("Could not unpack stella-engine: \(unzip.stderr)") }
+            try fm.moveItem(at: staging.appendingPathComponent(member), to: bin)
+            try? fm.removeItem(at: staging)
+            try? fm.removeItem(at: downloaded)
+        } else {
+            try fm.moveItem(at: downloaded, to: bin)
+        }
+        try fm.setAttributes([.posixPermissions: 0o755], ofItemAtPath: bin.path)
+        log("install: stella-engine \(version) ready")
+        return (bin, version)
+    }
+
     private static func requestedBun(paths: LauncherPaths) -> (String, Pins.Asset)? {
         let manifest = paths.app.appendingPathComponent("packages/desktop/launcher.json")
         guard let data = try? Data(contentsOf: manifest),

@@ -478,18 +478,17 @@ fn diff(old: &[Prim], new: &[Prim], lively: &[[f32; 4]], scrolls: &[Scrolled]) -
         !overlaps(r, p.clip)
     };
     for (i, p) in old.iter().enumerate() {
-        if let (Fate::Gone, Some(&c)) = (fo[i], group_of.get(&ck(p.clip))) {
-            if past(p, slides[c].d) {
-                fo[i] = if slides[c].scroll { Fate::Scrolled } else { Fate::Edge(c) };
-            }
+        if let (Fate::Gone, Some(&c)) = (fo[i], group_of.get(&ck(p.clip)))
+            && past(p, slides[c].d)
+        {
+            fo[i] = if slides[c].scroll { Fate::Scrolled } else { Fate::Edge(c) };
         }
     }
     for (j, p) in new.iter().enumerate() {
-        if let (Fate::New, Some(&c)) = (fnew[j], group_of.get(&ck(p.clip))) {
-            let d = slides[c].d;
-            if past(p, [-d[0], -d[1]]) {
-                fnew[j] = if slides[c].scroll { Fate::Scrolled } else { Fate::Edge(c) };
-            }
+        if let (Fate::New, Some(&c)) = (fnew[j], group_of.get(&ck(p.clip)))
+            && past(p, [-slides[c].d[0], -slides[c].d[1]])
+        {
+            fnew[j] = if slides[c].scroll { Fate::Scrolled } else { Fate::Edge(c) };
         }
     }
 
@@ -1394,8 +1393,8 @@ impl Gpu {
             .clone()
     }
 
-    fn pass(&self, device: &wgpu::Device, enc: &mut wgpu::CommandEncoder, entry: &'static str, format: wgpu::TextureFormat, target: &wgpu::TextureView, bind: &wgpu::BindGroup, draw: (u32, u32)) {
-        let pipe = self.pipe(device, entry, format);
+    fn pass(&self, device: &wgpu::Device, enc: &mut wgpu::CommandEncoder, pipe: (&'static str, wgpu::TextureFormat), target: &wgpu::TextureView, bind: &wgpu::BindGroup, draw: (u32, u32)) {
+        let pipe = self.pipe(device, pipe.0, pipe.1);
         let mut pass = enc.begin_render_pass(&wgpu::RenderPassDescriptor {
             label: Some("swapfx"),
             color_attachments: &[Some(wgpu::RenderPassColorAttachment {
@@ -1421,15 +1420,15 @@ impl Gpu {
             layout: &self.copy_layout,
             entries: &[wgpu::BindGroupEntry { binding: 0, resource: wgpu::BindingResource::TextureView(src) }],
         });
-        self.pass(device, enc, "copy", format, &dst.levels[0], &bind, (3, 1));
+        self.pass(device, enc, ("copy", format), &dst.levels[0], &bind, (3, 1));
         for (i, down) in dst.downs.iter().enumerate() {
-            self.pass(device, enc, "down", format, &dst.levels[i + 1], down, (3, 1));
+            self.pass(device, enc, ("down", format), &dst.levels[i + 1], down, (3, 1));
         }
     }
 
     /// Each pixel's topmost record, where the shapes are this frame.
     fn index(&self, device: &wgpu::Device, enc: &mut wgpu::CommandEncoder, target: &wgpu::TextureView, bind: &wgpu::BindGroup, recs: u32) {
-        self.pass(device, enc, "index", wgpu::TextureFormat::R32Uint, target, bind, (6, recs));
+        self.pass(device, enc, ("index", wgpu::TextureFormat::R32Uint), target, bind, (6, recs));
     }
 
     fn comp_group(&self, device: &wgpu::Device, before: &Mipped, live: &Mipped, index: &wgpu::TextureView, recs: &wgpu::Buffer) -> wgpu::BindGroup {

@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef } from "react";
 import { FullWindow } from "../../desktop-rune/ui/app/FullWindow";
 import { chatAtEnd } from "../../desktop-rune/ui/chat/chat-at-end";
+import { ToastPlacementContext } from "../../desktop-rune/ui/kit/Toast";
 import { usePhoneInsets } from "./phone/insets";
-import { barBase, barSpace } from "./phone/PhoneChrome";
+import { barBase, barSpace, PHONE_TOPBAR_H } from "./phone/PhoneChrome";
 
 /**
  * The phone's window: the shared Stella app (desktop-rune's FullWindow, with the phone's
@@ -24,13 +25,15 @@ export function PhoneRoot() {
   lastKeyboard.current = insets.keyboard;
   const base = barBase(insets);
   const lift = Math.max(0, insets.keyboard - base);
+  // Toasts sit under the status bar and the top bar, across the screen's width.
+  const toastPlace = useMemo(() => ({ top: insets.top + PHONE_TOPBAR_H + 4, left: insets.left + 12, right: insets.right + 12 }), [insets.top, insets.left, insets.right]);
   useEffect(() => {
     document.documentElement.dataset.stellaPhone = "true";
   }, []);
   return (
     <window id="main">
       <col id="phone-safe-area" w="full" h="full" pt={insets.top} pb={rides.current ? base : barSpace(insets)} pl={insets.left} pr={insets.right} y={rides.current ? -lift : 0}>
-        {app}
+        <ToastPlacementContext.Provider value={toastPlace}>{app}</ToastPlacementContext.Provider>
       </col>
     </window>
   );

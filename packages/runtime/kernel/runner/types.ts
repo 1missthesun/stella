@@ -249,6 +249,7 @@ export type PiCloudAgentThreads = {
     requestId: string;
     description: string;
     message: string;
+    model?: string;
     framed?: boolean;
   }) => Promise<"steered" | "resumed">;
   stop: (request: {

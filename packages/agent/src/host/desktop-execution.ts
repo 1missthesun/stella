@@ -8,6 +8,7 @@ import {
 } from "@stella/contracts/turn-plane/placement";
 import { AGENT_MOVE_CLOUD, deviceRefusal, deviceStanding, offlineMoveRefusal, type StellaExecutionHost } from "../stella/execution.ts";
 import type { StellaPlacement } from "../stella/placement.ts";
+import { deviceModelRefusal } from "@stella/contracts/execution-context";
 
 const LIST_TIMEOUT_MS = 15_000;
 
@@ -52,6 +53,7 @@ export function desktopExecution(options: {
   brainMoved?(record: PiBrainRecord): void;
   moveAgent?: StellaExecutionHost["moveAgent"];
   leftBehind?: StellaExecutionHost["leftBehind"];
+  switchBrainModel?: StellaExecutionHost["switchBrainModel"];
   report(error: unknown): void;
 }) {
   const isHere = (target: StellaPlacement): boolean =>
@@ -100,7 +102,9 @@ export function desktopExecution(options: {
     }
     const refusal = deviceRefusal(device, name);
     if (refusal) return { error: refusal };
-    if (needs.claudeCode && device.availability && !device.availability.capabilities.includes("claude-code")) {
+    const unfit = needs.model ? deviceModelRefusal(device, needs.model) : undefined;
+    if (unfit) return { error: unfit };
+    if (!needs.model && needs.claudeCode && device.availability && !device.availability.capabilities.includes("claude-code")) {
       return {
         error: `${name} isn't signed in to Claude Code, so you, on Claude Code, can't run there. Ask the user to sign in to Claude on ${name} (Settings › Claude and ChatGPT there) and try again.`,
       };
@@ -114,6 +118,7 @@ export function desktopExecution(options: {
       const device = listed ? findDeviceDestination(listed, deviceId) : undefined;
       return device ? deviceStanding(device) : undefined;
     },
+    ...(options.switchBrainModel ? { switchBrainModel: options.switchBrainModel } : {}),
     ...(options.moveAgent && options.devices && !options.localOnly
       ? { agentTarget, moveAgent: options.moveAgent, ...(options.leftBehind ? { leftBehind: options.leftBehind } : {}) }
       : {}),

@@ -1013,3 +1013,75 @@ export const resolveRealtimeVoiceId = (
   const stored = prefs.voices?.[underlyingProvider]?.trim();
   return stored && stored.length > 0 ? stored : fallback;
 };
+
+const CONVERSATION_AGENT_KEYS = ["orchestrator", "general"] as const;
+const REASONING_SUFFIX = /^(.+):(low|medium|high|xhigh|max)$/u;
+
+/**
+ * The change that puts Stella's conversation on `pick` (a spawn_agent model string such as "claude-code/opus:high",
+ * "codex/<model>", "antigravity/<model>" or "stella/<model>"), as the app's model picker would make it, so the picker
+ * and the account's model follow. Picks on Claude Code switch the engine; every other pick runs on Stella's own loop.
+ */
+export const conversationModelPatch = (
+  prefs: Pick<
+    LocalModelPreferencesSnapshot,
+    "modelOverrides" | "stellaConversationModelOverrides" | "reasoningEfforts" | "stellaConversationReasoningEfforts" | "agentRuntimeEngine"
+  >,
+  pick: string,
+): Partial<LocalModelPreferencesSnapshot> => {
+  const suffixed = REASONING_SUFFIX.exec(pick.trim());
+  const reference = (suffixed?.[1] ?? pick).trim();
+  const effort = suffixed?.[2] as ReasoningEffort | undefined;
+  const claudeCode = /^claude-code(?:\/(.+))?$/u.exec(reference);
+  const stellaOverrides = { ...prefs.stellaConversationModelOverrides };
+  const stellaEfforts = { ...prefs.stellaConversationReasoningEfforts };
+  if (claudeCode) {
+    if (prefs.agentRuntimeEngine === "default") {
+      for (const key of CONVERSATION_AGENT_KEYS) {
+        const current = prefs.modelOverrides[key];
+        if (current && !current.startsWith("chatgpt/")) stellaOverrides[key] = current;
+        else delete stellaOverrides[key];
+        const currentEffort = prefs.reasoningEfforts[key];
+        if (currentEffort) stellaEfforts[key] = currentEffort;
+      }
+    }
+    const efforts = { ...prefs.reasoningEfforts };
+    for (const key of CONVERSATION_AGENT_KEYS) delete efforts[key];
+    return {
+      agentRuntimeEngine: "claude_code_local",
+      claudeCodeModel: claudeCode[1]?.trim() || DEFAULT_CLAUDE_CODE_MODEL,
+      reasoningEfforts: efforts,
+      stellaConversationModelOverrides: stellaOverrides,
+      stellaConversationReasoningEfforts: stellaEfforts,
+      ...(effort ? { claudeCodeReasoningEffort: effort } : {}),
+    };
+  }
+  const slash = reference.indexOf("/");
+  const provider = slash > 0 ? reference.slice(0, slash).toLowerCase() : "";
+  const model = provider === "codex" || provider === "codex-cli" ? `chatgpt/${reference.slice(slash + 1)}` : reference;
+  const overrides = { ...prefs.modelOverrides };
+  const efforts = { ...prefs.reasoningEfforts };
+  const stellaDefault = model.toLowerCase() === "stella";
+  for (const key of CONVERSATION_AGENT_KEYS) {
+    if (stellaDefault) {
+      delete overrides[key];
+      delete stellaOverrides[key];
+    } else {
+      overrides[key] = model;
+      stellaOverrides[key] = model;
+    }
+    if (effort) {
+      efforts[key] = effort;
+      stellaEfforts[key] = effort;
+    } else if (prefs.agentRuntimeEngine !== "default" && stellaEfforts[key]) {
+      efforts[key] = stellaEfforts[key]!;
+    }
+  }
+  return {
+    agentRuntimeEngine: "default",
+    modelOverrides: overrides,
+    reasoningEfforts: efforts,
+    stellaConversationModelOverrides: stellaOverrides,
+    stellaConversationReasoningEfforts: stellaEfforts,
+  };
+};

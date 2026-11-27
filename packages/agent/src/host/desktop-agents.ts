@@ -28,6 +28,7 @@ export function desktopAgentsHost(
     beginAgentRun?: StellaAgentsHost["beginAgentRun"];
     endAgentRun?: StellaAgentsHost["endAgentRun"];
     ensureModel?: StellaAgentsHost["ensureModel"];
+    fitModel?: StellaAgentsHost["fitModel"];
     agentModel?: StellaAgentsHost["agentModel"];
     engine?: StellaAgentsHost["engine"];
     deliverReport?: StellaAgentsHost["deliverReport"];
@@ -50,6 +51,7 @@ export function desktopAgentsHost(
     ...(options.beginAgentRun ? { beginAgentRun: options.beginAgentRun } : {}),
     ...(options.endAgentRun ? { endAgentRun: options.endAgentRun } : {}),
     ...(options.ensureModel ? { ensureModel: options.ensureModel } : {}),
+    ...(options.fitModel ? { fitModel: options.fitModel } : {}),
     ...(options.agentModel ? { agentModel: options.agentModel } : {}),
     ...(options.engine ? { engine: options.engine } : {}),
     ...(options.deliverReport ? { deliverReport: options.deliverReport } : {}),

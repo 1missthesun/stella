@@ -834,6 +834,7 @@ export class StellaRuntimeHost {
             "engine-sign-ins",
             "email-page",
             "chat-failover",
+            "agent-model-switch",
             ...(claudeCode ? (["claude-code"] as const) : []),
             ...(chatGpt ? (["chatgpt"] as const) : []),
             ...(antigravity ? (["antigravity"] as const) : []),

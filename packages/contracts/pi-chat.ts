@@ -149,7 +149,9 @@ export type PiChatEvent =
   | { type: "remote_turns"; turns: PiRemoteTurn[] }
   | { type: "brain"; brain: PiChatBrainResult }
   | { type: "send_failed"; requestId: string; message: string }
-  | { type: "send_moved"; requestId: string; userMessageId: string };
+  | { type: "send_moved"; requestId: string; userMessageId: string }
+  /** Stella put this conversation on another model (switch_to); the app's model picker follows. */
+  | { type: "model_picked"; pick: string };
 
 export type PiRemoteTurn = {
   turnId: string;

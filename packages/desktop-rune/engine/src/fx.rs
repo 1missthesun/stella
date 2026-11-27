@@ -548,6 +548,14 @@ fn source_group(eng: &crate::engine::Engine, key: &str) -> Option<String> {
     })
 }
 
+/// `own` at its own size and radius, moved just inside `source` where it's nearest: where a glass
+/// rises out of a larger member of its group (a button out of the composer) and sinks back.
+fn tucked(source: Shape, own: Shape) -> Shape {
+    let (s, o) = (source.rect, own.rect);
+    let fit = |at: f32, len: f32, lo: f32, room: f32| if len >= room { lo + (room - len) * 0.5 } else { at.clamp(lo, lo + room - len) };
+    Shape::rounded(fit(o.x, o.w, s.x, s.w), fit(o.y, o.h, s.y, s.h), o.w, o.h, own.radius)
+}
+
 fn mix_shape(a: Shape, b: Shape, t: f32) -> Shape {
     let m = |x: f32, y: f32| x + (y - x) * t;
     let (ra, rb) = (a.rect, b.rect);
@@ -687,13 +695,15 @@ impl Compositor<Win> for Comp {
                                                 m.from = from;
                                             }
                                             let at = if settled { m.target } else { m.at(now).0 };
+                                            let kin = group.is_some() && source_group(eng, &m.key) == *group;
                                             // Out of a member of its own glass group it comes out of that glass (the
                                             // union pinches it off), so there's nothing to fade.
-                                            if group.is_none() || source_group(eng, &m.key) != *group {
+                                            if !kin {
                                                 alpha = morph_alpha(at);
                                             }
                                             moving |= !settled;
-                                            shape = mix_shape(m.from, shape, at);
+                                            let from = if kin { tucked(m.from, shape) } else { m.from };
+                                            shape = mix_shape(from, shape, at);
                                             lens = mix_lens(&m.from_lens.unwrap_or(lens), &lens, at.clamp(0.0, 1.0));
                                         }
                                     }

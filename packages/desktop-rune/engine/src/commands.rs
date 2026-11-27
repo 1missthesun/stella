@@ -96,6 +96,7 @@ pub fn route(v: Value) {
         "media.probe" => crate::media::probe(rid, &v),
         "views.start" | "views.deliver" | "views.stop" | "views.pause" | "views.resume" => crate::views::command(&cmd, rid, &v),
         "location.get" => crate::location::command(rid, &v),
+        c if c.starts_with("p2p.") => crate::p2p::command(c, rid, &v),
         "views.frame" => {
             crate::views::want_frame();
             reply(rid, Ok(Value::Null));

@@ -909,68 +909,6 @@
         "discard": "Отменить"
       },
       "tagline": "Говорите и рисуйте, чтобы показать Stella, что вы имеете в виду."
-    },
-    "welcomeDemos": {
-      "play": "Воспроизвести демонстрацию",
-      "replay": "Посмотреть ещё раз",
-      "errands": {
-        "title": "Короткая экскурсия",
-        "tablist": "Демонстрации возможностей",
-        "chapters": {
-          "errands": {
-            "word": "Поручения",
-            "title": "Попросите один раз. Считайте, что сделано.",
-            "caption": "Я нахожу нужное место, заполняю форму и добавляю в календарь, точно так же, как сделали бы вы."
-          },
-          "shopping": {
-            "word": "Покупки",
-            "title": "Я могу покупать, с вашего согласия.",
-            "caption": "Я нахожу товар и довожу до оформления. Вы подтверждаете сумму, а я размещаю заказ."
-          },
-          "work": {
-            "word": "Работа",
-            "title": "Настоящие файлы. Несколько задач сразу.",
-            "caption": "Я работаю в настоящих приложениях на этом компьютере и могу выполнять больше одной задачи одновременно."
-          },
-          "build": {
-            "word": "Создание",
-            "title": "Скажите. Я сделаю.",
-            "caption": "Приложения и сайты на заказ. Опишите простыми словами, и я создам, запущу и выложу в интернет."
-          },
-          "routines": {
-            "word": "Рутины",
-            "title": "Попросите один раз. Это будет происходить каждый день.",
-            "caption": "Запланируйте что угодно, и я сделаю это вовремя, даже пока вы спите."
-          }
-        }
-      },
-      "customize": {
-        "title": "Я могу менять саму себя",
-        "body": "Не хватает функции или хочется, чтобы что-то работало иначе? Просто попросите. Я перепишу собственный код, дам вам его попробовать, а вы решите, оставить ли изменение.",
-        "hint": "Изменения остаются на этом компьютере.",
-        "steps": {
-          "ask": {
-            "title": "Попросите",
-            "body": "Опишите изменение простыми словами."
-          },
-          "preview": {
-            "title": "Предпросмотр",
-            "body": "Задача создаст его и откроет живой предпросмотр."
-          },
-          "update": {
-            "title": "Обновить",
-            "body": "Один клик, чтобы применить. Отменить можно в любой момент."
-          }
-        }
-      },
-      "memory": {
-        "title": "Один разговор",
-        "titleChatbot": "Вам это знакомо",
-        "bodyChatbot": "Каждый раз новый чат, боковая панель, полная старых, и никакой памяти о том, что вы говорили на прошлой неделе.",
-        "titleStella": "Со мной это один разговор",
-        "bodyStella": "Никаких новых чатов и веток. Всё, что вы мне когда-либо говорили, в одном месте, поэтому, когда вы спрашиваете о прошлой неделе, я нахожу это.",
-        "showStella": "Теперь спросите меня"
-      }
     }
   },
   "global": {
@@ -1836,6 +1774,43 @@
   },
   "onboarding": {
     "chat": {
+      "composerPlaceholder": "Or just ask me something to get started",
+      "extras": {
+        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
+        "accessibilityTitle": "Accessibility",
+        "enable": "Enable",
+        "enabled": "Enabled",
+        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionOpened": "Opened",
+        "extensionTitle": "Stella for Chrome",
+        "getExtension": "Get extension",
+        "hint": "All of this lives in Settings too.",
+        "restart": "Restart Stella",
+        "restartHint": "Screen access needs a quick restart to take effect.",
+        "screenDesc": "So I can see the screen when you ask me to.",
+        "screenTitle": "Screen Recording",
+        "settledTitle": "Extras",
+        "heading": "Дополнительно, по желанию",
+        "lead": "Ничего из этого не обязательно, но каждое делает меня полезнее.",
+        "start": "Начать чат"
+      },
+      "gmail": {
+        "body": "Находите письма, догоняйте переписки и готовьте черновики ответов, просто попросив.",
+        "connect": "Подключить Gmail",
+        "connected": "Подключено",
+        "connecting": "Ждём Google…",
+        "error": "Не удалось подключить Gmail. Попробуйте ещё раз или пропустите пока.",
+        "title": "Gmail"
+      },
+      "messages": {
+        "extras": "Almost done. A little housekeeping, then we start.",
+        "signin": "Привет, я Stella. Сначала выберите, как я думаю: подписка Claude или ChatGPT, которая у вас уже есть, свой ключ или аккаунт Stella."
+      },
+      "progress": "Ход настройки",
+      "replies": {
+        "signinDone": "Готово."
+      },
+      "send": "Send",
       "signin": {
         "body": "Достаточно любого из вариантов. Остальные можно добавить позже.",
         "claudeCliMissing": "Сначала установите Claude Code, затем попробуйте ещё раз.",
@@ -1871,7 +1846,8 @@
         "settledNone": "ИИ пока не выбран",
         "settledNoneDesc": "Войдите или подключите подписку в любой момент, чтобы начать общение.",
         "fineOwnPlan": "ChatGPT и Claude Code используют вашу собственную подписку OpenAI или Anthropic. Это можно изменить в любой момент в Настройках."
-      }
+      },
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "Используя Stella, вы соглашаетесь с нашими {terms} и {privacy}.",
     "privacyPolicy": "Политикой конфиденциальности",
@@ -2458,6 +2434,11 @@
         "twinkle": "Мерцание"
       },
       "title": "Звук сообщений"
+    },
+    "onboardingReplay": {
+      "action": "Replay",
+      "description": "Пройти знакомство заново. Ваши данные сохранятся.",
+      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3510,9 +3491,11 @@
     },
     "onboarding": {
       "link": "Есть свой сервер Stella? Подключите его",
+      "prose": "Вы подключены к {name} как владелец. Теперь выберите, чем я буду думать: ваш тариф Claude или ChatGPT или ваш собственный API-ключ.",
       "title": "Подключено к {name}",
       "body": "Вы вошли как владелец. Выберите, чем думает Stella. Достаточно одного варианта.",
-      "bodyOptional": "Вы вошли как владелец. На этом сервере есть свои модели, так что это необязательно: можно также использовать тариф Claude или ChatGPT или API-ключ."
+      "bodyOptional": "Вы вошли как владелец. На этом сервере есть свои модели, так что это необязательно: можно также использовать тариф Claude или ChatGPT или API-ключ.",
+      "settled": "Подключено к {name}"
     }
   },
   "contextMenu": {
@@ -4054,21 +4037,6 @@
     "phoneApp": {
       "title": "Stella есть и на вашем телефоне",
       "detail": "Скачайте приложение, чтобы писать Stella и следить за задачами, когда вы не за этим компьютером."
-    }
-  },
-  "welcome": {
-    "actions": {
-      "getExtension": "Установить Stella for Chrome",
-      "connectGmail": "Подключить Gmail",
-      "gmailWaiting": "Ждём Google…",
-      "gmailRetry": "Повторить с Gmail",
-      "watchErrands": "Посмотреть в деле",
-      "signIn": "Войти",
-      "getPhoneApp": "Скачать приложение для телефона",
-      "watchMemory": "Посмотреть как",
-      "connectPlan": "Подключить подписку",
-      "changeLook": "Изменить мой вид",
-      "watchCustomize": "Посмотреть, как меняется"
     }
   }
 }

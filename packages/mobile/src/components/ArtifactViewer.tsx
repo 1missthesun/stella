@@ -77,6 +77,8 @@ import { DeviceFolderView, formatFileSize } from "./DeviceFolderView";
 import { stellaFileChatArtifact } from "../lib/stella-file-links";
 import { fetchWithinDeadline } from "../lib/cloud-request";
 import { loadDriveHtml } from "../lib/drive-html";
+import { MEET_STELLA_GUIDE_PATH } from "@stella/contracts/welcome-message";
+import { MEET_STELLA_GUIDE_HTML } from "@stella/contracts/meet-stella-guide";
 import { transferBudgetMs } from "@stella/contracts/request-deadline";
 import {
   embedRelativeHtmlAssets,
@@ -754,8 +756,9 @@ export function ArtifactViewerContent({
     }),
     [canvas],
   );
+  // The guide every app carries isn't the person's own canvas to share.
   const canvasShare = useCanvasShareToggle(
-    canvas ? canvasSlugFor(canvas.slug, canvas.filePath) : null,
+    canvas && canvas.filePath !== MEET_STELLA_GUIDE_PATH ? canvasSlugFor(canvas.slug, canvas.filePath) : null,
     loaded?.kind === "canvas-html" ? loaded.html : null,
     canvas?.title,
     canvas?.driveBacked ? canvas.filePath.replace(/^\/+/u, "") : null,
@@ -975,6 +978,12 @@ export function ArtifactViewerContent({
         if (filePath && /^(?:file|https?|data):/i.test(filePath)) {
           return { kind: "image" as const, uri: filePath };
         }
+      }
+      if (payload.kind === "canvas-html" && payload.filePath === MEET_STELLA_GUIDE_PATH) {
+        return {
+          kind: "canvas-html" as const,
+          html: prepareDocumentHtml(MEET_STELLA_GUIDE_HTML),
+        };
       }
       if (payload.kind === "canvas-html" && payload.driveBacked) {
         const html = await loadDriveHtml(payload.filePath, controller.signal);

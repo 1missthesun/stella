@@ -20,10 +20,15 @@ const DASH: u64 = 1 << 8;
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 const REPLACEMENT: u64 = 1 << 9;
 
-#[derive(Default, PartialEq)]
-struct Field {
+#[derive(Clone, Default, PartialEq)]
+pub struct Field {
     checking: u64,
     selected: Option<String>,
+    /// The field's key, its text and its selection, UTF-8 bytes `a..b` (`a == b` for a caret);
+    /// none when secure.
+    pub key: String,
+    pub text: String,
+    pub range: (usize, usize),
 }
 
 thread_local! {
@@ -49,7 +54,8 @@ pub fn note(s: &Win, tx: &Tx) {
                     };
                     let (a, b) = (st.edit.anchor.min(st.edit.focus), st.edit.anchor.max(st.edit.focus));
                     let selected = st.edit.text.get(a..b).filter(|t| !t.is_empty() && !props.secure).map(str::to_owned);
-                    Field { checking, selected }
+                    let text = if props.secure { String::new() } else { st.edit.text.clone() };
+                    Field { checking, selected, key: key.to_string(), text, range: if props.secure { (0, 0) } else { (a, b) } }
                 })
             })
         })
@@ -71,6 +77,11 @@ pub fn note(s: &Win, tx: &Tx) {
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 fn checking(window: u32) -> u64 {
     FIELDS.with(|f| f.borrow().get(&window).map_or(0, |f| f.checking))
+}
+
+/// The focused field in `window`, for Look Up.
+pub fn field(window: u32) -> Option<Field> {
+    FIELDS.with(|f| f.borrow().get(&window).cloned())
 }
 
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]

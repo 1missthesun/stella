@@ -180,7 +180,7 @@ fn note_state(node: u32, dark: bool, maximized: bool, full: bool, accent: String
 }
 
 pub fn on_key(s: &mut Win, ev: &rune::KeyEvent, tx: &mut Tx) -> bool {
-    if crate::look_up::is_shortcut(ev) && crate::look_up::show(s.node) {
+    if crate::look_up::is_shortcut(ev) && (crate::look_up::show(s.node) || crate::look_up::show_field(s, tx)) {
         return true;
     }
     let keys = engine::read(|e| e.tree.get(s.node).map(|n| n.props.keys.clone()).unwrap_or_default());

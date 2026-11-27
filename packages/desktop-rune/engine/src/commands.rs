@@ -287,6 +287,9 @@ pub fn run(st: &mut Win, tx: &mut Tx, rid: Option<u64>, v: Value) {
     let tkey = target(&v).and_then(key_of);
     let r: Result<Value, String> = (|| {
         match cmd.as_str() {
+            "lookUpAt" => {
+                crate::look_up::show_field_at(st, tx, [f(&v, "x").unwrap_or(f32::NAN), f(&v, "y").unwrap_or(f32::NAN)]);
+            }
             "bg" => {
                 st.bg = Some(v.get("color").and_then(|c| c.as_str()).and_then(crate::props::parse_color).ok_or("bg: needs a color")?);
             }

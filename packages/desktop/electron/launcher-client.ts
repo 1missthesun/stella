@@ -55,6 +55,13 @@ const handleMessage = (message: Record<string, unknown>) => {
   }
   if (message.op === "quit") {
     app.quit();
+    return;
+  }
+  if (message.op === "focus") {
+    // Stella was opened again while it runs: the same path as a second instance
+    // (it shows and focuses the window). The answer keeps the launcher's window down.
+    app.emit("second-instance", { preventDefault() {} }, [], process.cwd(), {});
+    send({ op: "focused" });
   }
 };
 

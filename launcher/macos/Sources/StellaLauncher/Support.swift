@@ -295,11 +295,21 @@ enum Net {
 
     /// GitHub release downloads answer 502/504 or time out for minutes at a
     /// time, so a GitHub asset is fetched from Stella's mirror of it first.
+    /// STELLA_LAUNCHER_MIRROR_URL points the mirror elsewhere (a test server), or turns it
+    /// off with "off"; by default it is the releases bucket.
+    static var mirrorBase: String? {
+        let raw = ProcessInfo.processInfo.environment["STELLA_LAUNCHER_MIRROR_URL"]?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if raw == "off" { return nil }
+        let base = raw.isEmpty ? Deployment.releasesURL : raw
+        return base.hasSuffix("/") ? String(base.dropLast()) : base
+    }
+
     static func download(_ url: URL, to destination: URL, sha256 expected: String) throws {
         let github = "https://github.com/"
         var sources = [url]
-        if url.absoluteString.hasPrefix(github),
-           let mirror = URL(string: "\(Deployment.releasesURL)/runtimes/github/" + url.absoluteString.dropFirst(github.count)) {
+        if url.absoluteString.hasPrefix(github), let base = mirrorBase,
+           let mirror = URL(string: "\(base)/runtimes/github/" + url.absoluteString.dropFirst(github.count)) {
             sources.insert(mirror, at: 0)
         }
         var lastError: Error = LauncherError("Download of \(url.absoluteString) failed.")
@@ -310,7 +320,10 @@ enum Net {
             }
             for source in sources {
                 do {
+                    let started = Date()
                     try downloadOnce(source, to: destination, sha256: expected)
+                    let size = ((try? FileManager.default.attributesOfItem(atPath: destination.path)[.size]) as? NSNumber)?.intValue ?? 0
+                    log("install: \(destination.lastPathComponent) from \(source.host ?? "?") (\(size / 1_000_000) MB, sha256 checked) in \(String(format: "%.1f", Date().timeIntervalSince(started)))s")
                     return
                 } catch {
                     lastError = error

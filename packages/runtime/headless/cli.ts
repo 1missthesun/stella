@@ -19,6 +19,7 @@ type CliOptions = {
   workerEntryPath: string | null;
   authToken: string | null;
   backendUrl: string | null;
+  desktopUserData: string | null;
   timeoutMs: number;
   help: boolean;
 };
@@ -44,6 +45,9 @@ Options:
                             packages/runtime/worker/entry.ts).
   --auth-token <token>      Stella auth token (or env STELLA_AUTH_TOKEN).
   --backend-url <url>       Stella backend URL (default: desktop-ui .env).
+  --desktop-user-data <dir> A desktop's Electron user-data dir: its sign-in
+                            mints the auth token (unless --auth-token) and
+                            its OS-encrypted storage unlocks saved model keys.
   --timeout <seconds>       Max wall time for the turn (default: 600).
   -h, --help                Show this help.
 
@@ -62,6 +66,7 @@ const parseArgs = (argv: string[]): CliOptions => {
     workerEntryPath: null,
     authToken: null,
     backendUrl: null,
+    desktopUserData: null,
     timeoutMs: 600_000,
     help: false,
   };
@@ -115,6 +120,9 @@ const parseArgs = (argv: string[]): CliOptions => {
         break;
       case "--backend-url":
         options.backendUrl = next(++i);
+        break;
+      case "--desktop-user-data":
+        options.desktopUserData = path.resolve(next(++i));
         break;
       case "--timeout": {
         const seconds = Number.parseFloat(next(++i));
@@ -199,10 +207,26 @@ const main = async (): Promise<void> => {
     options.workerEntryPath ??
     (existsSync(sourceWorkerEntry) ? sourceWorkerEntry : null);
 
-  const authToken =
+  let authToken =
     options.authToken?.trim() || process.env.STELLA_AUTH_TOKEN?.trim() || null;
-  const backendUrl =
+  let backendUrl =
     options.backendUrl ?? readDesktopUiBackendUrl(paths.stellaAppDir);
+  if (options.desktopUserData) {
+    const { useDesktopProtectedStorage, mintDesktopSessionToken } = await import(
+      "./desktop-session.js"
+    );
+    useDesktopProtectedStorage(options.desktopUserData);
+    if (!authToken) {
+      const session = await mintDesktopSessionToken({
+        userData: options.desktopUserData,
+        serverId: process.env.STELLA_LAUNCHER_SERVER_ID?.trim() || null,
+        backendUrl: options.backendUrl,
+      });
+      backendUrl = session.backendUrl ?? backendUrl;
+      if (session.ok) authToken = session.authToken;
+      else log(`desktop sign-in: ${session.reason}`);
+    }
+  }
 
   if (options.mode !== "list-models" && !options.prompt.trim()) {
     throw new Error("A prompt is required (use --prompt or --help).");

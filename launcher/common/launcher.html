@@ -584,7 +584,7 @@
           <div class="line failed-title"><span id="failed-title">Stella couldn’t start</span></div>
           <button class="control pill primary" id="retry" data-default>Try again</button>
           <div class="links">
-            <button class="link" id="failed-recover">Return to last working version</button>
+            <button class="link" id="failed-recover">Undo last change</button>
             <button class="link" id="failed-details">Details</button>
           </div>
         </div>
@@ -675,6 +675,7 @@
           progressTo: 0,
           title: "",
           offerRecovery: true,
+          canRepair: false,
           reason: "",
           output: [],
           hasKnownGood: false,
@@ -683,6 +684,7 @@
           moreChanges: 0,
         };
         let confirmingReinstall = false;
+        let primaryAction = "start";
 
         let shown = 0;
         let stepFrom = 0;
@@ -794,8 +796,14 @@
           tickBar();
           $("reason").textContent = state.reason;
           $("failed-title").textContent = state.title || "Stella couldn’t start";
-          $("failed-recover").hidden = state.offerRecovery === false;
-          $("failed-recover").textContent = state.hasKnownGood ? "Return to last working version" : "Reinstall";
+          // A start failure offers Repair (one pass) with Undo beside it; once Repair is spent,
+          // Undo is the button. Other failures (a download) offer Try again.
+          const startFailure = state.offerRecovery !== false;
+          const undoLabel = state.hasKnownGood ? "Undo last change" : "Reinstall";
+          primaryAction = !startFailure ? "start" : state.canRepair ? "repair" : state.hasKnownGood ? "return" : "reinstall";
+          $("retry").textContent = !startFailure ? "Try again" : state.canRepair ? "Repair" : undoLabel;
+          $("failed-recover").hidden = !startFailure || !state.canRepair;
+          $("failed-recover").textContent = undoLabel;
           $("version").textContent = state.version || "—";
 
           $("return").disabled = busy || !state.hasKnownGood;
@@ -818,7 +826,7 @@
 
         const act = (action) => post({ action });
         $("start").onclick = () => act("start");
-        $("retry").onclick = () => act("start");
+        $("retry").onclick = () => act(primaryAction);
         $("shutdown").onclick = () => act("shutdown");
         $("failed-recover").onclick = () => act(state.hasKnownGood ? "return" : "reinstall");
         $("failed-details").onclick = () => showSettings(true);

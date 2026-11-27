@@ -53,6 +53,36 @@ const NAMESPACE_BACKENDS = {
 };
 const backend = option("backend", NAMESPACE_BACKENDS[namespace]);
 
+// The launchers fetch the Bun a tree's launcher.json asks for from Stella's R2
+// mirror first (runtimes/github/<GitHub path>), falling back to GitHub. A
+// publish mirrors any it lacks; that failing costs speed, not the release.
+const MIRROR_BASE = "https://pub-a319aaada8144dc9be5a83625033769c.r2.dev/runtimes/github/";
+const ensureBunMirrored = async (dir) => {
+  const assets = Object.values(
+    JSON.parse(readFileSync(path.join(dir, "packages/desktop/launcher.json"), "utf8")).bun?.assets ?? {},
+  );
+  const missing = [];
+  for (const { url } of assets) {
+    if (!url?.startsWith("https://github.com/")) continue;
+    const mirror = MIRROR_BASE + url.slice("https://github.com/".length);
+    const head = await fetch(mirror, { method: "HEAD", signal: AbortSignal.timeout(30_000) }).catch(() => null);
+    if (!head?.ok) missing.push(url);
+  }
+  if (!missing.length) {
+    console.log(`Bun: all ${assets.length} launcher.json assets are on the R2 mirror.`);
+    return;
+  }
+  console.log(`Bun: mirroring ${missing.length} launcher.json asset(s) to R2: ${missing.join(", ")}`);
+  const mirrored = spawnSync("node", ["scripts/mirror-runtimes.mjs", "--launcher-only"], {
+    cwd: repoRoot,
+    stdio: "inherit",
+  });
+  if (mirrored.status !== 0) {
+    console.warn("WARNING: mirroring Bun to R2 failed; launchers will download it from GitHub until it is mirrored " +
+      "(node scripts/mirror-runtimes.mjs --launcher-only).");
+  }
+};
+
 const announce = async (expected) => {
   if (!backend) {
     console.log(`No backend follows ${namespace}; pass --backend <url> to tell its desktops.`);
@@ -212,6 +242,7 @@ try {
     rmSync(workDir, { recursive: true, force: true });
     process.exit(0);
   }
+  await ensureBunMirrored(workDir);
 
   let upstream = wrangler(["repos", "get", UPSTREAM_REPO, "--namespace", namespace]);
   if (!upstream.ok) {

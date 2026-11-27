@@ -12,6 +12,8 @@ struct LauncherViewState {
     var progressTo = 0.0
     var title = ""
     var offerRecovery = true
+    /// Repair is offered once per launcher run; after it, Undo is the button.
+    var canRepair = false
     var reason = ""
     var output: [String] = []
     var hasKnownGood = false
@@ -22,7 +24,7 @@ struct LauncherViewState {
     static let shownChanges = 200
 
     var json: [String: Any] {
-        ["platform": "macos", "phase": phase.rawValue, "status": status, "title": title, "offerRecovery": offerRecovery, "reason": reason,
+        ["platform": "macos", "phase": phase.rawValue, "status": status, "title": title, "offerRecovery": offerRecovery, "canRepair": canRepair, "reason": reason,
          "progress": phase == .starting ? progress : 0, "progressTo": phase == .starting ? progressTo : 0,
          "output": output, "hasKnownGood": hasKnownGood, "version": version,
          "changes": changes.prefix(Self.shownChanges).map { ["path": $0.path, "kind": $0.kind] },
@@ -32,6 +34,7 @@ struct LauncherViewState {
 
 enum LauncherCommand {
     case start
+    case repair
     case returnToKnownGood
     case reinstall
     case acceptOutsideChanges
@@ -65,6 +68,14 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
     init(logs: URL, captureDir: URL?) {
         self.logs = logs
         self.captureDir = captureDir
+    }
+
+    /// Opening Stella again while it runs: Stella comes to the front, not this window.
+    func reopen(activateStella: @escaping () -> Bool) {
+        DispatchQueue.main.async { [self] in
+            if state.phase == .running, activateStella() { return }
+            apply(.front)
+        }
     }
 
     func update(show: Show = .keep, _ change: @escaping (inout LauncherViewState) -> Void) {
@@ -260,6 +271,8 @@ final class LauncherWindow: NSObject, WKScriptMessageHandler, NSWindowDelegate {
             reveal(index)
         case "start" where state.phase == .idle || state.phase == .failed:
             choose(.start, "Starting Stella…", to: 0.05)
+        case "repair" where state.phase == .failed && state.canRepair:
+            choose(.repair, "Repairing Stella…", to: 0.9)
         case "return" where waiting:
             choose(.returnToKnownGood, "Restoring the last working version…", to: 0.3)
         case "reinstall" where waiting:

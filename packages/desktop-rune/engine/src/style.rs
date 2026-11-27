@@ -401,6 +401,7 @@ thread_local! {
 }
 
 /// A keyframed loop. `at` is a fraction of `period` (0..1), or seconds when any exceeds 1.
+/// It repeats unless `times` is 1.
 /// Rune scales uniformly: `scale`, else the mean of `scaleX`/`scaleY`.
 fn sequence(e: El, l: &crate::props::LoopP) -> El {
     if l.frames.len() < 2 {
@@ -447,7 +448,13 @@ fn sequence(e: El, l: &crate::props::LoopP) -> El {
         s.finish()
     };
     let frames: &'static [rune::Beat] = SEQUENCES.with(|m| *m.borrow_mut().entry(h).or_insert_with(|| Box::leak(beats.into_boxed_slice())));
-    let mut seq = rune::Sequence::new(frames).repeating();
+    // `times: 1` plays once and holds the last frame (CSS `animation-fill-mode: forwards`), from
+    // whenever the loop first appears on the element, so a one-shot entrance can start on an
+    // element that is already drawn. Anything else repeats.
+    let mut seq = rune::Sequence::new(frames);
+    if l.times != Some(1) {
+        seq = seq.repeating();
+    }
     if let Some(d) = l.delay {
         seq = seq.delay(d as f64);
     }

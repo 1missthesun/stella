@@ -361,7 +361,7 @@ export const createRunnerContext = ({
       );
       return { threadId: started.threadId, waitingForDevice: started.waitingForDevice === true };
     },
-    message: async ({ conversationId, threadId, requestId, message, framed }) => {
+    message: async ({ conversationId, threadId, requestId, message, framed, model }) => {
       if (!backend.client() || !isCloudSignedIn()) {
         throw new Error("Sign in to Stella to message agents running in the cloud.");
       }
@@ -373,6 +373,7 @@ export const createRunnerContext = ({
           text: message,
           from: { threadId: conversationId, label: "Stella" },
           ...(framed ? { framed } : {}),
+          ...(model ? { model } : {}),
         }))(),
         AGENT_MESSAGE_TIMEOUT_MS,
         () => new Error("Stella's cloud did not answer, so the message may not have been delivered."),

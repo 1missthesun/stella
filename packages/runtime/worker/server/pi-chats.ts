@@ -19,6 +19,7 @@ import {
   getReasoningEffort,
   loadLocalPreferences,
   updateLocalModelPreferences,
+  conversationModelPatch,
 } from "@stella/node-shared/preferences/local-preferences.js";
 import {
   getAccessibleLocalLlmApiKey,
@@ -214,7 +215,7 @@ const cloudAgentThreadsFor = (
         ...(parentThreadId ? { parentThreadId } : {}),
         ...(workspace ? { workspace } : {}),
       }),
-    message: async ({ key, threadId, description, message, framed }) =>
+    message: async ({ key, threadId, description, message, framed, model }) =>
       await threads().message({
         conversationId,
         threadId,
@@ -222,6 +223,7 @@ const cloudAgentThreadsFor = (
         description,
         message,
         ...(framed ? { framed } : {}),
+        ...(model ? { model } : {}),
       }),
     stop: async (threadId) => await threads().stop({ conversationId, threadId, requestId: requestId(`stop:${threadId}:${Date.now()}`) }),
   };
@@ -249,7 +251,7 @@ const deviceAgentThreadsFor = (
         ...(model ? { model } : {}),
         ...(parentThreadId ? { parentThreadId } : {}),
       }),
-    message: async ({ key, threadId, description, message, framed }) =>
+    message: async ({ key, threadId, description, message, framed, model }) =>
       await threads().message({
         conversationId,
         threadId,
@@ -257,6 +259,7 @@ const deviceAgentThreadsFor = (
         description,
         message,
         ...(framed ? { framed } : {}),
+        ...(model ? { model } : {}),
       }),
     stop: async (threadId) => await threads().stop({ conversationId, threadId, requestId: requestId(`stop:${threadId}:${Date.now()}`) }),
   };
@@ -571,13 +574,7 @@ export const piChatsFor = (
       },
       setStellaModel: (pick) => {
         const dataDir = session.config.get().stellaDataDirPath;
-        const claudeCode = /^claude-code\/(.+)$/.exec(pick)?.[1];
-        updateLocalModelPreferences(
-          dataDir,
-          claudeCode
-            ? { claudeCodeModel: claudeCode }
-            : { modelOverrides: { ...loadLocalPreferences(dataDir).modelOverrides, orchestrator: pick } },
-        );
+        updateLocalModelPreferences(dataDir, conversationModelPatch(loadLocalPreferences(dataDir), pick));
       },
       agentLogs: {
         append: async (args) => {

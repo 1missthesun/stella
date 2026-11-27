@@ -103,13 +103,17 @@ import {
 import { takeNativeToolCall } from "../engine/native-calls.ts";
 import { cliEnginePick, engineExtensionChange, onClaudeCode, onCliEngine } from "../engine/selection.ts";
 import { parseStellaModelId, stellaModelId, STELLA_PROVIDER_ID } from "../provider/stella.ts";
-import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole, type StellaPendingNote } from "./agent-doc.ts";
+import { MAX_AGENT_DEPTH, StellaAgentDoc, type StellaAgentRole, type StellaPendingNote, type SwitchedRunsOn } from "./agent-doc.ts";
+import { agentMoveModel } from "./agent-move-model.ts";
 import { computerOnlyProviderOf } from "@stella/contracts/backend/providers";
 import type { AgentLineage } from "@stella/contracts/agent-depth";
 import {
   AGENT_MOVE_CLOUD,
-  SWITCH_DESTINATION_TOOL_NAME,
-  switchDestinationTool,
+  LEGACY_SWITCH_DESTINATION_TOOL_NAME,
+  SWITCH_TO_TOOL_NAME,
+  switchedAgentBrief,
+  switchedByStarterNote,
+  switchToTool,
   untilOnline,
   whileDeviceOffline,
   type AgentSwitch,
@@ -273,6 +277,8 @@ export type AgentRun = {
 export type AgentRunEnd = {
   answer?: string;
   aborted?: true;
+  /** The run was interrupted to put the task on another model; it carries on there. */
+  switched?: true;
   error?: string;
   waiting?: true;
   waitingFor?: string;
@@ -397,7 +403,7 @@ export type RemoteAgentHost = {
     context: Context,
   ): Promise<{ threadId: string; waiting?: boolean; note?: string }>;
   message(
-    args: { key: string; threadId: string; message: string; framed?: boolean },
+    args: { key: string; threadId: string; message: string; framed?: boolean; model?: string },
     context: Context,
   ): Promise<AgentMessageDelivery | void>;
   stop?(threadId: string, context: Context): Promise<AgentStopResult | void>;
@@ -417,6 +423,8 @@ export type StellaAgentsHost = {
   rootPlacement: StellaPlacement;
   beginAgentRun?(run: AgentRun, context: Context): Promise<void>;
   ensureModel?(model: ModelRef, context: Context): Promise<void>;
+  /** Fits a task's conversation into `model`'s context window before it runs on it (compacting when it is smaller). */
+  fitModel?(agentConversationId: ConversationId, model: ModelRef, context: Context): Promise<void>;
   endAgentRun?(run: AgentRun, context: Context, end?: AgentRunEnd): Promise<void>;
   runNote?(run: AgentRun, context: Context): Promise<string | undefined>;
   deliverReport?(report: AgentReport, context: Context): Promise<void>;
@@ -458,12 +466,12 @@ export type AgentDirectoryHost = {
     unavailable?: string;
   }>;
   message(
-    args: { key: string; to: string; text: string; from: AgentMessageSender; remoteStella?: true },
+    args: { key: string; to: string; text: string; from: AgentMessageSender; remoteStella?: true; model?: string },
     context: Context,
   ): Promise<AgentMessageDelivery | undefined>;
   stop?(args: { key: string; threadId: string; requesterThreadId?: string; elsewhere?: true }, context: Context): Promise<AgentStopResult>;
   move?(
-    args: { key: string; threadId: string; to: string; message: string; requesterThreadId?: string },
+    args: { key: string; threadId: string; to: string; message: string; requesterThreadId?: string; model?: string },
     context: Context,
   ): Promise<AgentMoveResult>;
 };
@@ -513,6 +521,7 @@ const markStopped = async (
 };
 
 const wasStopped = (agent: AgentRecord): boolean => agent.stopped === true || agent.paused === true;
+const wasStoppedRecord = (agent: AgentRecord | undefined): boolean => agent !== undefined && wasStopped(agent);
 
 const runsElsewhere = (agent: AgentRecord): boolean => agent.remote === true || agent.away === true;
 
@@ -921,9 +930,9 @@ const relationOf = (row: { threadId: string; parentThreadId?: string }, self: { 
 export function stellaAgents(host: StellaAgentsHost) {
   const execution = host.execution;
   const agentsMove = execution?.moveAgent !== undefined && execution.agentTarget !== undefined;
-  const switchDestination =
-    execution && (execution.moveBrain || agentsMove)
-      ? switchDestinationTool(execution, host.rootPlacement, agentsMove ? (args, api, context) => agentSwitch(args, api, context) : undefined)
+  const switchTo =
+    execution && (execution.moveBrain || execution.switchBrainModel || agentsMove || host.agentModel)
+      ? switchToTool(execution, host.rootPlacement, (args, api, context) => agentSwitch(args, api, context))
       : undefined;
   const nextTurn = async (tx: Tx, home: ConversationId, input: ReporterInput): Promise<void> => {
     const reporter = await tx.createTask(Reporter, input, { ownership: { kind: "conversation" }, background: true, conversationId: home });
@@ -1056,6 +1065,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         let end: AgentRunEnd = {};
         let submitted = false;
         let ownSubmission: unknown;
+        let switchesAtSubmit = 0;
         try {
           try {
             await host.beginAgentRun?.(run, context);
@@ -1071,6 +1081,8 @@ export function stellaAgents(host: StellaAgentsHost) {
                 return undefined;
               }, context);
             }
+            await switchSettled(agentConversationId);
+            switchesAtSubmit = await switchesOf(runtime, agentConversationId, context);
             const submission = await agent.submit(
               {
                 type: "input",
@@ -1088,6 +1100,20 @@ export function stellaAgents(host: StellaAgentsHost) {
             refused = error instanceof Error ? error.message : String(error);
           }
           const withdrawn = settled?.status === "unanswered" && settled.reason === "aborted" && settled.entry === undefined;
+          const switched =
+            settled?.status === "unanswered" &&
+            settled.reason === "aborted" &&
+            (await switchesOf(runtime, agentConversationId, context)) !== switchesAtSubmit &&
+            !wasStoppedRecord((await runtime.snapshot(StellaAgentsDoc, runtime.conversationId, context))?.agents[threadId]);
+          if (switched) {
+            // Interrupted to put it on another model: the input that switched it carries on, so this one ends quietly.
+            end = { switched: true };
+            await runtime.commit(async (tx) => {
+              if (withdrawn) await nextTurn(tx, runtime.conversationId, { ...reporter.input, message: [...carried, message].join("\n\n") });
+              return { status: "terminal", outcome: { status: "completed", result: null } };
+            }, context);
+            return;
+          }
           if (settled?.status === "unanswered" && settled.reason === "aborted") end = { aborted: true };
           else if (refused !== undefined || settled === undefined) end = { error: refused ?? "The agent did not run." };
           else if (settled.status === "unanswered") end = { error: unansweredText(settled) };
@@ -1115,6 +1141,22 @@ export function stellaAgents(host: StellaAgentsHost) {
               if ("failed" in move) {
                 await nextTurn(tx, runtime.conversationId, { threadId, conversationId: reporter.input.conversationId, message: moveFailedText(move.failed) });
               }
+              return { status: "terminal", outcome: { status: "completed", result: null } };
+            }, context);
+            return;
+          }
+          const ownSwitch =
+            settled?.status === "done" && settled.type === "input" ? await takeSwitch(runtime, agentConversationId, context) : undefined;
+          if (ownSwitch && "text" in ownSwitch && settled?.status === "done" && settled.type === "input") {
+            const answered = settled.answer;
+            for (const note of (await runtime.snapshot(StellaAgentDoc, agentConversationId, context))?.notes ?? []) {
+              await deliverNote(runtime.conversationId, note, context, (id) => runtime.conversation(id, context)).catch(() => false);
+            }
+            await runtime.commit(async (tx) => {
+              await settleNotes(tx, agentConversationId);
+              const agent = (await tx.doc(StellaAgentsDoc, runtime.conversationId)).agents[threadId];
+              if (agent && !agent.reported.includes(answered)) agent.reported.push(answered);
+              await nextTurn(tx, runtime.conversationId, { threadId, conversationId: reporter.input.conversationId, message: ownSwitch.text, wake: true });
               return { status: "terminal", outcome: { status: "completed", result: null } };
             }, context);
             return;
@@ -1438,6 +1480,141 @@ export function stellaAgents(host: StellaAgentsHost) {
     );
   };
 
+  type SwitchStore = {
+    commit(change: (tx: Tx) => Promise<undefined>, context: Context): Promise<unknown>;
+    snapshot: ToolExecutionApi["snapshot"];
+    conversation(id: ConversationId, context: Context): Promise<{ abort(context: Context): Promise<void> } | undefined>;
+  };
+  const switchesInFlight = new Map<ConversationId, Promise<unknown>>();
+  const switchSettled = async (agentConversationId: ConversationId): Promise<void> => {
+    await switchesInFlight.get(agentConversationId)?.catch(() => undefined);
+  };
+  const switchesOf = async (store: Pick<SwitchStore, "snapshot">, agentConversationId: ConversationId, context: Context) =>
+    (await store.snapshot(StellaAgentDoc, agentConversationId, context))?.switches ?? 0;
+
+  const runsOnAlready = (agent: { model?: ModelRef; thinkingLevel?: ModelThinkingLevel | null } | undefined, runsOn: RunsOn): boolean =>
+    agent?.model?.provider === runsOn.model?.provider &&
+    agent?.model?.modelId === runsOn.model?.modelId &&
+    (agent?.thinkingLevel ?? undefined) === runsOn.thinkingLevel;
+
+  /**
+   * Puts a task on another model or engine with its whole conversation. A run on or onto a CLI engine (Claude Code,
+   * Antigravity) is interrupted (helpers it started keep working) and the new engine reads the transcript back in;
+   * a run moving between Stella's own models takes the new one at its next request. Switches of one task run one
+   * after another.
+   */
+  const switchModel = (
+    store: SwitchStore,
+    agentConversationId: ConversationId,
+    runsOn: SwitchedRunsOn,
+    context: Context,
+  ): Promise<{ interrupted: boolean } | undefined> => {
+    const work = (switchesInFlight.get(agentConversationId) ?? Promise.resolve())
+      .catch(() => undefined)
+      .then(async () => {
+        const agent = await store.snapshot(AgentDoc, agentConversationId, context);
+        if (runsOnAlready(agent, runsOn)) return undefined;
+        await host.ensureModel?.(runsOn.model, context);
+        const moved = agent?.model?.provider !== runsOn.model.provider || agent?.model?.modelId !== runsOn.model.modelId;
+        // A CLI engine can't change model midway, and a run changing engine would have its tools swapped under a
+        // call in flight; only a change between Stella's own models applies at the run's next request.
+        const interrupted =
+          (await store.snapshot(LiveDoc, agentConversationId, context))?.run !== undefined &&
+          (onCliEngine(agent?.model) || onCliEngine(runsOn.model));
+        if (interrupted) {
+          await store.commit(async (tx) => {
+            const role = await tx.doc(StellaAgentDoc, agentConversationId);
+            role.switches = (role.switches ?? 0) + 1;
+            return undefined;
+          }, context);
+          await (await store.conversation(agentConversationId, context))?.abort(context);
+        }
+        if (moved) {
+          await host.fitModel?.(agentConversationId, runsOn.model, context).catch((error: unknown) =>
+            console.warn("[stella-agents] fitting a task to its new model failed", { agentConversationId, error }),
+          );
+        }
+        await store.commit(async (tx) => {
+          await configure(tx, agentConversationId, {
+            model: runsOn.model,
+            thinkingLevel: runsOn.thinkingLevel ?? null,
+            ...(moved ? { extensions: { ...agentToolSelection, ...engineExtensionChange(runsOn.model) } } : {}),
+          });
+          return undefined;
+        }, context);
+        return { interrupted };
+      });
+    switchesInFlight.set(agentConversationId, work);
+    void work
+      .finally(() => {
+        if (switchesInFlight.get(agentConversationId) === work) switchesInFlight.delete(agentConversationId);
+      })
+      .catch(() => undefined);
+    return work;
+  };
+
+  /** A model a task can switch to here, resolved as spawn_agent resolves it. */
+  const switchTarget = async (requested: string, caller: RunsOn, context: Context): Promise<SwitchedRunsOn & { label: string }> => {
+    const choice = await chooseAgentModel(requested, caller, undefined, context);
+    const runsOn = "runsOn" in choice ? choice.runsOn : undefined;
+    if (!runsOn?.model) {
+      throw new Error(`"${requested}" can't run a task that already exists here. Start a new agent on it with spawn_agent instead.`);
+    }
+    return {
+      model: runsOn.model,
+      ...(runsOn.thinkingLevel ? { thinkingLevel: runsOn.thinkingLevel } : {}),
+      label: agentMoveModel(runsOn.model, runsOn.thinkingLevel) ?? requested,
+    };
+  };
+
+  const switchFailedText = (error: unknown): string =>
+    `[switch_to: your model switch did not happen: ${error instanceof Error ? error.message : String(error)} You still run on the model you had, with everything as you left it; carry on with your work.]`;
+
+  /** A switch_to with only a model, taken when the turn that asked for it ends: what the task reads next. */
+  const takeSwitch = async (
+    store: SwitchStore,
+    agentConversationId: ConversationId,
+    context: Context,
+    placed?: { threadId: string },
+  ): Promise<{ text: string } | { moved: string } | undefined> => {
+    const role = await store.snapshot(StellaAgentDoc, agentConversationId, context);
+    const pending = role?.switching;
+    if (!pending) return undefined;
+    await store.commit(async (tx) => {
+      delete (await tx.doc(StellaAgentDoc, agentConversationId)).switching;
+      return undefined;
+    }, context);
+    if (role.done) return undefined;
+    if (placed && execution?.moveAgent) {
+      const agent = await store.snapshot(AgentDoc, agentConversationId, context);
+      try {
+        const done = await execution.moveAgent(
+          {
+            threadId: placed.threadId,
+            agentConversationId,
+            deviceId: "",
+            name: "",
+            brief: pending.brief,
+            key: pending.key,
+            pick: pending.label,
+            inPlace: true,
+            ...(agent?.cwd ? { cwd: agent.cwd } : {}),
+          },
+          context,
+        );
+        return "error" in done ? { text: switchFailedText(done.error) } : { moved: done.where };
+      } catch (error) {
+        return { text: switchFailedText(error) };
+      }
+    }
+    try {
+      await switchModel(store, agentConversationId, pending.runsOn, context);
+    } catch (error) {
+      return { text: switchFailedText(error) };
+    }
+    return { text: switchedAgentBrief(pending.label, pending.brief) };
+  };
+
   const runsHereAgain = (record: AgentRecord): void => {
     delete record.remote;
     delete record.remoteRun;
@@ -1492,7 +1669,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       tools: {
         remove: [
           ...(depth >= MAX_AGENT_DEPTH ? [spawnAgent, stopAgent] : []),
-          ...(switchDestination && !agentsMove ? [switchDestination] : []),
+          ...(switchTo && !agentsMove && !host.agentModel ? [switchTo] : []),
         ],
       },
     });
@@ -1883,7 +2060,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     afterTool: async (call, result, api, context) => {
       const native = takeNativeToolCall(call.id);
       if (!host.endedCommands || native || call.parent || result.control) return undefined;
-      if (call.name === SWITCH_DESTINATION_TOOL_NAME) return undefined;
+      if (call.name === SWITCH_TO_TOOL_NAME || call.name === LEGACY_SWITCH_DESTINATION_TOOL_NAME) return undefined;
       if (result.diagnostics?.some((note) => note.code !== undefined && UNREAD_RESULT_CODES.has(note.code))) return undefined;
       const role = await api.snapshot(StellaAgentDoc, api.conversationId, context);
       if (!role?.threadId || role.agentType === "orchestrator" || role.waiting) return undefined;
@@ -2079,42 +2256,71 @@ export function stellaAgents(host: StellaAgentsHost) {
   const sendMessage = defineTool({
     name: "send_message",
     description:
-      'Message an agent or session by thread_id, or "stella". It reads the message before its next step, busy or not. To an agent you started it is an instruction: it steers it, or resumes it if finished or stopped, and its next report comes back to you. To anyone else it is a note from you that they can answer. Delivery is not completion. A message to an agent whose computer is offline is refused after a few seconds and nothing is queued: run the work somewhere else, or tell the user it has to wait until that computer is back on. With destination, an agent you started whose computer is offline or unavailable continues there instead, with its history.',
+      'Message an agent or session by thread_id, or "stella". It reads the message before its next step, busy or not. To an agent you started it is an instruction: it steers it, or resumes it if finished or stopped, and its next report comes back to you. To anyone else it is a note from you that they can answer. Delivery is not completion. A message to an agent whose computer is offline is refused after a few seconds and nothing is queued: run the work somewhere else, or tell the user it has to wait until that computer is back on. With destination, an agent you started whose computer is offline or unavailable continues there instead, with its history. With model, an agent you started runs on that model or engine from now on, keeping its conversation; a run on its way is interrupted and continues with this message.',
     parameters: obj({
       thread_id: str({ description: 'A thread_id from agent_status, or "stella".' }),
       message: str({ description: "The message. To your own agent, only what is new." }),
       destination: opt(
         str({ description: 'Optional: "cloud" or a device_id. The agent continues there, with this message as its instruction.' }),
       ),
+      model: opt(
+        str({
+          description:
+            'Optional, for an agent you started: the model to run it on from now on, as for spawn_agent ("<provider>/<model>", "claude-code[/<model>]", "antigravity/<model>", ":low" to ":max" for reasoning).',
+        }),
+      ),
       done: opt(bool({ description: SEND_MESSAGE_DONE_DESCRIPTION })),
     }),
     replay: "safe",
     execute: async (args, api, context) => {
       const threadId = args.thread_id.trim();
-      if (args.destination?.trim()) return await moveElsewhere(api, threadId, args.message, args.destination, context);
+      const model = args.model?.trim() || undefined;
+      if (args.destination?.trim()) return await moveElsewhere(api, threadId, args.message, args.destination, context, model);
       const conversation = await host.directory?.conversationId(context).catch(() => undefined);
-      if (args.done === true) return await finishReport(api, threadId, args.message, conversation, context);
+      const forStarted = () => {
+        if (model) throw new Error("model switches an agent you started; it isn't for this message, and nothing was sent.");
+      };
+      if (args.done === true) {
+        forStarted();
+        return await finishReport(api, threadId, args.message, conversation, context);
+      }
       if (threadId.toLowerCase() === STELLA_MESSAGE_TARGET || threadId === conversation) {
+        forStarted();
         return await messageStella(api, args.message, context);
       }
       const known = (await api.snapshot(StellaAgentsDoc, api.conversationId, context))?.agents[threadId];
-      if (!known) return await messageOther(api, threadId, args.message, conversation, context);
+      if (!known) {
+        forStarted();
+        return await messageOther(api, threadId, args.message, conversation, context);
+      }
       const remote = known?.remote ? remoteHostOf(known) : undefined;
-      const framed = formatAgentMessage(
-        senderOf(await roleOf(api, api.conversationId, context), conversation ?? STELLA_MESSAGE_TARGET),
-        args.message,
-        { starter: true },
-      );
-      if (known?.remote) {
-        if (!remote) return await messageThroughLedger(api, threadId, args.message, conversation, context);
+      const sender = senderOf(await roleOf(api, api.conversationId, context), conversation ?? STELLA_MESSAGE_TARGET);
+      if (known.remote || known.away) {
+        const framed = formatAgentMessage(sender, model ? `${switchedByStarterNote(model)}\n\n${args.message}` : args.message, { starter: true });
+        if (known.away) return await messageAway(api, api.conversationId, threadId, framed, `message:${api.taskId}`, context, model);
+        if (!remote) {
+          const text = model ? `${switchedByStarterNote(model)}\n\n${args.message}` : args.message;
+          return await messageThroughLedger(api, threadId, text, conversation, context, model);
+        }
         const delivery = await whileDeviceOffline(
-          () => remote.message({ key: `message:${api.taskId}`, threadId, message: framed, framed: true }, context),
+          () => remote.message({ key: `message:${api.taskId}`, threadId, message: framed, framed: true, ...(model ? { model } : {}) }, context),
           context.abortSignal,
         );
         await expectRemoteReport(api, api.conversationId, String(api.taskId), threadId, context);
         return deliveredResult(delivery ?? { threadId });
       }
-      if (known.away) return await messageAway(api, api.conversationId, threadId, framed, `message:${api.taskId}`, context);
+      let switchNote: string | undefined;
+      if (model && !(await api.snapshot(StellaAgentsDoc, api.conversationId, context))?.calls[String(api.taskId)]) {
+        const caller = await api.snapshot(AgentDoc, api.conversationId, context);
+        const target = await switchTarget(
+          model,
+          { ...(caller?.model ? { model: caller.model } : {}), ...(caller?.thinkingLevel ? { thinkingLevel: caller.thinkingLevel } : {}) },
+          context,
+        );
+        const switched = await switchModel(api, known.conversationId as ConversationId, target, context);
+        if (switched) switchNote = switchedByStarterNote(target.label);
+      }
+      const framed = formatAgentMessage(sender, switchNote ? `${switchNote}\n\n${args.message}` : args.message, { starter: true });
       const running = (await api.snapshot(LiveDoc, known.conversationId as ConversationId, context))?.run !== undefined;
       const answering = running && (await answersAsk(api, known.conversationId as ConversationId, framed, context));
       await api.commit(async (tx) => {
@@ -2144,11 +2350,12 @@ export function stellaAgents(host: StellaAgentsHost) {
     message: string,
     destination: string,
     context: Context,
+    model?: string,
   ) => {
     assertMessageSize(message);
     const conversation = await host.directory?.conversationId(context).catch(() => undefined);
     if (threadId.toLowerCase() === STELLA_MESSAGE_TARGET || threadId === conversation) {
-      throw new Error("Only an agent you started moves; Stella doesn't.");
+      throw new Error("Only an agent you started moves; Stella moves herself with switch_to.");
     }
     const target = parseSpawnDestination(destination);
     if (target.kind === "here") throw new Error('destination is "cloud" or a device_id.');
@@ -2157,7 +2364,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     if (!known) throw new Error(`${threadId} is not an agent you started, so you can't move it. agent_status lists the ones you started.`);
     if (!known.remote && !known.away) {
       throw new Error(
-        `${threadId} runs on ${describePlacement(host.rootPlacement)} with you, so it can't be offline, and nothing moved. To have it carry on somewhere else, ask it with send_message to move itself with switch_destination.`,
+        `${threadId} runs on ${describePlacement(host.rootPlacement)} with you, so it can't be offline, and nothing moved. To have it carry on somewhere else, ask it with send_message to move itself with switch_to${model ? "; to change only its model here, send model without destination" : ""}.`,
       );
     }
     const move = host.directory?.move;
@@ -2171,6 +2378,7 @@ export function stellaAgents(host: StellaAgentsHost) {
         to: target.kind === "cloud" ? AGENT_MOVE_CLOUD : target.deviceId,
         message: [...(known.held ?? []), framed].join("\n\n"),
         ...(self.agentType !== "orchestrator" && self.threadId ? { requesterThreadId: self.threadId } : {}),
+        ...(model ? { model } : {}),
       },
       context,
     );
@@ -2500,12 +2708,13 @@ export function stellaAgents(host: StellaAgentsHost) {
     message: string,
     conversation: string | undefined,
     context: Context,
+    model?: string,
   ) => {
     assertMessageSize(message);
     const { self } = await chainOf(api, context);
     const from = senderOf(self, conversation ?? STELLA_MESSAGE_TARGET);
     const delivery = await whileDeviceOffline(
-      async () => await host.directory?.message({ key: String(api.taskId), to: threadId, text: message, from }, context),
+      async () => await host.directory?.message({ key: String(api.taskId), to: threadId, text: message, from, ...(model ? { model } : {}) }, context),
       context.abortSignal,
     );
     if (delivery) return deliveredResult(delivery);
@@ -2519,6 +2728,7 @@ export function stellaAgents(host: StellaAgentsHost) {
     framed: string,
     key: string,
     context: Context,
+    model?: string,
   ) => {
     const callKey = String(api.taskId);
     const before = await api.snapshot(StellaAgentsDoc, home, context);
@@ -2531,9 +2741,15 @@ export function stellaAgents(host: StellaAgentsHost) {
     const delivery = await whileDeviceOffline(
       async () =>
         remote
-          ? await remote.message({ key: `moved:${key}`, threadId, message: text, framed: true }, context)
+          ? await remote.message({ key: `moved:${key}`, threadId, message: text, framed: true, ...(model ? { model } : {}) }, context)
           : await host.directory?.message(
-              { key: `moved:${key}`, to: threadId, text, from: { threadId: STELLA_MESSAGE_TARGET, label: "Stella" } },
+              {
+                key: `moved:${key}`,
+                to: threadId,
+                text,
+                from: { threadId: STELLA_MESSAGE_TARGET, label: "Stella" },
+                ...(model ? { model } : {}),
+              },
               context,
             ),
       context.abortSignal,
@@ -3032,6 +3248,19 @@ export function stellaAgents(host: StellaAgentsHost) {
         }, context);
       }
     }
+    if (args.runsOn?.model) {
+      // Its starter or the task itself switched its model through Stella's cloud: it runs on it from this run on.
+      try {
+        await switchModel(
+          harness,
+          agent.id,
+          { model: args.runsOn.model, ...(args.runsOn.thinkingLevel ? { thinkingLevel: args.runsOn.thinkingLevel } : {}) },
+          context,
+        );
+      } catch (error) {
+        return { threadId, status: "error", error: `It couldn't switch to its new model here: ${error instanceof Error ? error.message : String(error)}` };
+      }
+    }
     const carried = await harness.commit(async (tx) => {
       const current = (await tx.doc(StellaAgentsDoc, root.id)).agents[threadId];
       if (!current) return [];
@@ -3075,6 +3304,8 @@ export function stellaAgents(host: StellaAgentsHost) {
         if (role.waiting) delete role.waiting;
         return undefined;
       }, context);
+      await switchSettled(agent.id);
+      const switchesAtSubmit = await switchesOf(harness, agent.id, context);
       const submission = await agent.submit({ type: "input", content, whenBusy: "steer", requestId }, context);
       const stop = async () => {
         const withdrawn = await harness.abortSubmission(submission.id, context, agent.id);
@@ -3112,10 +3343,16 @@ export function stellaAgents(host: StellaAgentsHost) {
         host.agentLog?.kick(agent.id);
       }
       const stopped = args.signal?.aborted === true || (settled.status === "unanswered" && settled.reason === "aborted");
+      // A newer run of it switched its model and interrupted this one; that run carries on.
+      const switchedAway = stopped && args.signal?.aborted !== true && (await switchesOf(harness, agent.id, context)) !== switchesAtSubmit;
       const rewake =
         retry === 1
-          ? await keepWithdrawn(harness, root.id, threadId, args.runKey, first, [...carried, args.prompt], stopped, args.signal?.reason === PLACED_AGENT_STOPPED, context)
+          ? await keepWithdrawn(harness, root.id, threadId, args.runKey, first, [...carried, args.prompt], stopped && !switchedAway, args.signal?.reason === PLACED_AGENT_STOPPED, context)
           : [];
+      if (switchedAway) {
+        await settle();
+        return { threadId, status: "canceled", error: "It moved on to another model; its newer run carries on." };
+      }
       if (stopped) {
         await dropMove(harness, agent.id, context);
         await settle();
@@ -3167,6 +3404,14 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (move && "failed" in move) {
         content = moveFailedText(move.failed);
         requestId = `placed:${args.runKey}:stayed:${retry}`;
+        continue;
+      }
+      const ownSwitch = await takeSwitch(harness, agent.id, context, args.threadId ? { threadId: args.threadId } : undefined);
+      if (ownSwitch) await settle();
+      if (ownSwitch && "moved" in ownSwitch) return { threadId, status: "moved", where: ownSwitch.moved };
+      if (ownSwitch) {
+        content = ownSwitch.text;
+        requestId = `placed:${args.runKey}:switched:${retry}`;
         continue;
       }
       await settle();
@@ -3280,20 +3525,46 @@ export function stellaAgents(host: StellaAgentsHost) {
 
   const agentSwitch: AgentSwitch = async (args, api, context) => {
     const self = await roleOf(api, api.conversationId, context);
-    if (!self.threadId) throw new Error("Only an agent moves itself this way.");
+    if (!self.threadId) throw new Error("Only an agent switches itself this way.");
+    const brief = args.prompt?.trim();
+    if (!brief) throw new Error("Pass your brief as prompt: what you will do next, as you will read it then.");
+    const agent = await api.snapshot(AgentDoc, api.conversationId, context);
+    const requested = args.model?.trim() || undefined;
+    const destination = args.destination?.trim() ? parseSpawnDestination(args.destination) : undefined;
+    const elsewhere = destination !== undefined && destination.kind !== "here" ? destination : undefined;
+    const switchHere = async () => {
+      if (!requested) return { output: [{ type: "text" as const, text: `You already run on ${describePlacement(host.rootPlacement)}. Carry on here.` }] };
+      const caller = { ...(agent?.model ? { model: agent.model } : {}), ...(agent?.thinkingLevel ? { thinkingLevel: agent.thinkingLevel } : {}) };
+      const target = await switchTarget(requested, caller, context);
+      if (runsOnAlready(agent, target)) return { output: [{ type: "text" as const, text: `You already run on ${target.label}. Carry on.` }] };
+      const { label, ...runsOn } = target;
+      await api.commit(async (tx) => {
+        const role = await tx.doc(StellaAgentDoc, api.conversationId);
+        role.switching = { runsOn, label, brief, key: String(api.taskId) };
+      }, context);
+      return {
+        output: [
+          {
+            type: "text" as const,
+            text: `You switch to ${label} as soon as this turn ends: you carry on on it from your brief, with this whole conversation, under the same thread id. End this turn now with one short line saying you are switching; do no more work on this model.`,
+          },
+        ],
+        details: { move: "model", model: label },
+      };
+    };
+    if (!elsewhere) return await switchHere();
     const moveAgent = execution?.moveAgent;
     const agentTarget = execution?.agentTarget;
     if (!moveAgent || !agentTarget) throw new Error("This chat is stored only on this computer, so you can only run here.");
-    const destination = parseSpawnDestination(args.destination);
-    if (destination.kind === "here") throw new Error('destination is required: "cloud" or a device_id.');
-    const where = destination.kind === "cloud" ? AGENT_MOVE_CLOUD : destination.deviceId;
-    const brief = args.prompt?.trim();
-    if (!brief) throw new Error("Pass your brief as prompt: what you will do there next, as you will read it there.");
-    const agent = await api.snapshot(AgentDoc, api.conversationId, context);
+    const where = elsewhere.kind === "cloud" ? AGENT_MOVE_CLOUD : elsewhere.deviceId;
     if (where !== AGENT_MOVE_CLOUD) await untilOnline(execution?.standing, where, context);
-    const target = await agentTarget(where, { claudeCode: onClaudeCode(agent?.model) }, context);
+    const target = await agentTarget(
+      where,
+      { claudeCode: requested ? /^claude-code(?:[/:]|$)/u.test(requested) : onClaudeCode(agent?.model), ...(requested ? { model: requested } : {}) },
+      context,
+    );
     if ("error" in target) throw new Error(target.error);
-    if (target.here) return { output: [{ type: "text", text: `You already run on ${target.name}. Carry on here.` }] };
+    if (target.here) return await switchHere();
     if (await agentsBusy(busyReader(api, context), api.conversationId).catch(() => false)) {
       throw new Error(
         "Agents you started are still at work here, and they stay here. Wait for their reports (or stop them), then move.",
@@ -3302,23 +3573,23 @@ export function stellaAgents(host: StellaAgentsHost) {
     const left = agent?.cwd ? await execution?.leftBehind?.(agent.cwd).catch(() => undefined) : undefined;
     if (left && args.leave_files !== true) {
       throw new Error(
-        `${left} Files in your folder stay on this computer when you move. Commit and push that work first (a WIP branch is fine), then call switch_destination again; or pass leave_files: true to move without it.`,
+        `${left} Files in your folder stay on this computer when you move. Commit and push that work first (a WIP branch is fine), then call switch_to again; or pass leave_files: true to move without it.`,
       );
     }
     await api.commit(async (tx) => {
       const role = await tx.doc(StellaAgentDoc, api.conversationId);
-      role.moving = { deviceId: target.deviceId, name: target.name, brief, key: String(api.taskId) };
+      role.moving = { deviceId: target.deviceId, name: target.name, brief, key: String(api.taskId), ...(requested ? { model: requested } : {}) };
     }, context);
     return {
       output: [
         {
           type: "text",
-          text: `You move to ${target.name} as soon as this turn ends: its own Stella continues you there with this whole conversation and your brief, under the same thread id, and your reports, messages and stops follow you.${
+          text: `You move to ${target.name}${requested ? ` and onto ${requested}` : ""} as soon as this turn ends: its own Stella continues you there with this whole conversation and your brief, under the same thread id, and your reports, messages and stops follow you.${
             left ? ` What stays behind on this computer: ${left}` : ""
           } End this turn now with one short line saying you are moving to ${target.name}; do no more work here.`,
         },
       ],
-      details: { move: "agent", destination: target.deviceId },
+      details: { move: "agent", destination: target.deviceId, ...(requested ? { model: requested } : {}) },
     };
   };
 
@@ -3343,6 +3614,7 @@ export function stellaAgents(host: StellaAgentsHost) {
           key: move.key,
           ...(agent?.model ? { model: agent.model } : {}),
           ...(agent?.thinkingLevel ? { thinkingLevel: agent.thinkingLevel } : {}),
+          ...(move.model ? { pick: move.model } : {}),
           ...(agent?.cwd ? { cwd: agent.cwd } : {}),
         },
         context,
@@ -3524,7 +3796,7 @@ export function stellaAgents(host: StellaAgentsHost) {
   };
 
   const moveFailedText = (error: string) =>
-    `[switch_destination: your move did not happen: ${error} You still run on ${describePlacement(host.rootPlacement)}, with everything as you left it; carry on with your work here.]`;
+    `[switch_to: your move did not happen: ${error} You still run on ${describePlacement(host.rootPlacement)}, with everything as you left it; carry on with your work here.]`;
 
   const extension = defineExtension({
     name: STELLA_AGENTS_EXTENSION,
@@ -3536,7 +3808,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       sendMessage,
       agentStatus,
       stopAgent,
-      ...(switchDestination ? [switchDestination] : []),
+      ...(switchTo ? [switchTo] : []),
     ],
   });
   // Kept so stored agents that name it still resolve; every agent selects it and the orchestrator never does.

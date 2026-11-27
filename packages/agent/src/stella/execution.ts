@@ -12,14 +12,21 @@ import type { DeviceDestination } from "@stella/contracts/turn-plane/placement";
 import { StellaAgentDoc } from "./agent-doc.ts";
 import { describePlacement, parseSpawnDestination, samePlacement, type StellaPlacement } from "./placement.ts";
 
-export const SWITCH_DESTINATION_TOOL_NAME = "switch_destination";
+export const SWITCH_TO_TOOL_NAME = "switch_to";
+/** The name older builds gave the self-move tool; stored transcripts still carry it. */
+export const LEGACY_SWITCH_DESTINATION_TOOL_NAME = "switch_destination";
 
 export type StellaExecutionHost = {
   moveBrain?(target: StellaPlacement, brief: string, context: Context): Promise<{ moved: StellaPlacement } | { error: string }>;
+  /**
+   * Puts this conversation on `model` (a spawn_agent model string), and the app's model picker follows; with `brief`,
+   * Stella continues from it on that model once this turn ends. Throws when the model can't run here.
+   */
+  switchBrainModel?(model: string, brief: string | undefined, context: Context): Promise<{ label: string }>;
   standing?(deviceId: string, context: Context): Promise<DeviceStanding | undefined>;
   agentTarget?(
     deviceId: string,
-    needs: { claudeCode: boolean },
+    needs: { claudeCode: boolean; model?: string },
     context: Context,
   ): Promise<{ deviceId: string; name: string; here?: true } | { error: string }>;
   leftBehind?(cwd: string): Promise<string | undefined>;
@@ -38,14 +45,35 @@ export type AgentMove = {
   model?: { provider: string; modelId: string };
   thinkingLevel?: string;
   cwd?: string;
+  /** The model to run on there, as for spawn_agent, when it switches model as it moves (`model` is then ignored). */
+  pick?: string;
+  /** It stays on the computer it runs on and only changes model (`pick`): its next run there starts from the brief. */
+  inPlace?: true;
 };
 
-export const movedAgentBrief = (from: string, brief: string, held: readonly string[] = []): string =>
+export const movedAgentBrief = (from: string, brief: string, held: readonly string[] = [], model?: string): string =>
   [
-    `[You moved yourself here from ${from} with switch_destination, and you run here now: your conversation so far is above. Files in your old working folder stayed on ${from}. This is your brief, not a new message from anyone.]`,
+    `[You moved yourself here from ${from} with switch_to${model ? `, now on ${model}` : ""}, and you run here now: your conversation so far is above. Files in your old working folder stayed on ${from}. This is your brief, not a new message from anyone.]`,
     brief,
     ...held,
   ].join("\n\n");
+
+export const switchedAgentBrief = (model: string, brief: string): string =>
+  [
+    `[You switched yourself to ${model} with switch_to, and you run on it now: your conversation so far is above. This is your brief, not a new message from anyone.]`,
+    brief,
+  ].join("\n\n");
+
+/** What Stella reads to carry on after she put this conversation on another model. */
+export const switchedBrainBrief = (model: string, brief: string): string =>
+  [
+    `[You switched this conversation to ${model} with switch_to, and you run on it now: the conversation so far is above. Do not switch again. This is your brief, not a new message from the user.]`,
+    brief,
+  ].join("\n\n");
+
+/** What a task reads first after whoever started it put it on another model. */
+export const switchedByStarterNote = (model: string): string =>
+  `[Whoever started you switched you to ${model}; your conversation so far is above, and any run on your old model was interrupted. Carry on from the message below.]`;
 
 export { relocatedAgentBrief } from "./relocated-brief.js";
 
@@ -135,71 +163,82 @@ export const deviceRefusal = (device: DeviceDestination, name: string): string |
 };
 
 export type AgentSwitch = (
-  args: { destination: string; prompt?: string; leave_files?: boolean },
+  args: { destination?: string; model?: string; prompt?: string; leave_files?: boolean },
   api: ToolExecutionApi,
   context: Context,
 ) => Promise<{ output: Array<{ type: "text"; text: string }>; details?: Record<string, string> }>;
 
-export const switchDestinationTool = (
-  host: StellaExecutionHost,
-  rootPlacement: StellaPlacement,
-  agentSwitch?: AgentSwitch,
-) =>
+export const switchToTool = (host: StellaExecutionHost, rootPlacement: StellaPlacement, agentSwitch?: AgentSwitch) =>
   defineTool({
-    name: SWITCH_DESTINATION_TOOL_NAME,
+    name: SWITCH_TO_TOOL_NAME,
     description:
-      'Move yourself, with this whole conversation, to "cloud" or one of the user\'s computers; you continue there from your brief once this turn ends, so end the turn with at most one short line. As Stella, the conversation\'s turns run there from then on and the app\'s destination picker follows. As an agent, that place\'s Stella runs you with its files, apps, browser and sign-ins; your thread id, reports and messages follow you, but your working folder\'s files stay behind: commit and push first (a WIP branch is fine).',
+      'Move yourself, with this whole conversation, to "cloud" or one of the user\'s computers, onto another model or engine, or both; you continue from your brief once this turn ends, so end the turn with at most one short line. As Stella, the conversation\'s turns run there and on that model from then on, and the app\'s destination and model pickers follow. As an agent, your thread id, reports and messages stay with you; a move puts you under that place\'s Stella, with its files, apps, browser and sign-ins, but your working folder\'s files stay behind: commit and push first (a WIP branch is fine).',
     parameters: obj({
-      destination: str({
-        description: '"cloud" or a device_id.',
-      }),
-      prompt: str({
-        description: "Your self-contained brief to read there: what you were asked and what to do next.",
-      }),
-      leave_files: opt(
-        bool({
+      destination: opt(str({ description: '"cloud" or a device_id.' })),
+      model: opt(
+        str({
           description:
-            "Agents: move even with uncommitted or unpushed changes, which stay behind.",
+            'The model to run on, as for spawn_agent: "<provider>/<model>", "claude-code" or "claude-code/<model>", "antigravity/<model>", "stella/<model>"; ":low" to ":max" sets reasoning.',
         }),
       ),
+      prompt: str({
+        description: "Your self-contained brief to read when you continue: what you were asked and what to do next.",
+      }),
+      leave_files: opt(bool({ description: "Agents: move even with uncommitted or unpushed changes, which stay behind." })),
     }),
     replay: "safe",
     execute: async (args, api, context) => {
+      if (!args.destination?.trim() && !args.model?.trim()) throw new Error("Pass destination, model, or both.");
       const self = (await api.snapshot(StellaAgentDoc, api.conversationId, context)) ?? { agentType: "orchestrator" };
       if (self.agentType !== "orchestrator") {
-        if (!agentSwitch) throw new Error("You can't move from here. For work on another computer, ask Stella with send_message to \"stella\".");
+        if (!agentSwitch) throw new Error("You can't switch from here. To run somewhere else or on another model, ask Stella with send_message to \"stella\".");
         return await agentSwitch(args, api, context);
       }
-      const moveBrain = host.moveBrain;
-      if (!moveBrain) throw new Error("This chat is stored only on this computer, so you can only run here.");
-      const local = /^(local|here|this computer)$/iu.test(args.destination.trim());
-      const destination = parseSpawnDestination(args.destination);
-      if (destination.kind === "here") throw new Error('destination is required: "cloud" or a device_id.');
-      const target: StellaPlacement = local
-        ? rootPlacement
-        : destination.kind === "cloud"
-          ? { kind: "cloud" }
-          : { kind: "device", deviceId: destination.deviceId };
-      if (samePlacement(target, rootPlacement)) {
+      const brief = args.prompt?.trim();
+      if (!brief) throw new Error("Pass your brief as prompt: what you will do next, as you will read it then.");
+      const model = args.model?.trim();
+      const target = args.destination?.trim() ? brainTarget(args.destination, rootPlacement) : undefined;
+      const moves = target !== undefined && !samePlacement(target, rootPlacement);
+      if (!moves && !model) {
         return { output: [{ type: "text", text: `You already run on ${describePlacement(rootPlacement)}. Carry on here.` }] };
       }
-      const brief = args.prompt?.trim();
-      if (!brief) throw new Error("Pass your brief as prompt: what you will do there, as you will read it there.");
-      if (target.kind === "device") await untilOnline(host.standing, target.deviceId, context);
-      const moved = await moveBrain(target, brief, context);
+      if (moves && !host.moveBrain) throw new Error("This chat is stored only on this computer, so you can only run here.");
+      if (model && !host.switchBrainModel) throw new Error("This conversation can't change its own model from here; the user picks it in the app.");
+      const switched = model ? await host.switchBrainModel!(model, moves ? undefined : brief, context) : undefined;
+      if (!moves) {
+        return {
+          output: [
+            {
+              type: "text",
+              text: `You switch to ${switched!.label} once this turn ends: this conversation carries on on it from your brief, with everything so far, and the app's model picker shows it. End this turn now with at most one short line to the user; start no more work on this model.`,
+            },
+          ],
+          details: { move: "model", model: model!, brief },
+        };
+      }
+      if (target!.kind === "device") await untilOnline(host.standing, target!.deviceId, context);
+      const moved = await host.moveBrain!(target!, brief, context);
       if ("error" in moved) throw new Error(moved.error);
       return {
         output: [
           {
             type: "text",
-            text: `You are moving to ${describePlacement(moved.moved)}: from now on it takes this conversation's turns, and you carry on there with your brief once this turn ends, with the whole conversation. End this turn now with at most one short line to the user; start no more work here.`,
+            text: `You are moving to ${describePlacement(moved.moved)}${switched ? ` and onto ${switched.label}` : ""}: from now on it takes this conversation's turns, and you carry on there with your brief once this turn ends, with the whole conversation. End this turn now with at most one short line to the user; start no more work here.`,
           },
         ],
         details: {
           move: "brain",
           destination: moved.moved.kind === "device" ? moved.moved.deviceId : moved.moved.kind,
           brief,
+          ...(model ? { model } : {}),
         } satisfies Record<string, string> as Record<string, string>,
       };
     },
   });
+
+const brainTarget = (raw: string, rootPlacement: StellaPlacement): StellaPlacement => {
+  if (/^(local|here|this computer)$/iu.test(raw.trim())) return rootPlacement;
+  const destination = parseSpawnDestination(raw);
+  if (destination.kind === "here") return rootPlacement;
+  return destination.kind === "cloud" ? { kind: "cloud" } : { kind: "device", deviceId: destination.deviceId };
+};

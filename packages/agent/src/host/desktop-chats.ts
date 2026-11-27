@@ -46,7 +46,7 @@ import { PLACED_AGENT_STOPPED, PLACED_CALL_PREFIX } from "../stella/agents.ts";
 import type { AgentMessageDelivery, AgentStopResult } from "@stella/contracts/backend/agent-threads";
 import { agentReportReceipt, parseAgentReportId } from "@stella/contracts/backend/agent-reports";
 import { agentInputAction, agentInputSender, isAutomaticInputId, isOwnWakeId, type AgentInputSender } from "@stella/contracts/agent-rules";
-import { deviceEngineSignIns, type ExecutionContextSnapshot, type ExecutionDestination } from "@stella/contracts/execution-context";
+import { deviceEngineSignIns, deviceModelRefusal, type ExecutionContextSnapshot, type ExecutionDestination } from "@stella/contracts/execution-context";
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
 import { splitMessageReplyRefs } from "@stella/contracts/reply-refs";
 import {
@@ -167,7 +167,7 @@ import { agentLogDeviceHolder, type AgentLogCalls } from "@stella/contracts/back
 import type { AgentThreadCalls } from "@stella/contracts/backend/agent-threads";
 import { agentLogSync, importAgentLog, type AgentLogTransport } from "../stella/agent-log-sync.ts";
 import { agentMoveModel } from "../stella/agent-move-model.ts";
-import { movedAgentBrief, type AgentMove } from "../stella/execution.ts";
+import { movedAgentBrief, switchedAgentBrief, switchedBrainBrief, type AgentMove } from "../stella/execution.ts";
 import { fetchWithDeadline, REQUEST_BUDGET_MS, withDeadline } from "@stella/contracts/request-deadline";
 import { boundedReplay } from "../stella/doc-checkpoint.ts";
 import { applyViewRestore } from "@stella/runtime/kernel/tools/view-restore";
@@ -295,7 +295,7 @@ export type DesktopChatsOptions = {
       conversationId: string,
       threadIds?: string[],
     ): Promise<{ agents: AgentDirectoryAgentRow[]; sessions: AgentDirectorySessionRow[] }>;
-    message(args: { messageId: string; to: string; text: string; from: AgentMessageSender }): Promise<AgentMessageDelivery>;
+    message(args: { messageId: string; to: string; text: string; from: AgentMessageSender; model?: string }): Promise<AgentMessageDelivery>;
     stop(args: { conversationId: string; threadId: string; controlRequestId: string; requesterThreadId?: string }): Promise<AgentStopResult>;
     note(args: { noteId: string; conversationId: string; fromThreadId: string; text: string; toThreadId?: string }): Promise<void>;
     move?(
@@ -381,7 +381,7 @@ export type DesktopDeviceAgents = {
     threadId: string;
     waitingForDevice: boolean;
   }>;
-  message(args: { key: string; threadId: string; description: string; message: string; framed?: boolean }): Promise<"steered" | "resumed">;
+  message(args: { key: string; threadId: string; description: string; message: string; framed?: boolean; model?: string }): Promise<"steered" | "resumed">;
   stop(threadId: string): Promise<AgentStopResult | void>;
 };
 
@@ -394,7 +394,7 @@ export type DesktopEngineAgents = {
     parentThreadId?: string;
     workspace?: import("@stella/contracts/turn-plane/turn-start").AgentWorkspaceSize;
   }): Promise<{ threadId: string; note?: string }>;
-  message(args: { key: string; threadId: string; description: string; message: string; framed?: boolean }): Promise<"steered" | "resumed">;
+  message(args: { key: string; threadId: string; description: string; message: string; framed?: boolean; model?: string }): Promise<"steered" | "resumed">;
   stop(threadId: string): Promise<AgentStopResult | void>;
 };
 
@@ -500,7 +500,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     return executionContextRead.snapshot;
   };
   const placedIn = new Map<string, string>();
-  const placedRuns = new Map<string, { runKey: string; cancel: AbortController }>();
+  const placedRuns = new Map<string, { runKey: string; cancel: AbortController; ended: Promise<void> }>();
   const directory = path.join(options.dataDir, "agent");
   const historyIndex = historyIndexes(path.join(directory, "history-index"));
 
@@ -1187,9 +1187,9 @@ export function desktopChats(options: DesktopChatsOptions) {
           ...(parentThreadId ? { parentThreadId } : {}),
           ...(workspace ? { workspace } : {}),
         }),
-      message: async ({ key, threadId, message, framed }) => {
+      message: async ({ key, threadId, message, framed, model }) => {
         const description = await descriptionOf(threadId);
-        await engine.message({ key, threadId, description, message, ...(framed ? { framed } : {}) });
+        await engine.message({ key, threadId, description, message, ...(framed ? { framed } : {}), ...(model ? { model } : {}) });
       },
       stop: async (threadId) => {
         const result = await engine.stop(threadId);
@@ -1264,9 +1264,13 @@ export function desktopChats(options: DesktopChatsOptions) {
         });
         return { threadId: started.threadId, ...(started.waitingForDevice ? { waiting: true } : {}) };
       },
-      message: async ({ key, threadId, message, framed }) => {
+      message: async ({ key, threadId, message, framed, model }) => {
+        if (model) {
+          const unfit = deviceModelRefusal(await device(), model);
+          if (unfit) throw new Error(`${unfit} Nothing was sent.`);
+        }
         const description = await descriptionOf(threadId);
-        await agents.message({ key, threadId, description, message, ...(framed ? { framed } : {}) });
+        await agents.message({ key, threadId, description, message, ...(framed ? { framed } : {}), ...(model ? { model } : {}) });
       },
       stop: async (threadId) => {
         const result = await agents.stop(threadId);
@@ -1381,10 +1385,10 @@ export function desktopChats(options: DesktopChatsOptions) {
           };
         }
       },
-      message: async ({ key, to, text, from, remoteStella }) => {
+      message: async ({ key, to, text, from, remoteStella, model }) => {
         const id = createHash("sha256").update(`${options.deviceId ?? ""}\0${conversationId}\0${key}`).digest("hex").slice(0, 48);
         const framed = formatAgentMessage(from, text);
-        if (!remoteStella && to !== conversationId) {
+        if (!remoteStella && !model && to !== conversationId) {
           if (chats.has(to) || localSessions().some((row) => row.conversationId === to)) {
             if (await noteOnBrain(to, `agent-note:${id}`, framed)) return { outcome: "queued", threadId: to };
             const chat = await ready(to);
@@ -1404,7 +1408,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         }
         if (!cloud) return undefined;
         return await within(
-          cloud.message({ messageId: `pi-msg:${id}`, to, text, from }),
+          cloud.message({ messageId: `pi-msg:${id}`, to, text, from, ...(model ? { model } : {}) }),
           AGENT_MESSAGE_TIMEOUT_MS,
           "Stella's cloud did not answer, so the message may not have been delivered.",
         );
@@ -1432,7 +1436,7 @@ export function desktopChats(options: DesktopChatsOptions) {
       },
       ...(cloud?.move
         ? {
-            move: async ({ key, threadId, to, message, requesterThreadId }) => {
+            move: async ({ key, threadId, to, message, requesterThreadId, model }) => {
               const id = createHash("sha256").update(`${options.deviceId ?? ""}\0${conversationId}\0${key}`).digest("hex").slice(0, 48);
               return await within(
                 cloud.move!({
@@ -1442,6 +1446,7 @@ export function desktopChats(options: DesktopChatsOptions) {
                   targetDeviceId: to,
                   prompt: message,
                   ...(requesterThreadId ? { requesterThreadId } : {}),
+                  ...(model ? { model } : {}),
                 }),
                 AGENT_MOVE_TIMEOUT_MS,
                 "Stella's cloud did not answer, so the move may not have happened. Check agent_status before trying again.",
@@ -1589,32 +1594,60 @@ export function desktopChats(options: DesktopChatsOptions) {
                 const listed = await devices?.devices().catch(() => undefined);
                 const from = listed?.find((entry) => entry.deviceId === options.deviceId)?.label?.trim() || "the computer you ran on";
                 const brief = move.brief.length > 6_000 ? `${move.brief.slice(0, 6_000)}\n[brief cut]` : move.brief;
-                const model = agentMoveModel(move.model, move.thinkingLevel);
+                const model = move.pick ?? agentMoveModel(move.model, move.thinkingLevel);
+                if (move.inPlace && (!options.deviceId || !model)) return { error: "this computer can't record your new model in Stella's cloud." };
                 const moved = await handoff({
                   handoffId: `move:${createHash("sha256").update(`${conversationId}\0${move.threadId}\0${move.key}`).digest("hex").slice(0, 40)}`,
                   threadId: move.threadId,
                   conversationId,
-                  targetDeviceId: move.deviceId,
-                  prompt: movedAgentBrief(from, brief),
+                  targetDeviceId: move.inPlace ? options.deviceId! : move.deviceId,
+                  prompt: move.inPlace ? switchedAgentBrief(model!, brief) : movedAgentBrief(from, brief, [], move.pick),
                   ...(model ? { model } : {}),
                   ...(move.cwd ? { cwd: move.cwd } : {}),
                 });
                 return { where: moved.where };
               }
             : undefined;
+        const turnEnded = async () => {
+          const deadline = performance.now() + BRAIN_HANDOFF_WAIT_MS;
+          while (performance.now() < deadline) {
+            await new Promise((resolve) => setTimeout(resolve, 1_000));
+            if (opened && (await opened.harness.snapshot(LiveDoc, opened.root.id, context))?.run === undefined) return;
+          }
+        };
+        const switchBrainModel = async (requested: string, brief: string | undefined) => {
+          const setStellaModel = options.setStellaModel;
+          if (!setStellaModel) throw new Error("This computer can't change Stella's model from here; the user picks it in the app.");
+          const choice = await agentModel(conversationId, requested);
+          const runsOn = "runsOn" in choice ? choice.runsOn : undefined;
+          if (!runsOn?.model) throw new Error(`"${requested}" can't run this conversation here.`);
+          if (onClaudeCode(runsOn.model)) {
+            const problem = await options.claudeCodeProblem?.().catch(() => undefined);
+            if (problem) throw new Error(`${problem} Pick another model, or ask the user to sign in to Claude on this computer.`);
+          }
+          const effort = /:(low|medium|high|xhigh|max)$/u.exec(requested.trim())?.[1];
+          const label = agentMoveModel(runsOn.model, effort) ?? requested;
+          await setStellaModel(label);
+          options.emit({ conversationId, events: [{ type: "model_picked", pick: label }] });
+          if (brief !== undefined) {
+            const requestId = `switch-model:${createHash("sha256").update(`${conversationId}\0${label}\0${brief}`).digest("hex").slice(0, 32)}`;
+            void turnEnded()
+              .then(() => automation(conversationId, { requestId, prompt: switchedBrainBrief(label, brief), visible: false }))
+              .then((result) => {
+                if (result.status !== "ok") options.report(new Error(`Continuing on ${label} failed: ${result.error}`));
+              })
+              .catch((error: unknown) => options.report(error));
+          }
+          return { label };
+        };
         const execution = desktopExecution({
           ...(moveAgent ? { moveAgent, leftBehind: workLeftBehind } : {}),
+          switchBrainModel: (requested, brief) => switchBrainModel(requested, brief),
           ...(options.deviceId ? { deviceId: options.deviceId } : {}),
           localOnly: conversationId.startsWith("local_"),
           ...(devices ? { devices } : {}),
           ...(brain ? { brain } : {}),
-          turnEnded: async () => {
-            const deadline = performance.now() + BRAIN_HANDOFF_WAIT_MS;
-            while (performance.now() < deadline) {
-              await new Promise((resolve) => setTimeout(resolve, 1_000));
-              if (opened && (await opened.harness.snapshot(LiveDoc, opened.root.id, context))?.run === undefined) return;
-            }
-          },
+          turnEnded,
           brainMoved: (record) => rememberBrain(conversationId, { record, host: otherHost(record) }),
           report: options.report,
         });
@@ -1697,6 +1730,16 @@ export function desktopChats(options: DesktopChatsOptions) {
                     }
                   : {}),
                 ensureModel: (model) => ensureModel(model),
+                fitModel: async (agentConversationId, model, runContext) => {
+                  const into = harnessRef;
+                  const conversation = into ? await into.conversation(agentConversationId, runContext) : undefined;
+                  if (!into || !conversation) return;
+                  const window = onCliEngine(model)
+                    ? (cliEngineOf(model.provider)?.contextWindow(model.modelId) ?? 0)
+                    : (models.getModel(model.provider, model.modelId)?.contextWindow ?? 0);
+                  const fit = await fitForHandover({ harness: into, conversation, window, context: runContext, report: options.report });
+                  if (fit.fit !== "fits") console.info("[stella-handover] task", { agentConversationId, to: model, ...fit });
+                },
                 beginAgentRun: async (run) => {
                   if (!opened) return;
                   if (run.parentThreadId) subagentThreads.add(run.threadId);
@@ -2690,13 +2733,20 @@ export function desktopChats(options: DesktopChatsOptions) {
     },
   ): ReturnType<OpenStellaHarness["runPlacedAgent"]> => {
     placedIn.set(run.agentKey, conversationId);
-    const placed = { runKey: run.runKey, cancel: new AbortController() };
+    let end = () => {};
+    const placed = { runKey: run.runKey, cancel: new AbortController(), ended: new Promise<void>((resolve) => (end = resolve)) };
+    // A newer attempt for the same task (a model switch, a resume) supersedes the run still here.
+    const superseded = placedRuns.get(run.agentKey);
     placedRuns.set(run.agentKey, placed);
     const { model, signal, ...placedRun } = run;
     const stop = () => placed.cancel.abort(signal?.reason);
     if (signal?.aborted) stop();
     else signal?.addEventListener("abort", stop, { once: true });
     try {
+      if (superseded && superseded.runKey !== run.runKey) {
+        superseded.cancel.abort();
+        await superseded.ended;
+      }
       let runsOn: RunsOn | undefined;
       if (model) {
         const choice = await agentModel(conversationId, model).catch((error: unknown) => error instanceof Error ? error : new Error(String(error)));
@@ -2753,6 +2803,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     } finally {
       signal?.removeEventListener("abort", stop);
       if (placedRuns.get(run.agentKey) === placed) placedRuns.delete(run.agentKey);
+      end();
     }
   };
 

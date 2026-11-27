@@ -1,10 +1,13 @@
 // Loads the UI bundle for boot and every hot swap without the host growing: the bundler runs in a
 // child (ui-build-child.ts) that exists only while builds come in (started on demand, stopped when
-// idle, recycled as it grows), each build is evaluated as a CommonJS factory that no module
-// registry keeps (its global registrations scoped, ui-scope.ts), so a replaced UI is garbage once
-// React lets go of it, and once loads settle the compiled code of replaced UIs is released.
+// idle, recycled as it grows; another, at low priority, writes the boot bundle once edits go quiet
+// and is stopped when a build starts, so a swap never waits for it), each build is evaluated as a
+// CommonJS factory that no module registry keeps (its global registrations scoped, ui-scope.ts),
+// so a replaced UI is garbage once React lets go of it, and once loads settle the compiled code of
+// replaced UIs is released.
 
 import { createRequire } from "node:module";
+import os from "node:os";
 import path from "node:path";
 import type { Subprocess } from "bun";
 import type { UiBuildReply, UiBuildRequest } from "./ui-build-child";
@@ -14,6 +17,8 @@ import { bootMark } from "./boot-trace";
 import { uiBuildMode } from "./ui-mode";
 
 const CHILD = path.join(import.meta.dir, "ui-build-child.ts");
+/** Quiet time after a build before the boot bundle is written. */
+const CACHE_SETTLE_MS = 1500;
 
 export type UiModule = Record<string, any>;
 
@@ -43,7 +48,7 @@ export function createUiLoader(options: UiLoaderOptions) {
   let child: Child | null = null;
   let idleTimer: ReturnType<typeof setTimeout> | null = null;
 
-  const spawnChild = (): Child => {
+  const spawnChild = (onGone: (c: Child) => void = (c) => { if (child === c) child = null; }): Child => {
     let resolveReady!: () => void;
     const c: Child = { proc: null!, ready: new Promise((r) => (resolveReady = r)), builds: 0, pending: new Map() };
     c.proc = Bun.spawn([process.execPath, CHILD], {
@@ -58,7 +63,7 @@ export function createUiLoader(options: UiLoaderOptions) {
       onExit(_proc, code) {
         for (const settle of c.pending.values()) settle({ id: -1, ok: false, error: `UI builder exited (${code})`, rssMb: 0 });
         c.pending.clear();
-        if (child === c) child = null;
+        onGone(c);
       },
     });
     return c;
@@ -78,8 +83,35 @@ export function createUiLoader(options: UiLoaderOptions) {
     idleTimer.unref();
   };
 
+  let cacheTimer: ReturnType<typeof setTimeout> | null = null;
+  let cacheChild: Child | null = null;
+  const cancelCache = () => {
+    if (cacheTimer) { clearTimeout(cacheTimer); cacheTimer = null; }
+    const c = cacheChild;
+    cacheChild = null;
+    c?.proc.kill();
+  };
+  const scheduleCache = (inputs: string[]) => {
+    cancelCache();
+    cacheTimer = setTimeout(async () => {
+      cacheTimer = null;
+      const c = (cacheChild = spawnChild((gone) => { if (cacheChild === gone) cacheChild = null; }));
+      try { os.setPriority(c.proc.pid, os.constants.priority.PRIORITY_LOW); } catch {}
+      await c.ready;
+      if (cacheChild !== c) return;
+      const id = ++nextId;
+      await new Promise<UiBuildReply>((resolve) => {
+        c.pending.set(id, resolve);
+        c.proc.send({ id, entry: options.entry, tsconfig: options.tsconfig, external: options.external, writeCache: inputs } satisfies UiBuildRequest);
+      });
+      if (cacheChild === c) cancelCache();
+    }, CACHE_SETTLE_MS);
+    cacheTimer.unref();
+  };
+
   const build = async (): Promise<string> => {
     if (idleTimer) { clearTimeout(idleTimer); idleTimer = null; }
+    cancelCache();
     const c = (child ??= spawnChild());
     await c.ready;
     const id = ++nextId;
@@ -91,6 +123,7 @@ export function createUiLoader(options: UiLoaderOptions) {
     if (c.builds >= recycleAfter || reply.rssMb > recycleAboveMb) retire(c);
     else stopWhenIdle();
     if (!reply.ok) throw new Error(reply.error);
+    if (reply.inputs) scheduleCache(reply.inputs);
     return reply.code;
   };
 
@@ -130,7 +163,7 @@ export function createUiLoader(options: UiLoaderOptions) {
     }, options.settleMs ?? 2000);
     settleTimer.unref();
   };
-  process.once("exit", () => child?.proc.kill());
+  process.once("exit", () => { child?.proc.kill(); cacheChild?.proc.kill(); });
 
   return {
     /** Checks the boot bundle, and spawns the bundler ahead of the first load when it can't be used. */
@@ -178,6 +211,7 @@ export function createUiLoader(options: UiLoaderOptions) {
     },
     dispose() {
       if (idleTimer) clearTimeout(idleTimer);
+      cancelCache();
       if (child) retire(child);
     },
   };

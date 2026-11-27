@@ -244,9 +244,9 @@ export function ShellTopBarTabs({ room }: { room: number }) {
   return (
     <row id="topbar-tabs" h="full" align="center" gap={TAB_GAP} minW={0} shrink>
       <col hidden absolute={{ left: 0, top: 0 }} align="start" inert>
-        <text {...LABEL} nowrap onLayout={(r) => setLabelWidths((w) => (w["__chat"] === r.w ? w : { ...w, __chat: r.w }))}>Chat</text>
+        <text {...LABEL} nowrap onSize={(r) => setLabelWidths((w) => (w["__chat"] === r.w ? w : { ...w, __chat: r.w }))}>Chat</text>
         {tabs.map((tab) => (
-          <text key={tab.id} {...LABEL} nowrap onLayout={(r) => setLabelWidths((w) => (w[tab.id] === r.w ? w : { ...w, [tab.id]: r.w }))}>
+          <text key={tab.id} {...LABEL} nowrap onSize={(r) => setLabelWidths((w) => (w[tab.id] === r.w ? w : { ...w, [tab.id]: r.w }))}>
             {titles.get(tab.id) ?? ""}
           </text>
         ))}

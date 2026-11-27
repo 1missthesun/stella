@@ -698,7 +698,7 @@ function DetachedViewerFrame({ name, item, bodies }: { name: string; item: Displ
         fill={t.c.background}
         keys={STEP_CHORDS}
         onKey={(k) => stepViewer(k.chord, item.id)}
-        onLayout={(r) => setWidth(r.w)}
+        onSize={(r) => setWidth(r.w)}
         onContextMenu={(at) => itemMenu(item.id, at, snapshot.engineId)}
       >
         <ViewerHeader item={item} placement="window" width={width} onDetach={null} onClose={() => fileViewer.closeDetached(name)} onDock={dock} />

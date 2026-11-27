@@ -198,7 +198,8 @@ its own label.
 | `onHover(inside)` | boolean |
 | `onFocus(focused, keyboard)` | booleans |
 | `onFocusWithin(within)` | boolean |
-| `onLayout({x,y,w,h})` | window rect |
+| `onLayout({x,y,w,h})` | window rect: also on every frame its content scrolls |
+| `onSize({w,h})` | size, on first layout and when it changes (never for scrolling); prefer it when only the size matters |
 | `onScroll({x,y,maxX,maxY,viewport})` | scroll position |
 | `onAtBottom(atBottom)` | boolean |
 | `onKey({key, chord, mods})` | key |

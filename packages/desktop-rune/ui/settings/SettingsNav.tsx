@@ -110,7 +110,7 @@ export function SettingsBarNav({
 
   return (
     <col w="full" {...s.settingsBarNavWrap}>
-      <row {...s.settingsBarNav} role="tablist" label={label} onLayout={(r) => setAvailable(r.w)}>
+      <row {...s.settingsBarNav} role="tablist" label={label} onSize={(r) => setAvailable(r.w)}>
         {visible.map(({ key, labelKey }) => {
           const isActive = activeTab === key;
           return <AiryDotItem bar key={key} id={`settings-tab-${key}`} role="tab" label={t(labelKey)} active={isActive} onPress={() => onSelect(key)} tabProps={tabButtonProps(key, isActive)} />;

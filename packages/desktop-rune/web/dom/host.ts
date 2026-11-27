@@ -215,11 +215,17 @@ export function useHost(p: BoxProps, base: string): Host {
     };
   }, []);
 
-  const wantsLayout = !!p.onLayout;
+  const wantsLayout = !!(p.onLayout || p.onSize);
   useLayoutEffect(() => {
     const node = el.current;
     if (!node || !wantsLayout) return;
-    const w = watchLayout(node, (r) => latest.current.onLayout?.(r));
+    let sized: { w: number; h: number } | undefined;
+    const w = watchLayout(node, (r) => {
+      latest.current.onLayout?.(r);
+      if (!latest.current.onSize || (sized && sized.w === r.w && sized.h === r.h)) return;
+      sized = { w: r.w, h: r.h };
+      latest.current.onSize(sized);
+    });
     return () => w.stop();
   }, [wantsLayout]);
 

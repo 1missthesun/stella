@@ -132,7 +132,7 @@ export function AudioPlayer({ id, src }: { id: string; src: string }) {
           h={4}
           center
           onHover={setHover}
-          onLayout={(r) => (trackW.current = r.w)}
+          onSize={(r) => (trackW.current = r.w)}
           keys={["ArrowRight", "ArrowLeft", " ", "Enter"]}
           onKey={({ key }) => {
             if (clock.duration <= 0) return;
@@ -270,7 +270,7 @@ export function VideoPlayer({ id, src, onFullSize, onMore }: { id: string; src: 
           h={4}
           radius={radius.full}
           fill="rgba(255,255,255,0.3)"
-          onLayout={(r) => setBarWidth(r.w)}
+          onSize={(r) => setBarWidth(r.w)}
           onDrag={(d) => {
             wake();
             seekRatio(d.x / (barWidth || 1));

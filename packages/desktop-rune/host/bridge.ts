@@ -27,7 +27,9 @@ const u32 = (v: number) => { ensure(4); view.setUint32(len, v, true); len += 4; 
 const f64 = (v: number) => { ensure(8); view.setFloat64(len, v, true); len += 8; };
 function bytes(b: Uint8Array) { ensure(b.length); buf.set(b, len); len += b.length; }
 
-export const stats = { frames: 0, bytes: 0, ops: 0 };
+/** Bridge counters (`/stats`): frames and ops sent, engine frames sealed (`commits`: React commits and
+ *  direct `set` flushes), React commits alone (`renders`), and events read from the engine (`events`). */
+export const stats = { frames: 0, bytes: 0, ops: 0, commits: 0, renders: 0, events: 0 };
 
 export const ops = {
   create(id: number, type: string) { const t = enc.encode(type); u8(OP.CREATE); u32(id); u8(t.length); bytes(t); stats.ops++; },
@@ -89,6 +91,7 @@ export const opsPending = () => len > 4;
 /** Seals the pending ops as one frame and writes it. */
 export function flushFrame(commit = true) {
   if (commit) {
+    stats.commits++;
     u8(OP.COMMIT); u32(++generation); u32(commitCtx.ack); f64(commitCtx.t0 || now()); u8(commitCtx.kind);
     commitCtx.ack = 0; commitCtx.t0 = 0; commitCtx.kind = 0;
   }
@@ -227,6 +230,7 @@ export async function listen(extra?: (e: EngineEvent) => void) {
       if (!line) continue;
       let e: EngineEvent;
       try { e = JSON.parse(line); } catch (err) { console.error("[bridge] bad event", line, err); continue; }
+      stats.events++;
       dispatch(e);
       extra?.(e);
     }

@@ -5,7 +5,7 @@
 import Reconciler from "react-reconciler";
 import { ConcurrentRoot, ContinuousEventPriority, DefaultEventPriority, DiscreteEventPriority } from "react-reconciler/constants";
 import { createContext, type ReactNode } from "react";
-import { blob, command, commitCtx, flushFrame, freeBlob, ops, opsPending, setElementDispatch, type ElementEvent } from "./bridge";
+import { blob, command, commitCtx, flushFrame, freeBlob, ops, opsPending, setElementDispatch, stats, type ElementEvent } from "./bridge";
 
 type Handlers = Record<string, (...args: any[]) => void>;
 /** Props set through a ref, outside React. They stay over React's until set again. */
@@ -17,6 +17,8 @@ class Instance {
   /** The `<image src>` whose blob it holds (`srcBlobs`). */
   src?: string;
   direct?: Direct;
+  /** The size `onSize` last heard. */
+  sized?: { w: number; h: number };
   react: Record<string, any> = {};
   constructor(readonly id: number, readonly type: string) {}
 
@@ -210,6 +212,21 @@ function serialize(inst: Instance, reactProps: Record<string, any>): string {
     }
     out[k] = v;
   }
+  const size = inst.handlers.size;
+  if (size) {
+    // `onSize` rides the engine's layout events and fires only when the size changes: content
+    // moving under a scroll changes every rect it reports, never its size.
+    delete inst.handlers.size;
+    on.splice(on.indexOf("size"), 1);
+    const layout = inst.handlers.layout;
+    if (!layout) on.push("layout");
+    inst.handlers.layout = (r: Rect) => {
+      layout?.(r);
+      if (inst.sized && inst.sized.w === r.w && inst.sized.h === r.h) return;
+      inst.sized = { w: r.w, h: r.h };
+      size({ w: r.w, h: r.h });
+    };
+  }
   if (on.length) out.on = on;
   if (inst.type === "text") {
     const t = textOf(props.children);
@@ -361,6 +378,7 @@ const config: any = {
   getPublicInstance: (i: Instance) => i,
   prepareForCommit: () => null,
   resetAfterCommit: () => {
+    stats.renders++;
     flushFrame(true);
     if (fresh?.length) queueMicrotask(replayFresh);
   },

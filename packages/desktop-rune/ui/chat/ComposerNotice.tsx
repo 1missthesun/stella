@@ -120,7 +120,7 @@ function NoticeFrame({
   );
   if (compact) return <col w="full" mb={8}>{frame}</col>;
   return (
-    <row w="full" justify="center" px={narrow ? 8 : 48} mb={10} onLayout={(r) => setNarrow(r.w < NARROW_W)}>
+    <row w="full" justify="center" px={narrow ? 8 : 48} mb={10} onSize={(r) => setNarrow(r.w < NARROW_W)}>
       {frame}
     </row>
   );

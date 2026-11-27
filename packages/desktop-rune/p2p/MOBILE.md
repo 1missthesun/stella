@@ -34,4 +34,6 @@ it pairs with a computer's code (`pair`), then talks to that computer (`request`
   `stella_p2p_command`, `stella_p2p_stop`, `stella_p2p_android_init`.
 - The CLI built for `x86_64-linux-android` paired with a desktop host from the Android 16
   emulator and read its chat over a direct path.
-- iOS targets need the Mac (Xcode toolchain); not built here.
+- `aarch64-apple-ios` and `aarch64-apple-ios-sim` staticlibs build on the Mac and export the
+  same functions; the CLI built for the simulator ran there (`xcrun simctl spawn … status`),
+  reached the relay and kept its identity across runs.

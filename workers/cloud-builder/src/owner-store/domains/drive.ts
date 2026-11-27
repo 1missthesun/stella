@@ -267,10 +267,16 @@ export const DRIVE_USAGE_MIGRATION = {
 };
 
 /** SQL twin of isChatAttachmentPath, used once to sort the files stored before kinds existed. */
+/** SQL twin of isChatAttachmentPath, used once to sort the files stored before kinds existed.
+ * Cloudflare's SQLite refuses long GLOB patterns, so the phone's
+ * uploads/<yyyy-mm-dd>/<8 hex>-<name> shape is checked piece by piece. */
 const ATTACHMENT_PATH_SQL = `(path GLOB 'Chat Attachments/*'
   OR path GLOB 'execution-attachments/*'
-  OR (path GLOB 'uploads/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-*'
-      AND path NOT GLOB 'uploads/*/*/*'))`;
+  OR (path GLOB 'uploads/????-??-??/*'
+      AND substr(path, 9, 4) GLOB '[0-9][0-9][0-9][0-9]'
+      AND substr(path, 20, 8) NOT GLOB '*[^0-9a-f]*'
+      AND substr(path, 28, 1) = '-'
+      AND instr(substr(path, 20), '/') = 0))`;
 
 const usageUpsert = (table: string, row: "NEW", kind: FileKind) =>
   `INSERT INTO ${table} (space, files, bytes) SELECT ${row}.space, 1, ${row}.size_bytes WHERE ${row}.kind = '${kind}'

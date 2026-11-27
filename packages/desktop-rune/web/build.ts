@@ -99,6 +99,24 @@ const startedAt = Date.now();
 fs.rmSync(outDir, { recursive: true, force: true });
 fs.mkdirSync(path.join(outDir, ASSETS), { recursive: true });
 
+// A Stella View's worker (web/views/view-worker.ts) is its own bundle beside the app's chunks; the app
+// finds it by the name defined below.
+const viewWorker = await Bun.build({
+  entrypoints: [path.join(WEB, "views", "view-worker.ts")],
+  outdir: path.join(outDir, ASSETS),
+  target: "browser",
+  format: "esm",
+  minify: !process.argv.includes("--no-minify"),
+  sourcemap: "none",
+  naming: "[name]-[hash].[ext]",
+  throw: false,
+});
+const viewWorkerFile = viewWorker.outputs.find((o) => o.kind === "entry-point");
+if (!viewWorker.success || !viewWorkerFile) {
+  for (const log of viewWorker.logs) console.error(String(log));
+  throw new Error("The views worker build failed.");
+}
+
 const app = await Bun.build({
   entrypoints: [path.join(WEB, "entry.ts")],
   outdir: outDir,
@@ -108,7 +126,7 @@ const app = await Bun.build({
   minify: !process.argv.includes("--no-minify"),
   sourcemap: "none",
   naming: { entry: `${ASSETS}/[name]-[hash].[ext]`, chunk: `${ASSETS}/[name]-[hash].[ext]`, asset: `${ASSETS}/[name]-[hash].[ext]` },
-  define: { "process.env.NODE_ENV": JSON.stringify("production"), "import.meta.hot": "undefined" },
+  define: { "process.env.NODE_ENV": JSON.stringify("production"), "import.meta.hot": "undefined", __STELLA_VIEW_WORKER__: JSON.stringify(path.basename(viewWorkerFile.path)) },
   plugins: [webPlugin, viteCompat],
   throw: false,
 });

@@ -5,6 +5,7 @@ import { createStore, makeUseStore } from "../host/store";
 import { installSheet } from "./dom/sheet";
 import { pressedByKeys } from "./dom/host";
 import { onEngineEvent, startSelectionEvents, webEngine } from "./engine";
+import { webViews } from "./views";
 import { removeLaunchSplash } from "../ui/shell/launch-splash";
 import { adoptStaticHome } from "./static-home/adopt";
 
@@ -19,6 +20,7 @@ const store = createStore({ dark: true, sidebarOpen: true, messages: [], draft: 
   on: onEngineEvent,
   windowPortal: () => null,
   pressedByKeys,
+  views: webViews,
 };
 startSelectionEvents();
 

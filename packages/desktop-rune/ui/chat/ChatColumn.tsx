@@ -190,6 +190,10 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
   );
 
   const liveMessages = useChatMessages();
+  // Where the views' files aren't on this device (the web), the conversation carries their sources.
+  useEffect(() => {
+    globalThis.stella.views?.offerMessages?.(liveMessages);
+  }, [liveMessages]);
   const messages = useDeferredChatMessages(liveMessages, isUserScrolling, conversationId);
   const assistantReplyPeek = useAssistantReplyPeek({ messages, isFollowingLatest, isNearBottom });
 

@@ -3901,5 +3901,43 @@
       "title": "Stella juga ada di ponselmu",
       "detail": "Dapatkan aplikasinya untuk mengirim pesan ke Stella dan memantau tugasmu saat kamu jauh dari komputer ini."
     }
+  },
+  "devices": {
+    "title": "Perangkat",
+    "more": "Lainnya untuk {name}",
+    "unpair": "Putuskan pasangan",
+    "forget": "Lupakan",
+    "unpairTitle": "Putuskan pasangan {name}?",
+    "unpairBody": "Perangkat langsung terputus dan perlu kode baru untuk terhubung lagi.",
+    "forgetTitle": "Lupakan {name}?",
+    "forgetBody": "Perangkat ini berhenti terhubung ke sana. Chat tetap ada di komputer itu.",
+    "computerChat": "Stella di {name}",
+    "pair": {
+      "intro": "Pindai ini dengan Stella di ponsel, atau tempel kodenya di Stella pada komputer lain. Koneksinya langsung ke komputer ini, tanpa akun, dan hanya berlaku sekali.",
+      "copy": "Salin kode"
+    },
+    "enter": {
+      "title": "Gunakan Stella di komputer lain",
+      "intro": "Di komputer itu, buka Pengaturan › Akun › Hubungkan perangkat, lalu tempel kodenya di sini.",
+      "label": "Kode pemasangan",
+      "connect": "Hubungkan",
+      "connecting": "Menghubungkan…"
+    },
+    "status": {
+      "connected": "Terhubung",
+      "lastSeen": "Terakhir terlihat {time}",
+      "notYet": "Belum terhubung",
+      "online": "Online",
+      "onlineRelay": "Online lewat relay",
+      "offline": "Tidur atau offline",
+      "connecting": "Menghubungkan…",
+      "unpaired": "Tidak lagi dipasangkan"
+    },
+    "chat": {
+      "offline": "{name} sedang tidur atau offline. Akan terhubung lagi otomatis.",
+      "connecting": "Menghubungkan ke {name}…",
+      "unpaired": "{name} memutuskan pasangan perangkat ini.",
+      "back": "Kembali ke komputer ini"
+    }
   }
 }

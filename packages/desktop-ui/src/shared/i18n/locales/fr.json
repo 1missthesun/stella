@@ -4017,5 +4017,43 @@
       "title": "Stella est aussi sur votre téléphone",
       "detail": "Téléchargez l’app pour écrire à Stella et suivre vos tâches quand vous n’êtes pas devant cet ordinateur."
     }
+  },
+  "devices": {
+    "title": "Appareils",
+    "more": "Plus pour {name}",
+    "unpair": "Dissocier",
+    "forget": "Oublier",
+    "unpairTitle": "Dissocier {name} ?",
+    "unpairBody": "Il est déconnecté immédiatement et devra utiliser un nouveau code pour se reconnecter.",
+    "forgetTitle": "Oublier {name} ?",
+    "forgetBody": "Cet appareil ne s’y connectera plus. Ses conversations restent sur cet ordinateur.",
+    "computerChat": "Stella sur {name}",
+    "pair": {
+      "intro": "Scannez ceci avec Stella sur votre téléphone, ou collez le code dans Stella sur un autre ordinateur. La connexion se fait directement avec cet ordinateur, sans compte, et ne fonctionne qu’une fois.",
+      "copy": "Copier le code"
+    },
+    "enter": {
+      "title": "Utiliser la Stella d’un autre ordinateur",
+      "intro": "Sur cet ordinateur, ouvrez Réglages › Compte › Connecter un appareil, puis collez son code ici.",
+      "label": "Code d’association",
+      "connect": "Connecter",
+      "connecting": "Connexion…"
+    },
+    "status": {
+      "connected": "Connecté",
+      "lastSeen": "Vu {time}",
+      "notYet": "Pas encore connecté",
+      "online": "En ligne",
+      "onlineRelay": "En ligne via un relais",
+      "offline": "En veille ou hors ligne",
+      "connecting": "Connexion…",
+      "unpaired": "N’est plus associé"
+    },
+    "chat": {
+      "offline": "{name} est en veille ou hors ligne. Reconnexion automatique.",
+      "connecting": "Connexion à {name}…",
+      "unpaired": "{name} a dissocié cet appareil.",
+      "back": "Revenir à cet ordinateur"
+    }
   }
 }

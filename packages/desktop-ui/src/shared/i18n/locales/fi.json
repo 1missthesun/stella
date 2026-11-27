@@ -3960,5 +3960,43 @@
       "title": "Stella on myös puhelimessasi",
       "detail": "Hanki sovellus, niin voit viestiä Stellalle ja seurata tehtäviäsi, kun olet poissa tämän tietokoneen ääreltä."
     }
+  },
+  "devices": {
+    "title": "Laitteet",
+    "more": "Lisää: {name}",
+    "unpair": "Poista pariliitos",
+    "forget": "Unohda",
+    "unpairTitle": "Poistetaanko pariliitos: {name}?",
+    "unpairBody": "Yhteys katkeaa heti, ja uuteen yhteyteen tarvitaan uusi koodi.",
+    "forgetTitle": "Unohdetaanko {name}?",
+    "forgetBody": "Tämä laite lakkaa yhdistämästä siihen. Keskustelut jäävät sille tietokoneelle.",
+    "computerChat": "Stella: {name}",
+    "pair": {
+      "intro": "Skannaa tämä puhelimesi Stellalla tai liitä koodi toisen tietokoneen Stellaan. Se yhdistää suoraan tähän tietokoneeseen ilman tiliä, ja koodi toimii kerran.",
+      "copy": "Kopioi koodi"
+    },
+    "enter": {
+      "title": "Käytä toisen tietokoneen Stellaa",
+      "intro": "Avaa sillä tietokoneella Asetukset › Tili › Yhdistä laite ja liitä koodi tähän.",
+      "label": "Pariliitoskoodi",
+      "connect": "Yhdistä",
+      "connecting": "Yhdistetään…"
+    },
+    "status": {
+      "connected": "Yhdistetty",
+      "lastSeen": "Nähty viimeksi {time}",
+      "notYet": "Ei vielä yhdistetty",
+      "online": "Verkossa",
+      "onlineRelay": "Verkossa välityspalvelimen kautta",
+      "offline": "Lepotilassa tai offline-tilassa",
+      "connecting": "Yhdistetään…",
+      "unpaired": "Ei enää pariliitetty"
+    },
+    "chat": {
+      "offline": "{name} on lepotilassa tai offline-tilassa. Yhdistää automaattisesti uudelleen.",
+      "connecting": "Yhdistetään: {name}…",
+      "unpaired": "{name} poisti pariliitoksen tähän laitteeseen.",
+      "back": "Takaisin tähän tietokoneeseen"
+    }
   }
 }

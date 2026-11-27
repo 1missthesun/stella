@@ -3960,5 +3960,43 @@
       "title": "Stella er også på din telefon",
       "detail": "Hent appen for at skrive til Stella og følge dine opgaver, når du er væk fra denne computer."
     }
+  },
+  "devices": {
+    "title": "Enheder",
+    "more": "Mere for {name}",
+    "unpair": "Fjern parring",
+    "forget": "Glem",
+    "unpairTitle": "Fjern parring med {name}?",
+    "unpairBody": "Forbindelsen afbrydes med det samme, og der skal en ny kode til for at forbinde igen.",
+    "forgetTitle": "Glem {name}?",
+    "forgetBody": "Denne enhed holder op med at forbinde til den. Chattene bliver på den computer.",
+    "computerChat": "Stella på {name}",
+    "pair": {
+      "intro": "Scan dette med Stella på din telefon, eller indsæt koden i Stella på en anden computer. Den forbinder direkte til denne computer, uden konto, og virker én gang.",
+      "copy": "Kopiér kode"
+    },
+    "enter": {
+      "title": "Brug en anden computers Stella",
+      "intro": "Åbn Indstillinger › Konto › Forbind en enhed på den computer, og indsæt koden her.",
+      "label": "Parringskode",
+      "connect": "Forbind",
+      "connecting": "Forbinder…"
+    },
+    "status": {
+      "connected": "Forbundet",
+      "lastSeen": "Sidst set {time}",
+      "notYet": "Ikke forbundet endnu",
+      "online": "Online",
+      "onlineRelay": "Online via et relæ",
+      "offline": "I dvale eller offline",
+      "connecting": "Forbinder…",
+      "unpaired": "Ikke længere parret"
+    },
+    "chat": {
+      "offline": "{name} er i dvale eller offline. Forbinder automatisk igen.",
+      "connecting": "Forbinder til {name}…",
+      "unpaired": "{name} fjernede parringen med denne enhed.",
+      "back": "Tilbage til denne computer"
+    }
   }
 }

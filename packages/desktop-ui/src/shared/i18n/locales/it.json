@@ -4017,5 +4017,43 @@
       "title": "Stella è anche sul tuo telefono",
       "detail": "Scarica l’app per scrivere a Stella e seguire le tue attività quando non sei a questo computer."
     }
+  },
+  "devices": {
+    "title": "Dispositivi",
+    "more": "Altro per {name}",
+    "unpair": "Scollega",
+    "forget": "Dimentica",
+    "unpairTitle": "Scollegare {name}?",
+    "unpairBody": "Viene disconnesso subito e servirà un nuovo codice per ricollegarlo.",
+    "forgetTitle": "Dimenticare {name}?",
+    "forgetBody": "Questo dispositivo smette di collegarsi. Le chat restano su quel computer.",
+    "computerChat": "Stella su {name}",
+    "pair": {
+      "intro": "Scansiona questo con Stella sul telefono o incolla il codice in Stella su un altro computer. Si collega direttamente a questo computer, senza account, e funziona una sola volta.",
+      "copy": "Copia codice"
+    },
+    "enter": {
+      "title": "Usa la Stella di un altro computer",
+      "intro": "Su quel computer apri Impostazioni › Account › Collega un dispositivo, poi incolla qui il codice.",
+      "label": "Codice di abbinamento",
+      "connect": "Collega",
+      "connecting": "Collegamento…"
+    },
+    "status": {
+      "connected": "Collegato",
+      "lastSeen": "Visto {time}",
+      "notYet": "Non ancora collegato",
+      "online": "Online",
+      "onlineRelay": "Online tramite relay",
+      "offline": "In stop o offline",
+      "connecting": "Collegamento…",
+      "unpaired": "Non più abbinato"
+    },
+    "chat": {
+      "offline": "{name} è in stop o offline. Si ricollega automaticamente.",
+      "connecting": "Collegamento a {name}…",
+      "unpaired": "{name} ha scollegato questo dispositivo.",
+      "back": "Torna a questo computer"
+    }
   }
 }

@@ -4074,5 +4074,43 @@
       "title": "Stella je i ve vašem telefonu",
       "detail": "Stáhněte si aplikaci a pište Stelle a sledujte své úkoly, i když nejste u tohoto počítače."
     }
+  },
+  "devices": {
+    "title": "Zařízení",
+    "more": "Další pro {name}",
+    "unpair": "Zrušit spárování",
+    "forget": "Zapomenout",
+    "unpairTitle": "Zrušit spárování s {name}?",
+    "unpairBody": "Spojení se hned přeruší a pro nové připojení bude potřeba nový kód.",
+    "forgetTitle": "Zapomenout {name}?",
+    "forgetBody": "Toto zařízení se k němu přestane připojovat. Chaty zůstanou na tom počítači.",
+    "computerChat": "Stella na {name}",
+    "pair": {
+      "intro": "Naskenujte to ve Stelle v telefonu, nebo vložte kód do Stelly na jiném počítači. Připojí se přímo k tomuto počítači, bez účtu, a funguje jednou.",
+      "copy": "Kopírovat kód"
+    },
+    "enter": {
+      "title": "Použít Stellu jiného počítače",
+      "intro": "Na tom počítači otevřete Nastavení › Účet › Připojit zařízení a vložte sem kód.",
+      "label": "Párovací kód",
+      "connect": "Připojit",
+      "connecting": "Připojování…"
+    },
+    "status": {
+      "connected": "Připojeno",
+      "lastSeen": "Naposledy {time}",
+      "notYet": "Zatím nepřipojeno",
+      "online": "Online",
+      "onlineRelay": "Online přes relay",
+      "offline": "V režimu spánku nebo offline",
+      "connecting": "Připojování…",
+      "unpaired": "Už není spárováno"
+    },
+    "chat": {
+      "offline": "{name} je v režimu spánku nebo offline. Znovu se připojí automaticky.",
+      "connecting": "Připojování k {name}…",
+      "unpaired": "{name} zrušil spárování s tímto zařízením.",
+      "back": "Zpět na tento počítač"
+    }
   }
 }

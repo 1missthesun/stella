@@ -3901,5 +3901,43 @@
       "title": "Stella cũng có trên điện thoại của bạn",
       "detail": "Tải ứng dụng để nhắn tin cho Stella và theo dõi công việc khi bạn không ở bên máy tính này."
     }
+  },
+  "devices": {
+    "title": "Thiết bị",
+    "more": "Thêm cho {name}",
+    "unpair": "Hủy ghép đôi",
+    "forget": "Quên",
+    "unpairTitle": "Hủy ghép đôi {name}?",
+    "unpairBody": "Thiết bị sẽ bị ngắt kết nối ngay và cần mã mới để kết nối lại.",
+    "forgetTitle": "Quên {name}?",
+    "forgetBody": "Thiết bị này sẽ ngừng kết nối với máy đó. Các cuộc trò chuyện vẫn ở trên máy tính đó.",
+    "computerChat": "Stella trên {name}",
+    "pair": {
+      "intro": "Quét mã này bằng Stella trên điện thoại, hoặc dán mã vào Stella trên máy tính khác. Kết nối đi thẳng tới máy tính này, không cần tài khoản, và chỉ dùng được một lần.",
+      "copy": "Sao chép mã"
+    },
+    "enter": {
+      "title": "Dùng Stella của máy tính khác",
+      "intro": "Trên máy tính đó, mở Cài đặt › Tài khoản › Kết nối thiết bị, rồi dán mã vào đây.",
+      "label": "Mã ghép đôi",
+      "connect": "Kết nối",
+      "connecting": "Đang kết nối…"
+    },
+    "status": {
+      "connected": "Đã kết nối",
+      "lastSeen": "Thấy lần cuối {time}",
+      "notYet": "Chưa kết nối",
+      "online": "Trực tuyến",
+      "onlineRelay": "Trực tuyến qua máy chuyển tiếp",
+      "offline": "Đang ngủ hoặc ngoại tuyến",
+      "connecting": "Đang kết nối…",
+      "unpaired": "Không còn ghép đôi"
+    },
+    "chat": {
+      "offline": "{name} đang ngủ hoặc ngoại tuyến. Sẽ tự động kết nối lại.",
+      "connecting": "Đang kết nối tới {name}…",
+      "unpaired": "{name} đã hủy ghép đôi thiết bị này.",
+      "back": "Quay lại máy tính này"
+    }
   }
 }

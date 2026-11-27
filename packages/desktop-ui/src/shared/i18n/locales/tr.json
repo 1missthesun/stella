@@ -3960,5 +3960,43 @@
       "title": "Stella telefonunda da var",
       "detail": "Bu bilgisayardan uzaktayken Stella'ya mesaj atmak ve görevlerini takip etmek için uygulamayı indir."
     }
+  },
+  "devices": {
+    "title": "Cihazlar",
+    "more": "{name} için diğer",
+    "unpair": "Eşlemeyi kaldır",
+    "forget": "Unut",
+    "unpairTitle": "{name} eşlemesi kaldırılsın mı?",
+    "unpairBody": "Bağlantısı hemen kesilir ve yeniden bağlanmak için yeni bir kod gerekir.",
+    "forgetTitle": "{name} unutulsun mu?",
+    "forgetBody": "Bu cihaz artık ona bağlanmaz. Sohbetler o bilgisayarda kalır.",
+    "computerChat": "{name} üzerindeki Stella",
+    "pair": {
+      "intro": "Bunu telefonunuzdaki Stella ile tarayın ya da kodu başka bir bilgisayardaki Stella'ya yapıştırın. Hesap gerekmeden doğrudan bu bilgisayara bağlanır ve bir kez çalışır.",
+      "copy": "Kodu kopyala"
+    },
+    "enter": {
+      "title": "Başka bir bilgisayarın Stella'sını kullan",
+      "intro": "O bilgisayarda Ayarlar › Hesap › Cihaz bağla'yı açın ve kodu buraya yapıştırın.",
+      "label": "Eşleme kodu",
+      "connect": "Bağlan",
+      "connecting": "Bağlanıyor…"
+    },
+    "status": {
+      "connected": "Bağlı",
+      "lastSeen": "Son görülme {time}",
+      "notYet": "Henüz bağlanmadı",
+      "online": "Çevrimiçi",
+      "onlineRelay": "Bir aktarıcı üzerinden çevrimiçi",
+      "offline": "Uykuda veya çevrimdışı",
+      "connecting": "Bağlanıyor…",
+      "unpaired": "Artık eşli değil"
+    },
+    "chat": {
+      "offline": "{name} uykuda veya çevrimdışı. Otomatik olarak yeniden bağlanır.",
+      "connecting": "{name} cihazına bağlanıyor…",
+      "unpaired": "{name} bu cihazın eşlemesini kaldırdı.",
+      "back": "Bu bilgisayara dön"
+    }
   }
 }

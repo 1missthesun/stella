@@ -3901,5 +3901,43 @@
       "title": "Stella 也在你的手機上",
       "detail": "取得 App，離開這台電腦時也能傳訊息給 Stella、查看任務進度。"
     }
+  },
+  "devices": {
+    "title": "裝置",
+    "more": "{name} 的更多選項",
+    "unpair": "取消配對",
+    "forget": "移除",
+    "unpairTitle": "要取消與 {name} 的配對嗎？",
+    "unpairBody": "它會立即中斷連線，之後需要新的代碼才能重新連線。",
+    "forgetTitle": "要移除 {name} 嗎？",
+    "forgetBody": "此裝置將不再連線到它。聊天記錄仍保留在那台電腦上。",
+    "computerChat": "{name} 上的 Stella",
+    "pair": {
+      "intro": "用手機上的 Stella 掃描，或將代碼貼到另一台電腦上的 Stella。它會直接連線到這台電腦，不需要帳號，且只能使用一次。",
+      "copy": "複製代碼"
+    },
+    "enter": {
+      "title": "使用另一台電腦上的 Stella",
+      "intro": "在那台電腦上開啟「設定 › 帳號 › 連接裝置」，然後把代碼貼到這裡。",
+      "label": "配對代碼",
+      "connect": "連線",
+      "connecting": "正在連線…"
+    },
+    "status": {
+      "connected": "已連線",
+      "lastSeen": "上次上線 {time}",
+      "notYet": "尚未連線",
+      "online": "在線",
+      "onlineRelay": "透過中繼在線",
+      "offline": "睡眠或離線",
+      "connecting": "正在連線…",
+      "unpaired": "已不再配對"
+    },
+    "chat": {
+      "offline": "{name} 處於睡眠或離線狀態，會自動重新連線。",
+      "connecting": "正在連線到 {name}…",
+      "unpaired": "{name} 已取消與此裝置的配對。",
+      "back": "返回這台電腦"
+    }
   }
 }

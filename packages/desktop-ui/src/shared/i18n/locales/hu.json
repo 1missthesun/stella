@@ -3960,5 +3960,43 @@
       "title": "Stella a telefonodon is ott van",
       "detail": "Töltsd le az appot, hogy írhass Stellának és követhesd a feladataidat, amikor nem ennél a számítógépnél vagy."
     }
+  },
+  "devices": {
+    "title": "Eszközök",
+    "more": "Továbbiak: {name}",
+    "unpair": "Párosítás megszüntetése",
+    "forget": "Elfelejtés",
+    "unpairTitle": "Megszünteted a párosítást ezzel: {name}?",
+    "unpairBody": "Azonnal lecsatlakozik, és új kód kell az újbóli csatlakozáshoz.",
+    "forgetTitle": "Elfelejted ezt: {name}?",
+    "forgetBody": "Ez az eszköz többé nem csatlakozik hozzá. A csevegések azon a számítógépen maradnak.",
+    "computerChat": "Stella itt: {name}",
+    "pair": {
+      "intro": "Olvasd be a telefonodon a Stellával, vagy illeszd be a kódot egy másik számítógép Stellájába. Közvetlenül ehhez a számítógéphez csatlakozik, fiók nélkül, és egyszer működik.",
+      "copy": "Kód másolása"
+    },
+    "enter": {
+      "title": "Másik számítógép Stellájának használata",
+      "intro": "Azon a számítógépen nyisd meg a Beállítások › Fiók › Eszköz csatlakoztatása menüt, és illeszd be ide a kódot.",
+      "label": "Párosítási kód",
+      "connect": "Csatlakozás",
+      "connecting": "Csatlakozás…"
+    },
+    "status": {
+      "connected": "Csatlakozva",
+      "lastSeen": "Utoljára látva: {time}",
+      "notYet": "Még nem csatlakozott",
+      "online": "Online",
+      "onlineRelay": "Online, továbbítón keresztül",
+      "offline": "Alvó módban vagy offline",
+      "connecting": "Csatlakozás…",
+      "unpaired": "Már nincs párosítva"
+    },
+    "chat": {
+      "offline": "{name} alvó módban vagy offline. Automatikusan újracsatlakozik.",
+      "connecting": "Csatlakozás ehhez: {name}…",
+      "unpaired": "{name} megszüntette a párosítást ezzel az eszközzel.",
+      "back": "Vissza ehhez a számítógéphez"
+    }
   }
 }

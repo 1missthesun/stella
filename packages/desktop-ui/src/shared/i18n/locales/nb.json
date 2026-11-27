@@ -3960,5 +3960,43 @@
       "title": "Stella er også på telefonen din",
       "detail": "Last ned appen for å sende meldinger til Stella og følge oppgavene dine når du er borte fra denne datamaskinen."
     }
+  },
+  "devices": {
+    "title": "Enheter",
+    "more": "Mer for {name}",
+    "unpair": "Fjern paring",
+    "forget": "Glem",
+    "unpairTitle": "Fjerne paringen med {name}?",
+    "unpairBody": "Tilkoblingen brytes med en gang, og det trengs en ny kode for å koble til igjen.",
+    "forgetTitle": "Glemme {name}?",
+    "forgetBody": "Denne enheten slutter å koble til den. Chattene blir værende på den datamaskinen.",
+    "computerChat": "Stella på {name}",
+    "pair": {
+      "intro": "Skann dette med Stella på telefonen, eller lim inn koden i Stella på en annen datamaskin. Den kobler seg direkte til denne datamaskinen, uten konto, og virker én gang.",
+      "copy": "Kopier kode"
+    },
+    "enter": {
+      "title": "Bruk Stella på en annen datamaskin",
+      "intro": "Åpne Innstillinger › Konto › Koble til en enhet på den datamaskinen, og lim inn koden her.",
+      "label": "Paringskode",
+      "connect": "Koble til",
+      "connecting": "Kobler til …"
+    },
+    "status": {
+      "connected": "Tilkoblet",
+      "lastSeen": "Sist sett {time}",
+      "notYet": "Ikke tilkoblet ennå",
+      "online": "På nett",
+      "onlineRelay": "På nett via et relé",
+      "offline": "I dvale eller frakoblet",
+      "connecting": "Kobler til …",
+      "unpaired": "Ikke lenger paret"
+    },
+    "chat": {
+      "offline": "{name} er i dvale eller frakoblet. Kobler til igjen automatisk.",
+      "connecting": "Kobler til {name} …",
+      "unpaired": "{name} fjernet paringen med denne enheten.",
+      "back": "Tilbake til denne datamaskinen"
+    }
   }
 }

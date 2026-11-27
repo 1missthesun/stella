@@ -22,6 +22,7 @@ mod fx;
 mod input;
 mod keys;
 mod location;
+mod p2p;
 mod look_up;
 mod markdown;
 mod media;

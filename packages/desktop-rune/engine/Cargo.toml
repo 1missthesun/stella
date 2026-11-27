@@ -18,6 +18,8 @@ rune-light = { git = "https://github.com/1missthesun/rune", rev = "a69ad5544c19a
 wgpu = { version = "~30.0.1", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+# Direct device link (Iroh): ../p2p, shared with the phone engine.
+stella-p2p = { path = "../p2p" }
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 wry = { version = "0.58", optional = true }
 # Stella Views: view programs run in PsychoScript live runs (src/views.rs). No GPU canvases here

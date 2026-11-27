@@ -977,7 +977,6 @@
       }
     },
     "localMode": {
-      "banner": "Dina chattar stannar på den här datorn. Logga in för att använda Stella på mobilen och hålla allt synkat.",
       "needsAccount": "Det här körs i Stellas moln och kräver därför ett Stella-konto.",
       "syncFailed": "Det gick inte att lägga till chatten i ditt konto. Den finns kvar på den här datorn.",
       "synced": "Chatten har lagts till i ditt konto."

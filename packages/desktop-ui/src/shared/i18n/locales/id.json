@@ -968,7 +968,6 @@
       }
     },
     "localMode": {
-      "banner": "Obrolanmu tetap di komputer ini. Masuk untuk memakai Stella di ponselmu dan menjaga semuanya tetap sinkron.",
       "needsAccount": "Ini berjalan di cloud Stella, jadi perlu akun Stella.",
       "syncFailed": "Tidak bisa menambahkan obrolan ini ke akunmu. Obrolan masih ada di komputer ini.",
       "synced": "Obrolan ini sudah ditambahkan ke akunmu."

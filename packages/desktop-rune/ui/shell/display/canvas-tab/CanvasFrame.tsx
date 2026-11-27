@@ -18,35 +18,58 @@ const OUTGOING = ["stella:canvas-link", "stella:canvas-open-external", "stella:c
  * message whose `source` is the parent. A top-level WebView has no parent, so the page is its own
  * parent: host messages are posted by the page to itself (`source === parent` holds), the bridges'
  * outgoing messages are forwarded to the host, and the action port is a channel made in the page.
+ * On the web the page is an iframe (the web host's canvas host) whose parent is the app: the
+ * bridges talk to it as they are; only the action port is made in the page, as here, and handed to
+ * the bridge as if from the parent, since the host's `engine.webview.post` carries no ports.
  */
 const CANVAS_PRELOAD = `(() => {
   const bridge = window.__stellaBridge;
-  if (!bridge || bridge.canvas) return;
-  const toHost = bridge.post;
+  const framed = !bridge && window.parent !== window;
+  if (framed ? window.__stellaCanvasPreload : !bridge || bridge.canvas) return;
+  const host = window.parent;
+  const toHost = framed ? (data) => host.postMessage(data, "*") : bridge.post;
   const outgoing = new Set(${JSON.stringify(OUTGOING)});
-  try { Object.defineProperty(window, "parent", { get: () => window, configurable: true }); } catch {}
-  try { Object.defineProperty(window, "top", { get: () => window, configurable: true }); } catch {}
   let port = null;
-  bridge.canvas = true;
-  bridge.receive = (data) => {
-    if (data && data.type === "stella:rune-canvas-port") {
-      if (port) port.close();
-      const channel = new MessageChannel();
-      port = channel.port1;
-      port.onmessage = (event) => toHost({ type: "stella:rune-canvas-port-out", data: event.data }, "*");
-      window.postMessage({ type: "stella:canvas-port" }, "*", [channel.port2]);
-      return;
-    }
-    if (data && data.type === "stella:rune-canvas-port-in") {
-      if (port) port.postMessage(data.data);
-      return;
-    }
-    window.postMessage(data, "*");
+  const openPort = (handOver) => {
+    if (port) port.close();
+    const channel = new MessageChannel();
+    port = channel.port1;
+    port.onmessage = (event) => toHost({ type: "stella:rune-canvas-port-out", data: event.data }, "*");
+    handOver(channel.port2);
   };
-  window.addEventListener("message", (event) => {
-    if (event.source !== window || !event.data || !outgoing.has(event.data.type)) return;
-    toHost(event.data, "*");
-  }, true);
+  if (framed) {
+    window.__stellaCanvasPreload = true;
+    window.addEventListener("message", (event) => {
+      const data = event.data;
+      if (event.source !== host || !data) return;
+      if (data.type === "stella:rune-canvas-port") {
+        event.stopImmediatePropagation();
+        openPort((theirs) => window.dispatchEvent(new MessageEvent("message", { data: { type: "stella:canvas-port" }, source: host, ports: [theirs] })));
+      } else if (data.type === "stella:rune-canvas-port-in") {
+        event.stopImmediatePropagation();
+        if (port) port.postMessage(data.data);
+      }
+    }, true);
+  } else {
+    try { Object.defineProperty(window, "parent", { get: () => window, configurable: true }); } catch {}
+    try { Object.defineProperty(window, "top", { get: () => window, configurable: true }); } catch {}
+    bridge.canvas = true;
+    bridge.receive = (data) => {
+      if (data && data.type === "stella:rune-canvas-port") {
+        openPort((theirs) => window.postMessage({ type: "stella:canvas-port" }, "*", [theirs]));
+        return;
+      }
+      if (data && data.type === "stella:rune-canvas-port-in") {
+        if (port) port.postMessage(data.data);
+        return;
+      }
+      window.postMessage(data, "*");
+    };
+    window.addEventListener("message", (event) => {
+      if (event.source !== window || !event.data || !outgoing.has(event.data.type)) return;
+      toHost(event.data, "*");
+    }, true);
+  }
   let scheme = null;
   const reportScheme = () => {
     const root = document.documentElement;

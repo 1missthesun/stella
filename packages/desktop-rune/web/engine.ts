@@ -1,6 +1,7 @@
 import type { engine as BridgeEngine, EngineEvent, MenuItem } from "../host/bridge";
 import { registerAll } from "./dom/files";
 import { popupMenu } from "./dom/menu";
+import { loadHostedHtml } from "./dom/hosted-html";
 import { elementOf } from "./dom/registry";
 import { downloadPath } from "./downloads";
 import { createEngineViews } from "./views/wasm-vm";
@@ -293,9 +294,19 @@ export const webEngine: Engine = {
     },
     loadHtml: async (id, html) => {
       const f = frameOf(id);
-      if (f) f.srcdoc = html;
+      if (f) loadHostedHtml(f, html);
     },
-    reload: async (id) => { frameOf(id)?.contentWindow?.location.reload(); },
+    reload: async (id) => {
+      const f = frameOf(id);
+      if (!f) return;
+      // A hosted page (dom/hosted-html.ts) is another origin: load the host again, which asks for the page again.
+      try {
+        f.contentWindow?.location.reload();
+      } catch {
+        const src = f.src;
+        f.src = src;
+      }
+    },
     back: async (id) => { frameOf(id)?.contentWindow?.history.back(); },
     forward: async (id) => { frameOf(id)?.contentWindow?.history.forward(); },
     focus: async (id) => { frameOf(id)?.focus(); },

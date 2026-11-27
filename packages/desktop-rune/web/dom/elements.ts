@@ -1,6 +1,7 @@
 import { createElement, useImperativeHandle, useLayoutEffect, useMemo, useReducer, useRef, type ReactNode, type Ref } from "react";
 import type { BoxProps, IconProps, ImageProps, ListProps, MediaProps, Run, SurfaceProps, TextProps, VectorProps, WebviewProps, WindowProps } from "../../host/rune-jsx/props";
 import { useHost } from "./host";
+import { answerHost, clearLoadedHtml, HOSTED_SANDBOX, hostedPageUrl, loadedHtml, withPreload } from "./hosted-html";
 import { matchChord, modsOf, register, unregister } from "./registry";
 import { textStyle, type Css } from "./style";
 
@@ -286,33 +287,47 @@ export function Webview(raw: WebviewProps) {
   const frame = useRef<HTMLIFrameElement | null>(null);
   const latest = useRef(p);
   latest.current = p;
+  // `html` runs in the canvas host (hosted-html.ts); a new page is a new frame, so nothing of the old one stays.
+  const hosted = p.html !== undefined;
+  const generation = useRef({ html: p.html, count: 0 });
+  if (generation.current.html !== p.html) generation.current = { html: p.html, count: generation.current.count + 1 };
+  const pageCount = generation.current.count;
   useLayoutEffect(() => {
     const f = frame.current;
     if (!f || !p.id) return;
     register(p.id, f);
     return () => unregister(p.id!, f);
-  }, [p.id]);
+  }, [p.id, pageCount]);
   useLayoutEffect(() => {
     const onMessage = (e: MessageEvent) => {
       const f = frame.current;
       if (!f || e.source !== f.contentWindow) return;
-      latest.current.onMessage?.({ data: e.data, targetOrigin: e.origin });
+      const q = latest.current;
+      const fromHost = (q.html !== undefined || loadedHtml(f) !== undefined) &&
+        answerHost(f, e.data, () => withPreload(loadedHtml(f) ?? q.html ?? "", q.preload), () => q.onLoad?.({ phase: "finished", url: "about:srcdoc" }));
+      if (!fromHost) q.onMessage?.({ data: e.data, targetOrigin: e.origin });
     };
     window.addEventListener("message", onMessage);
     latest.current.onReady?.();
     return () => window.removeEventListener("message", onMessage);
   }, []);
+  useLayoutEffect(() => {
+    if (frame.current) clearLoadedHtml(frame.current);
+  }, [p.html, p.url]);
   const s = h.props.style;
   if (!p.transparent) s.colorScheme = "normal";
   return h.wrap(createElement("div", h.props, createElement("iframe", {
+    key: hosted ? `html:${pageCount}` : "url",
     ref: frame,
-    src: p.html ? undefined : p.url,
-    srcDoc: p.html,
+    src: hosted ? hostedPageUrl() : p.url,
+    ...(hosted ? { sandbox: HOSTED_SANDBOX, referrerPolicy: "no-referrer" as const } : {}),
     allow: p.microphone ? "microphone; clipboard-read; clipboard-write; autoplay; fullscreen" : "clipboard-read; clipboard-write; autoplay; fullscreen",
     style: { background: p.transparent ? "transparent" : undefined, borderRadius: s.borderRadius },
     onLoad: (e: React.SyntheticEvent<HTMLIFrameElement>) => {
       const q = latest.current;
-      let url = q.url ?? "about:srcdoc";
+      // A hosted page has loaded when the host says it has written it (above).
+      if (q.html !== undefined || loadedHtml(e.currentTarget) !== undefined) return;
+      let url = q.url ?? "about:blank";
       try { url = e.currentTarget.contentWindow?.location.href ?? url; } catch {}
       q.onLoad?.({ phase: "finished", url });
       try {

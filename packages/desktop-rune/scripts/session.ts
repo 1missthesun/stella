@@ -211,6 +211,10 @@ async function start() {
         if (process.env[key]) env[key] = process.env[key]!;
       }
       env.USERPROFILE = homeDir;
+      // A Windows profile always has these; Chromium refuses its debugging pipe in a home without them.
+      for (const dir of ["Local", "Roaming"]) mkdirSync(path.join(homeDir, "AppData", dir), { recursive: true });
+      // The in-app browser's bootstrap port is one per user on Windows: a run takes its own so it never reaches an installed Stella.
+      env.STELLA_IN_APP_BROWSER_INIT_PORT = String(await freePort());
     } else if (MAC) {
       env.RUNE_OPEN_INACTIVE = "1";
       if (unseen) env.RUNE_UNSEEN = "1";

@@ -96,22 +96,44 @@ install_macos() {
 }
 
 # The launcher's window is a WebKitGTK view; install it when it's missing.
+# Stella's engine plays video and audio through GStreamer, so the same install
+# adds the GStreamer decoders (WebM, MP4, H.264, AAC) when it runs.
 ensure_linux_libraries() {
   if ! have ldd || ! ldd "$1" 2>/dev/null | grep -q "not found"; then
+    suggest_media_plugins
     return 0
   fi
   echo "Stella needs WebKitGTK 4.1. Installing it (this asks for your password)..."
   if have pacman; then
     sudo pacman -S --needed --noconfirm webkit2gtk-4.1 || die "could not install webkit2gtk-4.1."
+    sudo pacman -S --needed --noconfirm gst-plugins-good gst-libav || true
   elif have apt-get; then
     sudo apt-get install -y libwebkit2gtk-4.1-0 || die "could not install libwebkit2gtk-4.1-0."
+    sudo apt-get install -y gstreamer1.0-plugins-good gstreamer1.0-libav || true
   elif have dnf; then
     sudo dnf install -y webkit2gtk4.1 || die "could not install webkit2gtk4.1."
+    sudo dnf install -y gstreamer1-plugins-good gstreamer1-plugin-libav || true
   elif have zypper; then
     sudo zypper --non-interactive install libwebkit2gtk-4_1-0 || die "could not install libwebkit2gtk-4_1-0."
+    sudo zypper --non-interactive install gstreamer-plugins-good gstreamer-plugins-libav || true
   else
     die "install WebKitGTK 4.1 with your package manager, then run this again."
   fi
+}
+
+# Without sudo: name the GStreamer decoders when they are known to be missing.
+suggest_media_plugins() {
+  have gst-inspect-1.0 || return 0
+  if gst-inspect-1.0 matroskademux >/dev/null 2>&1 && gst-inspect-1.0 avdec_h264 >/dev/null 2>&1; then
+    return 0
+  fi
+  if have pacman; then packages="gst-plugins-good gst-libav"
+  elif have apt-get; then packages="gstreamer1.0-plugins-good gstreamer1.0-libav"
+  elif have dnf; then packages="gstreamer1-plugins-good gstreamer1-plugin-libav"
+  elif have zypper; then packages="gstreamer-plugins-good gstreamer-plugins-libav"
+  else return 0
+  fi
+  echo "For video and audio in Stella, install: $packages"
 }
 
 install_linux() {

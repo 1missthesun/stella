@@ -1,8 +1,9 @@
 //! Look Up on macOS: the dictionary popover for the selection, as Chromium's
 //! `RenderWidgetHostViewMac::ShowDefinitionForSelection` shows it, from the context menu, a force
 //! click or three-finger tap on the selection (`quickLookWithEvent:`, which ⌃⌘D sends too), or a
-//! ⌃⌘D key press. In the focused field, `quickLookWithEvent:` looks up the word under the pointer,
-//! as Chromium's `LookUpDictionaryOverlayAtPoint` does, and a ⌃⌘D key press the field's selection.
+//! ⌃⌘D key press. Off the selection, `quickLookWithEvent:` looks up the word under the pointer in
+//! any text, as Chromium's `LookUpDictionaryOverlayAtPoint` does, and a ⌃⌘D key press the focused
+//! field's selection.
 
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -62,31 +63,18 @@ pub fn show_field(s: &crate::windows::Win, tx: &mut Tx) -> bool {
     true
 }
 
-/// Shows the popover for the word of the focused field under `at`, in window points from the top
-/// left; false when no field is focused or off macOS.
-pub fn show_field_at(s: &crate::windows::Win, tx: &mut Tx, at: [f32; 2]) -> bool {
-    let Some(field) = crate::text_services::field(s.node) else { return false };
+/// Shows the popover for the word under `at`, in window points from the top left, in any text
+/// or field, as Chromium's `LookUpDictionaryOverlayAtPoint` does; nothing when no word is there.
+pub fn show_word_at(s: &crate::windows::Win, tx: &mut Tx, at: [f32; 2]) {
     let (window, z) = (s.node, zoom(s.node));
-    let [x, y] = [at[0] / z, at[1] / z];
-    let over = Rc::new(RefCell::new(false));
-    let read = over.clone();
-    tx.read_layout(field.key.clone(), move |_: &mut crate::windows::Win, rect, _| {
-        *read.borrow_mut() = rect.is_some_and(|r| x >= r[0] && x <= r[0] + r[2] && y >= r[1] && y <= r[1] + r[3]);
-    });
-    tx.text_offset_at(field.key, x, y, move |_: &mut crate::windows::Win, offset, tx| {
-        if let Some(word) = offset.filter(|_| over.take()).and_then(|i| word_at(&field.text, i)) {
-            present_field(window, field.text, word, tx);
+    tx.word_at(at[0] / z, at[1] / z, move |_: &mut crate::windows::Win, word, _| {
+        let Some(word) = word else { return };
+        let Some(first) = word.lines.first() else { return };
+        let baseline = first.baseline - first.rect[1];
+        if let Some(target) = Target::new(word.text, word.style, baseline, word.lines.iter().map(|l| l.rect).collect()) {
+            imp::present(window, &target, zoom(window));
         }
     });
-    true
-}
-
-/// The word (UAX #29) holding byte `i` of `text`, or ending there, as `a..b` bytes.
-fn word_at(text: &str, i: usize) -> Option<(usize, usize)> {
-    use unicode_segmentation::UnicodeSegmentation;
-    let words: Vec<(usize, usize)> =
-        text.split_word_bound_indices().filter(|(_, w)| w.chars().any(char::is_alphanumeric)).map(|(a, w)| (a, a + w.len())).collect();
-    words.iter().find(|&&(a, b)| a <= i && i < b).or_else(|| words.iter().find(|&&(_, b)| b == i)).copied()
 }
 
 /// Shows the popover for bytes `a..b` of the focused field's `text`, drawn in the field's font.
@@ -198,9 +186,7 @@ mod imp {
             let y = if flipped { local.y } else { bounds.size.height - local.y };
             let at = [local.x as f32, y as f32];
             window_of(this).is_some_and(|w| {
-                super::show_at(w, Some(at))
-                    || (crate::text_services::field(w).is_some()
-                        && crate::windows::queue(w, None, serde_json::json!({ "cmd": "lookUpAt", "x": at[0], "y": at[1] })))
+                super::show_at(w, Some(at)) || crate::windows::queue(w, None, serde_json::json!({ "cmd": "lookUpAt", "x": at[0], "y": at[1] }))
             })
         };
         if !shown && let Some(Some(original)) = ORIGINAL.get() {

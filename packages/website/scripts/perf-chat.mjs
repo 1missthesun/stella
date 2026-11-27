@@ -59,7 +59,7 @@ Options:
                   \`next start\` and load the real /chat page around the frame
   --start-next    run \`next start\` on --port (default 3140) and use it as --next
   --variants a=DIR,b=DIR
-                  serve two chat builds (build-web-renderer --out DIR) from the
+                  serve two chat builds (each a build:chat --out DIR) from the
                   same server and alternate them run by run (ABBA), so machine
                   load drifts out of the comparison; needs --out-dir
 `;

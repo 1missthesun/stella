@@ -765,6 +765,12 @@ values out of the way: `scripts/deploy-stella.sh` pins every public value itself
 (backend, site URL, Turnstile key; the Google Ads tag only in `production`). The
 Maps browser key is the one value it takes from the environment.
 
+The web chat at `/chat-app` is built into `public/chat-app` by `build:chat`
+(run by `prebuild`): the Rune UI's web build, `packages/desktop-rune/web/build.ts`
+(see `packages/desktop-rune/WEB.md`). It is about 15 MB, most of it the Stella
+Views WebAssembly (9.2 MiB, fetched only when a view shows); the build refuses
+any file over Workers' 25 MiB static-asset limit.
+
 ```bash
 cd packages/website
 # dev → https://stella-website-dev.fromyou.workers.dev (dev backend, no Ads tag)

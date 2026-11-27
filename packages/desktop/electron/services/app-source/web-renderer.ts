@@ -38,10 +38,10 @@ const RUNE_RENDERER: RendererKind = {
   rendererId: (treeSha) => createHash("sha1").update(`stella-rune-web\0${treeSha}`).digest("hex"),
 };
 
+// stella.sh's shared /chat-app is the Rune UI's web build, so a user's own renderer is too, whichever
+// engine their desktop runs. Only a checkout from before Rune (no Rune web build) builds desktop-ui's.
 const rendererKind = (cwd: string): RendererKind =>
-  process.env.STELLA_LAUNCHER_ENGINE === "rune" && fs.existsSync(path.join(cwd, RUNE_RENDERER.buildScript))
-    ? RUNE_RENDERER
-    : DESKTOP_UI_RENDERER;
+  fs.existsSync(path.join(cwd, RUNE_RENDERER.buildScript)) ? RUNE_RENDERER : DESKTOP_UI_RENDERER;
 
 const verifiedRef = async (cwd: string, ref: string) => {
   const result = await gitRaw(cwd, ["rev-parse", "--verify", "--quiet", `${ref}^{commit}`]);

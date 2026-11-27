@@ -7,7 +7,7 @@
     "dev": "next dev",
     "prebuild": "bun run demo:check && bun run build:chat",
     "build": "next build --webpack",
-    "build:chat": "bun ../desktop/scripts/build-web-renderer.ts --static-home --script-src https://static.cloudflareinsights.com",
+    "build:chat": "bun ../desktop-rune/web/build.ts --script-src https://static.cloudflareinsights.com",
     "build-google-ads-import": "bun scripts/build-google-ads-import.mjs",
     "start": "next start",
     "cf:build": "opennextjs-cloudflare build",

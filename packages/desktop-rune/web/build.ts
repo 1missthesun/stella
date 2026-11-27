@@ -119,5 +119,9 @@ fs.cpSync(publicDir, outDir, { recursive: true });
 
 const files = (fs.readdirSync(outDir, { recursive: true }) as string[]).filter((f) => fs.statSync(path.join(outDir, f)).isFile());
 const bytes = files.reduce((n, f) => n + fs.statSync(path.join(outDir, f)).size, 0);
+// stella.sh serves this from Cloudflare Workers static assets, which refuse any file over 25 MiB.
+const MAX_ASSET_BYTES = 25 * 1024 * 1024;
+const oversized = files.filter((f) => fs.statSync(path.join(outDir, f)).size > MAX_ASSET_BYTES);
+if (oversized.length) throw new Error(`Over the 25 MiB static-asset limit: ${oversized.join(", ")}`);
 for (const log of app.logs) if (log.level === "error") console.error(String(log));
 console.log(`[rune-web] ${app.outputs.length} outputs, ${files.length} files, ${(bytes / 1048576).toFixed(2)} MB in ${Date.now() - startedAt}ms → ${outDir}`);

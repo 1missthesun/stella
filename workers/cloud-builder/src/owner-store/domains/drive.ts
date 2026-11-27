@@ -17,6 +17,7 @@ import {
 } from "@stella/contracts/page-preview";
 import { renderDrivePagePreview } from "../../drive-page-preview.js";
 import { DEVICE_FILE_COPY_LIMITS } from "@stella/contracts/device-files";
+import { isChatAttachmentPath } from "@stella/contracts/chat-attachments";
 import {
   EVIDENCE_THUMBNAIL_DRIVE_ROOT,
   evidenceThumbnailDrivePath,
@@ -45,16 +46,40 @@ const TB = 1024 * GB;
  */
 export const DRIVE_MAX_FILES = 1_000_000;
 
-type DriveQuota = { totalBytes: number; maxFileBytes: number };
+/**
+ * Files sent with chat messages are kept beside the Drive, not in it: they
+ * never count against the plan's Drive size or its per-file limit. Their own
+ * room exists only against abuse: as large as the plan's Drive, at least
+ * 10 GB (thousands of screenshots), with files up to 2 GB each.
+ */
+const ATTACHMENT_MIN_ROOM_BYTES = 10 * GB;
+const ATTACHMENT_MAX_FILE_BYTES = 2 * GB;
+
+type DriveQuota = {
+  totalBytes: number;
+  maxFileBytes: number;
+  attachmentBytes: number;
+  attachmentMaxFileBytes: number;
+};
 
 const planQuota = (plan: BillingPlan): DriveQuota => {
   const { driveBytes, driveFileBytes } = PLAN_CATALOG[plan].limits;
-  return { totalBytes: driveBytes, maxFileBytes: driveFileBytes };
+  return {
+    totalBytes: driveBytes,
+    maxFileBytes: driveFileBytes,
+    attachmentBytes: Math.max(ATTACHMENT_MIN_ROOM_BYTES, driveBytes),
+    attachmentMaxFileBytes: ATTACHMENT_MAX_FILE_BYTES,
+  };
 };
 const UNLIMITED_QUOTA: DriveQuota = {
   totalBytes: 10 * TB,
   maxFileBytes: 2_048 * MB,
+  attachmentBytes: 10 * TB,
+  attachmentMaxFileBytes: ATTACHMENT_MAX_FILE_BYTES,
 };
+
+type FileKind = "drive" | "attachment";
+const fileKindOf = (path: string): FileKind => (isChatAttachmentPath(path) ? "attachment" : "drive");
 
 export const DRIVE_INLINE_FILE_LIMIT_BYTES = 8 * MB;
 const DRIVE_INLINE_REQUEST_LIMIT_BYTES = 32 * MB;
@@ -241,6 +266,60 @@ export const DRIVE_USAGE_MIGRATION = {
   ],
 };
 
+/** SQL twin of isChatAttachmentPath, used once to sort the files stored before kinds existed. */
+const ATTACHMENT_PATH_SQL = `(path GLOB 'Chat Attachments/*'
+  OR path GLOB 'execution-attachments/*'
+  OR (path GLOB 'uploads/[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f]-*'
+      AND path NOT GLOB 'uploads/*/*/*'))`;
+
+const usageUpsert = (table: string, row: "NEW", kind: FileKind) =>
+  `INSERT INTO ${table} (space, files, bytes) SELECT ${row}.space, 1, ${row}.size_bytes WHERE ${row}.kind = '${kind}'
+       ON CONFLICT (space) DO UPDATE SET files = files + 1, bytes = bytes + excluded.bytes;`;
+const usageRemove = (table: string, kind: FileKind) =>
+  `UPDATE ${table} SET files = files - 1, bytes = bytes - OLD.size_bytes WHERE space = OLD.space AND OLD.kind = '${kind}';`;
+
+/**
+ * Chat attachments get their own kind and their own running totals, so the
+ * Drive quota (drive_usage, which keeps its meaning) no longer sees them.
+ */
+export const DRIVE_ATTACHMENTS_MIGRATION = {
+  id: "drive.5-attachment-kind",
+  statements: [
+    `ALTER TABLE drive_files ADD COLUMN kind TEXT NOT NULL DEFAULT 'drive'`,
+    `UPDATE drive_files SET kind = 'attachment' WHERE ${ATTACHMENT_PATH_SQL}`,
+    `CREATE TABLE drive_attachment_usage (
+       space TEXT PRIMARY KEY,
+       files INTEGER NOT NULL,
+       bytes INTEGER NOT NULL
+     )`,
+    `DROP TRIGGER drive_usage_insert`,
+    `DROP TRIGGER drive_usage_delete`,
+    `DROP TRIGGER drive_usage_update`,
+    `DELETE FROM drive_usage`,
+    `INSERT INTO drive_usage (space, files, bytes)
+     SELECT space, COUNT(*), COALESCE(SUM(size_bytes), 0) FROM drive_files WHERE kind = 'drive' GROUP BY space`,
+    `INSERT INTO drive_attachment_usage (space, files, bytes)
+     SELECT space, COUNT(*), COALESCE(SUM(size_bytes), 0) FROM drive_files WHERE kind = 'attachment' GROUP BY space`,
+    `CREATE TRIGGER drive_usage_insert AFTER INSERT ON drive_files
+     BEGIN
+       ${usageUpsert("drive_usage", "NEW", "drive")}
+       ${usageUpsert("drive_attachment_usage", "NEW", "attachment")}
+     END`,
+    `CREATE TRIGGER drive_usage_delete AFTER DELETE ON drive_files
+     BEGIN
+       ${usageRemove("drive_usage", "drive")}
+       ${usageRemove("drive_attachment_usage", "attachment")}
+     END`,
+    `CREATE TRIGGER drive_usage_update AFTER UPDATE OF space, size_bytes, kind ON drive_files
+     BEGIN
+       ${usageRemove("drive_usage", "drive")}
+       ${usageRemove("drive_attachment_usage", "attachment")}
+       ${usageUpsert("drive_usage", "NEW", "drive")}
+       ${usageUpsert("drive_attachment_usage", "NEW", "attachment")}
+     END`,
+  ],
+};
+
 export const PERSONAL_DRIVE_SPACE = "";
 
 const spaceOf = (ctx: Pick<OwnerContext, "crew">): string => ctx.crew?.space ?? PERSONAL_DRIVE_SPACE;
@@ -273,6 +352,7 @@ type FileRow = {
   upload_id: string | null;
   created_at: number;
   updated_at: number;
+  kind: string;
 };
 
 type UploadRow = {
@@ -427,12 +507,26 @@ const NOT_THUMBNAIL = `path NOT LIKE '${EVIDENCE_THUMBNAIL_DRIVE_ROOT}/%'`;
 const isKeyReferenced = (db: OwnerDbReader, r2Key: string): boolean =>
   db.one("SELECT 1 AS present FROM drive_files WHERE r2_key = ? LIMIT 1", r2Key) !== null;
 
-/** Kept by triggers on drive_files (DRIVE_USAGE_MIGRATION): one row per space. */
-const usage = (db: OwnerDbReader): { fileCount: number; totalBytes: number } => {
-  const row = db.one<{ files: number | null; bytes: number | null }>(
-    "SELECT SUM(files) AS files, SUM(bytes) AS bytes FROM drive_usage",
+type DriveUsage = {
+  fileCount: number;
+  totalBytes: number;
+  attachmentFiles: number;
+  attachmentBytes: number;
+};
+
+/** Kept by triggers on drive_files: one row per space in each table. */
+const usage = (db: OwnerDbReader): DriveUsage => {
+  const row = db.one<{ files: number | null; bytes: number | null; afiles: number | null; abytes: number | null }>(
+    `SELECT (SELECT SUM(files) FROM drive_usage) AS files, (SELECT SUM(bytes) FROM drive_usage) AS bytes,
+            (SELECT SUM(files) FROM drive_attachment_usage) AS afiles,
+            (SELECT SUM(bytes) FROM drive_attachment_usage) AS abytes`,
   );
-  return { fileCount: row?.files ?? 0, totalBytes: row?.bytes ?? 0 };
+  return {
+    fileCount: row?.files ?? 0,
+    totalBytes: row?.bytes ?? 0,
+    attachmentFiles: row?.afiles ?? 0,
+    attachmentBytes: row?.abytes ?? 0,
+  };
 };
 
 const fileRecord = (row: FileRow): DriveFileRecord => ({
@@ -527,56 +621,61 @@ const partitionWrite = (
   const quota = unlimited ? UNLIMITED_QUOTA : planQuota(plan);
   const proxied = !ctx.env.R2_ACCESS_KEY_ID?.trim() || !ctx.env.R2_SECRET_ACCESS_KEY?.trim();
   const label = planLabel(plan);
-  let { fileCount, totalBytes } = usage(ctx.db);
+  const used = usage(ctx.db);
+  let fileCount = used.fileCount + used.attachmentFiles;
+  const bytes: Record<FileKind, number> = { drive: used.totalBytes, attachment: used.attachmentBytes };
   const occurrences = new Map<string, number>();
   for (const file of files) occurrences.set(file.path, (occurrences.get(file.path) ?? 0) + 1);
   const accepted: WriteCandidate[] = [];
   const skipped: Array<{ path: string; reason: string }> = [];
   for (const file of files) {
+    const kind = fileKindOf(file.path);
+    const skip = (reason: string) => skipped.push({ path: file.path, reason });
     if ((occurrences.get(file.path) ?? 0) > 1) {
-      skipped.push({
-        path: file.path,
-        reason: `${file.path} appears more than once in the same write. Send one version per path.`,
-      });
+      skip(`${file.path} appears more than once in the same write. Send one version per path.`);
       continue;
     }
-    if (file.sizeBytes > quota.maxFileBytes) {
-      skipped.push({
-        path: file.path,
-        reason: `${file.path} is larger than the ${formatMb(quota.maxFileBytes)} per-file limit on your plan.`,
-      });
+    const maxFileBytes = kind === "attachment" ? quota.attachmentMaxFileBytes : quota.maxFileBytes;
+    if (file.sizeBytes > maxFileBytes) {
+      skip(
+        kind === "attachment"
+          ? `${file.path} is larger than ${formatStorageSize(maxFileBytes)}, the largest file a message can carry.`
+          : `${file.path} is larger than the ${formatMb(maxFileBytes)} per-file limit on your plan.`,
+      );
       continue;
     }
     if (proxied && file.sizeBytes > R2_PROXY_MAX_PUT_BYTES) {
-      skipped.push({
-        path: file.path,
-        reason: `${file.path} is larger than ${formatMb(R2_PROXY_MAX_PUT_BYTES)}, the largest file this server takes without an R2 API token.`,
-      });
+      skip(`${file.path} is larger than ${formatMb(R2_PROXY_MAX_PUT_BYTES)}, the largest file this server takes without an R2 API token.`);
       continue;
     }
-    const prior = getFile(ctx.db, spaceOf(ctx), file.path)?.size_bytes ?? null;
+    const prior = getFile(ctx.db, spaceOf(ctx), file.path);
+    const next = { ...bytes };
+    if (prior) next[prior.kind === "attachment" ? "attachment" : "drive"] -= prior.size_bytes;
+    next[kind] += file.sizeBytes;
     const nextFileCount = prior === null ? fileCount + 1 : fileCount;
-    const nextTotalBytes = totalBytes - (prior ?? 0) + file.sizeBytes;
-    if (nextTotalBytes > quota.totalBytes) {
-      skipped.push({
-        path: file.path,
-        reason: unlimited
+    if (kind === "drive" && next.drive > quota.totalBytes) {
+      skip(
+        unlimited
           ? `Your Drive is full at ${formatStorageSize(quota.totalBytes)}. Delete files to add more.`
           : `Your Drive is full: the ${label} plan includes ${formatStorageSize(quota.totalBytes)}. ${
               nextPlanUp(plan) ? "Delete files or upgrade to add more." : "Delete files to add more."
             }`,
-      });
+      );
+      continue;
+    }
+    if (kind === "attachment" && next.attachment > quota.attachmentBytes) {
+      skip(
+        `Files sent in chats take up ${formatStorageSize(quota.attachmentBytes)}, the most your account keeps. Delete old ones from Chat Attachments in Files to send more.`,
+      );
       continue;
     }
     if (nextFileCount > DRIVE_MAX_FILES) {
-      skipped.push({
-        path: file.path,
-        reason: `Your Drive holds ${DRIVE_MAX_FILES.toLocaleString("en-US")} files, the most one account can keep. Delete files to add more.`,
-      });
+      skip(`Your account holds ${DRIVE_MAX_FILES.toLocaleString("en-US")} files, the most it can keep. Delete files to add more.`);
       continue;
     }
     fileCount = nextFileCount;
-    totalBytes = nextTotalBytes;
+    bytes.drive = next.drive;
+    bytes.attachment = next.attachment;
     accepted.push(file);
   }
   return { accepted, skipped };
@@ -701,7 +800,7 @@ const finalizeUpload = async (
   if (existing) {
     ctx.db.run(
       `UPDATE drive_files SET r2_key = ?, name = ?, size_bytes = ?, content_type = ?, source = ?,
-         origin = ?, upload_id = ?, write_key = NULL, updated_at = ?
+         origin = ?, upload_id = ?, write_key = NULL, updated_at = ?, kind = ?
        WHERE space = ? AND path = ?`,
       finalKey,
       name,
@@ -711,6 +810,7 @@ const finalizeUpload = async (
       source === "upload" ? "upload" : existing.origin,
       uploadId,
       now,
+      fileKindOf(path),
       space,
       path,
     );
@@ -720,8 +820,8 @@ const finalizeUpload = async (
   } else {
     ctx.db.run(
       `INSERT INTO drive_files (space, path, r2_key, name, size_bytes, content_type, source, origin,
-         write_key, upload_id, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
+         write_key, upload_id, created_at, updated_at, kind)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
       space,
       path,
       finalKey,
@@ -733,6 +833,7 @@ const finalizeUpload = async (
       uploadId,
       now,
       now,
+      fileKindOf(path),
     );
   }
   ctx.db.run("DELETE FROM drive_uploads WHERE upload_id = ?", debtId);
@@ -1280,7 +1381,7 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
     if (existing) {
       ctx.db.run(
         `UPDATE drive_files SET r2_key = ?, name = ?, size_bytes = ?, content_type = ?, source = ?,
-           origin = ?, write_key = ?, upload_id = ?, updated_at = ?
+           origin = ?, write_key = ?, upload_id = ?, updated_at = ?, kind = ?
          WHERE space = ? AND path = ?`,
         entry.r2Key,
         entry.name,
@@ -1291,6 +1392,7 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
         writeKey ?? null,
         entry.uploadId,
         now,
+        fileKindOf(entry.path),
         space,
         entry.path,
       );
@@ -1304,8 +1406,8 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
     } else {
       ctx.db.run(
         `INSERT INTO drive_files (space, path, r2_key, name, size_bytes, content_type, source, origin,
-           write_key, upload_id, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           write_key, upload_id, created_at, updated_at, kind)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         space,
         entry.path,
         entry.r2Key,
@@ -1318,6 +1420,7 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
         entry.uploadId,
         now,
         now,
+        fileKindOf(entry.path),
       );
     }
     written.push(entry);
@@ -1915,7 +2018,13 @@ const pathArg = string({ min: 1, max: 4_000 });
 
 export const driveDomain = {
   name: "drive",
-  migrations: [DRIVE_MIGRATION, DRIVE_DEVICE_FILES_MIGRATION, DRIVE_SPACES_MIGRATION, DRIVE_USAGE_MIGRATION],
+  migrations: [
+    DRIVE_MIGRATION,
+    DRIVE_DEVICE_FILES_MIGRATION,
+    DRIVE_SPACES_MIGRATION,
+    DRIVE_USAGE_MIGRATION,
+    DRIVE_ATTACHMENTS_MIGRATION,
+  ],
   calls: {
     "drive.prepareUpload": {
       scope: "owner",

@@ -277,7 +277,7 @@ fn background_window(app: rune::App<Win>) -> rune::App<Win> {
 
 pub fn app_spec(p: &Props) -> AppSpec<Win> {
     let mut spec = AppSpec::new(leak(p.title.as_deref().unwrap_or("Stella")), size_of(p), Win::default, view);
-    spec.min_size = if is_background(p) { Some((0.0, 0.0)) } else { p.min_size.map(|[w, h]| (w, h)).or(Some((240.0, 160.0))) };
+    spec.min_size = Some(p.min_size.filter(|_| !is_background(p)).map_or((0.0, 0.0), |[w, h]| (w, h)));
     spec.setup = Some(setup);
     spec.poll = Some(poll);
     spec.on_key = Some(on_key);

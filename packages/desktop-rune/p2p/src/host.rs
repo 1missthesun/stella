@@ -41,15 +41,29 @@ pub async fn create_offer(inner: &Inner, ttl_ms: Option<u64>) -> Result<Value, S
     addrs.truncate(4);
     let secret = pairing::random_secret();
     let expires_at_ms = now_ms() + ttl.as_millis() as u64;
+    let code = Code { host: inner.endpoint.id(), secret, relay, addrs }.encode();
+    crate::short::withdraw(inner);
     {
         let mut offers = lock(&inner.offers);
-        offers.retain(|o| o.expires > Instant::now());
         // One live code at a time: showing a new one withdraws the last.
         offers.clear();
-        offers.push(Offer { secret, expires: Instant::now() + ttl, expires_at_ms, failed: 0 });
+        offers.push(Offer { code: code.clone(), secret, expires: Instant::now() + ttl, expires_at_ms, failed: 0 });
     }
-    let code = Code { host: inner.endpoint.id(), secret, relay, addrs }.encode();
-    Ok(json!({ "code": code, "url": format!("{}{code}", pairing::URL_PREFIX), "expiresAt": expires_at_ms }))
+    Ok(offer_json(&code, expires_at_ms))
+}
+
+fn offer_json(code: &str, expires_at_ms: u64) -> Value {
+    json!({ "code": code, "url": format!("{}{code}", pairing::URL_PREFIX), "expiresAt": expires_at_ms })
+}
+
+pub fn live_offer(inner: &Inner) -> Option<Value> {
+    let mut offers = lock(&inner.offers);
+    offers.retain(|o| o.expires > Instant::now());
+    offers.last().map(|o| offer_json(&o.code, o.expires_at_ms))
+}
+
+pub fn offer_is_live(inner: &Inner, code: &str) -> bool {
+    lock(&inner.offers).iter().any(|o| o.code == code && o.expires > Instant::now())
 }
 
 async fn pair_incoming(inner: Arc<Inner>, conn: Connection) {
@@ -62,6 +76,11 @@ async fn pair_incoming(inner: Arc<Inner>, conn: Connection) {
         conn.close(400u32.into(), b"no pairing request");
         return;
     };
+    match hello.get("mode").and_then(|m| m.as_str()) {
+        Some("info") => return crate::nearby::answer_info(&inner, conn, send).await,
+        Some("nearby") => return crate::nearby::host_confirm(inner, conn, send, recv, hello).await,
+        _ => {}
+    }
     let secret = hello.get("secret").and_then(|s| s.as_str()).and_then(|s| BASE64URL_NOPAD.decode(s.as_bytes()).ok()).unwrap_or_default();
     let accepted = {
         let mut offers = lock(&inner.offers);
@@ -91,24 +110,30 @@ async fn pair_incoming(inner: Arc<Inner>, conn: Connection) {
         conn.close(CLOSE_NOT_PAIRED.into(), b"pairing code expired");
         return;
     }
-    let text = |k: &str, fallback: &str| hello.get(k).and_then(|x| x.as_str()).map(|x| x.chars().take(80).collect::<String>()).filter(|x| !x.is_empty()).unwrap_or_else(|| fallback.to_owned());
-    let device = Device { id: device_id.clone(), name: text("name", "Device"), platform: text("platform", "unknown"), paired_at: now_ms(), last_seen_at: Some(now_ms()) };
-    let saved = {
-        let mut store = lock(&inner.store);
-        store.put_device(device.clone());
-        store.save()
+    let device = match keep_device(&inner, &device_id, &hello) {
+        Ok(device) => device,
+        Err(e) => {
+            let _ = wire::write(&mut send, &json!({ "ok": false, "error": e })).await;
+            let _ = send.finish();
+            return;
+        }
     };
-    if let Err(e) = saved {
-        let _ = wire::write(&mut send, &json!({ "ok": false, "error": e })).await;
-        let _ = send.finish();
-        return;
-    }
     let name = lock(&inner.name).clone();
     let _ = wire::write(&mut send, &json!({ "ok": true, "name": name, "platform": inner.platform })).await;
     let _ = send.finish();
     (inner.emit)(json!({ "kind": "pairing", "state": "used", "device": device }));
     (inner.emit)(json!({ "kind": "device", "id": device_id, "state": "paired", "device": device }));
     let _ = tokio::time::timeout(Duration::from_secs(5), conn.closed()).await;
+}
+
+/// Trusts a device from now on, named as its pairing request named it.
+pub(crate) fn keep_device(inner: &Inner, device_id: &str, hello: &Value) -> Result<Device, String> {
+    let text = |k: &str, fallback: &str| hello.get(k).and_then(|x| x.as_str()).map(|x| x.chars().take(80).collect::<String>()).filter(|x| !x.is_empty()).unwrap_or_else(|| fallback.to_owned());
+    let device = Device { id: device_id.to_owned(), name: text("name", "Device"), platform: text("platform", "unknown"), paired_at: now_ms(), last_seen_at: Some(now_ms()) };
+    let mut store = lock(&inner.store);
+    store.put_device(device.clone());
+    store.save()?;
+    Ok(device)
 }
 
 async fn device_incoming(inner: Arc<Inner>, conn: Connection) {

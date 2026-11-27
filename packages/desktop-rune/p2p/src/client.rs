@@ -43,16 +43,13 @@ pub async fn pair(inner: &Arc<Inner>, code: &str) -> Result<Value, String> {
     if reply.get("ok").and_then(|o| o.as_bool()) != Some(true) {
         return Err("That pairing code has expired or was already used. Show a new one on the computer.".into());
     }
-    let text = |k: &str, fallback: &str| reply.get(k).and_then(|x| x.as_str()).map(str::to_owned).filter(|x| !x.is_empty()).unwrap_or_else(|| fallback.to_owned());
-    let computer = Computer {
-        id: code.host.to_string(),
-        name: text("name", "Computer"),
-        platform: text("platform", "unknown"),
-        paired_at: now_ms(),
-        relay: code.relay,
-        addrs: code.addrs,
-        last_seen_at: Some(now_ms()),
-    };
+    saved(inner, code.host, &reply, code.relay, code.addrs)
+}
+
+/// Keeps a computer that just accepted this device and starts the link to it.
+pub(crate) fn saved(inner: &Arc<Inner>, host: EndpointId, reply: &Value, relay: Option<String>, addrs: Vec<String>) -> Result<Value, String> {
+    let text = |k: &str, fallback: &str| reply.get(k).and_then(|x| x.as_str()).map(|x| x.chars().take(80).collect::<String>()).filter(|x| !x.is_empty()).unwrap_or_else(|| fallback.to_owned());
+    let computer = Computer { id: host.to_string(), name: text("name", "Computer"), platform: text("platform", "unknown"), paired_at: now_ms(), relay, addrs, last_seen_at: Some(now_ms()) };
     {
         let mut store = lock(&inner.store);
         store.put_computer(computer.clone());

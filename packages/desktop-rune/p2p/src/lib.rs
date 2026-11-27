@@ -7,18 +7,24 @@
 //! JSON events it passes to the `emit` callback; the desktop engine, the phone engine, the C API
 //! and the CLI all expose exactly that surface.
 //!
-//! Commands: `status`, `rename {name}`, `pairing.create {ttlMs?}`, `pairing.cancel`, `pair {code}`,
-//! `peers`, `device.revoke {id}`, `computer.forget {id}`, `computer.connect {id}`,
-//! `computer.disconnect {id}`, `computer.retry {id?}`, `request {id, body, timeoutMs?}`,
-//! `respond {req, ok, body?, error?}`, `emit {id?, body}`, `stop`.
+//! Commands: `status`, `rename {name}`, `pairing.create {ttlMs?}`, `pairing.short`,
+//! `pairing.cancel`, `pairing.deny {request}`, `pair {code}`, `pair.short {code}`,
+//! `nearby.start`, `nearby.stop`, `nearby.list`, `pair.nearby {id}`, `pair.nearby.confirm {id, code}`,
+//! `pair.nearby.cancel {id}`, `peers`, `device.revoke {id}`, `computer.forget {id}`,
+//! `computer.connect {id}`, `computer.disconnect {id}`, `computer.retry {id?}`,
+//! `request {id, body, timeoutMs?}`, `respond {req, ok, body?, error?}`, `emit {id?, body}`, `stop`.
 //! Events: `{kind:"request", req, from, body}`, `{kind:"event", from, body}`,
 //! `{kind:"device", id, state: paired|connected|disconnected|revoked|rejected, ...}`,
 //! `{kind:"computer", id, state: paired|connecting|online|offline|revoked|not_paired|forgotten, ...}`,
-//! `{kind:"pairing", state: used|expired|withdrawn}`.
+//! `{kind:"pairing", state: used|expired|withdrawn|short_ended|confirm|confirm_done, ...}`,
+//! `{kind:"nearby", id, state: found|lost|ended, ...}`.
 
 mod client;
 mod host;
+mod nearby;
 pub mod pairing;
+pub mod pake;
+mod short;
 pub mod store;
 mod wire;
 
@@ -66,10 +72,17 @@ pub struct Config {
     pub relay: Relay,
     /// The UDP port to listen on; `None` reuses the last one (else picks one).
     pub port: Option<u16>,
+    /// Answer nearby devices on the local network. Phones, which are never computers, turn it off.
+    pub discoverable: bool,
+    /// The mailbox behind short codes; `None` turns them off.
+    pub rendezvous: Option<String>,
 }
 
+pub const DEFAULT_RENDEZVOUS: &str = "https://p2p.stella.sh";
+
 impl Config {
-    /// `{dataDir, name, platform, relay?: "default"|"off"|<url>, port?}`.
+    /// `{dataDir, name, platform, relay?: "default"|"off"|<url>, port?, discoverable?,
+    /// rendezvous?: "off"|<url>}`.
     pub fn from_json(v: &Value) -> Result<Config, String> {
         let s = |k: &str| v.get(k).and_then(|x| x.as_str()).map(str::to_owned);
         let data_dir = s("dataDir").filter(|d| !d.is_empty()).ok_or("dataDir is required")?;
@@ -84,6 +97,12 @@ impl Config {
             platform: s("platform").unwrap_or_else(|| std::env::consts::OS.into()),
             relay,
             port: v.get("port").and_then(|p| p.as_u64()).map(|p| p as u16),
+            discoverable: v.get("discoverable").and_then(|d| d.as_bool()).unwrap_or(true),
+            rendezvous: match s("rendezvous").as_deref() {
+                None | Some("") | Some("default") => Some(DEFAULT_RENDEZVOUS.to_owned()),
+                Some("off") => None,
+                Some(url) => Some(url.to_owned()),
+            },
         })
     }
 }
@@ -113,6 +132,13 @@ pub(crate) struct Inner {
     next_rid: AtomicU64,
     devices: Mutex<HashMap<String, DeviceLink>>,
     computers: Mutex<HashMap<String, ComputerLink>>,
+    mdns: Option<iroh_mdns_address_lookup::MdnsAddressLookup>,
+    discoverable: bool,
+    rendezvous: Option<String>,
+    confirming: Mutex<Option<nearby::Confirming>>,
+    nearby: Mutex<nearby::Nearby>,
+    asking: Mutex<HashMap<String, nearby::Asking>>,
+    short: Mutex<Option<short::Slot>>,
 }
 
 pub struct Node {
@@ -131,7 +157,8 @@ fn transport_config() -> QuicTransportConfig {
         .build()
 }
 
-async fn bind(config: &Config, key: SecretKey, port: u16) -> Result<Endpoint, String> {
+async fn bind(config: &Config, key: SecretKey, port: u16) -> Result<(Endpoint, Option<iroh_mdns_address_lookup::MdnsAddressLookup>), String> {
+    let key_id = key.public();
     let mut builder = match &config.relay {
         Relay::Off => Endpoint::builder(presets::N0DisableRelay),
         Relay::Default => Endpoint::builder(presets::N0),
@@ -143,8 +170,12 @@ async fn bind(config: &Config, key: SecretKey, port: u16) -> Result<Endpoint, St
     builder = builder
         .secret_key(key)
         .alpns(vec![ALPN.to_vec(), PAIR_ALPN.to_vec()])
-        .transport_config(transport_config())
-        .address_lookup(iroh_mdns_address_lookup::MdnsAddressLookup::builder().service_name("stella-p2p"));
+        .transport_config(transport_config());
+    let mdns = iroh_mdns_address_lookup::MdnsAddressLookup::builder().service_name("stella-p2p").advertise(config.discoverable).build(key_id);
+    match &mdns {
+        Ok(mdns) => builder = builder.address_lookup(mdns.clone()),
+        Err(e) => eprintln!("stella-p2p: no local network discovery ({e})"),
+    }
     if port != 0 {
         builder = builder
             .bind_addr(SocketAddr::from((Ipv4Addr::UNSPECIFIED, port)))
@@ -152,7 +183,8 @@ async fn bind(config: &Config, key: SecretKey, port: u16) -> Result<Endpoint, St
             .bind_addr_with_opts(SocketAddr::from((Ipv6Addr::UNSPECIFIED, port)), BindOpts::default().set_is_required(false))
             .map_err(|e| e.to_string())?;
     }
-    builder.bind().await.map_err(|e| e.to_string())
+    let endpoint = builder.bind().await.map_err(|e| e.to_string())?;
+    Ok((endpoint, mdns.ok()))
 }
 
 impl Node {
@@ -165,7 +197,7 @@ impl Node {
             .map_err(|e| format!("can't start the device link: {e}"))?;
         let (store, key) = store::Store::open(&config.data_dir)?;
         let port = config.port.or(store.peers.port).unwrap_or(0);
-        let endpoint = runtime.block_on(async {
+        let (endpoint, mdns) = runtime.block_on(async {
             match bind(&config, key.clone(), port).await {
                 Ok(endpoint) => Ok(endpoint),
                 Err(e) if port != 0 => {
@@ -186,6 +218,13 @@ impl Node {
             next_rid: AtomicU64::new(1),
             devices: Mutex::new(HashMap::new()),
             computers: Mutex::new(HashMap::new()),
+            mdns,
+            discoverable: config.discoverable,
+            rendezvous: config.rendezvous.clone(),
+            confirming: Mutex::new(None),
+            nearby: Mutex::new(nearby::Nearby::default()),
+            asking: Mutex::new(HashMap::new()),
+            short: Mutex::new(None),
         });
         let bound = inner.endpoint.bound_sockets().into_iter().find(|a| a.is_ipv4()).map(|a| a.port());
         {
@@ -221,6 +260,8 @@ impl Node {
     /// Closes every connection and the endpoint.
     pub fn shutdown(self) {
         let inner = self.inner.clone();
+        short::withdraw(&inner);
+        nearby::stop(&inner);
         self.runtime.block_on(async move {
             for (_, link) in lock(&inner.computers).drain() {
                 let _ = link.stop.send(true);
@@ -258,7 +299,23 @@ async fn run(inner: Arc<Inner>, cmd: &str, args: Value) -> Result<Value, String>
             Ok(Value::Null)
         }
         "pairing.create" => host::create_offer(&inner, args.get("ttlMs").and_then(|t| t.as_u64())).await,
+        "pairing.short" => short::create(&inner).await,
+        "pairing.deny" => Ok(json!(nearby::deny(&inner, args.get("request").and_then(|r| r.as_u64()).ok_or("request is required")?))),
+        "pair.short" => short::pair(&inner, str_arg(&args, "code")?).await,
+        "nearby.start" => nearby::start(&inner),
+        "nearby.stop" => {
+            nearby::stop(&inner);
+            Ok(Value::Null)
+        }
+        "nearby.list" => Ok(nearby::list(&inner)),
+        "pair.nearby" => nearby::ask(&inner, str_arg(&args, "id")?).await,
+        "pair.nearby.confirm" => nearby::confirm(&inner, str_arg(&args, "id")?, str_arg(&args, "code")?).await,
+        "pair.nearby.cancel" => {
+            nearby::cancel(&inner, str_arg(&args, "id")?);
+            Ok(Value::Null)
+        }
         "pairing.cancel" => {
+            short::withdraw(&inner);
             lock(&inner.offers).clear();
             (inner.emit)(json!({ "kind": "pairing", "state": "withdrawn" }));
             Ok(Value::Null)

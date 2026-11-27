@@ -9,10 +9,9 @@
  * - VACUUM is one write transaction: a SIGKILL before its WAL commit frame
  *   leaves the main file untouched, and its temp database is unlinked on open
  *   (unix) / deleted on close (Windows).
- * - With `sqlite_stat1` rows for the other `entry` indexes but none for the
- *   search-text index, the planner would pick it over
- *   `idx_entry_conv_visible_seq`, so its CREATE INDEX and ANALYZE commit
- *   together.
+ * - VACUUM time grows with the live bytes: a database whose live data is
+ *   small (tens of MiB) vacuums in well under a second, so it can run while
+ *   clients are attached once the runtime has been idle a few minutes.
  */
 
 import fs from "node:fs";
@@ -22,11 +21,8 @@ import { getFileLogger } from "@stella/node-shared/observability/file-logger.js"
 import { openSqliteConnection } from "./database.js";
 import { forkFixedRateFiber } from "./effect-runtime.js";
 import { deleteLegacyRunEventBatch } from "./entry-retention.js";
-import {
-  SCHEMA_VERSION,
-  SEARCH_TEXT_INDEX_NAME,
-  SEARCH_TEXT_INDEX_SQL,
-} from "@stella/node-shared/storage/schema.js";
+import { SCHEMA_VERSION } from "@stella/node-shared/storage/schema.js";
+import { savedAgeMs } from "@stella/contracts/server-clock";
 import type { SqliteDatabase } from "@stella/node-shared/storage/shared.js";
 
 const MiB = 1024 * 1024;
@@ -37,6 +33,9 @@ export type MaintenanceSettings = {
   walTruncateBytes: number;
   analyzeIdleTicks: number;
   reclaimIdleTicks: number;
+  reclaimAttachedIdleTicks: number;
+  reclaimAttachedMaxLiveBytes: number;
+  reclaimCooldownMs: number;
   sweepBudgetMs: number;
   sweepDetachedBudgetMs: number;
   reclaimMinFreelistBytes: number;
@@ -52,9 +51,12 @@ export const MAINTENANCE_DEFAULTS: Readonly<MaintenanceSettings> = {
   walTruncateBytes: 64 * MiB,
   analyzeIdleTicks: 2,
   reclaimIdleTicks: 1,
+  reclaimAttachedIdleTicks: 5,
+  reclaimAttachedMaxLiveBytes: 64 * MiB,
+  reclaimCooldownMs: 24 * 60 * 60_000,
   sweepBudgetMs: 250,
   sweepDetachedBudgetMs: 2_000,
-  reclaimMinFreelistBytes: 512 * MiB,
+  reclaimMinFreelistBytes: 32 * MiB,
   reclaimMinFreelistRatio: 0.25,
   reclaimDiskHeadroomBytes: 1 * GiB,
   busyTimeoutMs: 2_000,
@@ -110,19 +112,15 @@ export type ReclaimOutcome =
     }
   | {
       status: "skipped";
-      reason: "already-done" | "below-threshold" | "insufficient-disk";
+      reason: "recently-done" | "below-threshold" | "insufficient-disk";
       detail: Record<string, unknown>;
     };
-
-export type SearchIndexOutcome =
-  | { status: "built"; ms: number; indexBytes: number }
-  | { status: "present" }
-  | { status: "deferred"; reason: "busy" };
 
 export type ReclaimPolicy = {
   minFreelistBytes: number;
   minFreelistRatio: number;
   diskHeadroomBytes: number;
+  cooldownMs: number;
   busyTimeoutMs: number;
   checkpointBusyTimeoutMs: number;
   diskSpace: DiskSpaceProbe;
@@ -255,50 +253,6 @@ export const analyzeOncePerSchemaVersion = (
   return true;
 };
 
-export const searchTextIndexExists = (db: SqliteDatabase): boolean =>
-  Boolean(
-    db
-      .prepare("SELECT 1 FROM sqlite_master WHERE type = 'index' AND name = ?")
-      .get(SEARCH_TEXT_INDEX_NAME),
-  );
-
-export const buildSearchTextIndex = (
-  connection: SqliteDatabase,
-  options: {
-    busyTimeoutMs: number;
-    analysisLimit: number;
-    create?: (connection: SqliteDatabase) => void;
-  },
-): SearchIndexOutcome => {
-  if (searchTextIndexExists(connection)) return { status: "present" };
-  const livePages = () =>
-    pragmaNumber(connection, "page_count") -
-    pragmaNumber(connection, "freelist_count");
-  const pagesBefore = livePages();
-  const startedAt = performance.now();
-  try {
-    withBusyTimeout(connection, options.busyTimeoutMs, () => {
-      connection.exec(`PRAGMA analysis_limit = ${options.analysisLimit};`);
-      inImmediateTransaction(connection, () => {
-        (options.create ?? ((db) => db.exec(SEARCH_TEXT_INDEX_SQL)))(
-          connection,
-        );
-        connection.exec(`ANALYZE ${SEARCH_TEXT_INDEX_NAME};`);
-      });
-    });
-  } catch (error) {
-    if (isSqliteBusyError(error)) return { status: "deferred", reason: "busy" };
-    throw error;
-  }
-  return {
-    status: "built",
-    ms: elapsedMs(startedAt),
-    indexBytes:
-      Math.max(0, livePages() - pagesBefore) *
-      pragmaNumber(connection, "page_size"),
-  };
-};
-
 /**
  * `PRAGMA optimize` on a long-lived connection. `boot` uses mask 0x10002
  * (SQLite >= 3.46: consider every table, not only ones this connection
@@ -378,13 +332,24 @@ export const checkReclaimDiskSpace = (
       };
 };
 
+const lastReclaimAt = (value: string | null): number | null => {
+  if (value === null) return null;
+  try {
+    const at = (JSON.parse(value) as { at?: unknown } | null)?.at;
+    return typeof at === "number" && Number.isFinite(at) ? at : null;
+  } catch {
+    return null;
+  }
+};
+
 export const evaluateReclaim = (
   connection: SqliteDatabase,
   databasePath: string,
   policy: ReclaimPolicy,
 ): { ready: true; health: DatabaseHealth } | (ReclaimOutcome & { ready?: false }) => {
-  if (readMeta(connection, MAINTENANCE_META_KEYS.freelistReclaimed) !== null) {
-    return { status: "skipped", reason: "already-done", detail: {} };
+  const lastAt = lastReclaimAt(readMeta(connection, MAINTENANCE_META_KEYS.freelistReclaimed));
+  if (lastAt !== null && savedAgeMs(lastAt) < policy.cooldownMs) {
+    return { status: "skipped", reason: "recently-done", detail: { lastAt } };
   }
   const health = readDatabaseHealth(connection, databasePath);
   const totalBytes = health.pageCount * health.pageSize;
@@ -481,7 +446,6 @@ export type DatabaseMaintenanceOptions = {
   diskSpace?: DiskSpaceProbe;
   tempDirectory?: string;
   vacuum?: (connection: SqliteDatabase) => void;
-  createSearchIndex?: (connection: SqliteDatabase) => void;
   sweepBatchSize?: number;
   now?: () => number;
 } & Partial<MaintenanceSettings>;
@@ -495,7 +459,6 @@ export const reclaimKillSwitchEngaged = (): boolean =>
   process.env.STELLA_DB_RECLAIM === "0";
 
 const MAX_DETACHED_RECLAIM_DEFERRALS = 3;
-const MAX_DETACHED_SEARCH_INDEX_DEFERRALS = 3;
 
 const elapsedMs = (startedAt: number) =>
   Math.round(performance.now() - startedAt);
@@ -511,16 +474,10 @@ export class DatabaseMaintenance {
   private analyzeDone = false;
   private sweepDrained = false;
   private sweepCursor: string | null = null;
-  private reclaimDone = false;
   private reclaimDisabled = false;
   private reclaimReady = false;
   private reclaimRunning = false;
   private detachedDeferrals = 0;
-  private searchIndexDone = false;
-  private searchIndexPending = false;
-  private searchIndexRunning = false;
-  private searchIndexDisabled = false;
-  private searchIndexDeferrals = 0;
   private readonly loggedSkips = new Set<string>();
 
   constructor(private readonly options: DatabaseMaintenanceOptions) {
@@ -542,22 +499,11 @@ export class DatabaseMaintenance {
   }
 
   holdsWorkerAlive(): boolean {
-    if (this.reclaimRunning || this.searchIndexRunning) return true;
-    if (
-      !this.disposed &&
-      this.hooks &&
-      this.searchIndexPending &&
-      !this.searchIndexDone &&
-      !this.searchIndexDisabled &&
-      safeCount(this.hooks.attachedClientCount) === 0
-    ) {
-      return true;
-    }
+    if (this.reclaimRunning) return true;
     if (
       this.disposed ||
       !this.hooks ||
       !this.reclaimReady ||
-      this.reclaimDone ||
       this.reclaimDisabled ||
       reclaimKillSwitchEngaged()
     ) {
@@ -674,77 +620,8 @@ export class DatabaseMaintenance {
       }
     }
 
-    const searchIndex = this.searchIndexStep(connection);
-
-    if (this.sweepDrained && !this.reclaimDone && !this.reclaimDisabled) {
-      this.reclaim(connection, searchIndex === "settled");
-    }
-  }
-
-  private searchIndexStep(
-    connection: SqliteDatabase,
-  ): "settled" | "waiting" | "ran" {
-    if (this.searchIndexDone || this.searchIndexDisabled) return "settled";
-    if (searchTextIndexExists(connection)) {
-      this.searchIndexDone = true;
-      this.searchIndexPending = false;
-      return "settled";
-    }
-    this.searchIndexPending = true;
-    if (!this.isDetached()) {
-      this.logOnce(
-        "search-index-waiting",
-        "storage.maintenance.search-index-waiting",
-        { reason: "clients-attached" },
-      );
-      return "waiting";
-    }
-    if (this.idleStreak < this.settings.reclaimIdleTicks) return "waiting";
-    let outcome: SearchIndexOutcome;
-    this.searchIndexRunning = true;
-    const startedAt = performance.now();
-    try {
-      outcome = buildSearchTextIndex(connection, {
-        busyTimeoutMs: this.settings.busyTimeoutMs,
-        analysisLimit: this.settings.analysisLimit,
-        ...(this.options.createSearchIndex
-          ? { create: this.options.createSearchIndex }
-          : {}),
-      });
-    } catch (error) {
-      this.searchIndexDisabled = true;
-      this.logger?.warn("storage.maintenance.search-index-failed", {
-        error: (error as Error)?.message ?? String(error),
-        ms: elapsedMs(startedAt),
-      });
-      return "ran";
-    } finally {
-      this.searchIndexRunning = false;
-    }
-    switch (outcome.status) {
-      case "present":
-        this.searchIndexDone = true;
-        this.searchIndexPending = false;
-        return "settled";
-      case "built":
-        this.searchIndexDone = true;
-        this.searchIndexPending = false;
-        this.logger?.process("storage.maintenance.search-index", {
-          index: SEARCH_TEXT_INDEX_NAME,
-          indexBytes: outcome.indexBytes,
-          ms: outcome.ms,
-        });
-        return "ran";
-      case "deferred":
-        this.searchIndexDeferrals += 1;
-        if (this.searchIndexDeferrals >= MAX_DETACHED_SEARCH_INDEX_DEFERRALS) {
-          this.searchIndexDisabled = true;
-        }
-        this.logOnce("deferred:search-index", "storage.maintenance.deferred", {
-          step: "search-index",
-          reason: outcome.reason,
-        });
-        return "ran";
+    if (this.sweepDrained && !this.reclaimDisabled) {
+      this.reclaim(connection);
     }
   }
 
@@ -839,6 +716,7 @@ export class DatabaseMaintenance {
       minFreelistBytes: this.settings.reclaimMinFreelistBytes,
       minFreelistRatio: this.settings.reclaimMinFreelistRatio,
       diskHeadroomBytes: this.settings.reclaimDiskHeadroomBytes,
+      cooldownMs: this.settings.reclaimCooldownMs,
       busyTimeoutMs: this.settings.busyTimeoutMs,
       checkpointBusyTimeoutMs: this.settings.checkpointBusyTimeoutMs,
       diskSpace: this.options.diskSpace ?? defaultDiskSpaceProbe,
@@ -847,7 +725,7 @@ export class DatabaseMaintenance {
     };
   }
 
-  private reclaim(connection: SqliteDatabase, mayRun: boolean): void {
+  private reclaim(connection: SqliteDatabase): void {
     if (reclaimKillSwitchEngaged()) {
       this.reclaimReady = false;
       this.logOnce("kill-switch", "storage.maintenance.reclaim-skipped", {
@@ -867,15 +745,19 @@ export class DatabaseMaintenance {
       return;
     }
     this.reclaimReady = true;
-    if (!this.isDetached()) {
-      this.logOnce("waiting-for-detach", "storage.maintenance.reclaim-waiting", {
-        reason: "clients-attached",
-        freelistBytes: evaluation.health.freelistBytes,
-      });
-      return;
+    if (this.isDetached()) {
+      if (this.idleStreak < this.settings.reclaimIdleTicks) return;
+    } else {
+      if (evaluation.health.liveBytes > this.settings.reclaimAttachedMaxLiveBytes) {
+        this.logOnce("waiting-for-detach", "storage.maintenance.reclaim-waiting", {
+          reason: "clients-attached",
+          liveBytes: evaluation.health.liveBytes,
+          freelistBytes: evaluation.health.freelistBytes,
+        });
+        return;
+      }
+      if (this.idleStreak < this.settings.reclaimAttachedIdleTicks) return;
     }
-    if (this.idleStreak < this.settings.reclaimIdleTicks) return;
-    if (!mayRun) return;
     const startedAt = performance.now();
     let outcome: ReclaimOutcome;
     this.reclaimRunning = true;
@@ -897,7 +779,6 @@ export class DatabaseMaintenance {
   private handleOutcome(outcome: ReclaimOutcome, ms: number): void {
     switch (outcome.status) {
       case "reclaimed":
-        this.reclaimDone = true;
         this.reclaimReady = false;
         this.logger?.process("storage.maintenance.reclaim", {
           fileBytesBefore: outcome.before.fileBytes,
@@ -921,10 +802,6 @@ export class DatabaseMaintenance {
         });
         return;
       case "skipped":
-        if (outcome.reason === "already-done") {
-          this.reclaimDone = true;
-          return;
-        }
         if (outcome.reason === "insufficient-disk") {
           this.logOnce(
             "insufficient-disk",

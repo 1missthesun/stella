@@ -229,11 +229,9 @@ export function createViewsHost(engine: Engine, on: On) {
   };
 
   const readRemote = (entry: Entry) => {
+    // Not offered yet: the chat hands each conversation's views over as it renders.
     const view = known.get(entry.filePath);
-    if (!view) {
-      entry.session.report("file", "The view isn't on this computer, and the conversation doesn't carry it.");
-      return;
-    }
+    if (!view) return;
     const data = view.data === undefined ? null : JSON.stringify(view.data);
     if (data !== entry.lastData) {
       entry.lastData = data;
@@ -286,7 +284,7 @@ export function createViewsHost(engine: Engine, on: On) {
       existing.closeTimer = null;
       return existing;
     }
-    const remote = !isLocalViewFile(filePath) && known.has(filePath);
+    const remote = !isLocalViewFile(filePath);
     let data: unknown = remote ? (known.get(filePath)?.data ?? null) : null;
     try {
       const path = dataPathFor(filePath);
@@ -405,9 +403,7 @@ export function createViewsHost(engine: Engine, on: On) {
           if (previous && (previous.createdAt > view.createdAt || (previous.source === view.source && previous.data === view.data))) continue;
           known.set(view.filePath, view);
           const entry = entries.get(view.filePath);
-          if (!entry) continue;
-          if (!entry.remote && !isLocalViewFile(view.filePath)) entry.remote = true;
-          if (entry.remote) readSource(entry);
+          if (entry?.remote) readSource(entry);
         }
       }
     },

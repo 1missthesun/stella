@@ -49,14 +49,14 @@ import {
   type ConversationStore,
 } from "./cloud-conversation-store";
 import {
-  acknowledgedCloudDispatchIds,
   activeCloudTurnId,
   canonicalCloudDispatchIdForTurn,
-  createRecordedCloudDispatchIds,
+  createRecordedCloudSends,
   mergeCanonicalCloudMessages,
   projectCloudConversationMessages,
   latestJournalDestinationSwitch,
   rebindCanonicalCloudMessages,
+  recordedCloudSendIds,
 } from "./cloud-journal-projection";
 import { journalIndex } from "./journal-index";
 import { getBackendClient, useBackendView } from "./backend";
@@ -693,10 +693,10 @@ export const useCloudCanonicalChatThread = (
   });
   const displayedProjection = display.messages;
 
-  const [recordDispatchIds] = useState(createRecordedCloudDispatchIds);
-  const recordedDispatchIds = useMemo(
-    () => recordDispatchIds(acknowledgedCloudDispatchIds(journalWindow, dispatchBindings)),
-    [dispatchBindings, journalWindow, recordDispatchIds],
+  const [recordSends] = useState(createRecordedCloudSends);
+  const recordedSendIds = useMemo(
+    () => recordSends(recordedCloudSendIds(journalWindow, dispatchBindings)),
+    [dispatchBindings, journalWindow, recordSends],
   );
   const canonical = useMemo(
     () => rebindCanonicalCloudMessages(displayedProjection, dispatchBindings),
@@ -719,13 +719,13 @@ export const useCloudCanonicalChatThread = (
         canonical,
         local: localMessages,
         dispatchBindings,
-        recordedDispatchIds,
+        recordedSendIds,
       }),
     [
       canonical,
       dispatchBindings,
       localMessages,
-      recordedDispatchIds,
+      recordedSendIds,
     ],
   );
   const messages = useStableChatMessages(

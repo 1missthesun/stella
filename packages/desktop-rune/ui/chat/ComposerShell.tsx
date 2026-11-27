@@ -66,7 +66,7 @@ export function ComposerShell({ value, onChange, onSubmit, placeholder, disabled
           {expanded ? null : <box key="lead">{lead}</box>}
           <box key="field" grow={1} minW={0} selfAlign={expanded ? "stretch" : "center"} onLayout={expanded ? undefined : (r) => setPillFieldW(r.w)}>
             {pillFieldW > 0 && value.length > 0 ? (
-              <text absolute={{ left: 0, top: 0 }} w={pillFieldW - PILL_INPUT_PAD_X * 2} size={fontSize.md} lineHeight={LINE} hidden inert onLayout={(r) => setPillTextH(r.h)}>
+              <text absolute={{ left: 0, top: 0 }} w={pillFieldW - PILL_INPUT_PAD_X * 2} size={fontSize.md} lineHeight={LINE} hidden inert onSize={(r) => setPillTextH(r.h)}>
                 {value.endsWith("\n") ? `${value} ` : value}
               </text>
             ) : null}

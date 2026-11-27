@@ -303,7 +303,7 @@ function NotificationToast({ bellRight }: { bellRight: number | null }) {
       motion={{ dur: 0.2 }}
       onHover={setHeld}
       onFocusWithin={setHeld}
-      onLayout={(r) => setToastSpace(Math.round(r.h) + 8)}
+      onSize={(r) => setToastSpace(Math.round(r.h) + 8)}
     >
       <NotificationRow item={item} variant="toast" now={now} onClose={leave} />
     </col>

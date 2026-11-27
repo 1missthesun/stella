@@ -46,14 +46,14 @@ export const ShellTopBarFull = memo(function ShellTopBarFull({ onSignIn }: { onS
       gap={COLUMN_GAP}
       raise={80}
       windowDrag
-      onLayout={(r) => setWidth((w) => (Math.abs(w - r.w) < 0.5 ? w : r.w))}
+      onSize={(r) => setWidth((w) => (Math.abs(w - r.w) < 0.5 ? w : r.w))}
     >
       <row id="shell-topbar-full-left" w={left + reach} mr={-reach} raise={1} h="full" align="center" gap={8} pl={padLeft} pr={12} minW={0} clip={0} windowDrag>
         <ShellTopBarTabs room={left + reach - padLeft - 12} />
       </row>
       <ShellTopBarActivity width={middle} />
       <row id="shell-topbar-full-right" w={right} h="full" align="center" justify="end" pr={isWin ? 0 : 12} windowDrag>
-        <row gap={4} align="center" h="full" onLayout={(r) => setRightContent((w) => (Math.abs(w - (r.w + (isWin ? 0 : 12))) < 0.5 ? w : r.w + (isWin ? 0 : 12)))}>
+        <row gap={4} align="center" h="full" onSize={(r) => setRightContent((w) => (Math.abs(w - (r.w + (isWin ? 0 : 12))) < 0.5 ? w : r.w + (isWin ? 0 : 12)))}>
           <ShellTopBarUpdatePill />
           <GlobalExecutionTargetControl />
           <NotificationBell />

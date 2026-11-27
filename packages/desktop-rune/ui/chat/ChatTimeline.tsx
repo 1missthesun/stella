@@ -305,7 +305,7 @@ export const ChatTimeline = memo(function ChatTimeline({
   };
 
   const tail = extraTail ? (
-    <col w="full" gap={6} mt={!tailPulledUp && tailFilled ? EXTRA_TAIL_GAP : 0} onLayout={(r) => setTailFilled(r.h > 0)}>
+    <col w="full" gap={6} mt={!tailPulledUp && tailFilled ? EXTRA_TAIL_GAP : 0} onSize={(r) => setTailFilled(r.h > 0)}>
       {extraTail}
     </col>
   ) : null;

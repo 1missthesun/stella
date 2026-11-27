@@ -8,6 +8,7 @@ import type { AgentAttemptOutcome } from "./agent-status.js";
 import { wakePromptOf } from "./agent-wake-prompt.js";
 import { EMAIL_CARD_TYPE } from "./email-card.js";
 import { REMINDER_CARD_TYPE } from "./reminders.js";
+import { WELCOME_CARD_TYPE } from "./welcome-message.js";
 import {
   splitMessageReplyRefs,
   toReplyPreview,
@@ -93,6 +94,7 @@ const SHOWN_CARD_TYPES: ReadonlySet<string> = new Set([
   SCHEDULE_NOTICE_CARD_TYPE,
   SAFEGUARD_CARD_TYPE,
   EMAIL_CARD_TYPE,
+  WELCOME_CARD_TYPE,
 ]);
 
 const showsInChat = (record: JournalRecord): boolean =>

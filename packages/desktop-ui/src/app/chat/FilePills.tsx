@@ -1,7 +1,8 @@
 import { fileDisplayName } from "@stella/contracts/file-display-name";
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { ChevronDown } from "@/ui/icons";
 import { DisplayTabIcon } from "@/features/workspace-display/icons";
+import type { DisplayTabKind } from "@/features/workspace-display/types";
 import { openDisplayPayloadTab } from "@/features/workspace-display/open-payload";
 import { displayTabKindForPayload } from "@/features/workspace-display/payload-kind";
 import {
@@ -23,19 +24,26 @@ const pillName = (entry: ConversationFileEntry): string =>
     ? getDisplayPayloadTitle(entry.payload)
     : fileDisplayName(basenameOf(entry.path));
 
-const FilePillView = ({
-  entry,
+/** One file pill: what sits under a message for each file it made. */
+export const FilePillButton = ({
+  kind,
+  name,
+  title,
   onOpen,
   localFilePath,
+  children,
 }: {
-  entry: ConversationFileEntry;
+  kind: DisplayTabKind;
+  name: string;
+  title: string;
   onOpen: () => void;
   localFilePath?: string | null;
+  children?: ReactNode;
 }) => {
   return (
     <span
       className="agent-activity-files__pill"
-      title={entry.path}
+      title={title}
       onClick={(event) => event.stopPropagation()}
       onContextMenu={contextMenu(
         localFilePath
@@ -49,19 +57,36 @@ const FilePillView = ({
         onClick={onOpen}
       >
         <span className="agent-activity-files__pill-icon" aria-hidden="true">
-          <DisplayTabIcon
-            kind={displayTabKindForPayload(entry.payload)}
-            size={14}
-          />
+          <DisplayTabIcon kind={kind} size={14} />
         </span>
-        <span className="agent-activity-files__pill-name">
-          {pillName(entry)}
-        </span>
+        <span className="agent-activity-files__pill-name">{name}</span>
       </button>
+      {children}
+    </span>
+  );
+};
+
+const FilePillView = ({
+  entry,
+  onOpen,
+  localFilePath,
+}: {
+  entry: ConversationFileEntry;
+  onOpen: () => void;
+  localFilePath?: string | null;
+}) => {
+  return (
+    <FilePillButton
+      kind={displayTabKindForPayload(entry.payload)}
+      name={pillName(entry)}
+      title={entry.path}
+      onOpen={onOpen}
+      localFilePath={localFilePath}
+    >
       {localFilePath ? (
         <OpenWithMenu filePath={localFilePath} />
       ) : null}
-    </span>
+    </FilePillButton>
   );
 };
 

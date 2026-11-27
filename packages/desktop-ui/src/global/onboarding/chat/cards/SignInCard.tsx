@@ -2,7 +2,6 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } fr
 import { Button } from "@/ui/button";
 import { BrandIcon } from "@/ui/brand-icon";
 import { Check, KeyRound, LogIn } from "@/ui/icons";
-import { DialogTitle } from "@/ui/dialog";
 import { Select } from "@/ui/select";
 import { LLM_PROVIDERS } from "@/global/settings/lib/llm-providers";
 import {
@@ -31,6 +30,7 @@ import {
   buildEngineTransitionReasoningPatch,
   type ModelPickerEngine,
 } from "@/global/settings/lib/engine-model-routing";
+import type { OnboardingChatAnswer } from "../onboarding-chat-flow";
 import { selfHostDialogs, useDesktopServerState } from "@/global/self-host/self-host-store";
 import {
   useSelfHostedServer,
@@ -38,11 +38,13 @@ import {
   useServerFeature,
 } from "@/platform/backend/server-discovery";
 import { switchEngine } from "@/global/settings/lib/switch-engine";
+import { uiState } from "@/platform/ui-state";
 import "@/global/self-host/self-host.css";
-import "./choose-ai.css";
 
-type ChooseAiCardProps = {
-  onDone: () => void;
+type SignInCardProps = {
+  active: boolean;
+  answered: OnboardingChatAnswer | undefined;
+  onAnswer: (answer: OnboardingChatAnswer) => void;
 };
 
 type OptionId = "stella" | "claude" | "chatgpt" | "apikey";
@@ -68,6 +70,8 @@ const ENGINE_TO_OPTION: Record<ModelPickerEngine, OptionId> = {
 };
 
 type ApiKeyProvider = (typeof API_KEY_PROVIDERS)[number];
+
+const ENGINE_DEFAULT_DECIDED_KEY = "stella-onboarding-engine-default-decided";
 
 const hostOf = (origin: string): string => {
   try {
@@ -115,8 +119,7 @@ const routeToApiKeyProvider = async (provider: string): Promise<boolean> => {
   return true;
 };
 
-export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
-  const active = true;
+export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
   const t = useT();
   const session = useAuthSessionState();
   const { isAuthenticated } = useAuthState();
@@ -189,6 +192,12 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
     session.hasConnectedAccount,
   ]);
   const serverModels = selfHosted && managedModels;
+  const anyConnected =
+    serverModels ||
+    connected.stella ||
+    connected.claude ||
+    connected.chatgpt ||
+    connected.apikey;
   const inUse: OptionId | null = engine
     ? engine === "default" && apiKeyModel
       ? "apikey"
@@ -232,7 +241,7 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
       setKeyDraft("");
       setKeyFormOpen(false);
     } catch (caught) {
-      console.warn("[choose-ai] API key save failed", caught);
+      console.warn("[onboarding-chat] API key save failed", caught);
       setError(t("onboarding.chat.signin.error"));
     } finally {
       setPending(null);
@@ -244,8 +253,16 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
       const fallback = options.find((option) => option.id !== "stella" && connected[option.id]);
       if (fallback) await applyEngine(fallback);
     }
-    onDone();
-  }, [applyEngine, connected, lensOn, onDone, options]);
+    onAnswer("done");
+  }, [applyEngine, connected, lensOn, onAnswer, options]);
+
+  const claudeReady = claudeLocal.loaded && claudeLocal.cliInstalled && claudeLocal.signedIn;
+  useEffect(() => {
+    if (!active || answered !== undefined || engine === null || !claudeLocal.loaded) return;
+    if (uiState.getItem(ENGINE_DEFAULT_DECIDED_KEY)) return;
+    uiState.setItem(ENGINE_DEFAULT_DECIDED_KEY, "1");
+    if (engine === "default" && !apiKeyModel && claudeReady) void applyEngine(BASE_OPTIONS[1]!);
+  }, [active, answered, apiKeyModel, applyEngine, claudeLocal.loaded, claudeReady, engine]);
 
   const { reload: reloadClaudeLocal } = claudeLocal;
   const claudeLogin = useClaudeLogin({
@@ -306,7 +323,7 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
           await applyEngine(option);
         }
       } catch (caught) {
-        console.warn("[choose-ai] Subscription sign-in failed", caught);
+        console.warn("[onboarding-chat] Subscription sign-in failed", caught);
         setError(t("onboarding.chat.signin.error"));
       } finally {
         setPending(null);
@@ -345,33 +362,61 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
     }
     const row = list.querySelector<HTMLElement>(`[data-option="${lensOn}"]`);
     if (row) setLens({ top: row.offsetTop, height: row.offsetHeight });
-  }, [lensOn]);
+  }, [lensOn, answered]);
+
+  if (answered !== undefined) {
+    const label =
+      lensOn && lensOn !== "stella"
+        ? t("onboarding.chat.signin.settledEngine", {
+            name: t(`onboarding.chat.signin.options.${lensOn}.title`),
+          })
+        : selfHosted
+          ? t("selfHost.onboarding.settled", { name: serverName })
+          : anyConnected
+            ? t("onboarding.chat.signin.settledStella")
+            : t("onboarding.chat.signin.settledNone");
+    return (
+      <div className="obc-card" data-settled>
+        <span className="obc-card__settled-icon">
+          {anyConnected ? <Check size={15} /> : <KeyRound size={15} />}
+        </span>
+        <span className="obc-card__settled-text">
+          <span className="obc-card__settled-title">{label}</span>
+          <span className="obc-card__settled-desc">
+            {anyConnected || selfHosted
+              ? t("onboarding.chat.signin.settledDesc")
+              : t("onboarding.chat.signin.settledNoneDesc")}
+          </span>
+        </span>
+      </div>
+    );
+  }
 
   return (
-    <div className="choose-ai">
+    <div className="obc-card">
       <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
-      <div className="choose-ai-card__section">
+      <div className="obc-card__section">
         {selfHosted ? (
           <>
-            <DialogTitle className="choose-ai-card__title self-host-onboarding__title">
+            <h3 className="obc-card__title self-host-onboarding__title">
               <Check size={15} aria-hidden="true" />
               {t("selfHost.onboarding.title", { name: serverName })}
-            </DialogTitle>
-            <p className="choose-ai-card__body">
+            </h3>
+            <p className="obc-card__body">
               {t(serverModels ? "selfHost.onboarding.bodyOptional" : "selfHost.onboarding.body")}
             </p>
           </>
         ) : (
           <>
-            <DialogTitle className="choose-ai-card__title">{t("onboarding.chat.signin.title")}</DialogTitle>
-            <p className="choose-ai-card__body">{t("onboarding.chat.signin.body")}</p>
+            <h3 className="obc-card__title">{t("onboarding.chat.signin.title")}</h3>
+            <p className="obc-card__body">{t("onboarding.chat.signin.body")}</p>
           </>
         )}
       </div>
 
-      <div className="choose-ai-signin" ref={listRef}>
+      <div className="obc-signin" ref={listRef}>
         <span
-          className="choose-ai-signin__lens"
+          className="obc-signin__lens"
           data-visible={lens ? true : undefined}
           style={lens ? { transform: `translateY(${lens.top}px)`, height: lens.height } : undefined}
           aria-hidden="true"
@@ -388,7 +433,7 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
             <button
               key={option.id}
               type="button"
-              className="choose-ai-signin__row"
+              className="obc-signin__row"
               data-option={option.id}
               data-connected={isConnected || undefined}
               data-in-use={isInUse || undefined}
@@ -409,24 +454,24 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
               style={{ animationDelay: `${index * 70}ms` }}
               onClick={() => void (isPending ? undefined : handleRow(option))}
             >
-              <span className="choose-ai-signin__icon">
+              <span className="obc-signin__icon">
                 {option.id === "apikey" ? (
                   <KeyRound size={18} />
                 ) : (
                   <BrandIcon brand={option.brand} size={20} />
                 )}
               </span>
-              <span className="choose-ai-signin__text">
-                <span className="choose-ai-signin__title">
+              <span className="obc-signin__text">
+                <span className="obc-signin__title">
                   {t(`onboarding.chat.signin.options.${option.id}.title`)}
                 </span>
-                <span className="choose-ai-signin__desc">{detail}</span>
+                <span className="obc-signin__desc">{detail}</span>
               </span>
-              <span className="choose-ai-signin__state">
+              <span className="obc-signin__state">
                 {isPending ? (
-                  <span className="choose-ai-signin__spinner" aria-label={t("common.loading")} />
+                  <span className="obc-signin__spinner" aria-label={t("common.loading")} />
                 ) : isConnected ? (
-                  <span className="choose-ai-signin__badge">
+                  <span className="obc-signin__badge">
                     <svg viewBox="0 0 24 24" width={13} height={13} aria-hidden>
                       <path d="M5 12.8 9.9 17.7 19 7.3" pathLength={24} />
                     </svg>
@@ -435,7 +480,7 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
                       : t("onboarding.chat.signin.use")}
                   </span>
                 ) : (
-                  <span className="choose-ai-signin__action">
+                  <span className="obc-signin__action">
                     {option.id === "stella" ? <LogIn size={13} /> : null}
                     {t(
                       option.id === "stella"
@@ -452,7 +497,7 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
 
       {keyFormOpen ? (
         <form
-          className="choose-ai-signin__key-form"
+          className="obc-signin__key-form"
           onSubmit={(event) => {
             event.preventDefault();
             void saveApiKey();
@@ -468,7 +513,7 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
             }))}
           />
           <input
-            className="choose-ai-signin__key-input"
+            className="obc-signin__key-input"
             type="password"
             autoComplete="off"
             spellCheck={false}
@@ -498,21 +543,21 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
       ) : connect.flow ? (
         <EngineConnectPrompt connect={connect} />
       ) : pending && pending !== "stella" && pending !== "apikey" ? (
-        <p className="choose-ai-card__fine">
+        <p className="obc-card__fine">
           {t("onboarding.chat.signin.waiting")}{" "}
-          <button type="button" className="choose-ai-link-btn" onClick={handleCancel}>
+          <button type="button" className="obc-link-btn" onClick={handleCancel}>
             {t("common.cancel")}
           </button>
         </p>
       ) : error ? (
-        <p className="choose-ai-card__fine choose-ai-card__fine--error" role="alert">
+        <p className="obc-card__fine obc-card__fine--error" role="alert">
           {error}
         </p>
       ) : (
-        <p className="choose-ai-card__fine">{t("onboarding.chat.signin.fineOwnPlan")}</p>
+        <p className="obc-card__fine">{t("onboarding.chat.signin.fineOwnPlan")}</p>
       )}
 
-      <div className="choose-ai-actions">
+      <div className="obc-actions">
         <Button
           type="button"
           variant="primary"
@@ -521,13 +566,13 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
         >
           {t("common.continue")}
         </Button>
-        <span className="choose-ai-actions__spacer" />
+        <span className="obc-actions__spacer" />
         {selfHosted ? null : (
-          <span className="choose-ai-actions__hint">{t("onboarding.chat.signin.hint")}</span>
+          <span className="obc-actions__hint">{t("onboarding.chat.signin.hint")}</span>
         )}
       </div>
       {serverState?.canSwitch && !serverState.selfHosted ? (
-        <p className="choose-ai-card__fine">
+        <p className="obc-card__fine">
           <button
             type="button"
             className="self-host-signin-link"

@@ -4,8 +4,8 @@ Stella can run its chat and tasks on the user's own Claude Code (their claude.ai
 
 ## Entry points
 
-- **Models** › **Claude Code** group in the top bar (picking it switches the engine); the welcome message's "Connect a plan" (the "Choose your AI" dialog); Settings › Account for logins.
-- Install: one click everywhere (the Choose your AI dialog, Settings, the chat notice, the connect-plan card) runs Anthropic's installer into the home folder with progress (`desktop/electron/services/claude-cli-install.ts`, UI `features/claude/use-claude-cli-install.ts`). A send on Claude Code without the CLI shows a plain bubble and an install notice.
+- **Models** › **Claude Code** group in the top bar (picking it switches the engine); onboarding's "Choose your AI"; Settings › Account for logins.
+- Install: one click everywhere (onboarding, Settings, the chat notice, the connect-plan card) runs Anthropic's installer into the home folder with progress (`desktop/electron/services/claude-cli-install.ts`, UI `features/claude/use-claude-cli-install.ts`). A send on Claude Code without the CLI shows a plain bubble and an install notice.
 
 ## Behavior worth knowing
 

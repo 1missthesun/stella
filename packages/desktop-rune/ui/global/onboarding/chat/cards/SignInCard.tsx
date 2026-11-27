@@ -1,7 +1,7 @@
-import { BrandIcon, Button, Check, Form, Input, KeyRound, LogIn, Press, Select, T, tx } from "../../kit/compat";
-import { useChooseAi } from "./choose-ai.styles";
-import { mixOklch, useTokens } from "../../theme";
-import { useSelfHost } from "../../global/self-host/self-host.styles";
+import { BrandIcon, Button, Check, Form, Input, KeyRound, LogIn, Press, Select, T, tx } from "../../../../kit/compat";
+import { useOnboardingChat } from "../onboarding-chat.styles";
+import { mixOklch, useTokens } from "../../../../theme";
+import { useSelfHost } from "../../../self-host/self-host.styles";
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { LLM_PROVIDERS } from "@/global/settings/lib/llm-providers";
 import {
@@ -11,25 +11,26 @@ import {
 } from "@/global/settings/lib/provider-default-models";
 import { useLlmCredentials } from "@/global/settings/hooks/use-llm-credentials";
 import { useT } from "@/shared/i18n";
-import { AuthDialog } from "../../global/auth/AuthDialog";
+import { AuthDialog } from "../../../auth/AuthDialog";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { useAuthState } from "@/global/auth/BackendAuthProvider";
 import { useCloudEngines } from "@/features/cloud/cloud-engines-api";
-import { ClaudeLoginPrompt } from "../../global/claude/ClaudeLoginPrompt";
+import { ClaudeLoginPrompt } from "../../../claude/ClaudeLoginPrompt";
 import { useClaudeLocalAccounts } from "@/features/claude/use-claude-local-accounts";
 import { useClaudeLogin } from "@/features/claude/use-claude-login";
 import { useClaudeInstallThenSignIn } from "@/features/claude/use-claude-cli-install";
-import { ClaudeCliInstallStatus } from "../../global/claude/ClaudeCliInstallStatus";
-import { EngineConnectPrompt } from "../../global/cloud/EngineConnectPrompt";
+import { ClaudeCliInstallStatus } from "../../../claude/ClaudeCliInstallStatus";
+import { EngineConnectPrompt } from "../../../cloud/EngineConnectPrompt";
 import { useEngineConnect } from "@/features/cloud/use-engine-connect";
 import { isEngineConnectionUsable } from "@stella/contracts/backend/engines";
-import { announceChatGptPlanUse } from "../../global/chatgpt/ChatGptBrand";
+import { announceChatGptPlanUse } from "../../../chatgpt/ChatGptBrand";
 import { useChatGptProfiles } from "@/features/chatgpt/use-chatgpt-profiles";
 import {
   buildEngineRoutingPatch,
   buildEngineTransitionReasoningPatch,
   type ModelPickerEngine,
 } from "@/global/settings/lib/engine-model-routing";
+import type { OnboardingChatAnswer } from "@/global/onboarding/chat/onboarding-chat-flow";
 import { selfHostDialogs, useDesktopServerState } from "@/global/self-host/self-host-store";
 import {
   useSelfHostedServer,
@@ -37,9 +38,12 @@ import {
   useServerFeature,
 } from "@/platform/backend/server-discovery";
 import { switchEngine } from "@/global/settings/lib/switch-engine";
+import { uiState } from "@/platform/ui-state";
 
-type ChooseAiCardProps = {
-  onDone: () => void;
+type SignInCardProps = {
+  active: boolean;
+  answered: OnboardingChatAnswer | undefined;
+  onAnswer: (answer: OnboardingChatAnswer) => void;
 };
 
 type OptionId = "stella" | "claude" | "chatgpt" | "apikey";
@@ -69,6 +73,8 @@ const ENGINE_TO_OPTION: Record<ModelPickerEngine, OptionId> = {
 };
 
 type ApiKeyProvider = (typeof API_KEY_PROVIDERS)[number];
+
+const ENGINE_DEFAULT_DECIDED_KEY = "stella-onboarding-engine-default-decided";
 
 const hostOf = (origin: string): string => {
   try {
@@ -116,10 +122,8 @@ const routeToApiKeyProvider = async (provider: string): Promise<boolean> => {
   return true;
 };
 
-/** desktop-ui's `ChooseAiCard`: the sign-in and plan options, opened from the welcome message. */
-export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
-  const active = true;
-  const s = useChooseAi();
+export function SignInCard({ active, answered, onAnswer }: SignInCardProps) {
+  const s = useOnboardingChat();
   const tokens = useTokens();
   const sSelfHost = useSelfHost();
   const t = useT();
@@ -194,6 +198,12 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
     session.hasConnectedAccount,
   ]);
   const serverModels = selfHosted && managedModels;
+  const anyConnected =
+    serverModels ||
+    connected.stella ||
+    connected.claude ||
+    connected.chatgpt ||
+    connected.apikey;
   const inUse: OptionId | null = engine
     ? engine === "default" && apiKeyModel
       ? "apikey"
@@ -237,7 +247,7 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
       setKeyDraft("");
       setKeyFormOpen(false);
     } catch (caught) {
-      console.warn("[choose-ai] API key save failed", caught);
+      console.warn("[onboarding-chat] API key save failed", caught);
       setError(t("onboarding.chat.signin.error"));
     } finally {
       setPending(null);
@@ -249,8 +259,16 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
       const fallback = options.find((option) => option.id !== "stella" && connected[option.id]);
       if (fallback) await applyEngine(fallback);
     }
-    onDone();
-  }, [applyEngine, connected, lensOn, onDone, options]);
+    onAnswer("done");
+  }, [applyEngine, connected, lensOn, onAnswer, options]);
+
+  const claudeReady = claudeLocal.loaded && claudeLocal.cliInstalled && claudeLocal.signedIn;
+  useEffect(() => {
+    if (!active || answered !== undefined || engine === null || !claudeLocal.loaded) return;
+    if (uiState.getItem(ENGINE_DEFAULT_DECIDED_KEY)) return;
+    uiState.setItem(ENGINE_DEFAULT_DECIDED_KEY, "1");
+    if (engine === "default" && !apiKeyModel && claudeReady) void applyEngine(BASE_OPTIONS[1]!);
+  }, [active, answered, apiKeyModel, applyEngine, claudeLocal.loaded, claudeReady, engine]);
 
   const { reload: reloadClaudeLocal } = claudeLocal;
   const claudeLogin = useClaudeLogin({
@@ -311,7 +329,7 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
           await applyEngine(option);
         }
       } catch (caught) {
-        console.warn("[choose-ai] Subscription sign-in failed", caught);
+        console.warn("[onboarding-chat] Subscription sign-in failed", caught);
         setError(t("onboarding.chat.signin.error"));
       } finally {
         setPending(null);
@@ -347,35 +365,63 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
     const row = lensOn ? rowRects.current.get(lensOn) : undefined;
     setLens(row ? { top: row.y - listY.current, height: row.h } : null);
   }, [lensOn]);
-  useLayoutEffect(() => placeLens(), [placeLens]);
+  useLayoutEffect(() => placeLens(), [placeLens, answered]);
+
+  if (answered !== undefined) {
+    const label =
+      lensOn && lensOn !== "stella"
+        ? t("onboarding.chat.signin.settledEngine", {
+            name: t(`onboarding.chat.signin.options.${lensOn}.title`),
+          })
+        : selfHosted
+          ? t("selfHost.onboarding.settled", { name: serverName })
+          : anyConnected
+            ? t("onboarding.chat.signin.settledStella")
+            : t("onboarding.chat.signin.settledNone");
+    return (
+      <row {...s.obcCard} {...s.obcCardSettled}>
+        <row {...s.obcCardSettledIcon}>
+          {anyConnected ? <Check size={15} color={s.obcCardSettledIcon.color} /> : <KeyRound size={15} color={s.obcCardSettledIcon.color} />}
+        </row>
+        <col {...s.obcCardSettledText}>
+          <T {...s.obcCardSettledTitle}>{label}</T>
+          <T {...s.obcCardSettledDesc}>
+            {anyConnected || selfHosted
+              ? t("onboarding.chat.signin.settledDesc")
+              : t("onboarding.chat.signin.settledNoneDesc")}
+          </T>
+        </col>
+      </row>
+    );
+  }
 
   return (
-    <col {...s.chooseAi}>
+    <col {...s.obcCard}>
       <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
-      <col {...s.caCardSection}>
+      <col {...s.obcCardSection}>
         {selfHosted ? (
           <>
-            <row role="heading" {...s.caCardTitle} {...sSelfHost.selfHostOnboardingTitle}>
-              <Check size={15} color={s.caCardTitle.color} />
+            <row role="heading" {...s.obcCardTitle} {...sSelfHost.selfHostOnboardingTitle}>
+              <Check size={15} color={s.obcCardTitle.color} />
               {t("selfHost.onboarding.title", { name: serverName })}
             </row>
-            <T w="full" {...s.caCardBody}>
+            <T w="full" {...s.obcCardBody}>
               {t(serverModels ? "selfHost.onboarding.bodyOptional" : "selfHost.onboarding.body")}
             </T>
           </>
         ) : (
           <>
-            <T role="heading" {...s.caCardTitle} pr={32}>{t("onboarding.chat.signin.title")}</T>
-            <T w="full" {...s.caCardBody}>{t("onboarding.chat.signin.body")}</T>
+            <T role="heading" {...s.obcCardTitle}>{t("onboarding.chat.signin.title")}</T>
+            <T w="full" {...s.obcCardBody}>{t("onboarding.chat.signin.body")}</T>
           </>
         )}
       </col>
 
-      <col {...s.caSignin} onLayout={(r) => {
+      <col {...s.obcSignin} onLayout={(r) => {
           listY.current = r.y;
           placeLens();
         }}>
-        <row {...s.caSigninLens} {...(lens ? { y: lens.top, h: lens.height } : null)} {...(lens ? s.caSigninLensVisible : null)} />
+        <row {...s.obcSigninLens} {...(lens ? { y: lens.top, h: lens.height } : null)} {...(lens ? s.obcSigninLensVisible : null)} />
         {options.map((option, index) => {
           const isConnected = connected[option.id];
           const isPending = busyOption === option.id;
@@ -385,7 +431,7 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
               ? session.user.email
               : t(`onboarding.chat.signin.options.${option.id}.body`);
           return (
-            <Press {...s.caSigninRow} key={option.id} onLayout={(r) => {
+            <Press {...s.obcSigninRow} key={option.id} onLayout={(r) => {
                 rowRects.current.set(option.id, { y: r.y, h: r.h });
                 if (option.id === lensOn) placeLens();
               }} disabled={!active || (busyOption !== null && !isPending)} selected={isInUse} label={`${t(`onboarding.chat.signin.options.${option.id}.title`)}, ${
@@ -398,33 +444,33 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
                           ? "onboarding.chat.signin.signIn"
                           : "onboarding.chat.signin.connect",
                       )
-              }`} onPress={() => void (isPending ? undefined : handleRow(option))} {...((isInUse || undefined) ? s.caSigninRowInUse : null)} {...((isPending || undefined) ? s.caSigninRowPending : null)} {...((!active || (busyOption !== null && !isPending)) ? s.caSigninRowDisabled : null)}>
-              <box {...s.caSigninIcon}>
+              }`} onPress={() => void (isPending ? undefined : handleRow(option))} {...((isInUse || undefined) ? s.obcSigninRowInUse : null)} {...((isPending || undefined) ? s.obcSigninRowPending : null)} {...((!active || (busyOption !== null && !isPending)) ? s.obcSigninRowDisabled : null)}>
+              <box {...s.obcSigninIcon}>
                 {option.id === "apikey" ? (
                   <KeyRound size={18} />
                 ) : (
                   <BrandIcon brand={option.brand} size={20} />
                 )}
               </box>
-              <col {...s.caSigninText}>
-                <T {...tx(s.caSigninRow)} {...s.caSigninTitle}>
+              <col {...s.obcSigninText}>
+                <T {...tx(s.obcSigninRow)} {...s.obcSigninTitle}>
                   {t(`onboarding.chat.signin.options.${option.id}.title`)}
                 </T>
-                <T {...tx(s.caSigninRow)} {...s.caSigninDesc}>{detail}</T>
+                <T {...tx(s.obcSigninRow)} {...s.obcSigninDesc}>{detail}</T>
               </col>
-              <row {...s.caSigninState}>
+              <row {...s.obcSigninState}>
                 {isPending ? (
-                  <icon mr={8} svg={SPINNER_SVG(tokens.c.primary, mixOklch(tokens.c.foreground, 12, "transparent"))} name={`choose-ai/spinner-${tokens.themeId}-${tokens.dark}`} view={18} size={18} spin={0.8} title={t("common.loading")} />
+                  <icon mr={8} svg={SPINNER_SVG(tokens.c.primary, mixOklch(tokens.c.foreground, 12, "transparent"))} name={`obc/spinner-${tokens.themeId}-${tokens.dark}`} view={18} size={18} spin={0.8} title={t("common.loading")} />
                 ) : isConnected ? (
-                  <row {...s.caSigninBadge} {...(isInUse ? s.caSigninRowInUse_caSigninBadge : null)} enter={{ opacity: 0, scale: 0.6, dur: 0.52, bounce: 0.35 }}>
-                    <icon svg={CHECK_SVG} name="choose-ai/check" view={24} size={13} color={(isInUse ? s.caSigninRowInUse_caSigninBadge : s.caSigninBadge).color} />
+                  <row {...s.obcSigninBadge} {...(isInUse ? s.obcSigninRowInUse_obcSigninBadge : null)} enter={{ opacity: 0, scale: 0.6, dur: 0.52, bounce: 0.35 }}>
+                    <icon svg={CHECK_SVG} name="obc/check" view={24} size={13} color={(isInUse ? s.obcSigninRowInUse_obcSigninBadge : s.obcSigninBadge).color} />
                     {isInUse
                       ? t("onboarding.chat.signin.inUse")
                       : t("onboarding.chat.signin.use")}
                   </row>
                 ) : (
-                  <row {...s.caSigninAction}>
-                    {option.id === "stella" ? <LogIn size={13} color={s.caSigninAction.color} /> : null}
+                  <row {...s.obcSigninAction}>
+                    {option.id === "stella" ? <LogIn size={13} color={s.obcSigninAction.color} /> : null}
                     {t(
                       option.id === "stella"
                         ? "onboarding.chat.signin.signIn"
@@ -439,7 +485,7 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
       </col>
 
       {keyFormOpen ? (
-        <Form {...s.caSigninKeyForm} onSubmit={(event) => {
+        <Form {...s.obcSigninKeyForm} onSubmit={(event) => {
             event.preventDefault();
             void saveApiKey();
           }}>
@@ -447,7 +493,7 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
               value: provider,
               label: LLM_PROVIDERS.find((entry) => entry.key === provider)?.label ?? provider,
             }))} />
-          <Input {...s.caSigninKeyInput} type="password" autoComplete="off" spellCheck={false} value={keyDraft} placeholder={LLM_PROVIDERS.find((entry) => entry.key === keyProvider)?.placeholder} label={t("onboarding.chat.signin.options.apikey.title")} onChange={(event) => setKeyDraft(event.target.value)} disabled={!active || pending === "apikey"} />
+          <Input {...s.obcSigninKeyInput} type="password" autoComplete="off" spellCheck={false} value={keyDraft} placeholder={LLM_PROVIDERS.find((entry) => entry.key === keyProvider)?.placeholder} label={t("onboarding.chat.signin.options.apikey.title")} onChange={(event) => setKeyDraft(event.target.value)} disabled={!active || pending === "apikey"} />
           <Button type="submit" variant="primary" disabled={!active || pending === "apikey" || !keyDraft.trim()}>
             {t("common.save")}
           </Button>
@@ -461,32 +507,32 @@ export function ChooseAiCard({ onDone }: ChooseAiCardProps) {
       ) : connect.flow ? (
         <EngineConnectPrompt connect={connect} />
       ) : pending && pending !== "stella" && pending !== "apikey" ? (
-        <T w="full" {...s.caCardFine}>
+        <T w="full" {...s.obcCardFine}>
           {t("onboarding.chat.signin.waiting")}{" "}
-          <Press text={tx(s.caCardFine)} {...s.caLinkBtn} onPress={handleCancel}>
+          <Press text={tx(s.obcCardFine)} {...s.obcLinkBtn} onPress={handleCancel}>
             {t("common.cancel")}
           </Press>
         </T>
       ) : error ? (
-        <T w="full" {...s.caCardFine} {...s.caCardFineError} role="alert">
+        <T w="full" {...s.obcCardFine} {...s.obcCardFineError} role="alert">
           {error}
         </T>
       ) : (
-        <T w="full" {...s.caCardFine}>{t("onboarding.chat.signin.fineOwnPlan")}</T>
+        <T w="full" {...s.obcCardFine}>{t("onboarding.chat.signin.fineOwnPlan")}</T>
       )}
 
-      <row {...s.caActions}>
+      <row {...s.obcActions}>
         <Button variant="primary" disabled={!active || busyOption !== null} onClick={() => void handleContinue()}>
           {t("common.continue")}
         </Button>
-        <row {...s.caActionsSpacer} />
+        <row {...s.obcActionsSpacer} />
         {selfHosted ? null : (
-          <T {...s.caActionsHint}>{t("onboarding.chat.signin.hint")}</T>
+          <T {...s.obcActionsHint}>{t("onboarding.chat.signin.hint")}</T>
         )}
       </row>
       {serverState?.canSwitch && !serverState.selfHosted ? (
-        <T w="full" {...s.caCardFine}>
-          <Press text={tx(s.caCardFine)} {...sSelfHost.selfHostSigninLink} disabled={!active} onPress={() => selfHostDialogs.openConnect()}>
+        <T w="full" {...s.obcCardFine}>
+          <Press text={tx(s.obcCardFine)} {...sSelfHost.selfHostSigninLink} disabled={!active} onPress={() => selfHostDialogs.openConnect()}>
             {t("selfHost.onboarding.link")}
           </Press>
         </T>

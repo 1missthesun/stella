@@ -925,68 +925,6 @@
         "discard": "تجاهل"
       },
       "tagline": "تحدّث وارسم لتُري Stella ما تقصده."
-    },
-    "welcomeDemos": {
-      "play": "تشغيل هذا العرض",
-      "replay": "إعادة تشغيل العرض",
-      "errands": {
-        "title": "الجولة السريعة",
-        "tablist": "عروض لما أستطيع فعله",
-        "chapters": {
-          "errands": {
-            "word": "المهام",
-            "title": "اطلب مرة واحدة. اعتبرها منجزة.",
-            "caption": "أجد المكان المناسب، وأملأ النموذج، وأضيفه إلى تقويمك، تمامًا كما كنت ستفعل."
-          },
-          "shopping": {
-            "word": "التسوّق",
-            "title": "أستطيع شراء الأشياء، بموافقتك.",
-            "caption": "أجده وأوصله إلى صفحة الدفع. تؤكد أنت المبلغ، وأنا أُتم الطلب."
-          },
-          "work": {
-            "word": "العمل",
-            "title": "ملفات حقيقية. عدة مهام في وقت واحد.",
-            "caption": "أعمل داخل التطبيقات الحقيقية على هذا الكمبيوتر، ويمكنني تنفيذ أكثر من مهمة في وقت واحد."
-          },
-          "build": {
-            "word": "البناء",
-            "title": "قلها. وسأبنيها.",
-            "caption": "تطبيقات ومواقع حسب الطلب. صِفها بكلمات بسيطة وسأبنيها وأشغّلها وأنشرها على الإنترنت."
-          },
-          "routines": {
-            "word": "الروتينات",
-            "title": "اطلب مرة واحدة. ويحدث كل يوم.",
-            "caption": "جدول أي شيء وسأنجزه في موعده، حتى وأنت نائم."
-          }
-        }
-      },
-      "customize": {
-        "title": "يمكنني تغيير نفسي",
-        "body": "هل تفتقد ميزة، أو تريد أن يعمل شيء بطريقة مختلفة؟ فقط اطلب. سأعيد كتابة شيفرتي بنفسي، وأتيح لك تجربتها، وأنت تقرر هل تبقيها.",
-        "hint": "تبقى التغييرات على هذا الكمبيوتر.",
-        "steps": {
-          "ask": {
-            "title": "اطلب",
-            "body": "صف التغيير بكلمات بسيطة."
-          },
-          "preview": {
-            "title": "معاينة",
-            "body": "تبنيه مهمة وتفتح معاينة مباشرة."
-          },
-          "update": {
-            "title": "تحديث",
-            "body": "نقرة واحدة لتطبيقه. تراجع في أي وقت."
-          }
-        }
-      },
-      "memory": {
-        "title": "محادثة واحدة",
-        "titleChatbot": "أنت تعرف هذا",
-        "bodyChatbot": "محادثة جديدة في كل مرة، وشريط جانبي مليء بالمحادثات القديمة، ولا ذاكرة لما قلته الأسبوع الماضي.",
-        "titleStella": "معي هي محادثة واحدة",
-        "bodyStella": "لا محادثات جديدة ولا سلاسل. كل ما قلته لي في مكان واحد، فعندما تسأل عن الأسبوع الماضي أذهب وأجده.",
-        "showStella": "والآن اسألني"
-      }
     }
   },
   "global": {
@@ -1856,6 +1794,43 @@
   },
   "onboarding": {
     "chat": {
+      "composerPlaceholder": "Or just ask me something to get started",
+      "extras": {
+        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
+        "accessibilityTitle": "Accessibility",
+        "enable": "Enable",
+        "enabled": "Enabled",
+        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionOpened": "Opened",
+        "extensionTitle": "Stella for Chrome",
+        "getExtension": "Get extension",
+        "hint": "All of this lives in Settings too.",
+        "restart": "Restart Stella",
+        "restartHint": "Screen access needs a quick restart to take effect.",
+        "screenDesc": "So I can see the screen when you ask me to.",
+        "screenTitle": "Screen Recording",
+        "settledTitle": "Extras",
+        "heading": "إضافات اختيارية",
+        "lead": "لا شيء من هذه مطلوب، لكن كل واحدة تجعلني أكثر فائدة.",
+        "start": "ابدأ المحادثة"
+      },
+      "gmail": {
+        "body": "ابحث عن الرسائل، والحق بالمحادثات، واكتب مسودات الردود بمجرد أن تطلب.",
+        "connect": "ربط Gmail",
+        "connected": "متصل",
+        "connecting": "بانتظار Google…",
+        "error": "تعذّر ربط Gmail. حاول مجددًا أو تخطَّ الآن.",
+        "title": "Gmail"
+      },
+      "messages": {
+        "extras": "Almost done. A little housekeeping, then we start.",
+        "signin": "مرحبًا، أنا Stella. أولًا، اختر كيف أفكر: اشتراك Claude أو ChatGPT الذي لديك، أو مفتاحك الخاص، أو حساب Stella."
+      },
+      "progress": "تقدّم الإعداد",
+      "replies": {
+        "signinDone": "تم."
+      },
+      "send": "Send",
       "signin": {
         "body": "يكفي أي خيار من هذه. يمكنك إضافة الباقي لاحقًا.",
         "claudeCliMissing": "ثبّت Claude Code أولاً، ثم حاول مرة أخرى.",
@@ -1891,7 +1866,8 @@
         "settledNone": "لم يتم اختيار ذكاء اصطناعي بعد",
         "settledNoneDesc": "سجّل الدخول أو اربط اشتراكًا في أي وقت لتبدأ المحادثة.",
         "fineOwnPlan": "يستخدم ChatGPT وClaude Code اشتراكك الخاص لدى OpenAI أو Anthropic. يمكنك تغيير ذلك في أي وقت من الإعدادات."
-      }
+      },
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "باستخدامك Stella، فأنت توافق على {terms} و{privacy}.",
     "privacyPolicy": "سياسة الخصوصية",
@@ -2478,6 +2454,11 @@
         "twinkle": "تلألؤ"
       },
       "title": "صوت الرسائل"
+    },
+    "onboardingReplay": {
+      "action": "Replay",
+      "description": "أعد تشغيل الإعداد الأولي. تبقى بياناتك كما هي.",
+      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3574,9 +3555,11 @@
     },
     "onboarding": {
       "link": "لديك خادم Stella خاص؟ وصّله",
+      "prose": "أنت متصل بـ {name} بصفتك مالكه. الآن اختر ما أفكر به: خطة Claude أو ChatGPT لديك، أو مفتاح API الخاص بك.",
       "title": "متصل بـ {name}",
       "body": "سجّلت الدخول بصفتك المالك. اختر ما تفكر به Stella. يكفي خيار واحد.",
-      "bodyOptional": "سجّلت الدخول بصفتك المالك. لهذا الخادم نماذجه الخاصة، لذا هذا اختياري: يمكنك أيضًا استخدام خطة Claude أو ChatGPT، أو مفتاح API."
+      "bodyOptional": "سجّلت الدخول بصفتك المالك. لهذا الخادم نماذجه الخاصة، لذا هذا اختياري: يمكنك أيضًا استخدام خطة Claude أو ChatGPT، أو مفتاح API.",
+      "settled": "متصل بـ {name}"
     }
   },
   "contextMenu": {
@@ -4168,21 +4151,6 @@
     "phoneApp": {
       "title": "Stella على هاتفك أيضًا",
       "detail": "احصل على التطبيق لمراسلة Stella ومتابعة مهامك عندما تكون بعيدًا عن هذا الكمبيوتر."
-    }
-  },
-  "welcome": {
-    "actions": {
-      "getExtension": "احصل على Stella for Chrome",
-      "connectGmail": "ربط Gmail",
-      "gmailWaiting": "بانتظار Google…",
-      "gmailRetry": "جرّب Gmail مرة أخرى",
-      "watchErrands": "شاهده وهو يعمل",
-      "signIn": "تسجيل الدخول",
-      "getPhoneApp": "احصل على تطبيق الهاتف",
-      "watchMemory": "شاهد كيف",
-      "connectPlan": "اربط اشتراكك",
-      "changeLook": "غيّر مظهري",
-      "watchCustomize": "شاهده يتغيّر"
     }
   }
 }

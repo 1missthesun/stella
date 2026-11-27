@@ -893,68 +893,6 @@
         "discard": "Hylkää"
       },
       "tagline": "Puhu ja piirrä, niin Stella näkee mitä tarkoitat."
-    },
-    "welcomeDemos": {
-      "play": "Toista tämä esittely",
-      "replay": "Toista demo uudelleen",
-      "errands": {
-        "title": "Pikakierros",
-        "tablist": "Esittelyt siitä, mitä osaan",
-        "chapters": {
-          "errands": {
-            "word": "Asiointi",
-            "title": "Pyydä kerran. Asia hoidettu.",
-            "caption": "Löydän oikean paikan, täytän lomakkeen ja lisään sen kalenteriisi, aivan kuten sinäkin tekisit."
-          },
-          "shopping": {
-            "word": "Ostokset",
-            "title": "Voin ostaa asioita, kun annat luvan.",
-            "caption": "Löydän sen ja vien kassalle asti. Sinä vahvistat summan, ja minä teen tilauksen."
-          },
-          "work": {
-            "word": "Työ",
-            "title": "Oikeita tiedostoja. Useita töitä yhtä aikaa.",
-            "caption": "Työskentelen tämän tietokoneen oikeissa sovelluksissa, ja voin hoitaa useampaa työtä yhtä aikaa."
-          },
-          "build": {
-            "word": "Rakenna",
-            "title": "Sano se. Minä rakennan sen.",
-            "caption": "Sovelluksia ja verkkosivuja tilauksesta. Kuvaile se omin sanoin, niin rakennan sen, käynnistän sen ja julkaisen sen verkossa."
-          },
-          "routines": {
-            "word": "Rutiinit",
-            "title": "Pyydä kerran. Se tapahtuu joka päivä.",
-            "caption": "Ajasta mitä tahansa, niin teen sen ajallaan, vaikka nukkuisit."
-          }
-        }
-      },
-      "customize": {
-        "title": "Voin muuttaa itseäni",
-        "body": "Puuttuuko ominaisuus, vai haluatko jonkin toimivan toisin? Pyydä vain. Kirjoitan oman koodini uusiksi, annan sinun kokeilla sitä, ja sinä päätät, pidätkö muutoksen.",
-        "hint": "Muutokset pysyvät tällä tietokoneella.",
-        "steps": {
-          "ask": {
-            "title": "Pyydä",
-            "body": "Kuvaile muutos tavallisin sanoin."
-          },
-          "preview": {
-            "title": "Esikatsele",
-            "body": "Tehtävä rakentaa sen ja avaa suoran esikatselun."
-          },
-          "update": {
-            "title": "Päivitä",
-            "body": "Yksi napsautus ottaa sen käyttöön. Kumoa milloin tahansa."
-          }
-        }
-      },
-      "memory": {
-        "title": "Yksi keskustelu",
-        "titleChatbot": "Tämä on tuttu",
-        "bodyChatbot": "Joka kerta uusi chat, sivupalkki täynnä vanhoja eikä mitään muistia siitä, mitä sanoit viime viikolla.",
-        "titleStella": "Kanssani se on yksi keskustelu",
-        "bodyStella": "Ei uusia chatteja, ei ketjuja. Kaikki, mitä olet koskaan kertonut minulle, on samassa paikassa, joten kun kysyt viime viikosta, etsin sen.",
-        "showStella": "Kysy nyt minulta"
-      }
     }
   },
   "global": {
@@ -1816,6 +1754,43 @@
   },
   "onboarding": {
     "chat": {
+      "composerPlaceholder": "Or just ask me something to get started",
+      "extras": {
+        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
+        "accessibilityTitle": "Accessibility",
+        "enable": "Enable",
+        "enabled": "Enabled",
+        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionOpened": "Opened",
+        "extensionTitle": "Stella for Chrome",
+        "getExtension": "Get extension",
+        "hint": "All of this lives in Settings too.",
+        "restart": "Restart Stella",
+        "restartHint": "Screen access needs a quick restart to take effect.",
+        "screenDesc": "So I can see the screen when you ask me to.",
+        "screenTitle": "Screen Recording",
+        "settledTitle": "Extras",
+        "heading": "Valinnaiset lisät",
+        "lead": "Mikään näistä ei ole pakollinen, mutta jokainen tekee minusta hyödyllisemmän.",
+        "start": "Aloita keskustelu"
+      },
+      "gmail": {
+        "body": "Etsi viestejä, pysy keskustelujen tasalla ja luonnostele vastauksia pelkällä pyynnöllä.",
+        "connect": "Yhdistä Gmail",
+        "connected": "Yhdistetty",
+        "connecting": "Odotetaan Googlea…",
+        "error": "Gmailin yhdistäminen epäonnistui. Yritä uudelleen tai ohita toistaiseksi.",
+        "title": "Gmail"
+      },
+      "messages": {
+        "extras": "Almost done. A little housekeeping, then we start.",
+        "signin": "Hei, olen Stella. Valitse ensin, miten ajattelen: Claude- tai ChatGPT-tilauksesi, oma avaimesi tai Stella-tili."
+      },
+      "progress": "Käyttöönoton eteneminen",
+      "replies": {
+        "signinDone": "Valmis."
+      },
+      "send": "Send",
       "signin": {
         "body": "Yksi näistä riittää. Voit lisätä muut myöhemmin.",
         "claudeCliMissing": "Asenna ensin Claude Code ja yritä sitten uudelleen.",
@@ -1851,7 +1826,8 @@
         "settledNone": "Tekoälyä ei ole vielä valittu",
         "settledNoneDesc": "Kirjaudu tai yhdistä tilaus milloin tahansa aloittaaksesi.",
         "fineOwnPlan": "ChatGPT ja Claude Code käyttävät omaa OpenAI- tai Anthropic-tilaustasi. Voit muuttaa tämän milloin tahansa asetuksista."
-      }
+      },
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "Käyttämällä Stellaa hyväksyt {terms} ja {privacy}.",
     "privacyPolicy": "tietosuojakäytäntömme",
@@ -2438,6 +2414,11 @@
         "twinkle": "Tuike"
       },
       "title": "Viestin ääni"
+    },
+    "onboardingReplay": {
+      "action": "Replay",
+      "description": "Käy käyttöönotto uudelleen läpi. Tietosi säilyvät.",
+      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3446,9 +3427,11 @@
     },
     "onboarding": {
       "link": "Onko sinulla oma Stella-palvelin? Yhdistä se",
+      "prose": "Olet yhteydessä palvelimeen {name} omistajana. Valitse seuraavaksi, millä ajattelen: Claude- tai ChatGPT-tilauksesi tai oma API-avaimesi.",
       "title": "Yhdistetty: {name}",
       "body": "Olet kirjautunut omistajana. Valitse, millä Stella ajattelee. Yksi riittää.",
-      "bodyOptional": "Olet kirjautunut omistajana. Tällä palvelimella on omat mallit, joten tämä on valinnaista: voit käyttää myös Claude- tai ChatGPT-tilaustasi tai API-avainta."
+      "bodyOptional": "Olet kirjautunut omistajana. Tällä palvelimella on omat mallit, joten tämä on valinnaista: voit käyttää myös Claude- tai ChatGPT-tilaustasi tai API-avainta.",
+      "settled": "Yhdistetty: {name}"
     }
   },
   "contextMenu": {
@@ -3940,21 +3923,6 @@
     "phoneApp": {
       "title": "Stella on myös puhelimessasi",
       "detail": "Hanki sovellus, niin voit viestiä Stellalle ja seurata tehtäviäsi, kun olet poissa tämän tietokoneen ääreltä."
-    }
-  },
-  "welcome": {
-    "actions": {
-      "getExtension": "Hanki Stella for Chrome",
-      "connectGmail": "Yhdistä Gmail",
-      "gmailWaiting": "Odotetaan Googlea…",
-      "gmailRetry": "Yritä Gmailia uudelleen",
-      "watchErrands": "Katso sen työskentelevän",
-      "signIn": "Kirjaudu",
-      "getPhoneApp": "Hanki puhelinsovellus",
-      "watchMemory": "Katso miten",
-      "connectPlan": "Yhdistä tilaus",
-      "changeLook": "Muuta ulkoasuani",
-      "watchCustomize": "Katso muutos"
     }
   }
 }

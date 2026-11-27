@@ -885,68 +885,6 @@
         "discard": "破棄"
       },
       "tagline": "話しながら描いて、伝えたいことをStellaに見せましょう。"
-    },
-    "welcomeDemos": {
-      "play": "このデモを再生",
-      "replay": "もう一度再生",
-      "errands": {
-        "title": "クイックツアー",
-        "tablist": "できることのデモ",
-        "chapters": {
-          "errands": {
-            "word": "用事",
-            "title": "一度頼めば、それで完了。",
-            "caption": "ふさわしい場所を見つけ、フォームに入力し、カレンダーに入れます。あなたがやるのと同じ手順です。"
-          },
-          "shopping": {
-            "word": "買い物",
-            "title": "あなたの OK があれば、買い物もできます。",
-            "caption": "商品を見つけて購入手続きまで進めます。あなたが合計金額を確認したら、私が注文します。"
-          },
-          "work": {
-            "word": "仕事",
-            "title": "本物のファイル。複数の作業を同時に。",
-            "caption": "このコンピューターにある本物のアプリの中で作業し、複数の作業を同時に進められます。"
-          },
-          "build": {
-            "word": "作る",
-            "title": "言うだけで、私が作ります。",
-            "caption": "アプリもウェブサイトも注文どおりに。ふだんの言葉で説明すれば、私が作って動かし、公開します。"
-          },
-          "routines": {
-            "word": "ルーティン",
-            "title": "一度頼むだけ。毎日、実行されます。",
-            "caption": "何でもスケジュールしてください。眠っている間も、時間どおりにこなします。"
-          }
-        }
-      },
-      "customize": {
-        "title": "私は自分を変えられます",
-        "body": "足りない機能がある、または動きを変えたいときは、頼むだけです。私が自分のコードを書き直し、あなたが試して、残すかどうかを決めます。",
-        "hint": "変更はこのコンピューターの中だけに残ります。",
-        "steps": {
-          "ask": {
-            "title": "頼む",
-            "body": "変更内容を普通の言葉で伝えます。"
-          },
-          "preview": {
-            "title": "プレビュー",
-            "body": "タスクが作成し、ライブプレビューを開きます。"
-          },
-          "update": {
-            "title": "アップデート",
-            "body": "ワンクリックで適用。いつでも元に戻せます。"
-          }
-        }
-      },
-      "memory": {
-        "title": "ひとつの会話",
-        "titleChatbot": "よくある光景です",
-        "bodyChatbot": "毎回新しいチャット、古いチャットで埋まったサイドバー、そして先週話したことは覚えていない。",
-        "titleStella": "私とならひとつの会話です",
-        "bodyStella": "新しいチャットもスレッドもありません。あなたが話したことはすべて同じ場所にあるので、先週のことを聞かれたら探しに行きます。",
-        "showStella": "では私に聞いてみて"
-      }
     }
   },
   "global": {
@@ -1806,6 +1744,43 @@
   },
   "onboarding": {
     "chat": {
+      "composerPlaceholder": "Or just ask me something to get started",
+      "extras": {
+        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
+        "accessibilityTitle": "Accessibility",
+        "enable": "Enable",
+        "enabled": "Enabled",
+        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionOpened": "Opened",
+        "extensionTitle": "Stella for Chrome",
+        "getExtension": "Get extension",
+        "hint": "All of this lives in Settings too.",
+        "restart": "Restart Stella",
+        "restartHint": "Screen access needs a quick restart to take effect.",
+        "screenDesc": "So I can see the screen when you ask me to.",
+        "screenTitle": "Screen Recording",
+        "settledTitle": "Extras",
+        "heading": "オプションの追加機能",
+        "lead": "どれも必須ではありませんが、それぞれが私をもっと役立つようにします。",
+        "start": "チャットを始める"
+      },
+      "gmail": {
+        "body": "メールを探したり、スレッドに追いついたり、返信の下書きを作ったり。頼むだけです。",
+        "connect": "Gmail を連携",
+        "connected": "連携済み",
+        "connecting": "Google を待っています…",
+        "error": "Gmail を連携できませんでした。もう一度試すか、今はスキップしてください。",
+        "title": "Gmail"
+      },
+      "messages": {
+        "extras": "Almost done. A little housekeeping, then we start.",
+        "signin": "こんにちは、Stella です。まず、私の考え方を選んでください。お持ちの Claude や ChatGPT のプラン、ご自身のキー、または Stella アカウントを使えます。"
+      },
+      "progress": "セットアップの進行状況",
+      "replies": {
+        "signinDone": "完了しました。"
+      },
+      "send": "Send",
       "signin": {
         "body": "どれかひとつで十分です。ほかはあとから追加できます。",
         "claudeCliMissing": "先に Claude Code をインストールしてから、もう一度お試しください。",
@@ -1841,7 +1816,8 @@
         "settledNone": "まだ AI が選ばれていません",
         "settledNoneDesc": "いつでもサインインするかプランを接続すると、チャットを始められます。",
         "fineOwnPlan": "ChatGPT と Claude Code は、OpenAI または Anthropic のご自身のサブスクリプションを使います。設定からいつでも変更できます。"
-      }
+      },
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "Stella を利用することで、{terms}および{privacy}に同意したことになります。",
     "privacyPolicy": "プライバシーポリシー",
@@ -2428,6 +2404,11 @@
         "twinkle": "きらめき"
       },
       "title": "メッセージ音"
+    },
+    "onboardingReplay": {
+      "action": "Replay",
+      "description": "オンボーディングをやり直します。データはそのままです。",
+      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3412,9 +3393,11 @@
     },
     "onboarding": {
       "link": "自分の Stella サーバーをお持ちですか？接続する",
+      "prose": "{name} にオーナーとして接続しています。次に、私が考えるために使うものを選んでください：お持ちの Claude または ChatGPT のプラン、またはご自身の API キーです。",
       "title": "{name} に接続済み",
       "body": "オーナーとしてサインインしています。Stella が使うものを選んでください。1つで十分です。",
-      "bodyOptional": "オーナーとしてサインインしています。このサーバーには独自のモデルがあるため、これは任意です。Claude や ChatGPT のプラン、または API キーも使えます。"
+      "bodyOptional": "オーナーとしてサインインしています。このサーバーには独自のモデルがあるため、これは任意です。Claude や ChatGPT のプラン、または API キーも使えます。",
+      "settled": "{name} に接続済み"
     }
   },
   "contextMenu": {
@@ -3881,21 +3864,6 @@
     "phoneApp": {
       "title": "Stella はスマートフォンでも使えます",
       "detail": "アプリを入手すると、このコンピュータから離れているときも Stella にメッセージを送ったり、タスクを確認したりできます。"
-    }
-  },
-  "welcome": {
-    "actions": {
-      "getExtension": "Stella for Chrome を入手",
-      "connectGmail": "Gmail を連携",
-      "gmailWaiting": "Google を待っています…",
-      "gmailRetry": "Gmail をもう一度試す",
-      "watchErrands": "動いているところを見る",
-      "signIn": "サインイン",
-      "getPhoneApp": "スマホアプリを入手",
-      "watchMemory": "仕組みを見る",
-      "connectPlan": "プランを連携",
-      "changeLook": "見た目を変える",
-      "watchCustomize": "変わる様子を見る"
     }
   }
 }

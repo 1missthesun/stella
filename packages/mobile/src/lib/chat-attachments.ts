@@ -106,6 +106,7 @@ export const uploadChatAttachment = async (
     path,
     sizeBytes: bytes.byteLength,
     contentType,
+    sendWithoutSavingIfFull: true,
   });
   const put = await putSignedUpload({
     url: prepared.uploadUrl,

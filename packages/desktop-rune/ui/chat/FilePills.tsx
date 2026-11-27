@@ -19,14 +19,18 @@ const PILL_CAP = 5;
 
 const pillName = (entry: ConversationFileEntry): string => (entry.payload.kind === "canvas-html" ? getDisplayPayloadTitle(entry.payload) : fileDisplayName(basenameOf(entry.path)));
 
-const FilePillView = ({ entry, onOpen, localFilePath }: { entry: ConversationFileEntry; onOpen: () => void; localFilePath?: string | null }) => {
+const FilePillView = ({ entry, onOpen, localFilePath }: { entry: ConversationFileEntry; onOpen: () => void; localFilePath?: string | null }) => (
+  <FilePillButton kind={displayTabKindForPayload(entry.payload)} name={pillName(entry)} title={entry.path} onOpen={onOpen} localFilePath={localFilePath} />
+);
+
+/** desktop-ui's `FilePillButton`: one file pill, for a file that isn't a conversation entry (the Meet Stella guide). */
+export const FilePillButton = ({ kind, name, title, onOpen, localFilePath }: { kind: string; name: string; title: string; onOpen: () => void; localFilePath?: string | null }) => {
   const tokens = useTokens();
   const color = useChatTextColor(tokens.c.textStrong);
   const look = derive(tokens, `file-pill:${color}`, () => ({ fill: mix(color, 12, "transparent"), hover: mix(color, 18, "transparent") }));
-  const kind = displayTabKindForPayload(entry.payload);
   return (
     <row
-      title={entry.path}
+      title={title}
       align="center"
       gap={2}
       maxW="full"
@@ -43,7 +47,7 @@ const FilePillView = ({ entry, onOpen, localFilePath }: { entry: ConversationFil
           <Icon icon={Icons.display[kind as keyof typeof Icons.display] ?? Icons.display.text} size={14} color={color} />
         </box>
         <text size={fontSize.base} weight={400} tracking={APP_TRACKING} lineHeight={fontSize.base * 1.2} color={color} nowrap truncate>
-          {pillName(entry)}
+          {name}
         </text>
       </row>
       {localFilePath ? <OpenWithMenu filePath={localFilePath} /> : null}

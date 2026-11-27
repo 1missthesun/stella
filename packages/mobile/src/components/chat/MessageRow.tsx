@@ -44,7 +44,7 @@ import {
 } from "../ReplyPreview";
 import { Icon } from "../Icon";
 import { AssistantMarkdown } from "../AssistantMarkdown";
-import { WelcomeMessage } from "./WelcomeMessage";
+import { meetStellaGuideArtifact, WelcomeMessage } from "./WelcomeMessage";
 import { MESSAGE_PRESS_SCALE } from "../MessageContextMenu";
 import { MessageEvidenceStrip } from "../evidence/MessageEvidenceStrip";
 import { AppPreviewCard } from "../AppPreviewCard";
@@ -1150,7 +1150,15 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       animate={!menuClone && (animate || mountedEmptyRef.current)}
     >
       {item.welcome ? (
-        <WelcomeMessage colors={colors} fill={boundedAssistantBubble} />
+        <WelcomeMessage
+          colors={colors}
+          fill={boundedAssistantBubble}
+          onOpenGuide={
+            onOpenArtifact && !menuClone
+              ? () => onOpenArtifact(meetStellaGuideArtifact(conversationId))
+              : undefined
+          }
+        />
       ) : (
         <AssistantMarkdown
           text={bodyText}

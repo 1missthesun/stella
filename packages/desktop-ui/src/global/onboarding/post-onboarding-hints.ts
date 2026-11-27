@@ -96,6 +96,12 @@ export const seedPostOnboardingHints = (): void => {
   notifyAll();
 };
 
+export const clearPostOnboardingHints = (): void => {
+  if (!platformCapabilities.onboarding) return;
+  safeWrite(EMPTY_STATE);
+  notifyAll();
+};
+
 export const dismissPostOnboardingHint = (id: PostOnboardingHintId): void => {
   if (!platformCapabilities.onboarding) return;
   const state = safeRead();

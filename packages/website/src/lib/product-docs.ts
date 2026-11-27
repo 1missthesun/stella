@@ -95,7 +95,7 @@ const DEVICES_AND_CLOUD = (): string => `## Where Stella runs
 ## Stella Drive and files
 - Stella Drive is your file space in Stella's cloud: ${driveSizes()}. It is limited by total size, not by how many files you keep. Files Stella makes in the cloud land there, and Drive links open on every device with previews for images, audio, video, PDFs and web pages.
 - Files on a computer stay on it unless shared. A link to one opens from that computer on your other devices while it is on.
-- Attach files to a message from any device (up to 2 GB each from the phone or the web). Files sent in chats are kept with the chat, not counted against your Drive, and they send even when the Drive is full.
+- Attach files to a message from any device. They're saved in your Drive (Chat Attachments, or uploads from the phone), count toward it and show in Files. When the Drive is full, images still reach Stella: they're sent without being saved.
 
 ## What syncs
 Signed in: conversations (Settings › Privacy › Save chat history in the cloud; off keeps chats on that computer), memory, settings, saved logins (end-to-end encrypted, see ${docUrl("connectors-and-logins")}), custom skills, and Claude Code sessions.

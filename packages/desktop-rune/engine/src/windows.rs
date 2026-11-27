@@ -737,7 +737,7 @@ fn sync_inputs(s: &mut Win) {
 pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
     flush_outbox();
     #[cfg(target_os = "windows")]
-    crate::webview::forward_hover();
+    crate::webview::tick();
     drain(s.node);
     let decoded = crate::media::decoded_since_built();
     let sized = !decoded.is_empty();

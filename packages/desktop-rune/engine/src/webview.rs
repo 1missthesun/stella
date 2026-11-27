@@ -1177,9 +1177,6 @@ mod win_hover {
     }
 }
 
-#[cfg(target_os = "windows")]
-pub use win_hover::drain as forward_hover;
-
 /// WebKitGTK ships WebRTC off (Chromium and WKWebView have it on) and reads the setting when a
 /// document is created, so it is set before the view's first load.
 #[cfg(target_os = "linux")]
@@ -1506,15 +1503,11 @@ fn snap(view: &WebView, done: impl FnOnce(Option<image::RgbaImage>) + 'static) {
     mac::snapshot(view, done);
     #[cfg(target_os = "linux")]
     gtk_snap::snapshot(view, done);
-    #[cfg(not(any(target_os = "macos", target_os = "linux")))]
-    {
-        let _ = view;
-        done(None);
-    }
+    #[cfg(target_os = "windows")]
+    win_snap::snapshot(view, done);
 }
 
 /// Snapshots every shown webview of `window` and hands them to `done` once all have answered.
-/// Windows can't snapshot yet; there `done` gets none.
 pub fn snapshots(window: u32, done: Box<dyn FnOnce(Vec<Shot>) + Send>) {
     let targets: Vec<(u32, [f32; 4], Option<Shape>)> = VIEWS.with(|v| {
         v.borrow().iter().filter(|(_, x)| x.window == window && x.visible).map(|(n, x)| (*n, x.rect, x.applied.as_ref().map(|a| a.0.clone()))).collect()
@@ -1553,6 +1546,104 @@ pub fn snapshots(window: u32, done: Box<dyn FnOnce(Vec<Shot>) + Send>) {
             answer(&pending, None);
         }
     }
+}
+
+/// WebView2's capture of the page as a PNG, decoded on a worker. Its answer, or a capture that
+/// couldn't start, reaches `done` from the window's next poll: never inside the caller, which
+/// holds the views (`cover` places the view from `done`).
+#[cfg(target_os = "windows")]
+mod win_snap {
+    use std::cell::{Cell, RefCell};
+    use std::collections::HashMap;
+    use std::rc::Rc;
+    use std::sync::Mutex;
+    use std::sync::atomic::{AtomicU64, Ordering};
+    use webview2_com::CapturePreviewCompletedHandler;
+    use webview2_com::Microsoft::Web::WebView2::Win32::COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_PNG;
+    use windows::Win32::Foundation::HGLOBAL;
+    use windows::Win32::System::Com::StructuredStorage::CreateStreamOnHGlobal;
+    use windows::Win32::System::Com::{IStream, STREAM_SEEK_SET};
+    use wry::WebViewExtWindows;
+
+    type Done = Box<dyn FnOnce(Option<image::RgbaImage>)>;
+
+    thread_local! {
+        static WAITING: RefCell<HashMap<u64, Done>> = RefCell::new(HashMap::new());
+    }
+    static READY: Mutex<Vec<(u64, Option<image::RgbaImage>)>> = Mutex::new(Vec::new());
+    static NEXT: AtomicU64 = AtomicU64::new(1);
+
+    fn ready(id: u64, image: Option<image::RgbaImage>) {
+        READY.lock().unwrap_or_else(|e| e.into_inner()).push((id, image));
+        crate::windows::wake_all();
+    }
+
+    pub fn snapshot(view: &wry::WebView, done: impl FnOnce(Option<image::RgbaImage>) + 'static) {
+        let id = NEXT.fetch_add(1, Ordering::Relaxed);
+        WAITING.with(|w| w.borrow_mut().insert(id, Box::new(done)));
+        let answered = Rc::new(Cell::new(false));
+        let started = {
+            let answered = answered.clone();
+            // SAFETY: on the UI thread with wry's live controller; the stream is kept by the
+            // completion, which reads it back.
+            unsafe {
+                view.controller().CoreWebView2().and_then(|web| {
+                    let stream: IStream = CreateStreamOnHGlobal(HGLOBAL::default(), true)?;
+                    let png = stream.clone();
+                    let handler = CapturePreviewCompletedHandler::create(Box::new(move |status| {
+                        answered.set(true);
+                        let bytes = status.ok().and_then(|_| read(&png));
+                        let spawned = std::thread::Builder::new()
+                            .name("stella-snapshot".into())
+                            .spawn(move || ready(id, bytes.and_then(|b| image::load_from_memory_with_format(&b, image::ImageFormat::Png).ok()).map(|i| i.to_rgba8())));
+                        if spawned.is_err() {
+                            ready(id, None);
+                        }
+                        Ok(())
+                    }));
+                    web.CapturePreview(COREWEBVIEW2_CAPTURE_PREVIEW_IMAGE_FORMAT_PNG, &stream, &handler)
+                })
+            }
+        };
+        if started.is_err() && !answered.get() {
+            ready(id, None);
+        }
+    }
+
+    fn read(stream: &IStream) -> Option<Vec<u8>> {
+        // SAFETY: reading back the memory stream the capture wrote, on its own thread.
+        unsafe {
+            stream.Seek(0, STREAM_SEEK_SET, None).ok()?;
+            let mut bytes = Vec::new();
+            let mut buf = vec![0u8; 1 << 16];
+            loop {
+                let mut got = 0u32;
+                stream.Read(buf.as_mut_ptr().cast(), buf.len() as u32, Some(&mut got as *mut u32)).ok().ok()?;
+                if got == 0 {
+                    break;
+                }
+                bytes.extend_from_slice(&buf[..got as usize]);
+            }
+            Some(bytes)
+        }
+    }
+
+    /// On the UI thread, from the window's poll.
+    pub fn answer() {
+        let ready = std::mem::take(&mut *READY.lock().unwrap_or_else(|e| e.into_inner()));
+        for (id, image) in ready {
+            if let Some(done) = WAITING.with(|w| w.borrow_mut().remove(&id)) {
+                done(image);
+            }
+        }
+    }
+}
+
+/// What other threads left for the UI thread: snapshots and the pointer over a view.
+#[cfg(target_os = "windows")]
+pub fn tick() {
+    win_snap::answer();
+    win_hover::drain();
 }
 
 #[cfg(target_os = "linux")]

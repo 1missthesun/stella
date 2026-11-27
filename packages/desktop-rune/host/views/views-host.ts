@@ -1,12 +1,15 @@
 // `globalThis.stella.views`: Stella Views on the Rune desktop. A view is a `.view.tsx` file; its
 // program runs in the engine (engine/src/views.rs) and the UI renders the trees it posts
 // (ui/views). The host keeps one session per file, outside the hot-swapped UI, watches the file
-// so an agent's edit swaps the running view in place, and keeps the view's storage on disk.
+// so an agent's edit swaps the running view in place, and keeps the view's storage on disk. A view
+// whose file isn't on this computer (made in the cloud, by another computer, or by a task) runs from
+// the newest source the conversation carries, as on the web and the phone.
 import { existsSync, mkdirSync, readFileSync, renameSync, rmSync, watch, writeFileSync, type FSWatcher } from "node:fs";
 import { homedir } from "node:os";
-import { basename, dirname, join } from "node:path";
+import { basename, dirname, isAbsolute, join } from "node:path";
 import { ViewSession, type ViewCapabilities, type ViewRun, type ViewSnapshot, type ViewStorage, type ViewVm } from "@stella/views/session";
 import type { ViewMessage, ViewPost, ViewTheme } from "@stella/views/protocol";
+import { latestConversationViews, type ConversationView, type ViewToolEvent } from "@stella/views/conversation";
 import { isViewPath, viewDataPath as dataPathFor, viewKey as hash, viewSourceHash, viewStatusPath, viewTitle as titleFor, type ViewStatusFile } from "@stella/views/files";
 import type { engine as BridgeEngine, onEngineEvent as BridgeOn } from "../bridge";
 
@@ -163,7 +166,12 @@ type Entry = {
   lastSource: string | null;
   lastData: string | null;
   sourceHash: string;
+  /** The file isn't on this computer: the view runs from the conversation's copy. */
+  remote: boolean;
 };
+
+/** Whether a view's file is on this computer (a cloud view's path is a Drive path, not a local one). */
+const isLocalViewFile = (filePath: string): boolean => isAbsolute(filePath) && existsSync(filePath);
 
 /**
  * Keeps the view's status file current while it is open, so the agent tool that wrote the source
@@ -198,6 +206,9 @@ function statusWriter(entry: { filePath: string; sourceHash: string }) {
 
 export function createViewsHost(engine: Engine, on: On) {
   const entries = new Map<string, Entry>();
+  /** The newest version of each view the open conversations carry, by file path. */
+  const known = new Map<string, ConversationView>();
+  const scanned = new WeakMap<readonly ViewToolEvent[], Map<string, ConversationView>>();
   const vm = engineVm(engine, on);
   const caps = capabilities(engine);
   const now = () => performance.now();
@@ -217,7 +228,25 @@ export function createViewsHost(engine: Engine, on: On) {
     }, Math.max(1, next - at));
   };
 
+  const readRemote = (entry: Entry) => {
+    const view = known.get(entry.filePath);
+    if (!view) {
+      entry.session.report("file", "The view isn't on this computer, and the conversation doesn't carry it.");
+      return;
+    }
+    const data = view.data === undefined ? null : JSON.stringify(view.data);
+    if (data !== entry.lastData) {
+      entry.lastData = data;
+      entry.session.setData(view.data ?? null);
+    }
+    if (view.source === entry.lastSource) return;
+    entry.lastSource = view.source;
+    entry.sourceHash = viewSourceHash(view.source);
+    void entry.session.load(view.source, basename(entry.filePath));
+  };
+
   const readSource = (entry: Entry) => {
+    if (entry.remote) return readRemote(entry);
     let source: string;
     try {
       source = readFileSync(entry.filePath, "utf8");
@@ -257,10 +286,11 @@ export function createViewsHost(engine: Engine, on: On) {
       existing.closeTimer = null;
       return existing;
     }
-    let data: unknown = null;
+    const remote = !isLocalViewFile(filePath) && known.has(filePath);
+    let data: unknown = remote ? (known.get(filePath)?.data ?? null) : null;
     try {
       const path = dataPathFor(filePath);
-      if (existsSync(path)) data = JSON.parse(readFileSync(path, "utf8"));
+      if (!remote && existsSync(path)) data = JSON.parse(readFileSync(path, "utf8"));
     } catch {
       data = null;
     }
@@ -278,7 +308,7 @@ export function createViewsHost(engine: Engine, on: On) {
         if (process.env.STELLA_VIEWS_LOG === "1" || log.level === "error") console.error(`[view ${basename(filePath)}] ${log.level}: ${log.text}`);
       },
     });
-    const entry: Entry = { session, filePath, watchers: [], refs: 0, closeTimer: null, lastSource: null, lastData: data === null ? null : JSON.stringify(data), sourceHash: "" };
+    const entry: Entry = { session, filePath, watchers: [], refs: 0, closeTimer: null, lastSource: null, lastData: data === null ? null : JSON.stringify(data), sourceHash: "", remote };
     session.subscribe(statusWriter(entry));
     if (process.env.STELLA_VIEWS_LOG === "1") {
       let seen = { first: null as number | null, swap: null as number | null, problem: null as string | null };
@@ -290,6 +320,10 @@ export function createViewsHost(engine: Engine, on: On) {
       });
     }
     entries.set(filePath, entry);
+    if (remote) {
+      readSource(entry);
+      return entry;
+    }
     const dir = dirname(filePath);
     const names = new Set([basename(filePath), basename(dataPathFor(filePath))]);
     let pending: ReturnType<typeof setTimeout> | null = null;
@@ -353,6 +387,30 @@ export function createViewsHost(engine: Engine, on: On) {
     theme: (filePath: string, theme: ViewTheme) => withEntry(filePath, (e) => e.session.setTheme(theme)),
     restart: (filePath: string) => withEntry(filePath, (e) => void e.session.restart()),
     logs: (filePath: string) => entries.get(filePath)?.session.logs.slice() ?? [],
+    /**
+     * The views a conversation carries (its `view` tool calls and view cards): a view whose file
+     * isn't on this computer runs the newest of them, and swaps when a newer one arrives.
+     */
+    offerMessages(messages: readonly { toolEvents?: readonly ViewToolEvent[] }[]) {
+      for (const message of messages) {
+        const events = message.toolEvents;
+        if (!events?.length) continue;
+        let views = scanned.get(events);
+        if (!views) {
+          views = latestConversationViews(events);
+          scanned.set(events, views);
+        }
+        for (const view of views.values()) {
+          const previous = known.get(view.filePath);
+          if (previous && (previous.createdAt > view.createdAt || (previous.source === view.source && previous.data === view.data))) continue;
+          known.set(view.filePath, view);
+          const entry = entries.get(view.filePath);
+          if (!entry) continue;
+          if (!entry.remote && !isLocalViewFile(view.filePath)) entry.remote = true;
+          if (entry.remote) readSource(entry);
+        }
+      }
+    },
     /** Loads a source without a file (the gallery, previews of a view an agent is writing). */
     reload: (filePath: string) => withEntry(filePath, (e) => {
       e.lastSource = null;

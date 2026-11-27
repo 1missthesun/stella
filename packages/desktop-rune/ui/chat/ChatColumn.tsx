@@ -190,7 +190,7 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
   );
 
   const liveMessages = useChatMessages();
-  // Where the views' files aren't on this device (the web), the conversation carries their sources.
+  // Where a view's file isn't on this device (the web, a view made in the cloud or elsewhere), the conversation carries its source.
   useEffect(() => {
     globalThis.stella.views?.offerMessages?.(liveMessages);
   }, [liveMessages]);

@@ -11,6 +11,7 @@ import {
   type SafeguardCard,
 } from "@stella/contracts/safeguard-block";
 import { redactSensitiveJson } from "@stella/contracts/sensitive-data";
+import { parseViewCard, VIEW_CARD_TYPE, viewCardGroup } from "@stella/contracts/view-card";
 import type { AgentMessage } from "@stella/runtime/kernel/agent-core/types.js";
 import type { ConversationDeletedEvent } from "@stella/contracts/turn-plane/owner-events";
 import { sha256Hex } from "../hash.js";
@@ -485,6 +486,15 @@ export abstract class OrchestratorJournalWrites extends OrchestratorRunTurn {
       if (!lifecycle) return json({ error: "Malformed request." }, 400);
       writerKey = `card:${lifecycle.eventId}`;
       this.refreshAgentsSoon();
+    }
+    if (card.type === VIEW_CARD_TYPE) {
+      // Each version of a task's view is its own card; the group (sourceTurnId) keeps them together.
+      // A restore is a group of its own.
+      const view = parseViewCard(card);
+      if (!view || sourceTurnId !== viewCardGroup(view)) {
+        return json({ error: "Malformed request." }, 400);
+      }
+      writerKey = `card:${sourceTurnId}:${view.createdAt}`;
     }
     const payloadJson = JSON.stringify(card);
     const now = Date.now();

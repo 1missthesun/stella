@@ -872,6 +872,14 @@
       "problem": "Cihazların kontrol edilemiyor",
       "startOverTitle": "Baştan başlansın mı?",
       "startOverBody": "Yalnızca bu telefonun olduğu yeni bir liste başlar. Diğer cihazlarının her birine yeniden izin verilmesi gerekir."
+    },
+    "views": {
+      "share": "Paylaş",
+      "publicLinkTitle": "Herkese açık bağlantı",
+      "shareLink": "Bağlantıyı paylaş",
+      "makePrivate": "Özel yap",
+      "shareFailed": "Bağlantı değiştirilemedi",
+      "missing": "Bu görünüm artık uygulamalarında değil."
     }
   },
   "settings": {
@@ -978,9 +986,27 @@
           "openFailed": "Bağlantı açılamadı"
         }
       },
+      "media": {
+        "expand": "Genişlet"
+      },
       "folder": {
         "emptyTitle": "Bu klasör boş",
         "truncated": "Yalnızca ilk {count} öğe gösteriliyor."
+      },
+      "viewHistory": {
+        "title": "Sürüm geçmişi",
+        "stella": "Stella",
+        "task": "Bir görev",
+        "you": "Sen",
+        "current": "Geçerli",
+        "restoredFrom": "{time} sürümü geri yüklendi",
+        "undo": "Son değişikliği geri al",
+        "back": "Geçerli sürüme dön",
+        "restore": "Geri yükle",
+        "ask": "Stella'dan geri getirmesini iste",
+        "askMessage": "\"{title}\" görünümünün {time} sürümünü, şu an kayıtlı verileriyle çalışacak şekilde uyarlayarak geri getir.",
+        "restoredHere": "{time} sürümü yalnızca bu cihazda geri yüklendi",
+        "restoreFailed": "Bu sürüm geri yüklenemedi"
       }
     },
     "sidebar": {

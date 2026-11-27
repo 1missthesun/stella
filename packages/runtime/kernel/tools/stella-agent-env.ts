@@ -1,5 +1,6 @@
 import path from "path";
 import { taskProcessEnvironment } from "../shared/task-processes.js";
+import { hostRendersViews } from "./views-env.js";
 
 export const stellaAgentShellEnvironment = (context: {
   stellaAppDir?: string;
@@ -16,6 +17,7 @@ export const stellaAgentShellEnvironment = (context: {
       "drafts",
     );
   }
+  if (hostRendersViews()) env.STELLA_VIEWS = "1";
   if (context.agentId) {
     env.STELLA_AGENT_ID = context.agentId;
     if (context.stellaDataDir) {

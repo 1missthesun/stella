@@ -19,6 +19,7 @@ import { PreviewProblem } from "../preview-states";
 import { CanvasShareBar } from "./CanvasShareBar";
 import { CanvasFrame, type CanvasFrameHost, type CanvasFrameSource } from "./CanvasFrame";
 import { useCanvasActions, useCanvasLinks } from "./use-canvas-frame-bridge";
+import { ViewTabContent, isViewFile } from "../../../views/ViewTabContent";
 
 const decoder = new TextDecoder("utf-8");
 const CANVAS_HTML_MAX_BYTES = 4 * 1024 * 1024;
@@ -356,8 +357,13 @@ function CanvasHeroFrameDocument({ item, reloadSeq = 0, location, frame, error, 
   );
 }
 
-/** desktop-ui's `CanvasTabContent`: the share bar over the canvas page in its own WebView. */
-export const CanvasTabContent = ({ item }: { item: CanvasHtmlItem }) => (
+/** desktop-ui's `CanvasTabContent`: the share bar over the canvas page in its own WebView; a Stella View (`*.view.tsx`) draws natively instead. */
+export const CanvasTabContent = ({ item }: { item: CanvasHtmlItem }) =>
+  isViewFile(item.filePath) && !item.driveBacked ? (
+    <col id="canvas-tab" grow={1} minH={0}>
+      <ViewTabContent key={item.filePath} filePath={item.filePath} />
+    </col>
+  ) : (
   <col id="canvas-tab" grow={1} minH={0}>
     <col id="canvas-tab-hero" grow={1} minH={0} clip={0}>
       <CanvasShareBar item={item} />

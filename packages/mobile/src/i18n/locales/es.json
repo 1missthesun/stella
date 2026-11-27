@@ -873,6 +873,14 @@
       "problem": "No se pueden comprobar tus dispositivos",
       "startOverTitle": "¿Empezar de nuevo?",
       "startOverBody": "Esto crea una lista nueva solo con este teléfono. Habrá que volver a permitir cada uno de tus otros dispositivos."
+    },
+    "views": {
+      "share": "Compartir",
+      "publicLinkTitle": "Enlace público",
+      "shareLink": "Compartir enlace",
+      "makePrivate": "Hacer privado",
+      "shareFailed": "No se pudo cambiar el enlace",
+      "missing": "Esta vista ya no está en tus apps."
     }
   },
   "settings": {
@@ -980,9 +988,27 @@
           "openFailed": "No se pudo abrir el enlace"
         }
       },
+      "media": {
+        "expand": "Ampliar"
+      },
       "folder": {
         "emptyTitle": "Esta carpeta está vacía",
         "truncated": "Solo se muestran los primeros {count}."
+      },
+      "viewHistory": {
+        "title": "Historial de versiones",
+        "stella": "Stella",
+        "task": "Una tarea",
+        "you": "Tú",
+        "current": "Actual",
+        "restoredFrom": "Se restauró la versión de las {time}",
+        "undo": "Deshacer el último cambio",
+        "back": "Volver a la actual",
+        "restore": "Restaurar",
+        "ask": "Pedir a Stella que la recupere",
+        "askMessage": "Recupera la versión de la vista «{title}» de {time}, adaptada para que funcione con los datos que tiene guardados ahora.",
+        "restoredHere": "Se restauró la versión de las {time} solo en este dispositivo",
+        "restoreFailed": "No se pudo restaurar esta versión"
       }
     },
     "sidebar": {

@@ -13,7 +13,12 @@
       "loadErrorTitle": "Sovellusten lataus epäonnistui",
       "loadErrorBody": "Stella ei juuri nyt saa yhteyttä palvelimiinsa. Tarkista yhteys ja yritä uudelleen.",
       "refreshError": "Sovellusten päivitys epäonnistui.",
-      "retry": "Yritä uudelleen"
+      "retry": "Yritä uudelleen",
+      "viewsHeading": "Näkymät",
+      "cloudAppsHeading": "Pilvisovellukset",
+      "removeView": "Poista sovelluksista",
+      "viewOpenFailed": "Tätä näkymää ei voitu avata.",
+      "viewRemoveFailed": "Tätä näkymää ei voitu poistaa."
     },
     "chat": {
       "activityPill": {
@@ -1749,6 +1754,14 @@
       "problem": "Laitteitasi ei voi tarkistaa",
       "startOverTitle": "Aloitetaanko alusta?",
       "startOverBody": "Tämä aloittaa uuden luettelon, jossa on vain tämä puhelin. Muut laitteesi on sallittava uudelleen yksitellen."
+    },
+    "views": {
+      "share": "Jaa",
+      "publicLinkTitle": "Julkinen linkki",
+      "shareLink": "Jaa linkki",
+      "makePrivate": "Tee yksityiseksi",
+      "shareFailed": "Linkkiä ei voitu muuttaa",
+      "missing": "Tämä näkymä ei ole enää sovelluksissasi."
     }
   },
   "onboarding": {
@@ -3012,6 +3025,30 @@
         "position": "{index}/{count} tässä joukossa",
         "previousSet": "Edellinen joukko",
         "nextSet": "Seuraava joukko"
+      },
+      "viewHistory": {
+        "title": "Versiohistoria",
+        "stella": "Stella",
+        "task": "Tehtävä",
+        "you": "Sinä",
+        "current": "Nykyinen",
+        "restoredFrom": "Palautettiin versio ajalta {time}",
+        "undo": "Kumoa viimeisin muutos",
+        "back": "Takaisin nykyiseen",
+        "restore": "Palauta",
+        "ask": "Pyydä Stellaa tuomaan se takaisin",
+        "askMessage": "Tuo takaisin näkymän ”{title}” versio ajalta {time} niin muokattuna, että se toimii nyt tallennettujen tietojen kanssa.",
+        "restored": "Palautettiin versio ajalta {time}",
+        "restoredHere": "Versio ajalta {time} palautettiin vain tälle laitteelle",
+        "restoreFailed": "Tätä versiota ei voitu palauttaa"
+      },
+      "viewShare": {
+        "notSynced": "Tämä näkymä ei ole vielä tullut tilillesi. Yritä hetken kuluttua uudelleen.",
+        "noLink": "Jaa linkki, joka avaa tämän näkymän missä tahansa selaimessa. Vierailijoiden tallentamat tiedot pysyvät heidän omassa selaimessaan.",
+        "makePrivateLink": "Yksityinen linkki",
+        "madeWithStella": "Tehty Stellalla",
+        "live": "Näkymä on julkaistu",
+        "publicLink": "Näkymän julkinen linkki"
       }
     },
     "displayPanel": {

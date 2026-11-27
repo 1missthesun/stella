@@ -3,6 +3,7 @@ import { registerAll } from "./dom/files";
 import { popupMenu } from "./dom/menu";
 import { elementOf } from "./dom/registry";
 import { downloadPath } from "./downloads";
+import { createEngineViews } from "./views/wasm-vm";
 
 type Engine = typeof BridgeEngine;
 type Listener = (e: any) => void;
@@ -281,6 +282,8 @@ export const webEngine: Engine = {
     },
     probe: () => unsupported("media.probe"),
   },
+  views: createEngineViews(emit),
+  location: () => unsupported("location.get"),
   webview: {
     post: async (id, data, origin) => { frameOf(id)?.contentWindow?.postMessage(data, origin ?? "*"); },
     eval: () => unsupported("webview.eval"),

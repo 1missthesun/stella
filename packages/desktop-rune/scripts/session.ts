@@ -2,7 +2,8 @@
 // a run folder outside the home with its own data dir, user-data dir, HOME, protected-storage key
 // and (optionally) a signed-in dev test account. Never touches the user's ~/.stella or account.
 //
-//   bun scripts/session.ts start [--account pro|signed-out] [--email <test account>] [--headless] [--show] [--installed] [--first-run] [--name <run>]
+//   bun scripts/session.ts start [--account pro|signed-out] [--email <test account>] [--headless] [--show] [--installed] [--first-run] [--keep-data] [--name <run>]
+// --keep-data restarts a stopped run on its own data, user-data and home (a real app restart).
 //   bun scripts/session.ts eval '<async function body using api, windows, electron>'
 //   bun scripts/session.ts shot <file.png> [--window <window id>]
 //   bun scripts/session.ts stop
@@ -139,7 +140,8 @@ async function start() {
     const old = readRun();
     if (Object.values(old.pids).some(alive)) throw new Error(`Run ${runName} is still running; stop it first.`);
   }
-  rmSync(RUN_DIR, { recursive: true, force: true });
+  const keepData = has("--keep-data") && existsSync(path.join(RUN_DIR, "data"));
+  if (!keepData) rmSync(RUN_DIR, { recursive: true, force: true });
   const dataDir = path.join(RUN_DIR, "data");
   const userDataDir = path.join(RUN_DIR, "user-data");
   const homeDir = path.join(RUN_DIR, "home");
@@ -147,14 +149,16 @@ async function start() {
   // The NVIDIA driver keeps its shader cache in ~/.cache only if the folder exists; without it every launch compiles
   // every shader again and the engine keeps ~100 MB more, so timings and memory wouldn't match a real home.
   mkdirSync(path.join(homeDir, ".cache"), { recursive: true });
-  symlinkSync(dataDir, path.join(homeDir, ".stella"), WIN ? "junction" : "dir");
+  if (!existsSync(path.join(homeDir, ".stella"))) symlinkSync(dataDir, path.join(homeDir, ".stella"), WIN ? "junction" : "dir");
   writeFileSync(path.join(homeDir, ".gitconfig"), "[user]\n\tname = Stella Rune Verify\n\temail = verify@test.stella.local\n");
   const keyFile = path.join(RUN_DIR, "protected-storage.key");
-  writeFileSync(keyFile, randomBytes(32).toString("base64url"), { mode: 0o600 });
+  if (!keepData || !existsSync(keyFile)) writeFileSync(keyFile, randomBytes(32).toString("base64url"), { mode: 0o600 });
   const accountMode = flag("--account") ?? "pro";
   const firstRun = has("--first-run");
-  writeFileSync(path.join(dataDir, "ui-state.json"), JSON.stringify(firstRun ? {} : { "stella-onboarding-complete": "true" }));
-  writeFileSync(path.join(dataDir, "preferences.json"), JSON.stringify(firstRun ? {} : { onboardingCompleted: true }));
+  if (!keepData) {
+    writeFileSync(path.join(dataDir, "ui-state.json"), JSON.stringify(firstRun ? {} : { "stella-onboarding-complete": "true" }));
+    writeFileSync(path.join(dataDir, "preferences.json"), JSON.stringify(firstRun ? {} : { onboardingCompleted: true }));
+  }
   const minted = accountMode === "signed-out" ? null : await mint(accountMode);
   const ctlPort = await freePort();
   const headless = has("--headless");

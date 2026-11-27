@@ -13,6 +13,7 @@
   "dependencies": {
     "@stella/contracts": "workspace:*",
     "@stella/theme": "workspace:*",
+    "@stella/views": "workspace:*",
     "react": "^19.3.0",
     "react-reconciler": "0.34.0",
     "remark-gfm": "^4.0.1",

@@ -873,6 +873,14 @@
       "problem": "Dispozitivele tale nu pot fi verificate",
       "startOverTitle": "O iei de la capăt?",
       "startOverBody": "Începe o listă nouă doar cu acest telefon. Fiecare dintre celelalte dispozitive va trebui permis din nou."
+    },
+    "views": {
+      "share": "Distribuie",
+      "publicLinkTitle": "Link public",
+      "shareLink": "Distribuie linkul",
+      "makePrivate": "Fă-l privat",
+      "shareFailed": "Nu s-a putut schimba linkul",
+      "missing": "Această vizualizare nu mai este în aplicațiile tale."
     }
   },
   "settings": {
@@ -980,9 +988,27 @@
           "openFailed": "Nu s-a putut deschide linkul"
         }
       },
+      "media": {
+        "expand": "Extinde"
+      },
       "folder": {
         "emptyTitle": "Acest dosar este gol",
         "truncated": "Sunt afișate doar primele {count}."
+      },
+      "viewHistory": {
+        "title": "Istoric versiuni",
+        "stella": "Stella",
+        "task": "O sarcină",
+        "you": "Tu",
+        "current": "Actuală",
+        "restoredFrom": "Versiunea de la {time} a fost restabilită",
+        "undo": "Anulează ultima modificare",
+        "back": "Înapoi la cea actuală",
+        "restore": "Restabilește",
+        "ask": "Cere-i Stellei să o aducă înapoi",
+        "askMessage": "Adu înapoi versiunea vizualizării „{title}” de la {time}, adaptată ca să funcționeze cu datele pe care le are salvate acum.",
+        "restoredHere": "Versiunea de la {time} a fost restabilită doar pe acest dispozitiv",
+        "restoreFailed": "Versiunea nu a putut fi restabilită"
       }
     },
     "sidebar": {

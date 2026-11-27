@@ -1,5 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import type { ChatMessage, MobileTask } from "../types";
+import type { ChatMessage, ChatViewRef, MobileTask } from "../types";
 import type { ToolStep } from "./tool-activity";
 import {
   desktopChatOutboxStorageKeys,
@@ -431,6 +431,34 @@ function parseStoredTasks(value: unknown): MobileTask[] {
   return tasks;
 }
 
+function parseStoredViewAuthor(value: unknown): ChatViewRef["by"] | null {
+  if (!value || typeof value !== "object") return null;
+  const by = value as Record<string, unknown>;
+  if (by.kind === "stella") return { kind: "stella" };
+  if (by.kind === "restore" && typeof by.from === "number") return { kind: "restore", from: by.from };
+  if (by.kind === "task" && typeof by.agentId === "string") return { kind: "task", agentId: by.agentId, ...(typeof by.title === "string" ? { title: by.title } : {}) };
+  return null;
+}
+
+function parseStoredViews(value: unknown): ChatViewRef[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((entry): ChatViewRef[] => {
+    if (!entry || typeof entry !== "object") return [];
+    const v = entry as Record<string, unknown>;
+    if (typeof v.slug !== "string" || typeof v.source !== "string" || typeof v.toolCallId !== "string") return [];
+    return [{
+      filePath: typeof v.filePath === "string" && v.filePath ? v.filePath : `${v.slug}.view.tsx`,
+      slug: v.slug,
+      title: typeof v.title === "string" ? v.title : v.slug,
+      source: v.source,
+      ...("data" in v && v.data !== undefined ? { data: v.data } : {}),
+      createdAt: typeof v.createdAt === "number" ? v.createdAt : 0,
+      toolCallId: v.toolCallId,
+      ...(parseStoredViewAuthor(v.by) ? { by: parseStoredViewAuthor(v.by)! } : {}),
+    }];
+  });
+}
+
 function parseRow(row: unknown): ChatMessage | null {
   if (!row || typeof row !== "object") {
     return null;
@@ -456,6 +484,8 @@ function parseRow(row: unknown): ChatMessage | null {
   const artifacts = parseChatArtifacts(o.artifacts, conversationId);
   const tasks = parseStoredTasks(o.tasks);
   const toolSteps = parseStoredToolSteps(o.toolSteps);
+  const views = parseStoredViews(o.views);
+  const viewVersions = parseStoredViews(o.viewVersions);
   return {
     id: o.id,
     ...(typeof o.canonicalId === "string" && o.canonicalId.trim()
@@ -489,6 +519,8 @@ function parseRow(row: unknown): ChatMessage | null {
     text: o.text,
     ...(artifacts.length > 0 ? { artifacts } : {}),
     ...(toolSteps.length > 0 ? { toolSteps } : {}),
+    ...(views.length > 0 ? { views } : {}),
+    ...(viewVersions.length > 0 ? { viewVersions } : {}),
     ...(tasks.length > 0 ? { tasks } : {}),
     ...(o.hasImage === true ? { hasImage: true } : {}),
     ...(thumbnailUris.length > 0 ? { thumbnailUris } : {}),

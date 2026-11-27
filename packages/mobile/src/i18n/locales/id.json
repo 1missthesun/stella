@@ -871,6 +871,14 @@
       "problem": "Tidak bisa memeriksa perangkat Anda",
       "startOverTitle": "Mulai ulang?",
       "startOverBody": "Ini memulai daftar baru yang hanya berisi ponsel ini. Setiap perangkat Anda yang lain perlu diizinkan lagi."
+    },
+    "views": {
+      "share": "Bagikan",
+      "publicLinkTitle": "Tautan publik",
+      "shareLink": "Bagikan tautan",
+      "makePrivate": "Jadikan pribadi",
+      "shareFailed": "Tidak dapat mengubah tautan",
+      "missing": "Tampilan ini sudah tidak ada di Aplikasimu."
     }
   },
   "settings": {
@@ -976,9 +984,27 @@
           "openFailed": "Tidak dapat membuka tautan"
         }
       },
+      "media": {
+        "expand": "Perbesar"
+      },
       "folder": {
         "emptyTitle": "Folder ini kosong",
         "truncated": "Hanya {count} item pertama yang ditampilkan."
+      },
+      "viewHistory": {
+        "title": "Riwayat versi",
+        "stella": "Stella",
+        "task": "Sebuah tugas",
+        "you": "Kamu",
+        "current": "Saat ini",
+        "restoredFrom": "Versi {time} dipulihkan",
+        "undo": "Urungkan perubahan terakhir",
+        "back": "Kembali ke saat ini",
+        "restore": "Pulihkan",
+        "ask": "Minta Stella mengembalikannya",
+        "askMessage": "Kembalikan versi tampilan \"{title}\" dari {time}, disesuaikan agar berfungsi dengan data yang tersimpan sekarang.",
+        "restoredHere": "Versi {time} dipulihkan hanya di perangkat ini",
+        "restoreFailed": "Tidak dapat memulihkan versi ini"
       }
     },
     "sidebar": {

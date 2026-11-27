@@ -13,7 +13,12 @@
       "loadErrorTitle": "Det gick inte att läsa in dina appar",
       "loadErrorBody": "Stella når inte sina servrar just nu. Kontrollera anslutningen och försök igen.",
       "refreshError": "Det gick inte att uppdatera dina appar.",
-      "retry": "Försök igen"
+      "retry": "Försök igen",
+      "viewsHeading": "Vyer",
+      "cloudAppsHeading": "Molnappar",
+      "removeView": "Ta bort från Appar",
+      "viewOpenFailed": "Det gick inte att öppna den här vyn.",
+      "viewRemoveFailed": "Det gick inte att ta bort den här vyn."
     },
     "chat": {
       "activityPill": {
@@ -1749,6 +1754,14 @@
       "problem": "Kan inte kontrollera dina enheter",
       "startOverTitle": "Börja om?",
       "startOverBody": "Det startar en ny lista med bara den här telefonen. Dina andra enheter måste tillåtas igen, var och en."
+    },
+    "views": {
+      "share": "Dela",
+      "publicLinkTitle": "Offentlig länk",
+      "shareLink": "Dela länk",
+      "makePrivate": "Gör privat",
+      "shareFailed": "Det gick inte att ändra länken",
+      "missing": "Den här vyn finns inte längre bland dina appar."
     }
   },
   "onboarding": {
@@ -3012,6 +3025,30 @@
         "position": "{index} av {count} i den här gruppen",
         "previousSet": "Föregående grupp",
         "nextSet": "Nästa grupp"
+      },
+      "viewHistory": {
+        "title": "Versionshistorik",
+        "stella": "Stella",
+        "task": "En uppgift",
+        "you": "Du",
+        "current": "Aktuell",
+        "restoredFrom": "Återställde versionen från {time}",
+        "undo": "Ångra senaste ändringen",
+        "back": "Tillbaka till aktuell",
+        "restore": "Återställ",
+        "ask": "Be Stella ta tillbaka den",
+        "askMessage": "Ta tillbaka versionen av vyn ”{title}” från {time}, anpassad så att den fungerar med den data den har sparad nu.",
+        "restored": "Återställde versionen från {time}",
+        "restoredHere": "Återställde versionen från {time} bara på den här enheten",
+        "restoreFailed": "Det gick inte att återställa den här versionen"
+      },
+      "viewShare": {
+        "notSynced": "Den här vyn har inte nått ditt konto än. Försök igen om en stund.",
+        "noLink": "Dela en länk som kör den här vyn i vilken webbläsare som helst. Det besökare sparar stannar i deras egen webbläsare.",
+        "makePrivateLink": "Privat länk",
+        "madeWithStella": "Skapad med Stella",
+        "live": "Vyn är publicerad",
+        "publicLink": "Offentlig länk till vyn"
       }
     },
     "displayPanel": {

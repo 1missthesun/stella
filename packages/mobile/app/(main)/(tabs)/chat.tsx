@@ -66,6 +66,7 @@ import {
   useShellTopInset,
 } from "../../../src/components/MainScreenSurface";
 import { ArtifactViewer } from "../../../src/components/ArtifactViewer";
+import { ViewFullScreenHost } from "../../../src/views/ViewSurface";
 import { useChatSendQueue } from "../../../src/lib/chat-send-queue";
 import { CloudBrowserInterventionCard } from "../../../src/components/CloudBrowserInterventionCard";
 import { CloudConnectorConnectCard } from "../../../src/components/CloudConnectorConnectCard";
@@ -636,6 +637,7 @@ function ChatSurface(props: {
         catchingUp={thread.catchingUp}
         onFooterHeightChange={setComposerReserve}
       />
+      <ViewFullScreenHost />
       <ArtifactViewer
         visible={Boolean(selectedArtifact)}
         artifact={selectedArtifact}

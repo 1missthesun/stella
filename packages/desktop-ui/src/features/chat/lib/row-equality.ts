@@ -393,6 +393,7 @@ const assistantRowEqual = (
   (a.officePreviewRef?.sessionId ?? null) ===
     (b.officePreviewRef?.sessionId ?? null) &&
   resourcePayloadEqual(a.resourcePayload, b.resourcePayload) &&
+  sourceDiffPayloadsEqual(a.viewPayloads, b.viewPayloads) &&
   linkedFilesKey(a.linkedFiles) === linkedFilesKey(b.linkedFiles) &&
   sourceDiffPayloadsEqual(a.inlineImagePayloads, b.inlineImagePayloads) &&
   sourceDiffPayloadsEqual(a.sourceDiffPayloads, b.sourceDiffPayloads) &&

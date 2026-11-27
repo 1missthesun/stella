@@ -871,6 +871,14 @@
       "problem": "デバイスを確認できません",
       "startOverTitle": "最初からやり直しますか？",
       "startOverBody": "このスマートフォンだけの新しいリストになります。ほかのデバイスはそれぞれもう一度許可する必要があります。"
+    },
+    "views": {
+      "share": "共有",
+      "publicLinkTitle": "公開リンク",
+      "shareLink": "リンクを共有",
+      "makePrivate": "非公開にする",
+      "shareFailed": "リンクを変更できませんでした",
+      "missing": "このビューはもうアプリにありません。"
     }
   },
   "settings": {
@@ -976,9 +984,27 @@
           "openFailed": "リンクを開けませんでした"
         }
       },
+      "media": {
+        "expand": "拡大"
+      },
       "folder": {
         "emptyTitle": "このフォルダは空です",
         "truncated": "最初の {count} 件のみ表示しています。"
+      },
+      "viewHistory": {
+        "title": "バージョン履歴",
+        "stella": "Stella",
+        "task": "タスク",
+        "you": "あなた",
+        "current": "現在",
+        "restoredFrom": "{time} のバージョンを復元しました",
+        "undo": "最後の変更を元に戻す",
+        "back": "現在に戻る",
+        "restore": "復元",
+        "ask": "Stella に戻してもらう",
+        "askMessage": "ビュー「{title}」の {time} のバージョンを、いま保存されているデータで動くように調整して戻してください。",
+        "restoredHere": "{time} のバージョンをこのデバイスでのみ復元しました",
+        "restoreFailed": "このバージョンを復元できませんでした"
       }
     },
     "sidebar": {

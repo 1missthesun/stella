@@ -79,6 +79,7 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
   const READS = ["get", "useStore", "now", "snapshot", "pressedByKeys"];
   g.stella = scopeUiFacing({ store, useStore: makeUseStore(store), command, now, engine, on: onEngineEvent, windowPortal, pressedByKeys }, READS);
   if (services) g.stella.host = scopeUiFacing((await import("./services/ui-host")).createUiHost(), READS);
+  g.stella.views = scopeUiFacing((await import("./views/views-host")).createViewsHost(engine, onEngineEvent), ["snapshot", "isViewPath", "logs", "syncState", "history", "previewing"]);
 
   /** An app exporting `Root` renders its own `<window>`s; `App` is wrapped in the main window. */
   const root = () => ui.wrap(app.Root ? createElement(app.Root) : createElement("window", { id: "main" }, createElement(app.App)));
@@ -95,6 +96,7 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
   const builtMtime = new Map<string, number>();
   watch(APP_DIR, { recursive: true }, (_ev, file) => {
     if (!file || !/\.(tsx?|json)$/.test(file)) return;
+    if (/\.view\.(tsx|ts|jsx|js)$/i.test(file)) return; // a Stella View: views-host runs it, not the app
     let mtime = -1;
     try { mtime = statSync(join(APP_DIR, file)).mtimeMs; } catch {}
     if (!pending && builtMtime.get(file) === mtime) return;

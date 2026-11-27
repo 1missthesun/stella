@@ -20,6 +20,9 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 image = { version = "0.25", default-features = false, features = ["jpeg", "png", "webp"] }
 wry = { version = "0.58", optional = true }
+# Stella Views: view programs run in PsychoScript live runs (src/views.rs). No GPU canvases here
+# (the default `widget-gpu` feature): views draw through Rune.
+psychoscript-mobile = { git = "https://github.com/anomalyco/psychoscript", rev = "e289f8ba62aa2b21c19a7ff20e8440c04d3f444c", default-features = false }
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"

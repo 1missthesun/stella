@@ -19,7 +19,17 @@ import type {
   TurnStartedEvent,
 } from "@stella/contracts/turn-plane/owner-events";
 import { welcomeCard } from "@stella/contracts/welcome-message";
-import { empty, object, optional, string } from "../args.js";
+import type { PublishViewArgs } from "@stella/contracts/backend/conversations";
+import {
+  parseViewCard,
+  VIEW_CARD_MAX_DATA_BYTES,
+  VIEW_CARD_MAX_SOURCE_BYTES,
+  VIEW_CARD_TYPE,
+  viewCardGroup,
+} from "@stella/contracts/view-card";
+import { empty, json, number, object, optional, string } from "../args.js";
+import { recordViewVersion } from "./view-index.js";
+import { RpcError } from "../errors.js";
 import {
   CONVERSATION_PURGE_JOB,
   conversationPurgeJob,
@@ -458,6 +468,54 @@ export const applyConversationEvent = (
 
 const conversationIdArg = string({ pattern: CONVERSATION_ID_PATTERN, max: 64 });
 
+const publishViewArgs = object({
+  conversationId: conversationIdArg,
+  agentId: string({ min: 1, max: 128 }),
+  agentTitle: optional(string({ max: 200 })),
+  filePath: string({ min: 1, max: 1024 }),
+  slug: string({ min: 1, max: 128 }),
+  title: string({ min: 1, max: 200 }),
+  source: string({ min: 1, max: VIEW_CARD_MAX_SOURCE_BYTES }),
+  data: optional(json({ maxBytes: VIEW_CARD_MAX_DATA_BYTES })),
+  createdAt: number({ min: 0 }),
+  restoredFrom: optional(number({ min: 0 })),
+});
+
+/** Puts a task's view (or the user's restore of one) into the user's chat as a view card, so every device shows it. */
+const publishView = async (ctx: OwnerContext, args: PublishViewArgs): Promise<{ posted: boolean }> => {
+  if (!isLiveConversation(ctx.db, args.conversationId)) {
+    throw new RpcError("NOT_FOUND", "That conversation doesn't exist.");
+  }
+  const card = parseViewCard({ type: VIEW_CARD_TYPE, ...args });
+  if (!card) throw new RpcError("BAD_REQUEST", "That isn't a view.");
+  const snapshot = await ctx.host.snapshot();
+  if (!snapshot.writable) return { posted: false };
+  // The Apps list on every device has it as soon as the card is posted (or staged for a running turn).
+  try {
+    await recordViewVersion(ctx, {
+      conversationId: args.conversationId,
+      filePath: card.filePath,
+      slug: card.slug,
+      title: card.title,
+      source: card.source,
+      ...(card.data !== undefined ? { data: card.data } : {}),
+      createdAt: card.createdAt,
+    });
+  } catch (error) {
+    console.error(JSON.stringify({
+      event: "view_index_record_failed",
+      message: error instanceof Error ? error.message : String(error),
+    }));
+  }
+  const posted = await ctx.host.postConversationCard({
+    conversationId: args.conversationId,
+    ownerGeneration: snapshot.ownerGeneration,
+    sourceTurnId: viewCardGroup(card),
+    card,
+  });
+  return { posted };
+};
+
 export const conversationsDomain = {
   name: "conversations",
   migrations: [
@@ -466,6 +524,10 @@ export const conversationsDomain = {
     CONVERSATIONS_MAIN_MIGRATION,
   ],
   purge: purgeConversationData,
+  internal: {
+    // A cloud task's `view` tool, through its turn broker.
+    "conversations.publishView": (ctx: OwnerContext, args: unknown) => publishView(ctx, publishViewArgs(args)),
+  },
   jobs: {
     [CONVERSATION_PURGE_JOB]: conversationPurgeJob,
     [CONVERSATION_WELCOME_JOB]: conversationWelcomeJob,
@@ -480,6 +542,12 @@ export const conversationsDomain = {
     scope: "owner",
     parse: empty(),
     handler: (ctx: OwnerContext) => exportData(ctx),
+  },
+  "conversations.publishView": {
+    scope: "owner",
+    maxBodyBytes: VIEW_CARD_MAX_SOURCE_BYTES + VIEW_CARD_MAX_DATA_BYTES + 16 * 1024,
+    parse: publishViewArgs,
+    handler: publishView,
   },
   "conversations.bootstrap": {
     scope: "owner",

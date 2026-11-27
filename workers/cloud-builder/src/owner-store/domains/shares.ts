@@ -16,6 +16,8 @@ import {
   buildFileShareUrl,
   readCanvasShareBaseUrl,
 } from "@stella/contracts/canvas-share";
+import { VIEW_INDEX_ID_PATTERN, type IndexedViewSource } from "@stella/contracts/backend/view-index";
+import { VIEW_SHARE_KIND, type SharedViewPayload } from "@stella/contracts/view-share";
 import {
   isDocumentFolderAsset,
   relativeHtmlAssetPaths,
@@ -76,6 +78,14 @@ export const SHARES_ASSETS_MIGRATION = {
   statements: ["ALTER TABLE shares ADD COLUMN asset_count INTEGER NOT NULL DEFAULT 0"],
 };
 
+export const SHARES_VIEWS_MIGRATION = {
+  id: "shares.5-views",
+  statements: [
+    "ALTER TABLE shares ADD COLUMN view_id TEXT",
+    "CREATE UNIQUE INDEX shares_by_view ON shares (view_id) WHERE view_id IS NOT NULL",
+  ],
+};
+
 const SHARE_FILE_MAX_BYTES = 500 * 1024 * 1024;
 const MAX_DOCUMENT_ASSETS = 200;
 const ASSET_COPY_CONCURRENCY = 4;
@@ -91,6 +101,7 @@ type ShareRow = {
   file_path: string | null;
   file_source_key: string | null;
   asset_count: number;
+  view_id: string | null;
 };
 
 const unavailable = () =>
@@ -175,12 +186,12 @@ const putObject = async (
   ctx: OwnerContext,
   key: string,
   body: Uint8Array | ArrayBuffer,
-  options: { expiresAt: number; visibility: ShareVisibility; assets?: boolean },
+  options: { expiresAt: number; visibility: ShareVisibility; assets?: boolean; view?: boolean },
 ): Promise<void> => {
   const ownerSite = ownerSiteOf(ctx.env);
   await bucketOf(ctx.env).put(key, body, {
     httpMetadata: {
-      contentType: "text/html; charset=utf-8",
+      contentType: options.view ? "application/json; charset=utf-8" : "text/html; charset=utf-8",
       cacheControl: options.visibility === "public" ? "public, max-age=300" : "private, no-store",
     },
     customMetadata: {
@@ -189,6 +200,7 @@ const putObject = async (
       owner: await canvasOwnerTag(ctx.ownerId),
       ...(ownerSite ? { "owner-site": ownerSite } : {}),
       ...(options.assets ? { assets: "1" } : {}),
+      ...(options.view ? { kind: VIEW_SHARE_KIND } : {}),
     },
   });
 };
@@ -207,6 +219,7 @@ const toLink = (base: string, row: ShareRow): ShareLink => ({
   visibility: visibilityOf(row),
   canvas: row.canvas,
   file: row.file_path,
+  view: row.view_id,
 });
 
 const generateSlug = (): string => {
@@ -412,6 +425,7 @@ const setVisibility = async (
       expiresAt: row.expires_at,
       visibility: args.visibility,
       assets: row.asset_count > 0,
+      view: row.view_id !== null,
     });
   } catch (error) {
     console.error(JSON.stringify({
@@ -732,6 +746,143 @@ const saveDriveDocument = async (
   };
 };
 
+type ViewIndexRow = {
+  id: string;
+  title: string;
+  source: string;
+  data_json: string | null;
+  updated_at: number;
+};
+
+type ShareableView = Pick<IndexedViewSource, "id" | "title" | "source" | "data" | "updatedAt">;
+
+const readIndexedViewRow = (db: OwnerDbReader, viewId: string): ShareableView | null => {
+  const row = db.one<ViewIndexRow>(
+    "SELECT id, title, source, data_json, updated_at FROM view_index WHERE id = ?",
+    viewId,
+  );
+  if (!row) return null;
+  let data: unknown;
+  let hasData = false;
+  if (row.data_json !== null) {
+    try {
+      data = JSON.parse(row.data_json);
+      hasData = true;
+    } catch {
+      hasData = false;
+    }
+  }
+  return { id: row.id, title: row.title, source: row.source, updatedAt: row.updated_at, ...(hasData ? { data } : {}) };
+};
+
+const viewPayloadBytes = (view: ShareableView): Uint8Array => {
+  const payload: SharedViewPayload = {
+    v: 1,
+    title: view.title,
+    source: view.source,
+    ...(view.data !== undefined ? { data: view.data } : {}),
+    createdAt: view.updatedAt,
+  };
+  return new TextEncoder().encode(JSON.stringify(payload));
+};
+
+/** Shares a view from the account's view index at a `/c/` link; private unless asked, like a canvas. */
+const saveView = async (
+  ctx: OwnerContext,
+  args: { viewId: string; visibility?: ShareVisibility },
+): Promise<SavedCanvasShare> => {
+  bucketOf(ctx.env);
+  const base = baseUrlOf(ctx.env);
+  enforceOwnerRateLimit(
+    ctx.db,
+    ctx.now,
+    "shares.save",
+    SAVE_RATE_LIMIT,
+    "Too many canvases saved. Please wait a moment.",
+  );
+  const view = readIndexedViewRow(ctx.db, args.viewId);
+  if (!view) {
+    throw new RpcError("NOT_FOUND", "This view hasn't reached your account yet. Try again in a moment.");
+  }
+  const title = view.title.slice(0, SHARE_MAX_TITLE_CHARS) || null;
+  const bytes = viewPayloadBytes(view);
+  const expiresAt = ctx.now + SHARE_TTL_MS;
+  const existing = ctx.db.one<ShareRow>("SELECT * FROM shares WHERE view_id = ?", args.viewId);
+  const visibility = args.visibility ?? (existing ? visibilityOf(existing) : "private");
+  const slug = existing?.slug ?? generateSlug();
+  const key = existing?.r2_key ?? keyForSlug(slug);
+  if (existing) {
+    ctx.db.run("UPDATE shares SET title = ?, expires_at = ? WHERE slug = ?", title, expiresAt, slug);
+  } else {
+    ctx.db.run(
+      `INSERT INTO shares (slug, title, r2_key, created_at, expires_at, visibility, view_id)
+         VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      slug,
+      title,
+      key,
+      ctx.now,
+      expiresAt,
+      visibility,
+      args.viewId,
+    );
+  }
+  ctx.jobs.schedule(EXPIRE_JOB, expiresAt, { slug }, { id: expireJobId(slug) });
+  try {
+    await putObject(ctx, key, bytes, { expiresAt, visibility, view: true });
+  } catch (error) {
+    if (existing) {
+      console.error(JSON.stringify({
+        event: "share_save_failed",
+        message: error instanceof Error ? error.message : String(error),
+      }));
+    } else {
+      await forgetFailedPut(ctx, slug, key, error);
+    }
+    throw unavailable();
+  }
+  if (existing && visibility !== visibilityOf(existing)) {
+    ctx.db.run("UPDATE shares SET visibility = ? WHERE slug = ?", visibility, slug);
+  }
+  return { url: buildCanvasShareUrl(base, slug), slug, visibility, expiresAt };
+};
+
+/** A shared view's link follows its newest version (and, like a canvas saved again, lives 90 days from it). */
+export const refreshViewShare = async (ctx: OwnerContext, view: ShareableView): Promise<void> => {
+  const row = ctx.db.one<ShareRow>(
+    "SELECT * FROM shares WHERE view_id = ? AND expires_at > ?",
+    view.id,
+    ctx.now,
+  );
+  if (!row || !ctx.env.CANVAS_SHARES) return;
+  const expiresAt = ctx.now + SHARE_TTL_MS;
+  await putObject(ctx, row.r2_key, viewPayloadBytes(view), {
+    expiresAt,
+    visibility: visibilityOf(row),
+    view: true,
+  });
+  ctx.db.run(
+    "UPDATE shares SET title = ?, expires_at = ? WHERE slug = ?",
+    view.title.slice(0, SHARE_MAX_TITLE_CHARS) || row.title,
+    expiresAt,
+    row.slug,
+  );
+  ctx.jobs.schedule(EXPIRE_JOB, expiresAt, { slug: row.slug }, { id: expireJobId(row.slug) });
+};
+
+const readViewShare = (
+  db: OwnerDbReader,
+  env: Cloudflare.Env,
+  now: number,
+  viewId: string,
+): ShareLink | null => {
+  const row = db.one<ShareRow>(
+    "SELECT * FROM shares WHERE view_id = ? AND expires_at > ?",
+    viewId,
+    now,
+  );
+  return row ? toLink(baseUrlOf(env), row) : null;
+};
+
 const saveArgs = object({
   canvas: string({ min: 1, max: 64, pattern: SHARE_CANVAS_PATTERN }),
   html: string({ max: SHARE_MAX_HTML_BYTES }),
@@ -788,6 +939,7 @@ export const sharesDomain = {
     SHARES_CANVAS_MIGRATION,
     SHARES_FILE_MIGRATION,
     SHARES_ASSETS_MIGRATION,
+    SHARES_VIEWS_MIGRATION,
   ],
   calls: {
     "shares.publish": {
@@ -838,6 +990,14 @@ export const sharesDomain = {
       parse: object({ slug: string({ min: 1, max: 128 }) }),
       handler: revoke,
     },
+    "shares.saveView": {
+      scope: "owner",
+      parse: object({
+        viewId: string({ min: 3, max: 300, pattern: VIEW_INDEX_ID_PATTERN }),
+        visibility: optional(literal("private", "public")),
+      }),
+      handler: saveView,
+    },
   },
   views: {
     "shares.list": {
@@ -847,6 +1007,10 @@ export const sharesDomain = {
     "shares.canvas": {
       parse: object({ canvas: string({ min: 1, max: 64, pattern: SHARE_CANVAS_PATTERN }) }),
       read: (ctx, args) => readCanvasShare(ctx.db, ctx.env, ctx.now, args.canvas),
+    },
+    "shares.view": {
+      parse: object({ viewId: string({ min: 3, max: 300, pattern: VIEW_INDEX_ID_PATTERN }) }),
+      read: (ctx, args) => readViewShare(ctx.db, ctx.env, ctx.now, args.viewId),
     },
   },
   internal: {

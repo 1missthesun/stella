@@ -170,6 +170,7 @@ import { agentMoveModel } from "../stella/agent-move-model.ts";
 import { movedAgentBrief, type AgentMove } from "../stella/execution.ts";
 import { fetchWithDeadline, REQUEST_BUDGET_MS, withDeadline } from "@stella/contracts/request-deadline";
 import { boundedReplay } from "../stella/doc-checkpoint.ts";
+import { applyViewRestore } from "@stella/runtime/kernel/tools/view-restore";
 
 const HISTORY_PAGE = 200;
 const CLIENT_PAGE_BYTES = 2 * 1024 * 1024;
@@ -1889,6 +1890,10 @@ export function desktopChats(options: DesktopChatsOptions) {
                 }
               },
               onUsageLimit: (card, at) => noteCloudUsageLimit(conversationId, card, at),
+              // A view restored on any device lands in its file here (when it's here); Stella reads it in the conversation.
+              onViewRestore: async (card) => {
+                await applyViewRestore(options.dataDir, { filePath: card.filePath, source: card.source, createdAt: card.createdAt, restoredFrom: card.restoredFrom ?? card.createdAt, told: "orchestrator" });
+              },
               safeguardInfo: safeguardInfoOf,
               onSafeguard: (event) => noteSafeguard(conversationId, { harness, root }, [event]),
               onSafeguardCard: (card, record) => applySafeguardCard(conversationId, { harness, root }, card, record),

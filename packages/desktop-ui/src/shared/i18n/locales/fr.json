@@ -13,7 +13,12 @@
       "loadErrorTitle": "Impossible de charger tes apps",
       "loadErrorBody": "Stella ne peut pas joindre ses serveurs pour le moment. Vérifie ta connexion et réessaie.",
       "refreshError": "Impossible d’actualiser tes apps.",
-      "retry": "Réessayer"
+      "retry": "Réessayer",
+      "viewsHeading": "Vues",
+      "cloudAppsHeading": "Apps cloud",
+      "removeView": "Retirer des Apps",
+      "viewOpenFailed": "Impossible d'ouvrir cette vue.",
+      "viewRemoveFailed": "Impossible de retirer cette vue."
     },
     "chat": {
       "activityPill": {
@@ -1759,6 +1764,14 @@
       "problem": "Impossible de vérifier tes appareils",
       "startOverTitle": "Recommencer ?",
       "startOverBody": "Cela crée une nouvelle liste avec ce téléphone seulement. Tes autres appareils devront chacun être autorisés de nouveau."
+    },
+    "views": {
+      "share": "Partager",
+      "publicLinkTitle": "Lien public",
+      "shareLink": "Partager le lien",
+      "makePrivate": "Rendre privé",
+      "shareFailed": "Impossible de modifier le lien",
+      "missing": "Cette vue n'est plus dans tes apps."
     }
   },
   "onboarding": {
@@ -3028,6 +3041,30 @@
         "position": "{index} sur {count} dans cet ensemble",
         "previousSet": "Ensemble précédent",
         "nextSet": "Ensemble suivant"
+      },
+      "viewHistory": {
+        "title": "Historique des versions",
+        "stella": "Stella",
+        "task": "Une tâche",
+        "you": "Vous",
+        "current": "Actuelle",
+        "restoredFrom": "Version de {time} restaurée",
+        "undo": "Annuler la dernière modification",
+        "back": "Revenir à l’actuelle",
+        "restore": "Restaurer",
+        "ask": "Demander à Stella de la rétablir",
+        "askMessage": "Rétablis la version de la vue « {title} » de {time}, adaptée pour fonctionner avec les données qu’elle a enregistrées maintenant.",
+        "restored": "Version de {time} restaurée",
+        "restoredHere": "Version de {time} restaurée sur cet appareil uniquement",
+        "restoreFailed": "Impossible de restaurer cette version"
+      },
+      "viewShare": {
+        "notSynced": "Cette vue n'est pas encore arrivée sur ton compte. Réessaie dans un instant.",
+        "noLink": "Partage un lien qui exécute cette vue dans n'importe quel navigateur. Ce que les visiteurs enregistrent reste dans leur propre navigateur.",
+        "makePrivateLink": "Lien privé",
+        "madeWithStella": "Fait avec Stella",
+        "live": "La vue est en ligne",
+        "publicLink": "Lien public de la vue"
       }
     },
     "displayPanel": {

@@ -13,7 +13,12 @@
       "loadErrorTitle": "Não foi possível carregar seus apps",
       "loadErrorBody": "A Stella não consegue acessar os servidores agora. Verifique sua conexão e tente de novo.",
       "refreshError": "Não foi possível atualizar seus apps.",
-      "retry": "Tentar de novo"
+      "retry": "Tentar de novo",
+      "viewsHeading": "Visualizações",
+      "cloudAppsHeading": "Apps na nuvem",
+      "removeView": "Remover dos Apps",
+      "viewOpenFailed": "Não foi possível abrir esta visualização.",
+      "viewRemoveFailed": "Não foi possível remover esta visualização."
     },
     "chat": {
       "activityPill": {
@@ -1759,6 +1764,14 @@
       "problem": "Não foi possível verificar seus dispositivos",
       "startOverTitle": "Começar de novo?",
       "startOverBody": "Isso cria uma nova lista só com este telefone. Cada um dos seus outros dispositivos precisará ser permitido de novo."
+    },
+    "views": {
+      "share": "Compartilhar",
+      "publicLinkTitle": "Link público",
+      "shareLink": "Compartilhar link",
+      "makePrivate": "Tornar privado",
+      "shareFailed": "Não foi possível alterar o link",
+      "missing": "Esta visualização não está mais nos seus apps."
     }
   },
   "onboarding": {
@@ -3028,6 +3041,30 @@
         "position": "{index} de {count} neste conjunto",
         "previousSet": "Conjunto anterior",
         "nextSet": "Próximo conjunto"
+      },
+      "viewHistory": {
+        "title": "Histórico de versões",
+        "stella": "Stella",
+        "task": "Uma tarefa",
+        "you": "Você",
+        "current": "Atual",
+        "restoredFrom": "Versão das {time} restaurada",
+        "undo": "Desfazer última alteração",
+        "back": "Voltar à atual",
+        "restore": "Restaurar",
+        "ask": "Pedir à Stella para trazê-la de volta",
+        "askMessage": "Traga de volta a versão da visualização \"{title}\" das {time}, adaptada para funcionar com os dados que ela tem salvos agora.",
+        "restored": "Versão das {time} restaurada",
+        "restoredHere": "Versão das {time} restaurada só neste dispositivo",
+        "restoreFailed": "Não foi possível restaurar esta versão"
+      },
+      "viewShare": {
+        "notSynced": "Esta visualização ainda não chegou à sua conta. Tente novamente em instantes.",
+        "noLink": "Compartilhe um link que executa esta visualização em qualquer navegador. O que os visitantes salvam fica no próprio navegador deles.",
+        "makePrivateLink": "Link privado",
+        "madeWithStella": "Feito com Stella",
+        "live": "A visualização está no ar",
+        "publicLink": "Link público da visualização"
       }
     },
     "displayPanel": {

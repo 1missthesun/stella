@@ -1,5 +1,6 @@
 import { VIEW_TOOL, viewFromToolEvent } from "@stella/views/conversation";
 import { VIEW_FILE_RE, viewFileName, viewTitle } from "@stella/views/paths";
+import { parseViewCard } from "@stella/contracts/view-card";
 import { reminderMarkOf } from "@stella/contracts/reminders";
 import { WELCOME_CARD_TYPE, WELCOME_TEXT, welcomeMarkOf } from "@stella/contracts/welcome-message";
 import { SCHEDULE_NOTICE_CARD_TYPE } from "@stella/contracts/schedule-notice";
@@ -327,6 +328,39 @@ const projectTurn = (
       canonicalCreatedAt: reminderRecord.createdAtMs,
       sequence: reminderRecord.seq,
       reminder: reminderMarkOf(card),
+    });
+    return out;
+  }
+  // A task's view: one row per task and view, running its newest version.
+  const viewCards = turn.flatMap((record) => {
+    const card = record.kind === "card" ? parseViewCard(record.card) : null;
+    return card ? [{ record, card }] : [];
+  });
+  if (viewCards.length > 0) {
+    const first = viewCards[0]!.record;
+    const byFile = new Map<string, ChatViewRef>();
+    let data: unknown;
+    for (const { record, card } of viewCards) {
+      if (card.data !== undefined) data = card.data;
+      byFile.delete(card.filePath);
+      byFile.set(card.filePath, {
+        filePath: card.filePath,
+        slug: card.slug,
+        title: card.title,
+        source: card.source,
+        ...(data !== undefined ? { data } : {}),
+        createdAt: card.createdAt,
+        toolCallId: `cloud:${turnId}:view-call:${record.seq}`,
+      });
+    }
+    out.push({
+      id: `cloud:${turnId}:view:${first.seq}`,
+      role: "assistant",
+      text: "",
+      createdAt: first.createdAtMs,
+      canonicalCreatedAt: first.createdAtMs,
+      sequence: first.seq,
+      views: [...byFile.values()],
     });
     return out;
   }

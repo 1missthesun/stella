@@ -1,15 +1,19 @@
 ---
 name: stella-views
-description: Build a Stella View, a native live mini-app or visual (tracker, dashboard, calculator, small tool, game, explainer) written as one TSX file that Stella draws itself on the user's device and updates within milliseconds as you edit it. Use for anything the user looks at or uses inside Stella when `STELLA_VIEWS=1` is set in your shell; without it, make an HTML page instead.
+description: Build a Stella View, a native live mini-app or visual (tracker, dashboard, calculator, small tool, game, explainer) written as one TSX file that Stella draws itself on the user's device and updates within milliseconds as you edit it. Use for anything the user looks at or uses inside Stella when you have the `view` tool or `STELLA_VIEWS=1` is set in your shell; without either, make an HTML page instead.
 ---
 
 # Stella Views
 
 A view is one `.view.tsx` file. Stella compiles it on the device, runs it in a small sandboxed VM and draws it with its own native components, so it follows the user's theme, needs no browser or server, and keeps working offline. Saving the file swaps the running view to the new code in a few milliseconds and keeps its state.
 
-Views show only where `STELLA_VIEWS=1` is set in your shell (Stella's native desktop app). Without it, build an HTML page.
+Views run on the user's phone, in the web chat and in Stella's native desktop app. You can make one when you have the `view` tool (in the cloud and on that desktop) or `STELLA_VIEWS=1` is set in your shell. Without either, build an HTML page.
 
 ## Make one
+
+With the `view` tool, call it with a `slug`, a `title` and the whole file as `source` (and `data` for `useData()`). It saves the file, checks it (common mistakes, icon names and the compile devices do), says whether it rendered where Stella draws views, and puts it in the user's chat on every device, live. To change it, call `view` again with the same slug and the whole new file: open copies swap to it and keep their state. Link the path it returns in your report.
+
+Without the tool (`STELLA_VIEWS=1` only), the view reaches only this computer:
 
 1. Write `~/.stella/outputs/views/<slug>.view.tsx`. For a view made from the user's files, put it beside those files instead. Write the whole file in one step (write to `<file>.tmp`, then `mv`) so an open view never reads half a file.
 2. Check it:
@@ -19,7 +23,7 @@ Views show only where `STELLA_VIEWS=1` is set in your shell (Stella's native des
    This type-checks the file against the view API, checks icon names and compiles it the way devices do. When the view is open on this device, it then prints `on screen (rendered in N ms)` or the error it hit while running. Fix every problem it prints. A broken edit never blanks an open view: the last good version stays on screen with the error under it.
 3. Show it: link it in your report as `[Title](</absolute/path/<slug>.view.tsx>)`. The user gets it live in the chat and can open it in the panel.
 
-To change a view, edit the file. Small edits are fine, and each save is live.
+To change a file-only view, edit the file. Small edits are fine, and each save is live.
 
 ## The file
 

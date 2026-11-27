@@ -16,6 +16,7 @@ import type { ReactNode } from "react";
 import type { UiBuildReply, UiBuildRequest } from "./ui-build-child";
 import { evaluateInScope, type UiScope } from "./ui-scope";
 import { uiCacheKey, validUiCache } from "./ui-cache";
+import { holdBuild } from "./source-stamps";
 import { bootMark } from "./boot-trace";
 import { uiBuildMode } from "./ui-mode";
 import { createUiRegistry, type SwapResult, type UiRegistry } from "./ui-registry";
@@ -195,6 +196,7 @@ export function createUiLoader(options: UiLoaderOptions) {
     const dir = path.dirname(file);
     const lines = (await Bun.file(path.join(dir, MODULES_LINES)).json()) as ModulesLines;
     const boot = loadBootBundle(file) as unknown as ModulesBootFile;
+    if (Object.keys(boot.lazy).length > 0) holdBuild(file);
     const opened = new Set<string>();
     const reg: UiRegistry = newRegistry((module) => {
       const name = boot.lazy[module];

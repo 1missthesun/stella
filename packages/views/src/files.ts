@@ -4,8 +4,8 @@ import { readFile } from "node:fs/promises";
 import { tmpdir, userInfo } from "node:os";
 import { join } from "node:path";
 
-export { VIEW_FILE_RE, isViewPath, viewDataPath, viewKey, viewSourceHash, viewTitle } from "./paths";
-import { viewKey, viewSourceHash } from "./paths";
+export { VIEW_FILE_RE, conversationViewRelPath, isViewPath, viewDataPath, viewIdentityFromPath, viewKey, viewSourceHash, viewTitle } from "./paths";
+import { conversationViewRelPath, viewKey, viewSourceHash } from "./paths";
 
 /** The uid on POSIX: Bun's `userInfo().username` follows `$USER`, which a host's child processes may not have. */
 const user = (() => {
@@ -74,4 +74,27 @@ export async function awaitViewStatus(filePath: string, source: string, waitMs: 
     await new Promise((resolve) => setTimeout(resolve, 25));
   }
   return null;
+}
+
+/** Which synced view (`<conversationId>/<slug>`) each view file on this device is, as its host learned it (kept by the desktop's views host). */
+export const viewIdentityIndexPath = (dataDir: string): string => join(dataDir, "views", "identity.json");
+export type ViewIdentityIndex = { byPath: Record<string, string>; bySource: Record<string, string> };
+
+/**
+ * Where the `view` tool saves a view: `outputs/views/<conversation>/<slug>.view.tsx`, so the same slug
+ * in two chats is two views. A view this chat made before views had a folder per chat
+ * (`outputs/views/<slug>.view.tsx`, which its host knows as this chat's) keeps its path, so its
+ * cards and saved data stay one view. With no conversation, the flat path.
+ */
+export async function viewFilePathFor(dataDir: string, conversationId: string | null | undefined, slug: string): Promise<string> {
+  const flat = join(dataDir, "outputs", "views", `${slug}.view.tsx`);
+  const id = conversationId?.trim();
+  if (!id) return flat;
+  try {
+    const index = JSON.parse(await readFile(viewIdentityIndexPath(dataDir), "utf8")) as Partial<ViewIdentityIndex>;
+    if (index.byPath?.[flat] === `${id}/${slug}`) return flat;
+  } catch {
+    // No views opened here yet.
+  }
+  return join(dataDir, ...conversationViewRelPath(id, slug).split("/"));
 }

@@ -35,3 +35,46 @@ export const viewTitle = (filePath: string): string =>
     .replace(VIEW_FILE_RE, "")
     .replace(/[-_]+/gu, " ")
     .replace(/^\w/u, (c) => c.toUpperCase());
+
+// ------------------------------------------------------------------ where a conversation's views live
+//
+// Each conversation keeps its views in a folder of its own, `outputs/views/<conversation>/<slug>.view.tsx`,
+// so the same slug in two chats is two views (two files, two storages), and a view's file names the
+// view it is: `<conversationId>/<slug>`, its synced id, comes straight from its path. Views written
+// before this (`outputs/views/<slug>.view.tsx`) keep their path and learn their id from the chat.
+
+/** The folder a conversation's views live in, under `outputs/views`: the id, with anything a file name can't hold escaped as `~XX`. */
+export const viewConversationDirName = (conversationId: string): string => {
+  let out = "";
+  for (const ch of conversationId) {
+    if (/[A-Za-z0-9_-]/u.test(ch) || (ch === "." && out.length > 0)) out += ch;
+    else {
+      const encoded = encodeURIComponent(ch);
+      out += encoded.startsWith("%") ? encoded.replace(/%/gu, "~") : `~${ch.charCodeAt(0).toString(16).toUpperCase().padStart(2, "0")}`;
+    }
+  }
+  return out;
+};
+
+/** The conversation id a folder from `viewConversationDirName` names, or null when it isn't one. */
+export const conversationIdFromViewDirName = (name: string): string | null => {
+  if (!name || !/^(?:[A-Za-z0-9_-]|~[0-9A-F]{2})(?:[A-Za-z0-9_.-]|~[0-9A-F]{2})*$/u.test(name)) return null;
+  try {
+    return decodeURIComponent(name.replace(/~/gu, "%"));
+  } catch {
+    return null;
+  }
+};
+
+/** `outputs/views/<conversation>/<slug>.view.tsx`, relative to wherever outputs are (a data dir, the Drive). */
+export const conversationViewRelPath = (conversationId: string, slug: string): string => `outputs/views/${viewConversationDirName(conversationId)}/${slug}.view.tsx`;
+
+const CONVERSATION_VIEW_RE = /(?:^|[\\/])outputs[\\/]views[\\/]([^\\/]+)[\\/]([\w.-]{1,128})\.view\.(?:tsx|ts|jsx|js)$/iu;
+
+/** The conversation and slug a view's path names (`…/outputs/views/<conversation>/<slug>.view.tsx`), or null for any other path. */
+export const viewIdentityFromPath = (filePath: string): { conversationId: string; slug: string } | null => {
+  const match = CONVERSATION_VIEW_RE.exec(filePath);
+  if (!match) return null;
+  const conversationId = conversationIdFromViewDirName(match[1]!);
+  return conversationId ? { conversationId, slug: match[2]! } : null;
+};

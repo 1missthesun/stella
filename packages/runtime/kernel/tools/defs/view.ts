@@ -4,7 +4,7 @@ import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import { BackendClient } from "@stella/contracts/backend/client";
 import { compileView, lintView } from "@stella/views/compile";
 import { iconProblems } from "@stella/views/icons";
-import { awaitViewStatus, liveViewHost, readViewStatus } from "@stella/views/files";
+import { awaitViewStatus, liveViewHost, readViewStatus, viewDataPath, viewFilePathFor } from "@stella/views/files";
 import type { ToolContext, ToolDefinition } from "../types.js";
 import { htmlCanvasSlug } from "./html-def.js";
 import { VIEW_TOOL_DESCRIPTION, VIEW_TOOL_NAME, VIEW_TOOL_PARAMETERS } from "./view-def.js";
@@ -80,11 +80,11 @@ export const createViewTool = (options: ViewToolOptions): ToolDefinition => {
       if (!source.trim()) return { error: "source is required." };
 
       const slug = htmlCanvasSlug(typeof args.slug === "string" ? args.slug.trim() : "", title);
-      const dir = path.join(stellaDataDir, "outputs", "views");
-      const filePath = path.join(dir, `${slug}.view.tsx`);
-      await fs.mkdir(dir, { recursive: true });
+      // Each chat keeps its views in a folder of its own, so the same slug in two chats is two views.
+      const filePath = await viewFilePathFor(stellaDataDir, context.conversationId, slug);
+      await fs.mkdir(path.dirname(filePath), { recursive: true });
       if (args.data !== undefined) {
-        const dataPath = path.join(dir, `${slug}.data.json`);
+        const dataPath = viewDataPath(filePath);
         await fs.writeFile(`${dataPath}.tmp`, JSON.stringify(args.data, null, 2), "utf8");
         await fs.rename(`${dataPath}.tmp`, dataPath);
       }

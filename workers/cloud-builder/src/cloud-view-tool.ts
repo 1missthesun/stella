@@ -6,6 +6,7 @@
 import type { TSchema } from "@sinclair/typebox";
 import { compileView, lintView } from "@stella/views/compile";
 import { iconProblems } from "@stella/views/icons";
+import { conversationViewRelPath, viewDataPath, viewFileName } from "@stella/views/paths";
 import { htmlCanvasSlug } from "@stella/runtime/kernel/tools/defs/html-def.js";
 import {
   VIEW_TOOL_DESCRIPTION,
@@ -25,6 +26,8 @@ const MAX_DATA_BYTES = 1024 * 1024;
 
 export type CloudViewToolContext = Readonly<{
   turnId: string;
+  /** Each chat keeps its views in a folder of its own, so the same slug in two chats is two views. */
+  conversationId: string;
   ownerInternal: OwnerInternalCall;
 }>;
 
@@ -42,7 +45,8 @@ const encodeBase64 = (bytes: Uint8Array): string => {
   return btoa(binary);
 };
 
-export const cloudViewDrivePath = (slug: string): string => `${CLOUD_VIEW_DRIVE_DIR}/${slug}.view.tsx`;
+export const cloudViewDrivePath = (conversationId: string, slug: string): string =>
+  conversationId.trim() ? conversationViewRelPath(conversationId.trim(), slug) : `${CLOUD_VIEW_DRIVE_DIR}/${slug}.view.tsx`;
 
 /** Compile, lint and icon problems in a view's source, as the model should read them. */
 export const viewSourceProblems = (source: string, fileName: string): string[] => {
@@ -80,7 +84,8 @@ export const createCloudViewTool = (context: CloudViewToolContext): CloudCodeSou
       return failure(`The data is ${dataBytes.byteLength} bytes; keep it under ${MAX_DATA_BYTES}.`);
     }
 
-    const filePath = cloudViewDrivePath(slug);
+    const filePath = cloudViewDrivePath(context.conversationId, slug);
+    const dataPath = viewDataPath(filePath);
     const problems = viewSourceProblems(source, `${slug}.view.tsx`);
 
     // The Drive copy lets the user keep, download or move it; the devices run it from the conversation.
@@ -95,8 +100,8 @@ export const createCloudViewTool = (context: CloudViewToolContext): CloudCodeSou
       ...(dataBytes
         ? [
             {
-              path: `${CLOUD_VIEW_DRIVE_DIR}/${slug}.data.json`,
-              name: `${slug}.data.json`,
+              path: dataPath,
+              name: viewFileName(dataPath),
               sizeBytes: dataBytes.byteLength,
               contentType: DATA_CONTENT_TYPE,
               contentBase64: encodeBase64(dataBytes),

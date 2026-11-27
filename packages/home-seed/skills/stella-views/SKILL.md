@@ -66,7 +66,7 @@ export default function App() {
   - `saveFile(name, text)` and `pickFile()`.
   - `send(text)` posts to the chat as the user.
 
-State survives a swap by each hook's name and initial value. Renaming a `useState` variable, or changing its initial value, starts that one fresh; everything else carries over. `useStorage` values belong to the file's path, so moving or renaming the file starts them over.
+State survives a swap by each hook's name and initial value. Renaming a `useState` variable, or changing its initial value, starts that one fresh; everything else carries over. `useStorage` values belong to the view: one the `view` tool made keeps them per chat and slug (each chat has its own folder of views), so calling it again with the same slug keeps them; a file-only view keeps them by its path, so renaming it starts them over.
 
 ## Design
 

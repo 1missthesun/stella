@@ -243,6 +243,7 @@ export abstract class OrchestratorTools extends OrchestratorPi {
       // The user's phone, the web chat and the desktop run views from this call's arguments.
       createCloudViewTool({
         turnId: turn.turnId,
+        conversationId: turn.conversationId,
         ownerInternal: toolContext.ownerInternal,
       }),
       createCloudMapTool({

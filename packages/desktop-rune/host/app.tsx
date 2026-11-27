@@ -34,6 +34,7 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
     tsconfig: join(ROOT, "tsconfig.build.json"),
     external: ["react", "react/jsx-runtime", "react/jsx-dev-runtime"],
     bootCache: process.env.STELLA_RUNE_UI_CACHE !== "0",
+    modules: "swap",
   });
   ui.warm();
 
@@ -169,7 +170,10 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
       app = next;
       const { kind, swap } = ui.lastLoad();
       const how = swap && kind !== "fresh" ? `${kind}, ${swap.evaluated} module${swap.evaluated === 1 ? "" : "s"}${swap.reason ? `: ${swap.reason}` : ""}` : kind;
-      if (kind === "refresh" && swap?.evaluated === 0) return true;
+      if (kind === "refresh" && swap?.evaluated === 0) {
+        console.error(`[ui] hot swap #${swapN} ${label}: no module changed (bundle+load ${(t_built - t0).toFixed(1)} ms)`);
+        return true;
+      }
       if (kind === "refresh") {
         // The tree stays mounted and only re-renders: nothing to load, so nothing to hold.
         store.set((s) => ({ error: null, swaps: s.swaps + 1 }));

@@ -43,6 +43,9 @@ pub struct WinSlot {
     pub baked: Option<String>,
 }
 
+/// A window's (min, max) inner size, logical points; `None` = no limit on that side.
+pub type SizeLimits = (Option<[f32; 2]>, Option<[f32; 2]>);
+
 #[derive(Default, PartialEq, Clone)]
 pub struct Applied {
     pub title: Option<String>,
@@ -55,7 +58,7 @@ pub struct Applied {
     pub click_through: Option<bool>,
     pub content_protection: Option<bool>,
     pub font_smoothing: Option<Option<String>>,
-    pub size_limits: Option<(Option<[f32; 2]>, Option<[f32; 2]>)>,
+    pub size_limits: Option<SizeLimits>,
 }
 
 pub struct Engine {

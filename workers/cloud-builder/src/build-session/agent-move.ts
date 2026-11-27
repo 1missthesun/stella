@@ -27,7 +27,7 @@ export const agentDevicesSection = async (env: Pick<Cloudflare.Env, "OWNER_GATES
     ...listed.devices.map(
       (device) => `- ${device.label?.trim() || device.deviceId} [device_id: ${device.deviceId}]: ${device.online ? "online" : "offline"}`,
     ),
-    "To move yourself to one of these computers, pass its device_id to switch_destination.",
+    "To move yourself to one of these computers, pass its device_id to switch_to.",
   ].join("\n");
 };
 

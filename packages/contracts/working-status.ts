@@ -396,6 +396,7 @@ const TOOL_STATUS_BY_NAME: Record<string, readonly string[]> = {
   todo_write: ["Planning it out", "Making a plan", "Lining up the steps"],
   agent: AGENT_WORK_VARIATIONS,
   no_response: ["Wrapping up", "Finishing up", "Almost done"],
+  switch_to: ["Switching over", "Picking it up elsewhere", "Changing gears"],
   switch_destination: [
     "Moving over",
     "Switching places",
@@ -665,6 +666,7 @@ const STILL_STATUS_BY_NAME: Record<string, string> = {
   memory: "Still checking my notes",
   drive_upload: "Still uploading",
   drive_download: "Still downloading",
+  switch_to: "Still switching over",
   switch_destination: "Still moving over",
 };
 

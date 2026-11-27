@@ -184,4 +184,4 @@ export const parsePiBrainHost = (value: unknown): PiBrainHost | undefined => {
 };
 
 export const piBrainHandoffPrompt = (from: string, brief: string): string =>
-  `[You moved this chat here from ${from} with switch_destination, and you run here now: do not move again for this brief. This is your brief, not a new message from the user.]\n\n${brief}`;
+  `[You moved this chat here from ${from} with switch_to, and you run here now: do not move again for this brief. This is your brief, not a new message from the user.]\n\n${brief}`;

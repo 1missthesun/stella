@@ -239,7 +239,7 @@ export const latestDestinationSwitch = (
   for (const record of records) {
     if (record.kind !== "message" || record.role !== "assistant") continue;
     for (const call of toolCalls(record)) {
-      if (call.name !== "switch_destination") continue;
+      if (call.name !== "switch_to" && call.name !== "switch_destination") continue;
       const at = results.get(call.id);
       const destination = call.args?.destination?.trim();
       if (at === undefined || !destination) continue;
@@ -804,11 +804,11 @@ const SWITCH_RECORDS: JournalView = {
   test: (record) => {
     if (record.kind !== "message") return false;
     if (record.role === "assistant") {
-      return toolCalls(record).some((call) => call.name === "switch_destination");
+      return toolCalls(record).some((call) => call.name === "switch_to" || call.name === "switch_destination");
     }
     if (record.role !== "toolResult") return false;
     const toolName = record.payload.toolName;
-    return typeof toolName !== "string" || toolName.includes("switch_destination");
+    return typeof toolName !== "string" || toolName.includes("switch_to") || toolName.includes("switch_destination");
   },
 };
 

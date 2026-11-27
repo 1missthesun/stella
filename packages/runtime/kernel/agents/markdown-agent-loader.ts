@@ -10,6 +10,7 @@ import {
 
 const LEGACY_TOOL_NAME_ALIASES: Readonly<Record<string, string>> = {
   [LEGACY_EXEC_COMMAND_TOOL_NAME]: EXEC_COMMAND_TOOL_NAME,
+  switch_destination: "switch_to",
 };
 
 const normalizeLegacyToolNames = (

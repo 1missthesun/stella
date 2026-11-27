@@ -51,7 +51,7 @@ const CALL_LIMITS_MS: Readonly<Record<string, number>> = {
   image_gen: 15 * 60_000,
 };
 
-const AGENT_CALLS = ["spawn_agent", "send_message", "stop_agent", "agent_status", "switch_destination"] as const;
+const AGENT_CALLS = ["spawn_agent", "send_message", "stop_agent", "agent_status", "switch_to", "switch_destination"] as const;
 
 const lateCallText = (name: string, ms: number): string =>
   `${name} had not finished after ${Math.round(ms / 60_000)} minutes, so Stella stopped waiting for it. It may still go through by itself: check before trying again, and say so plainly if it matters to the user.`;

@@ -40,6 +40,7 @@ export const STELLA_HARNESS_TOOL_NAMES: ReadonlySet<string> = new Set([
   "multi_tool_use_parallel",
   "NoResponse",
   "node_repl",
+  "switch_to",
   "switch_destination",
 ]);
 

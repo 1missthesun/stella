@@ -539,6 +539,15 @@ fn source_shape(rt: &rune::Runtime<Win>, eng: &crate::engine::Engine, key: &str)
     Some((Shape::rounded(x, y, w, h, r), lens))
 }
 
+/// The glass group of the element keyed `key`, if its glass is in one.
+fn source_group(eng: &crate::engine::Engine, key: &str) -> Option<String> {
+    let p = eng.tree.find_key(key).and_then(|n| eng.tree.get(n)).map(|n| &*n.props)?;
+    p.fx.as_ref()?.0.iter().find_map(|s| match &s.effect {
+        Effect::Glass { group, .. } => group.clone(),
+        Effect::Fill(_) => None,
+    })
+}
+
 fn mix_shape(a: Shape, b: Shape, t: f32) -> Shape {
     let m = |x: f32, y: f32| x + (y - x) * t;
     let (ra, rb) = (a.rect, b.rect);
@@ -678,7 +687,11 @@ impl Compositor<Win> for Comp {
                                                 m.from = from;
                                             }
                                             let at = if settled { m.target } else { m.at(now).0 };
-                                            alpha = morph_alpha(at);
+                                            // Out of a member of its own glass group it comes out of that glass (the
+                                            // union pinches it off), so there's nothing to fade.
+                                            if group.is_none() || source_group(eng, &m.key) != *group {
+                                                alpha = morph_alpha(at);
+                                            }
                                             moving |= !settled;
                                             shape = mix_shape(m.from, shape, at);
                                             lens = mix_lens(&m.from_lens.unwrap_or(lens), &lens, at.clamp(0.0, 1.0));

@@ -145,6 +145,12 @@ dumps. An element with an `id` is memoized: it rebuilds only when it or somethin
   element or an ancestor, a change lands at once, as in CSS.
 - `enter` / `exit`: a preset (`fade rise drop blur scale pop slide`) or `{opacity, scale, x, y,
   blur, dur, bounce}`.
+- `matched: "id"` (SwiftUI `matchedGeometryEffect`): an element that mounts in the same commit
+  another with that id leaves starts where the old one was drawn, with its velocity, radius, fill
+  and opacity, and springs on its `motion` to its own place; neither plays `enter`/`exit`.
+  `matchedInPlace` keeps it in its destination's paint order and clips while it moves, so a
+  selection pill rendered only inside the selected tab slides under the labels to the next one,
+  across a scrolling strip too. Reduce Motion lands it at once.
 - `loop`: `opacity`, `rotation`, `slide`, or `sequence {period, delay, ease, frames:[{at, x, y, scale,
   opacity, rotate}]}`. `at` ≤ 1 is a fraction of the period. `scaleX` / `scaleY` are averaged,
   since Rune scales uniformly. `ease` (`linear ease easeIn easeOut easeInOut`, default `easeInOut`)

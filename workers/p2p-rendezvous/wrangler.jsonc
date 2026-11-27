@@ -1,0 +1,38 @@
+{
+  "$schema": "../../node_modules/wrangler/config-schema.json",
+  // The mailbox behind short pairing codes (packages/desktop-rune/p2p/src/short.rs): a slot holds
+  // a few opaque key-exchange blobs for five minutes, then is gone. No accounts, nothing kept.
+  "name": "stella-p2p-rendezvous-dev",
+  "main": "src/index.ts",
+  "compatibility_date": "2026-08-30",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    "logs": { "enabled": true, "invocation_logs": false, "head_sampling_rate": 0.1 }
+  },
+  "durable_objects": {
+    "bindings": [{ "name": "SLOTS", "class_name": "Slot" }]
+  },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Slot"] }],
+  "ratelimits": [
+    // Rate-limit namespaces are shared by every worker in the Cloudflare account.
+    { "name": "OPEN_LIMITER", "namespace_id": "41101", "simple": { "limit": 20, "period": 60 } },
+    { "name": "CLAIM_LIMITER", "namespace_id": "41102", "simple": { "limit": 30, "period": 60 } }
+  ],
+  "env": {
+    "production": {
+      "name": "stella-p2p-rendezvous",
+      "workers_dev": true,
+      "preview_urls": false,
+      "routes": [{ "pattern": "p2p.stella.sh", "custom_domain": true }],
+      "durable_objects": {
+        "bindings": [{ "name": "SLOTS", "class_name": "Slot" }]
+      },
+      "ratelimits": [
+        { "name": "OPEN_LIMITER", "namespace_id": "41103", "simple": { "limit": 20, "period": 60 } },
+        { "name": "CLAIM_LIMITER", "namespace_id": "41104", "simple": { "limit": 30, "period": 60 } }
+      ]
+    }
+  }
+}

@@ -26,7 +26,7 @@ export function useViewHistory(filePath: string): { versions: readonly ViewVersi
   useEffect(() => {
     setState(read());
     return views?.onHistory?.((changed) => {
-      if (changed === filePath) setState(read());
+      if (changed === filePath || changed === "*") setState(read());
     });
   }, [views, filePath, read]);
   return state;

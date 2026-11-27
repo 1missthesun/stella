@@ -93,7 +93,13 @@ export const webViews = {
   history: (filePath: string): readonly ViewVersion[] => host?.history(filePath) ?? [],
   previewing: (filePath: string): ViewVersion | null => host?.previewing(filePath) ?? null,
   setPreview: (filePath: string, versionId: string | null) => host?.setPreview(filePath, versionId),
-  onHistory: (listener: (filePath: string) => void): (() => void) => whenLoaded((h) => h.onHistory(listener)),
+  /** Calls `listener` with each file whose history or preview changed, and with "*" once the host loads (any view's may have). */
+  onHistory: (listener: (filePath: string) => void): (() => void) =>
+    whenLoaded((h) => {
+      const off = h.onHistory(listener);
+      listener("*");
+      return off;
+    }),
   subscribePreview: (filePath: string, versionId: string, theme: ViewTheme, listener: (snapshot: ViewSnapshot) => void): (() => void) =>
     whenLoaded((h) => h.subscribePreview(filePath, versionId, theme, listener)),
   restore: async (filePath: string, versionId: string) => (await load()).restore(filePath, versionId),

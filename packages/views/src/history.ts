@@ -27,7 +27,19 @@ export const viewVersionId = (createdAt: number, source: string): string => `${M
 
 const slugOf = (filePath: string) => (filePath.split(/[\\/]/u).pop() ?? filePath).replace(/\.view\.(tsx|ts|jsx|js)$/iu, "");
 
-/** Every version of every view among `events` (one message's, in order). */
+const asRecord = (v: unknown): Record<string, unknown> | null => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
+
+/**
+ * Whether a `view` result reports problems (it was saved but doesn't compile, lint or render):
+ * a broken draft the agent fixes next, so not a version anyone would go back to.
+ */
+export function viewResultHasProblems(payload: unknown): boolean {
+  const p = asRecord(payload);
+  const details = asRecord(p?.details) ?? asRecord(p?.result) ?? p;
+  return Array.isArray(details?.problems) && details.problems.length > 0;
+}
+
+/** Every version of every view among `events` (one message's, in order), leaving out broken drafts. */
 export function viewVersionsOf(events: readonly ViewToolEvent[]): ViewVersion[] {
   const calls = new Map<string, Record<string, unknown>>();
   const out: ViewVersion[] = [];
@@ -38,7 +50,7 @@ export function viewVersionsOf(events: readonly ViewToolEvent[]): ViewVersion[] 
       continue;
     }
     const view = viewFromToolEvent(event, event.requestId ? calls.get(event.requestId) : null);
-    if (!view) continue;
+    if (!view || viewResultHasProblems(event.payload)) continue;
     out.push({
       id: viewVersionId(view.createdAt, view.source),
       filePath: view.filePath,

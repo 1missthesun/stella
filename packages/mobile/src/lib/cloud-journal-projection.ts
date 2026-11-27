@@ -1,5 +1,6 @@
 import { VIEW_TOOL, viewFromToolEvent } from "@stella/views/conversation";
 import { VIEW_FILE_RE, viewFileName, viewTitle } from "@stella/views/paths";
+import { viewResultHasProblems } from "@stella/views/history";
 import { parseViewCard, VIEW_RESTORE_AUTHOR, type ViewCard } from "@stella/contracts/view-card";
 import { reminderMarkOf } from "@stella/contracts/reminders";
 import { WELCOME_CARD_TYPE, WELCOME_TEXT, welcomeMarkOf } from "@stella/contracts/welcome-message";
@@ -120,11 +121,12 @@ const cardAuthor = (card: ViewCard): NonNullable<ChatViewRef["by"]> =>
     ? { kind: "restore", from: card.restoredFrom }
     : { kind: "task", agentId: card.agentId, ...(card.agentTitle ? { title: card.agentTitle } : {}) };
 
-/** `views` (the last version per file) and, when some file has more than one, every version. */
-const withVersions = (all: ChatViewRef[], byFile: ReadonlyMap<string, ChatViewRef>): Pick<ChatMessage, "views" | "viewVersions"> => ({
-  ...(byFile.size ? { views: [...byFile.values()] } : {}),
-  ...(all.length > byFile.size ? { viewVersions: all } : {}),
-});
+/** `views` (the last version per file) and, when the history differs from it, every version worth going back to. */
+const withVersions = (all: ChatViewRef[], byFile: ReadonlyMap<string, ChatViewRef>): Pick<ChatMessage, "views" | "viewVersions"> => {
+  const views = [...byFile.values()];
+  const same = all.length === views.length && all.every((ref, i) => ref === views[i]);
+  return { ...(views.length ? { views } : {}), ...(same ? {} : { viewVersions: all }) };
+};
 
 /** The Stella Views an assistant message's `view` calls made: the last version per file, and every version. */
 const viewRefs = (
@@ -157,7 +159,7 @@ const viewRefs = (
       toolCallId: block.id,
       by: view.by ?? { kind: "stella" },
     };
-    all.push(ref);
+    if (!viewResultHasProblems(result.payload)) all.push(ref);
     byFile.delete(view.filePath);
     byFile.set(view.filePath, ref);
   }

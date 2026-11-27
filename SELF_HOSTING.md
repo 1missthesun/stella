@@ -124,7 +124,7 @@ you don't use (no website, no mobile app) can be skipped.
 | | desktop | `VITE_CANVAS_SHARE_BASE_URL` in `packages/desktop-ui/.env` | `https://stellashare.app` | your canvas-share URL |
 | | mobile | `EXPO_PUBLIC_CANVAS_SHARE_BASE_URL` | `https://stellashare.app` | your canvas-share URL |
 | | canvas-share, cloud-builder | canvas-share `vars.OWNER_SITE_URL`; cloud-builder `vars.CANVAS_OWNER_SITE_URL` (dev points at the dev website) | `https://stella.sh` | your website origin: a private canvas's "private" page sends its owner to `<site>/canvas/open` to sign in |
-| **Releases bucket** (public R2) | launchers | `STELLA_RELEASES_URL` at build (1.8). The launcher also hands it to the app, so native helpers and the Stella browser download from it | `https://pub-a319aaada8144dc9be5a83625033769c.r2.dev` | your releases bucket's public base |
+| **Releases bucket** (public R2) | launchers | `STELLA_RELEASES_URL` at build (1.8). The launcher also hands it to the app, so native helpers and the Stella browser download from it | `https://dl.stella.sh` | your releases bucket's public base |
 | | release workflows | repository variable `STELLA_RELEASES_URL` | 〃 | 〃 |
 | | website | `NEXT_PUBLIC_STELLA_RELEASES_URL` | 〃 | 〃 |
 | | source runs | `STELLA_RELEASES_URL` for `bun run native:download` / `stella-browser:download` (or one manifest with `STELLA_NATIVE_HELPERS_MANIFEST_URL` / `STELLA_BROWSER_MANIFEST_URL`) | 〃 | 〃 |
@@ -511,7 +511,7 @@ repository secrets; unset, they keep Stella's values. Signing needs your own
 Apple Developer ID, Windows code-signing certificate and Linux update key. The git runtime
 objects are content-addressed and pinned by sha256 in
 `launcher/macos/Sources/StellaLauncher/Support.swift`; copy the two objects from
-`https://pub-a319aaada8144dc9be5a83625033769c.r2.dev/git-runtime/objects/` into
+`https://dl.stella.sh/git-runtime/objects/` into
 your bucket. Run `build-native-helpers.yml` and `build-stella-browser.yml` once
 to fill `native-helpers/` and `stella-browser/`.
 

@@ -22,7 +22,7 @@ depends=('webkit2gtk-4.1' 'gtk3' 'glib2' 'cairo' 'openssl' 'glibc'
 optdepends=('xdg-utils: open links in your browser')
 install=stella-desktop-bin.install
 options=('!strip' '!debug')
-_base="https://pub-a319aaada8144dc9be5a83625033769c.r2.dev/launcher/releases/${pkgver}"
+_base="https://dl.stella.sh/launcher/releases/${pkgver}"
 _raw="https://raw.githubusercontent.com/1missthesun/stella/${_commit}"
 source=("stella-desktop-icon-${_commit:0:12}.png::${_raw}/packages/desktop/build/icon.png"
         "LICENSE-${_commit:0:12}::${_raw}/LICENSE"

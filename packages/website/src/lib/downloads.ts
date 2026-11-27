@@ -1,7 +1,7 @@
 import { PUBLIC_SITE } from "./site-url";
 
 const RELEASES_URL = (
-  process.env.NEXT_PUBLIC_STELLA_RELEASES_URL?.trim() || "https://pub-a319aaada8144dc9be5a83625033769c.r2.dev"
+  process.env.NEXT_PUBLIC_STELLA_RELEASES_URL?.trim() || "https://dl.stella.sh"
 ).replace(/\/+$/, "");
 
 export const LAUNCHER_STABLE_BASE = `${RELEASES_URL}/launcher/stable`;

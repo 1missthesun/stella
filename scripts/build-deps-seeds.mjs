@@ -27,7 +27,7 @@ const repoRoot = path.resolve(import.meta.dirname, "..");
 const BUCKET = "stella-files";
 const RELEASES_URL =
   process.env.STELLA_RELEASES_URL ||
-  "https://pub-a319aaada8144dc9be5a83625033769c.r2.dev";
+  "https://dl.stella.sh";
 export const ALL_PLATFORMS = [
   "darwin-arm64",
   "darwin-x64",

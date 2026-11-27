@@ -688,11 +688,23 @@ after the app-source publish; stella.sh after the website deploy.
    `publish-app-source.mjs` (without `--out`) checks every `launcher.json` Bun
    asset on the mirror and mirrors the missing ones; both only warn on failure.
    `launcher.log` names the host each download came from and how long it took
-   (`install: bun-….zip from pub-….r2.dev (40 MB, sha256 checked) in 1.9s`).
+   (`install: bun-….zip from dl.stella.sh (40 MB, sha256 checked) in 1.9s`).
    `STELLA_LAUNCHER_MIRROR_URL=<base>` points a launcher at another mirror (a
-   test server serving `runtimes/github/…`), `off` turns it off. r2.dev is
-   rate-limited and not edge-cached; a Cloudflare custom domain on the bucket
-   would cache it at the edge.
+   test server serving `runtimes/github/…`), `off` turns it off.
+   **Releases domain:** `https://dl.stella.sh` is a Cloudflare custom domain on
+   the `stella-files` bucket (zone `stella.sh`, min TLS 1.2; check it with
+   `env -u CLOUDFLARE_API_TOKEN wrangler r2 bucket domain list stella-files`).
+   It is every default releases URL (launchers, workflows, scripts, website).
+   Keep the bucket's `pub-a319aaada8144dc9be5a83625033769c.r2.dev` access on:
+   launchers built before 2026-11-27 and their installs still read it.
+   Two zone Cache Rules on `dl.stella.sh` make Cloudflare and browsers follow
+   each upload's `Cache-Control` (the zone's 4-hour browser TTL otherwise
+   overrides `no-cache`) and edge-cache the versioned prefixes (`runtimes/`,
+   `git-runtime/objects/`, `launcher/releases/`, `electron-identity/`,
+   `deps-seed/`) whatever their extension. So versioned uploads must be
+   `public, max-age=31536000, immutable` and moving ones `no-cache`
+   (`launcher/stable/*`, `*/current.json`) or a short max-age
+   (`deps-seed/<lock>/deps-seed.json`, 300 s), which the edge then keeps.
 3. **Electron version bump**: the push of `package.json` runs
    `build-electron-identity.yml`, which publishes the Developer ID-signed
    `Stella.app` for that Electron version. Let it finish before publishing app
@@ -708,7 +720,7 @@ after the app-source publish; stella.sh after the website deploy.
    (the dev channel's build) or `-f source_sha=<full sha>`. A dev machine can
    take the dev channel with `STELLA_BROWSER_MANIFEST_URL=…/stella-browser/dev/current.json`
    for `packages/desktop/scripts/download-stella-browser.mjs`. What is live now:
-   `curl -s https://pub-a319aaada8144dc9be5a83625033769c.r2.dev/native-helpers/current.json`
+   `curl -s https://dl.stella.sh/native-helpers/current.json`
    (`stella-browser/current.json` and `stella-browser/dev/current.json` likewise). Installs fetch them in the
    launcher's prepare step (`packages/desktop/scripts/prepare-install.mjs`),
    which runs on install, relaunch and rollback.

@@ -47,7 +47,7 @@ extern char **environ;
 #define DEFAULT_BACKEND_URL "https://stella-v2-cloud-builder-prod.fromyou.workers.dev"
 #endif
 #ifndef RELEASES_URL
-#define RELEASES_URL "https://pub-a319aaada8144dc9be5a83625033769c.r2.dev"
+#define RELEASES_URL "https://dl.stella.sh"
 #endif
 #ifndef UPDATE_PUBLIC_KEY
 #define UPDATE_PUBLIC_KEY ""

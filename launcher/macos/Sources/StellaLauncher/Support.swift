@@ -83,7 +83,7 @@ enum Deployment {
     }
 
     static let backendURL = value("StellaBackendURL", "https://stella-v2-cloud-builder-prod.fromyou.workers.dev")
-    static let releasesURL = value("StellaReleasesURL", "https://pub-a319aaada8144dc9be5a83625033769c.r2.dev")
+    static let releasesURL = value("StellaReleasesURL", "https://dl.stella.sh")
     static let appleTeamID = value("StellaAppleTeamID", "7UVYHQ763X")
 }
 

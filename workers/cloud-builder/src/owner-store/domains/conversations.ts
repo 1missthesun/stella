@@ -17,6 +17,7 @@ import type {
   ConversationIndexEvent,
   TurnStartedEvent,
 } from "@stella/contracts/turn-plane/owner-events";
+import { welcomeCard } from "@stella/contracts/welcome-message";
 import { empty, object, optional, string } from "../args.js";
 import {
   CONVERSATION_PURGE_JOB,
@@ -24,7 +25,7 @@ import {
   purgeConversationData,
   scheduleConversationPurge,
 } from "../purge.js";
-import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
+import type { JobDef, OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
 import {
   isSlackConversationId,
   NOT_SLACK_CONVERSATION_SQL,
@@ -242,6 +243,22 @@ const newestConversationId = (db: OwnerDbReader): string | null =>
 export const readMainConversationId = (db: OwnerDbReader): string | null =>
   pinnedMainConversationId(db) ?? newestConversationId(db);
 
+const CONVERSATION_WELCOME_JOB = "conversations.welcome";
+const WELCOME_SOURCE_TURN_ID = "welcome";
+const WELCOME_RETRY_AFTER_MS = 5_000;
+const WELCOME_INLINE_WAIT_MS = 8_000;
+/** Only an account made in the last two weeks counts as new; older ones never get the welcome. */
+const WELCOME_NEW_OWNER_MS = 14 * 24 * 60 * 60_000;
+
+const welcomeJobId = (conversationId: string): string => `welcome:${conversationId}`;
+
+const isNewOwner = (ctx: Pick<OwnerContext, "db" | "now">): boolean => {
+  const first = ctx.db.one<{ at: number | null }>(
+    "SELECT MIN(applied_at) AS at FROM _owner_migrations",
+  );
+  return typeof first?.at === "number" && ctx.now - first.at < WELCOME_NEW_OWNER_MS;
+};
+
 const resolveMainConversation = (
   ctx: OwnerContext,
   preferConversationId: string | undefined,
@@ -255,6 +272,7 @@ const resolveMainConversation = (
       ? preferConversationId
       : newestConversationId(ctx.db);
   if (!conversationId) {
+    const firstEver = !ctx.db.one("SELECT 1 AS found FROM conversations LIMIT 1");
     conversationId = crypto.randomUUID();
     ctx.db.run(
       `INSERT INTO conversations
@@ -264,6 +282,14 @@ const resolveMainConversation = (
       ctx.now,
       ctx.now,
     );
+    if (firstEver && isNewOwner(ctx)) {
+      ctx.jobs.schedule(
+        CONVERSATION_WELCOME_JOB,
+        ctx.now + WELCOME_RETRY_AFTER_MS,
+        { conversationId },
+        { id: welcomeJobId(conversationId) },
+      );
+    }
   }
   ctx.db.run(
     `INSERT INTO conversation_main (id, conversation_id, pinned_at) VALUES (1, ?, ?)
@@ -273,6 +299,44 @@ const resolveMainConversation = (
     ctx.now,
   );
   return conversationId;
+};
+
+const postWelcome = async (ctx: OwnerContext, conversationId: string): Promise<boolean> => {
+  if (!isLiveConversation(ctx.db, conversationId)) return true;
+  const snapshot = await ctx.host.snapshot();
+  if (!snapshot.writable) return true;
+  return await ctx.host.postConversationCard({
+    conversationId,
+    ownerGeneration: snapshot.ownerGeneration,
+    sourceTurnId: WELCOME_SOURCE_TURN_ID,
+    card: welcomeCard(),
+    onlyFirst: true,
+  });
+};
+
+const welcomePayload = object({ conversationId: string({ max: 64 }) });
+
+const conversationWelcomeJob: JobDef = {
+  maxAttempts: 8,
+  run: async (ctx, payload) => {
+    const { conversationId } = welcomePayload(payload);
+    if (!(await postWelcome(ctx, conversationId))) {
+      throw new Error("The welcome message could not be posted yet.");
+    }
+  },
+};
+
+const settleWelcome = async (ctx: OwnerContext, conversationId: string): Promise<void> => {
+  const jobId = welcomeJobId(conversationId);
+  if (!ctx.db.one("SELECT 1 AS queued FROM owner_jobs WHERE id = ?", jobId)) return;
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const posted = await Promise.race([
+    postWelcome(ctx, conversationId),
+    new Promise<false>((resolve) => {
+      timer = setTimeout(() => resolve(false), WELCOME_INLINE_WAIT_MS);
+    }),
+  ]).finally(() => clearTimeout(timer));
+  if (posted) ctx.jobs.cancel(jobId);
 };
 
 export type ConversationEvent =
@@ -403,7 +467,10 @@ export const conversationsDomain = {
     CONVERSATIONS_MAIN_MIGRATION,
   ],
   purge: purgeConversationData,
-  jobs: { [CONVERSATION_PURGE_JOB]: conversationPurgeJob },
+  jobs: {
+    [CONVERSATION_PURGE_JOB]: conversationPurgeJob,
+    [CONVERSATION_WELCOME_JOB]: conversationWelcomeJob,
+  },
   calls: {
   "owner.identity": {
     scope: "owner",
@@ -426,10 +493,9 @@ export const conversationsDomain = {
       args: ConversationCalls["conversations.bootstrap"]["args"],
     ) => {
       const identity = await ownerIdentity(ctx);
-      return {
-        ...identity,
-        conversationId: resolveMainConversation(ctx, args.preferConversationId),
-      };
+      const conversationId = resolveMainConversation(ctx, args.preferConversationId);
+      await settleWelcome(ctx, conversationId);
+      return { ...identity, conversationId };
     },
   },
   },

@@ -65,6 +65,10 @@ enum DebugDriver {
       }
     case "/type":
       (firstResponder(in: app) as? UIKeyInput)?.insertText(q["text"] ?? "")
+    case "/paste":
+      // UIKit's own paste (the edit menu's Paste), of `text` put on the pasteboard first.
+      UIPasteboard.general.string = q["text"] ?? ""
+      firstResponder(in: app)?.paste(nil)
     case "/key":
       guard let input = firstResponder(in: app) as? UIKeyInput else { break }
       switch q["name"] {

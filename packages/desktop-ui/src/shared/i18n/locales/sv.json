@@ -1031,6 +1031,10 @@
     "signOut": {
       "body": "Din chatt finns kvar i ditt konto. Stella döljer den på den här datorn tills du loggar in igen.",
       "failed": "Det gick inte att logga ut. Försök igen.",
+      "phoneBody": "Din chatt finns kvar i ditt konto. Stella döljer den på den här telefonen tills du loggar in igen.",
+      "phoneRemove": "Ta även bort chatten från den här telefonen",
+      "phoneRemoveNote": "För en delad eller lånad telefon. Den laddas ned igen när du loggar in.",
+      "phoneTitle": "Logga ut från den här telefonen?",
       "remove": "Ta även bort chatten från den här datorn",
       "removeNote": "För en delad eller lånad dator. Den laddas ned igen när du loggar in.",
       "title": "Logga ut från den här datorn?"

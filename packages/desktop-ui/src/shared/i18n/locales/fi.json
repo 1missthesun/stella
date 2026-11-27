@@ -1031,6 +1031,10 @@
     "signOut": {
       "body": "Keskustelusi pysyy tililläsi. Stella piilottaa sen tällä tietokoneella, kunnes kirjaudut takaisin.",
       "failed": "Uloskirjautuminen epäonnistui. Yritä uudelleen.",
+      "phoneBody": "Keskustelusi pysyy tililläsi. Stella piilottaa sen tällä puhelimella, kunnes kirjaudut takaisin.",
+      "phoneRemove": "Poista keskustelu myös tältä puhelimelta",
+      "phoneRemoveNote": "Jaetulle tai lainatulle puhelimelle. Se ladataan uudelleen, kun kirjaudut sisään.",
+      "phoneTitle": "Kirjaudutaanko ulos tältä puhelimelta?",
       "remove": "Poista keskustelu myös tältä tietokoneelta",
       "removeNote": "Jaetulle tai lainatulle tietokoneelle. Se ladataan uudelleen, kun kirjaudut sisään.",
       "title": "Kirjaudutaanko ulos tältä tietokoneelta?"

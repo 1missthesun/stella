@@ -1031,6 +1031,10 @@
     "signOut": {
       "body": "Sohbetin hesabında kalır. Stella, tekrar oturum açana kadar onu bu bilgisayarda gizler.",
       "failed": "Oturum kapatılamadı. Tekrar dene.",
+      "phoneBody": "Sohbetin hesabında kalır. Stella, tekrar oturum açana kadar onu bu telefonda gizler.",
+      "phoneRemove": "Sohbeti bu telefondan da kaldır",
+      "phoneRemoveNote": "Ortak veya ödünç alınmış bir telefon için. Tekrar oturum açınca yeniden indirilir.",
+      "phoneTitle": "Bu telefonda oturum kapatılsın mı?",
       "remove": "Sohbeti bu bilgisayardan da kaldır",
       "removeNote": "Ortak veya ödünç alınmış bir bilgisayar için. Tekrar oturum açınca yeniden indirilir.",
       "title": "Bu bilgisayarda oturum kapatılsın mı?"

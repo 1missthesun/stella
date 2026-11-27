@@ -1041,6 +1041,10 @@
     "signOut": {
       "body": "La tua chat resta nel tuo account. Stella la nasconde su questo computer finché non accedi di nuovo.",
       "failed": "Impossibile uscire. Riprova.",
+      "phoneBody": "La tua chat resta nel tuo account. Stella la nasconde su questo telefono finché non accedi di nuovo.",
+      "phoneRemove": "Rimuovi anche la chat da questo telefono",
+      "phoneRemoveNote": "Per un telefono condiviso o in prestito. Accedendo di nuovo verrà riscaricata.",
+      "phoneTitle": "Uscire da questo telefono?",
       "remove": "Rimuovi anche la chat da questo computer",
       "removeNote": "Per un computer condiviso o in prestito. Accedendo di nuovo verrà riscaricata.",
       "title": "Uscire da questo computer?"

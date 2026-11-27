@@ -1021,6 +1021,10 @@
     "signOut": {
       "body": "Obrolanmu tetap ada di akunmu. Stella menyembunyikannya di komputer ini sampai kamu masuk lagi.",
       "failed": "Tidak bisa keluar. Coba lagi.",
+      "phoneBody": "Obrolanmu tetap ada di akunmu. Stella menyembunyikannya di ponsel ini sampai kamu masuk lagi.",
+      "phoneRemove": "Hapus juga obrolan dari ponsel ini",
+      "phoneRemoveNote": "Untuk ponsel bersama atau pinjaman. Saat masuk lagi, obrolan diunduh ulang.",
+      "phoneTitle": "Keluar dari ponsel ini?",
       "remove": "Hapus juga obrolan dari komputer ini",
       "removeNote": "Untuk komputer bersama atau pinjaman. Saat masuk lagi, obrolan diunduh ulang.",
       "title": "Keluar dari komputer ini?"

@@ -1031,6 +1031,10 @@
     "signOut": {
       "body": "Your chat stays in your account. Stella hides it on this computer until you sign back in.",
       "failed": "Couldn't sign out. Try again.",
+      "phoneBody": "Your chat stays in your account. Stella hides it on this phone until you sign back in.",
+      "phoneRemove": "Also remove your chat from this phone",
+      "phoneRemoveNote": "For a shared or borrowed phone. Signing back in downloads it again.",
+      "phoneTitle": "Sign out of this phone?",
       "remove": "Also remove your chat from this computer",
       "removeNote": "For a shared or borrowed computer. Signing back in downloads it again.",
       "title": "Sign out of this computer?"

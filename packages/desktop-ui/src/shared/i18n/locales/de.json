@@ -1031,6 +1031,10 @@
     "signOut": {
       "body": "Dein Chat bleibt in deinem Konto. Stella blendet ihn auf diesem Computer aus, bis du dich wieder anmeldest.",
       "failed": "Abmelden fehlgeschlagen. Versuch es noch einmal.",
+      "phoneBody": "Dein Chat bleibt in deinem Konto. Stella blendet ihn auf diesem Telefon aus, bis du dich wieder anmeldest.",
+      "phoneRemove": "Chat auch von diesem Telefon entfernen",
+      "phoneRemoveNote": "Für ein geteiltes oder geliehenes Telefon. Bei der nächsten Anmeldung wird er wieder geladen.",
+      "phoneTitle": "Auf diesem Telefon abmelden?",
       "remove": "Chat auch von diesem Computer entfernen",
       "removeNote": "Für einen geteilten oder geliehenen Computer. Bei der nächsten Anmeldung wird er wieder geladen.",
       "title": "Auf diesem Computer abmelden?"

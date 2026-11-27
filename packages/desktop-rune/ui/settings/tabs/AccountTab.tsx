@@ -19,6 +19,7 @@ import { PasskeysCard } from "./PasskeysCard";
 import { ServerSettingsCard } from "../../global/self-host/ServerSettingsCard";
 import { useSelfHostedServer } from "@/platform/backend/server-discovery";
 import { useCurrentUser } from "@/global/auth/hooks/use-current-user";
+import { onPhone } from "../../shell/phone";
 
 type AccountDeleteAction = "data" | "account";
 
@@ -172,7 +173,7 @@ export function AccountTab({ onSignOut, onOpenLegal }: AccountTabProps) {
           </col>
           <row {...s.settingsRowControl}>
             <Button variant="ghost" className="pill-btn" onClick={onSignOut}>
-              {t("settings.account.signOut.thisComputer")}
+              {t(onPhone() ? "common.signOut" : "settings.account.signOut.thisComputer")}
             </Button>
           </row>
         </SettingsRow>

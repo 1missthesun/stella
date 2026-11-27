@@ -1031,6 +1031,10 @@
     "signOut": {
       "body": "Je chat blijft in je account. Stella verbergt hem op deze computer tot je je weer aanmeldt.",
       "failed": "Afmelden is mislukt. Probeer het opnieuw.",
+      "phoneBody": "Je chat blijft in je account. Stella verbergt hem op deze telefoon tot je je weer aanmeldt.",
+      "phoneRemove": "Je chat ook van deze telefoon verwijderen",
+      "phoneRemoveNote": "Voor een gedeelde of geleende telefoon. Bij opnieuw aanmelden wordt hij weer gedownload.",
+      "phoneTitle": "Afmelden op deze telefoon?",
       "remove": "Je chat ook van deze computer verwijderen",
       "removeNote": "Voor een gedeelde of geleende computer. Bij opnieuw aanmelden wordt hij weer gedownload.",
       "title": "Afmelden op deze computer?"

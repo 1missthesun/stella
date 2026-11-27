@@ -1051,6 +1051,10 @@
     "signOut": {
       "body": "Váš chat zůstane ve vašem účtu. Stella ho na tomto počítači skryje, dokud se znovu nepřihlásíte.",
       "failed": "Odhlášení se nezdařilo. Zkuste to znovu.",
+      "phoneBody": "Váš chat zůstane ve vašem účtu. Stella ho na tomto telefonu skryje, dokud se znovu nepřihlásíte.",
+      "phoneRemove": "Odebrat chat i z tohoto telefonu",
+      "phoneRemoveNote": "Pro sdílený nebo zapůjčený telefon. Po přihlášení se znovu stáhne.",
+      "phoneTitle": "Odhlásit se z tohoto telefonu?",
       "remove": "Odebrat chat i z tohoto počítače",
       "removeNote": "Pro sdílený nebo zapůjčený počítač. Po přihlášení se znovu stáhne.",
       "title": "Odhlásit se z tohoto počítače?"

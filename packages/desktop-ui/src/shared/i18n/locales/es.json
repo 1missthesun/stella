@@ -1041,6 +1041,10 @@
     "signOut": {
       "body": "Tu chat se queda en tu cuenta. Stella lo oculta en este ordenador hasta que vuelvas a iniciar sesión.",
       "failed": "No se pudo cerrar sesión. Inténtalo de nuevo.",
+      "phoneBody": "Tu chat se queda en tu cuenta. Stella lo oculta en este teléfono hasta que vuelvas a iniciar sesión.",
+      "phoneRemove": "Eliminar también tu chat de este teléfono",
+      "phoneRemoveNote": "Para un teléfono compartido o prestado. Se volverá a descargar cuando inicies sesión.",
+      "phoneTitle": "¿Cerrar sesión en este teléfono?",
       "remove": "Eliminar también tu chat de este ordenador",
       "removeNote": "Para un ordenador compartido o prestado. Se volverá a descargar cuando inicies sesión.",
       "title": "¿Cerrar sesión en este ordenador?"

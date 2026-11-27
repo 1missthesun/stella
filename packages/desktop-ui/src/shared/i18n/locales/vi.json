@@ -1021,6 +1021,10 @@
     "signOut": {
       "body": "Cuộc trò chuyện vẫn ở trong tài khoản của bạn. Stella ẩn nó trên máy tính này cho đến khi bạn đăng nhập lại.",
       "failed": "Không thể đăng xuất. Hãy thử lại.",
+      "phoneBody": "Cuộc trò chuyện vẫn ở trong tài khoản của bạn. Stella ẩn nó trên điện thoại này cho đến khi bạn đăng nhập lại.",
+      "phoneRemove": "Xóa cả cuộc trò chuyện khỏi điện thoại này",
+      "phoneRemoveNote": "Dành cho điện thoại dùng chung hoặc mượn. Khi đăng nhập lại, nó sẽ được tải xuống lại.",
+      "phoneTitle": "Đăng xuất khỏi điện thoại này?",
       "remove": "Xóa cả cuộc trò chuyện khỏi máy tính này",
       "removeNote": "Dành cho máy dùng chung hoặc mượn. Khi đăng nhập lại, nó sẽ được tải xuống lại.",
       "title": "Đăng xuất khỏi máy tính này?"

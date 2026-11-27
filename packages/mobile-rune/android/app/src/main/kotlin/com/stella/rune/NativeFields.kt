@@ -160,7 +160,13 @@ object NativeFields {
       f.placed = rect
       if (sizeChanged) reportHeight(f)
     }
-    v.visibility = View.VISIBLE
+    if (v.visibility != View.VISIBLE) {
+      v.visibility = View.VISIBLE
+      // Shown again over the SurfaceView (after `hideField`, or placed while hidden): an EditText
+      // made visible in the same pass as a relayout sometimes kept its old, empty drawing, losing
+      // the placeholder until the next keystroke. Draw it once more after it has laid out.
+      v.post { v.invalidate() }
+    }
     if (App.traceNative) v.post { AppLog.write("debug", "field ${f.n}: ${v.width}x${v.height} at ${v.x},${v.y} scroll ${v.scrollX},${v.scrollY} lines ${v.layout?.lineCount} layoutH ${v.layout?.height} alpha ${v.alpha} shown ${v.isShown}") }
   }
 

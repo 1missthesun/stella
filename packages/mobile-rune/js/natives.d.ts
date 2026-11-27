@@ -14,6 +14,8 @@ declare const __native: {
     dark: boolean;
     processStartMs: number;
     locale: string;
+    /** Android: the user agent the app sends on its own HTTP requests (navigator.userAgent matches it). */
+    userAgent?: string;
     args: string[];
     env: Record<string, string>;
   };

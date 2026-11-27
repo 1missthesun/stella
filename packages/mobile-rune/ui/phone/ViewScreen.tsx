@@ -33,6 +33,7 @@ export const phoneViewScreen = {
     open = false;
     emit();
   },
+  isOpen: () => open,
 };
 
 const subscribe = (l: () => void) => {

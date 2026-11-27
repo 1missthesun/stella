@@ -195,6 +195,10 @@ pub fn image(eng: &Engine, n: u32, p: &Props) -> El {
             Some([w, h]) => e = e.pixels_natural(w, h),
             None => rebuild_when_decoded(n, &img),
         }
+    } else if p.w.is_none() || p.h.is_none() {
+        // One side set (a chat photo's `h` with its width left to the ratio): that side comes from
+        // the decoded image, so it lays out again once the image lands rather than staying empty.
+        rebuild_when_decoded(n, &img);
     }
     e
 }

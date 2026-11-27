@@ -20,6 +20,10 @@ import com.caoccao.javet.values.reference.V8ValueObject
 import com.caoccao.javet.values.reference.V8ValueTypedArray
 import okhttp3.Call
 import okhttp3.Callback
+import okhttp3.Cookie
+import okhttp3.CookieJar
+import okhttp3.HttpUrl
+import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.Headers
 import okhttp3.MediaType.Companion.toMediaTypeOrNull
 import okhttp3.OkHttpClient
@@ -54,13 +58,26 @@ class JSRuntime(private val context: Context) {
   private lateinit var v8: V8Runtime
   private lateinit var global: V8ValueObject
   private val timers = HashMap<Int, Runnable>()
+  /** When each one-shot timer is due (`SystemClock.uptimeMillis`, the Looper's clock), for `fireDueTimers`. */
+  private val oneShotDue = HashMap<Int, Long>()
   private val pendingRejections = HashMap<Int, String>()
   private val storage = context.getSharedPreferences("stella-rune-storage", Context.MODE_PRIVATE)
   private val http = OkHttpClient.Builder()
     .readTimeout(0, TimeUnit.MILLISECONDS)
     .pingInterval(30, TimeUnit.SECONDS)
+    .addInterceptor { chain ->
+      val r = chain.request()
+      chain.proceed(if (r.header("User-Agent") == null) r.newBuilder().header("User-Agent", App.userAgent).build() else r)
+    }
     .build()
   private val httpManual = http.newBuilder().followRedirects(false).followSslRedirects(false).build()
+  // Cookies as a browser page at stella-app:// has them (ios/StellaRune/JSRuntime.swift does the
+  // same): every backend is another origin, so only `credentials: "include"` sends or keeps them.
+  // A stray cookie (a social sign-in's state cookie) otherwise trips the backend's origin check
+  // on requests the web build makes cookie-free.
+  private val cookieJar = StoredCookies(context)
+  private val httpCookies = http.newBuilder().cookieJar(cookieJar).build()
+  private val httpCookiesManual = httpManual.newBuilder().cookieJar(cookieJar).build()
   private val calls = ConcurrentHashMap<Int, Call>()
   private val sockets = ConcurrentHashMap<Int, WebSocket>()
   private val random = SecureRandom()
@@ -116,14 +133,33 @@ class JSRuntime(private val context: Context) {
     perform { v8.getExecutor(code).setResourceName("driver.js").executeVoid() }
   }
 
-  /** Runs `block` on the JS thread. */
+  /**
+   * Runs `block` on the JS thread, after any one-shot timers already due (as iOS's JSRuntime.swift
+   * does). A burst of socket or fetch events is queued ahead of the `setTimeout(0)`s the first of
+   * them schedules (React's scheduler tasks), so without this each event's effects chain into the
+   * next until React gives up ("Maximum update depth exceeded").
+   */
   fun perform(block: () -> Unit) {
     handler.post {
       try {
+        fireDueTimers()
         block()
       } catch (e: Throwable) {
         AppLog.write("error", "uncaught: ${e.message}")
       }
+    }
+  }
+
+  /** Fires the one-shot timers due by now, oldest first, each as its own call (JS thread). */
+  private fun fireDueTimers() {
+    if (oneShotDue.isEmpty()) return
+    val now = SystemClock.uptimeMillis()
+    val due = oneShotDue.entries.filter { it.value <= now }.sortedWith(compareBy({ it.value }, { it.key })).map { it.key }
+    for (id in due) {
+      if (oneShotDue.remove(id) == null) continue
+      val r = timers.remove(id) ?: continue
+      handler.removeCallbacks(r)
+      call("__timerFire", id)
     }
   }
 
@@ -215,21 +251,24 @@ class JSRuntime(private val context: Context) {
     @V8Function(name = "setTimer")
     fun setTimer(id: Int, ms: Double, repeats: Boolean) {
       timers.remove(id)?.let { handler.removeCallbacks(it) }
+      oneShotDue.remove(id)
       val delay = maxOf(0L, ms.toLong())
       val r = object : Runnable {
         override fun run() {
           if (timers[id] !== this) return
-          if (repeats) handler.postDelayed(this, maxOf(1L, delay)) else timers.remove(id)
+          if (repeats) handler.postDelayed(this, maxOf(1L, delay)) else { timers.remove(id); oneShotDue.remove(id) }
           call("__timerFire", id)
         }
       }
       timers[id] = r
+      if (!repeats) oneShotDue[id] = SystemClock.uptimeMillis() + delay
       handler.postDelayed(r, delay)
     }
 
     @V8Function(name = "clearTimer")
     fun clearTimer(id: Int) {
       timers.remove(id)?.let { handler.removeCallbacks(it) }
+      oneShotDue.remove(id)
     }
 
     @V8Function(name = "post")
@@ -307,6 +346,7 @@ class JSRuntime(private val context: Context) {
       val url = req.getString("url")
       val method = (req.getString("method") ?: "GET").uppercase()
       val manual = req.getString("redirect") == "manual"
+      val include = req.getString("credentials") == "include"
       val headers = Headers.Builder()
       try {
         req.get<V8ValueObject>("headers")?.use { h ->
@@ -326,7 +366,13 @@ class JSRuntime(private val context: Context) {
         call("__fetchEvent", id, "error", "bad request: ${e.message}")
         return
       }
-      val c = (if (manual) httpManual else http).newCall(request)
+      val client = when {
+        include && manual -> httpCookiesManual
+        include -> httpCookies
+        manual -> httpManual
+        else -> http
+      }
+      val c = client.newCall(request)
       calls[id] = c
       c.enqueue(object : Callback {
         override fun onFailure(call: Call, e: IOException) {
@@ -377,7 +423,7 @@ class JSRuntime(private val context: Context) {
         return
       }
       if (protocols.isNotEmpty()) b.header("Sec-WebSocket-Protocol", protocols.joinToString(", "))
-      val ws = http.newWebSocket(b.build(), object : WebSocketListener() {
+      val ws = httpCookies.newWebSocket(b.build(), object : WebSocketListener() {
         override fun onOpen(webSocket: WebSocket, response: Response) {
           val proto = response.header("Sec-WebSocket-Protocol") ?: ""
           perform { call("__wsEvent", id, "open", proto) }
@@ -419,6 +465,50 @@ class JSRuntime(private val context: Context) {
     fun wsClose(id: Int, code: Int, reason: String) {
       sockets.remove(id)?.close(if (code in 1000..4999) code else 1000, reason)
     }
+  }
+}
+
+/**
+ * The cookies `credentials: "include"` requests send and keep, as HTTPCookieStorage.shared does on
+ * iOS: in memory, with the persistent ones kept across launches in the app's preferences.
+ */
+class StoredCookies(context: Context) : CookieJar {
+  private val prefs = context.getSharedPreferences("stella-rune-cookies", Context.MODE_PRIVATE)
+  private val cookies = ArrayList<Cookie>()
+
+  init {
+    for (line in prefs.getStringSet(KEY, emptySet()).orEmpty()) {
+      val tab = line.indexOf('\t')
+      if (tab <= 0) continue
+      val url = line.substring(0, tab).toHttpUrlOrNull() ?: continue
+      Cookie.parse(url, line.substring(tab + 1))?.let { cookies.add(it) }
+    }
+  }
+
+  @Synchronized
+  override fun saveFromResponse(url: HttpUrl, cookies: List<Cookie>) {
+    val now = System.currentTimeMillis()
+    for (c in cookies) {
+      this.cookies.removeAll { it.name == c.name && it.domain == c.domain && it.path == c.path }
+      if (c.expiresAt > now) this.cookies.add(c)
+    }
+    persist(now)
+  }
+
+  @Synchronized
+  override fun loadForRequest(url: HttpUrl): List<Cookie> {
+    val now = System.currentTimeMillis()
+    if (cookies.removeAll { it.expiresAt <= now }) persist(now)
+    return cookies.filter { it.matches(url) }
+  }
+
+  private fun persist(now: Long) {
+    val kept = cookies.filter { it.persistent && it.expiresAt > now }.map { "https://${it.domain}${it.path}\t$it" }.toSet()
+    prefs.edit().putStringSet(KEY, kept).apply()
+  }
+
+  private companion object {
+    const val KEY = "cookies"
   }
 }
 

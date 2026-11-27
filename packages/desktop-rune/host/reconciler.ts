@@ -507,3 +507,27 @@ export type HostElement = Pick<Instance, "id" | "set">;
 
 /** The engine node id of a host element (from a ref). */
 export const nodeId = (ref: unknown): number | undefined => (ref as Instance | null)?.id;
+
+/**
+ * Closes the innermost open modal (a dialog, sheet, menu or popover) through its `onDismiss`, as
+ * Escape does: what a phone's back button closes first. False when none is open.
+ */
+export function dismissTopModal(): boolean {
+  let top: Instance | undefined;
+  for (const inst of instances.values()) {
+    const p = inst.react;
+    if (inst.scope !== "" || !p.modal || p.hidden || p.inert || !inst.handlers.dismiss) continue;
+    if (!top || inst.id > top.id) top = inst;
+  }
+  const dismiss = top?.handlers.dismiss;
+  if (!dismiss) return false;
+  const previous = currentPriority;
+  currentPriority = DiscreteEventPriority;
+  try {
+    batched(() => dismiss());
+    reconciler.flushSyncWork();
+  } finally {
+    currentPriority = previous;
+  }
+  return true;
+}

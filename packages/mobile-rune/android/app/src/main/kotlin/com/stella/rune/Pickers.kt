@@ -105,7 +105,7 @@ object Pickers {
     if (pending != null) finish(emptyList())
     pending = rid
     var chosen = false
-    AlertDialog.Builder(a, if (App.dark) android.R.style.Theme_DeviceDefault_Dialog_Alert else android.R.style.Theme_DeviceDefault_Light_Dialog_Alert)
+    AlertDialog.Builder(a, if (App.uiDark) android.R.style.Theme_DeviceDefault_Dialog_Alert else android.R.style.Theme_DeviceDefault_Light_Dialog_Alert)
       .setItems(arrayOf("Photo Library", "Choose Files")) { _, which ->
         chosen = true
         val media = PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)

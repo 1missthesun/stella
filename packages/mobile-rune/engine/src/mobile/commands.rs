@@ -63,6 +63,23 @@ pub fn route(v: Value) {
             m["t"] = json!("cmd");
             crate::native::send(m);
         }
+        // A context menu (a message's long press): Android shows its own pop-up menu and
+        // answers the rid with the picked id. iOS has no menu of its own here yet.
+        #[cfg(target_os = "android")]
+        "menu.popup" => {
+            let mut m = v.clone();
+            m["t"] = json!("cmd");
+            crate::native::send(m);
+        }
+        // The app's own light or dark (its theme, which needn't follow the system's): Android
+        // themes its native menus and dialogs to match.
+        #[cfg(target_os = "android")]
+        "webview.colorScheme" => {
+            let mut m = v.clone();
+            m["t"] = json!("cmd");
+            crate::native::send(m);
+            reply(rid, Ok(Value::Null));
+        }
         "quit" | "menu.setApplicationMenu" | "tray.create" | "tray.setMenu" | "tray.setTooltip" | "tray.setIcon" | "tray.destroy" | "shortcut.register" | "shortcut.unregister" | "shortcut.unregisterAll" | "app.setAppUserModelId" => {
             reply(rid, Ok(Value::Null))
         }

@@ -571,9 +571,36 @@ class ReadableStreamPoly {
       desiredSize: 1,
     };
     this._cancel = source.cancel;
-    source.start?.(controller);
+    this._controller = controller;
+    this._pull = source.pull;
+    // A source with `pull` is asked for chunks while readers wait, once its `start` has settled.
+    this._started = Promise.resolve(source.start?.(controller)).then(() => undefined, (e) => controller.error(e));
   }
   private _cancel?: (r?: unknown) => void;
+  private _controller: unknown;
+  private _pull?: (c: any) => void | Promise<void>;
+  private _started: Promise<void>;
+  private _pulling = false;
+  /** Calls the source's `pull` while a read waits and nothing is queued, one call at a time. */
+  private _demand() {
+    if (!this._pull || this._pulling) return;
+    this._pulling = true;
+    void this._started
+      .then(() => {
+        if (this.closed || this.error || this.queue.length || !this.waiters.length) return;
+        return this._pull!(this._controller);
+      })
+      .then(
+        () => {
+          this._pulling = false;
+          if (this.waiters.length && !this.queue.length && !this.closed && !this.error) this._demand();
+        },
+        (e) => {
+          this._pulling = false;
+          (this._controller as { error(e: unknown): void }).error(e);
+        },
+      );
+  }
   getReader() {
     this.locked = true;
     return {
@@ -581,7 +608,9 @@ class ReadableStreamPoly {
         if (this.queue.length) return Promise.resolve({ value: this.queue.shift(), done: false });
         if (this.error) return Promise.reject(this.error);
         if (this.closed) return Promise.resolve({ value: undefined, done: true });
-        return new Promise((res, rej) => { this.waiters.push(res); this.failers.push(rej); });
+        const waiting = new Promise<IteratorResult<any>>((res, rej) => { this.waiters.push(res); this.failers.push(rej); });
+        this._demand();
+        return waiting;
       },
       releaseLock: () => { this.locked = false; },
       cancel: async (r?: unknown) => { this.closed = true; this._cancel?.(r); },
@@ -1004,19 +1033,23 @@ g.BroadcastChannel ??= class extends EventTargetPoly { constructor(readonly name
 g.Worker ??= class { constructor() { throw new Error("Web Workers are not available on the phone yet"); } };
 
 g.navigator = {
-  userAgent: `Mozilla/5.0 (iPhone; CPU iPhone OS ${N.env.osVersion.replace(/\./g, "_")} like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) StellaRune/0.1 Mobile/15E148`,
+  // The phone's own: Android's comes from the app (it sends the same one on its HTTP requests).
+  userAgent:
+    N.env.platform === "ios"
+      ? `Mozilla/5.0 (iPhone; CPU iPhone OS ${N.env.osVersion.replace(/\./g, "_")} like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) StellaRune/0.1 Mobile/15E148`
+      : (N.env.userAgent ?? `Mozilla/5.0 (Linux; Android ${N.env.osVersion}; ${N.env.model}) AppleWebKit/537.36 (KHTML, like Gecko) StellaRune/0.1 Mobile Safari/537.36`),
   platform: N.env.platform === "ios" ? "iPhone" : "Linux armv8l",
   language: N.env.locale,
   languages: [N.env.locale],
   onLine: true,
   hardwareConcurrency: 6,
   maxTouchPoints: 5,
-  vendor: "Apple Computer, Inc.",
+  vendor: N.env.platform === "ios" ? "Apple Computer, Inc." : "Google Inc.",
   cookieEnabled: true,
   userAgentData: { platform: N.env.platform === "ios" ? "iOS" : "Android", mobile: true, brands: [] },
   clipboard: {
     async writeText(text: string) { N.post(JSON.stringify({ cmd: "clipboard.writeText", text })); },
-    async readText() { return ""; },
+    async readText(): Promise<string> { return (await g.stella?.engine?.clipboard.readText().catch(() => "")) ?? ""; },
   },
   share: async (data: { text?: string; url?: string; title?: string }) => { N.post(JSON.stringify({ cmd: "share", ...data })); },
   vibrate: () => { N.post(JSON.stringify({ cmd: "haptic", kind: "medium" })); return true; },

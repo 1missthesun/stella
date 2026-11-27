@@ -12,6 +12,7 @@ import * as app from "../ui/App";
 import { notePhoneAppearance } from "../ui/phone/insets";
 import { createPhoneViews } from "./views";
 import { startPush } from "../ui/native/push";
+import { installBackButton } from "../ui/phone/back";
 
 const t0 = __native.now();
 
@@ -24,6 +25,7 @@ try {
   });
   const store = createStore((app as any).initialState?.() ?? {});
   (globalThis as any).stella = { store, useStore: makeUseStore(store), command, now, engine, on: onEngineEvent, windowPortal, pressedByKeys, views: createPhoneViews(), phone: { env, post: (m: object) => __native.post(JSON.stringify(m)) } };
+  installBackButton();
   render(createElement(app.Root), { t0: performance.timeOrigin + (t0 - __native.now()) + performance.now() });
   console.info(`[phone] first render ${(__native.now() - t0).toFixed(1)} ms after app start`);
   // Dev launches can pass STELLA_PUSH=0 to leave notifications alone (no permission prompt).

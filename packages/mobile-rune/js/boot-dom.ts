@@ -45,7 +45,8 @@ export const dom = installDom({
   viewport: { width: env.width, height: env.height, devicePixelRatio: env.scale },
   uiState: nativeUiState(),
   clipboard: {
-    readText: async () => "",
+    // The app reads the system clipboard (UIPasteboard, ClipboardManager) through the engine's `clipboard.read`.
+    readText: async () => (await (globalThis as any).stella?.engine?.clipboard.readText().catch(() => "")) ?? "",
     writeText: async (text: string) => { __native.post(JSON.stringify({ cmd: "clipboard.writeText", text })); },
   },
   openExternal: (url: string) => __native.post(JSON.stringify({ cmd: "openURL", url })),

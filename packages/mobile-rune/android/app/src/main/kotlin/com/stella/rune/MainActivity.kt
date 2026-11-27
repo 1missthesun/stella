@@ -18,6 +18,7 @@ import android.view.WindowInsets
 import android.webkit.MimeTypeMap
 import android.widget.FrameLayout
 import androidx.activity.ComponentActivity
+import androidx.activity.OnBackPressedCallback
 import androidx.browser.customtabs.CustomTabsIntent
 import androidx.core.content.FileProvider
 import org.json.JSONArray
@@ -32,6 +33,10 @@ object App {
   var rune: RuneView? = null
   var js: JSRuntime? = null
   var dark = false
+  /** The app's own theme (`webview.colorScheme`), which needn't follow the system's; null until it says. */
+  var themeDark: Boolean? = null
+  /** What native menus and dialogs shown over the app match. */
+  val uiDark get() = themeDark ?: dark
   /** The caret and selection colour when a field names none. */
   var accent = Color.rgb(0x5b, 0x6c, 0xff)
   var firstFrameMs = 0.0
@@ -42,6 +47,8 @@ object App {
   val processStartMs: Double = Process.getStartUptimeMillis().toDouble()
   /** Dev builds: log every engine → app message (`--ez STELLA_TRACE_NATIVE true`). */
   var traceNative = false
+  /** What the app calls itself on its HTTP requests and in `navigator.userAgent`: an Android phone, as Chrome on one does. */
+  val userAgent: String = "Mozilla/5.0 (Linux; Android ${Build.VERSION.RELEASE}; ${Build.MODEL}) AppleWebKit/537.36 (KHTML, like Gecko) StellaRune/0.1 Mobile Safari/537.36"
 
   fun onHostReady(view: RuneView) {
     val h = view.host
@@ -98,7 +105,7 @@ object App {
   /** Commands from TS (through the engine's `native` commands or `__native.post`). */
   fun command(m: JSONObject) {
     val a = activity ?: return
-    if (Pickers.handle(m)) return
+    if (Pickers.handle(m) || Menus.handle(m)) return
     val cmd = m.optString("cmd").ifEmpty { m.optString("t") }
     when (cmd) {
       "clipboard.writeText" -> Pickers.write(m.optString("text"), null)
@@ -107,6 +114,9 @@ object App {
       "share" -> share(a, m)
       "haptic" -> haptic(m.optString("kind").ifEmpty { m.optString("style") })
       "app.setBadge" -> {}
+      "webview.colorScheme" -> themeDark = m.optBoolean("dark")
+      // Back with nothing left to close: leave the app as Android's own back does, keeping it alive (as React Native's).
+      "app.background" -> a.moveTaskToBack(true)
       "firstContent" -> if (firstContentMs == 0.0) {
         firstContentMs = SystemClock.uptimeMillis() - processStartMs
         AppLog.write("info", String.format("first content %.1f ms after process start", firstContentMs))
@@ -254,10 +264,18 @@ class MainActivity : ComponentActivity() {
       "dark" to App.dark,
       "processStartMs" to App.processStartMs,
       "locale" to Locale.getDefault().toLanguageTag(),
+      "userAgent" to App.userAgent,
       "args" to ArrayList<String>(),
       "env" to stellaEnv,
     )
     js.start(File(res, "app.js"), env)
+    // Back goes to TS, which closes what is on top (a menu or dialog, a drawer, a full-screen view),
+    // returns to the Chat tab, or asks to leave (`app.background`).
+    onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+      override fun handleOnBackPressed() {
+        js.deliver(JSONObject().put("t", "phone.back").toString())
+      }
+    })
     if (BuildConfig.STELLA_DEV) DebugDriver.start(this)
   }
 

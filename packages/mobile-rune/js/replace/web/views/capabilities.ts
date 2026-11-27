@@ -105,10 +105,7 @@ export function browserCapabilities(_notice: (viewId: string, kind: "copied") =>
     "clipboard.writeText": async ([text]) => {
       await engine.clipboard.writeText(string(text));
     },
-    "clipboard.readText": async () => {
-      if (platform() !== "ios") throw new Error("Reading the clipboard isn't on Android yet");
-      return engine.request<string>("clipboard.readText");
-    },
+    "clipboard.readText": async () => engine.request<string>("clipboard.readText"),
     openUrl: async ([url]) => {
       const target = new URL(string(url));
       if (!/^(https?|mailto|tel):$/u.test(target.protocol)) throw new Error(`openUrl opens web, mail and phone links, not ${target.protocol}`);

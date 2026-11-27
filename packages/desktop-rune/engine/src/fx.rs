@@ -457,11 +457,13 @@ pub struct Comp {
     animating: bool,
     /// Glass growing out of (or going back into) its `morphFrom` source, by effect node.
     morphs: HashMap<u32, Morph>,
+    /// The main window's hot swap transition (`swapfx`).
+    swap: crate::swapfx::Swap,
 }
 
 impl Comp {
     pub fn new(window: Option<u32>) -> Comp {
-        Comp { window, engaged: Cell::new(false), gpu: None, animating: false, morphs: HashMap::new() }
+        Comp { window, engaged: Cell::new(false), gpu: None, animating: false, morphs: HashMap::new(), swap: Default::default() }
     }
 }
 
@@ -606,15 +608,16 @@ impl Compositor<Win> for Comp {
         if let Some(on) = window_has_fx(self.window) {
             self.engaged.set(on || !self.morphs.is_empty());
         }
-        self.engaged.get()
+        self.engaged.get() || (self.window.is_none() && self.swap.engaged())
     }
 
     fn animating(&self) -> bool {
-        self.animating
+        self.animating || (self.window.is_none() && self.swap.animating())
     }
 
     fn release_gpu(&mut self) {
         self.gpu = None;
+        self.swap.release_gpu();
     }
 
     fn render(&mut self, f: &mut Frame<'_, Win>) {
@@ -809,10 +812,23 @@ impl Compositor<Win> for Comp {
         for lit in gpu.lights.values_mut() {
             lit.seen = false;
         }
+        let swapping = self.window.is_none() && crate::swapfx::active();
+        if swapping {
+            self.swap.prepare(f);
+        } else {
+            self.swap.settle();
+        }
+        let swap = &mut self.swap;
         let clear = f.rt.clear_color();
         f.prepare_ui();
         let Gpu { fx, lights: lits, blit, clear: clear_tex, .. } = gpu;
         f.ui.draw_with_backdrop(f.encoder, f.target, clear, &mut |phase, s: &EffectSite<'_>| {
+            if s.mark == crate::swapfx::MARK {
+                if swapping {
+                    swap.hook(device, phase, s);
+                }
+                return;
+            }
             if let Some(on) = shown.iter().find(|o| o.instance == s.index) {
                 match phase {
                     EffectPhase::Backdrop(enc) => {

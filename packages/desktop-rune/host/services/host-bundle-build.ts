@@ -7,7 +7,7 @@ import { buildFolder, discardFolder, recordBuild, stampAll } from "./source-stam
 import { HOST_CACHE_DIR, hostBundleKey } from "./host-bundle";
 
 const ENTRY = path.resolve(import.meta.dir, "../app.tsx");
-const BUILD_TOOLS = ["host-bundle-build.ts", "host-bundle.ts", "source-stamps.ts", "../electron/plugin.ts", "../main.tsx"].map((f) => path.resolve(import.meta.dir, f));
+const BUILD_TOOLS = ["host-bundle-build.ts", "host-bundle.ts", "source-stamps.ts", "../electron/plugin.ts", "../main.tsx", "../../../../scripts/lib/module-paths.mjs"].map((f) => path.resolve(import.meta.dir, f));
 
 const startedAt = Date.now();
 const externals = new Set<string>();

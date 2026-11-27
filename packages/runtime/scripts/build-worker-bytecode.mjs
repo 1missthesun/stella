@@ -24,6 +24,7 @@ import {
   writeSync,
 } from "node:fs";
 import path from "node:path";
+import { appRootBanner, atAppRoot, MODULE_PATHS, relocateModulePaths } from "../../../scripts/lib/module-paths.mjs";
 import {
   checkRuntimeBytecode,
   computeRuntimeSourceStamp,
@@ -144,6 +145,14 @@ const prune = (currentFile) => {
   }
 };
 
+// The bundle's own paths (a module's import.meta.url, dir, __dirname) are expressions on the app
+// folder it runs from, which the banner finds from the bundle's real location: an app bundle's
+// build was made in another folder (scripts/build-app-bundle.mjs, scripts/lib/module-paths.mjs).
+const AT_APP = atAppRoot(repoRoot);
+const APP_ROOT_BANNER = appRootBanner(outDir, repoRoot);
+const SOURCE_FILE = /\.([cm]?[jt]sx?)$/;
+const LOADERS = { ".ts": "ts", ".mts": "ts", ".cts": "ts", ".tsx": "tsx", ".jsx": "jsx" };
+
 const bundle = async (stagingDir) => {
   const result = await Bun.build({
     entrypoints: [path.join(repoRoot, "packages", "runtime", "worker", "entry.ts")],
@@ -154,6 +163,7 @@ const bundle = async (stagingDir) => {
     bytecode: true,
     sourcemap: "none",
     external: EXTERNALS,
+    banner: APP_ROOT_BANNER,
     throw: false,
     plugins: [
       {
@@ -166,6 +176,14 @@ const bundle = async (stagingDir) => {
             contents: readFileSync(args.path, "utf8").replaceAll("import.meta?.env", "undefined"),
             loader: "js",
           }));
+          build.onLoad({ filter: SOURCE_FILE }, (args) => {
+            const source = readFileSync(args.path, "utf8");
+            if (!MODULE_PATHS.test(source)) return undefined;
+            return {
+              contents: relocateModulePaths(source, args.path, repoRoot, AT_APP),
+              loader: LOADERS[path.extname(args.path)] ?? "js",
+            };
+          });
         },
       },
     ],

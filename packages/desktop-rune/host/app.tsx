@@ -3,7 +3,7 @@
 
 import { bootMark } from "./services/boot-trace";
 import { watch, statSync } from "node:fs";
-import { dirname, join, resolve } from "node:path";
+import { join, resolve } from "node:path";
 import { createElement } from "react";
 import * as bridge from "./bridge";
 import { command, commitCtx, engine, listen, now, onEngineEvent, stats } from "./bridge";
@@ -11,6 +11,7 @@ import { batched, pressedByKeys, render, replayLayouts, windowPortal } from "./r
 import { createStore, makeUseStore } from "./store";
 import { applyUiEnv } from "./services/ui-env";
 import { createUiLoader } from "./services/ui-loader";
+import { appUiSpec } from "./services/app-ui-spec";
 import { scopeUiFacing } from "./services/ui-scope";
 import { installRendererErrorRouting } from "./services/renderer-errors";
 import { holdDeliveries, releaseDeliveries } from "./electron/ipc";
@@ -26,16 +27,17 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
   const t_boot = now();
   bootMark("host-imports-done");
   const ROOT = join(import.meta.dir, "..");
-  const APP_ENTRY = resolve(ROOT, process.env.STELLA_RUNE_APP ?? "ui/App.tsx");
-  const APP_DIR = dirname(APP_ENTRY);
+  const UI_SPEC = appUiSpec();
+  const APP_ENTRY = UI_SPEC.entry;
+  const APP_DIR = UI_SPEC.dir;
   const SERVICES = process.env.STELLA_RUNE_SERVICES === "1";
 
   installRendererErrorRouting();
   applyUiEnv();
   const ui = createUiLoader({
     entry: APP_ENTRY,
-    tsconfig: join(ROOT, "tsconfig.build.json"),
-    external: ["react", "react/jsx-runtime", "react/jsx-dev-runtime"],
+    tsconfig: UI_SPEC.tsconfig,
+    external: UI_SPEC.external,
     bootCache: process.env.STELLA_RUNE_UI_CACHE !== "0",
     modules: "swap",
   });

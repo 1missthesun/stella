@@ -29,7 +29,7 @@ const EXCLUDED_PATHS = [
   "TESTING.md",
   "eslint.workers.config.js",
 ];
-const KEPT_ROOT_SCRIPTS = new Set(["lib/entry-point.mjs"]);
+const KEPT_ROOT_SCRIPTS = new Set(["lib/entry-point.mjs", "lib/module-paths.mjs"]);
 const INSTALL_GUIDE = "scripts/app-source/install-guide.md";
 
 const args = process.argv.slice(2);

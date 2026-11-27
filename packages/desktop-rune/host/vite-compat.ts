@@ -4,10 +4,16 @@
 import type { BunPlugin } from "bun";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join, relative, resolve, sep } from "node:path";
-import { pathToFileURL } from "node:url";
+import { atAppRoot, fromRoot, MODULE_PATHS, relocateModulePaths } from "../../../scripts/lib/module-paths.mjs";
 import { uiBuildMode } from "./services/ui-mode";
 
 const DESKTOP_UI_SRC = resolve(import.meta.dir, "../../desktop-ui/src");
+const REPO_ROOT = resolve(import.meta.dir, "../../..");
+// Files the UI names by path (assets, lazy JSON, a module's own location) are expressions on the
+// app folder it runs from, not this build's folder: the boot bundle a first install opens from
+// is built elsewhere (scripts/build-app-bundle.mjs, scripts/lib/module-paths.mjs).
+const AT_APP = atAppRoot(REPO_ROOT);
+const assetUrl = (path: string) => `export default ${AT_APP.url(fromRoot(REPO_ROOT, path))};`;
 const REPLACE_DIR = resolve(import.meta.dir, "../ui/replace");
 const EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".json"];
 const ASSET = /\.(png|jpe?g|gif|webp|avif|svg|ico|bmp|woff2?|ttf|otf|mp3|wav|ogg|m4a|mp4|webm|mov|wasm|pdf|txt|md|html)$/i;
@@ -133,7 +139,7 @@ function rewriteGlobs(src: string, file: string): string {
         entries.push(`${JSON.stringify(key)}: ${name}`);
       } else {
         const pick = options.import && options.import !== "*" ? `.then((m) => m[${JSON.stringify(options.import)}])` : "";
-        const target = path.endsWith(".json") && !suffix ? `String(${spec})` : spec;
+        const target = path.endsWith(".json") && !suffix ? AT_APP.path(fromRoot(REPO_ROOT, path)) : spec;
         entries.push(`${JSON.stringify(key)}: () => import(${target})${pick}`);
       }
     }
@@ -174,24 +180,26 @@ export const viteCompat: BunPlugin = {
     build.onLoad({ filter: /.*/, namespace: "vite-asset" }, (args) => {
       const query = (args as { pluginData?: { query?: string } }).pluginData?.query ?? "url";
       if (query === "raw") return { contents: `export default ${JSON.stringify(readFileSync(args.path, "utf8"))};`, loader: "js" };
-      return { contents: `export default ${JSON.stringify(pathToFileURL(args.path).href)};`, loader: "js" };
+      return { contents: assetUrl(args.path), loader: "js" };
     });
 
     build.onLoad({ filter: /\.css$/ }, () => ({ contents: "export default {};", loader: "js" }));
 
     build.onLoad({ filter: ASSET }, (args) => {
       if (args.path.includes("/node_modules/") && !/\.(png|jpe?g|gif|webp|svg)$/i.test(args.path)) return undefined;
-      return { contents: `export default ${JSON.stringify(pathToFileURL(args.path).href)};`, loader: "js" };
+      return { contents: assetUrl(args.path), loader: "js" };
     });
 
     build.onLoad({ filter: SOURCE }, (args) => {
-      if (args.path.includes("/node_modules/")) return undefined;
       const src = readFileSync(args.path, "utf8");
+      const ownPaths = MODULE_PATHS.test(src);
+      if (/[\\/]node_modules[\\/]/.test(args.path) && !ownPaths) return undefined;
       const glob = src.includes("import.meta.glob");
       const env = src.includes("import.meta.env");
-      if (!glob && !env) return undefined;
+      if (!glob && !env && !ownPaths) return undefined;
       let contents = glob ? rewriteGlobs(src, args.path) : src;
       if (env) contents = contents.replace(/\bimport\.meta\.env\b/g, `(${JSON.stringify(viteEnv())})`);
+      if (ownPaths) contents = relocateModulePaths(contents, args.path, REPO_ROOT, AT_APP);
       const ext = args.path.match(SOURCE)![1];
       return { contents, loader: (ext === "mjs" ? "js" : ext) as "ts" | "tsx" | "js" | "jsx" };
     });

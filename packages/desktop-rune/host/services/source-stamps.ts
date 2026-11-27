@@ -2,7 +2,17 @@
 // each recorded with the size and mtime of every file it was built from and of the folders
 // holding them, since a new file can change what an import resolves to. A build is used only
 // while every stamp still matches.
+//
+// Stamps are keyed relative to the app folder, so a build made elsewhere (the app bundle a first
+// install opens from, scripts/build-app-bundle.mjs) holds wherever it is unpacked. Installed
+// packages count as the lockfile they were installed from rather than file by file: the app
+// bundle carries no node_modules, and its builds stay current once the launcher installs them
+// behind it. A folder's stamp is the names in it, not its mtime and size: those differ between
+// file systems and change with what is installed or built beside the sources, which is also why
+// the names leave out node_modules, .git, .cache and build output folders (out, dist,
+// dist-electron: the launcher's install builds some, such as packages/stella-browser/out). For the same reason the app folder itself is not stamped.
 
+import { createHash } from "node:crypto";
 import { writeFileSync } from "node:fs";
 import { mkdir, readdir, readFile, rename, rm, stat, writeFile } from "node:fs/promises";
 import path from "node:path";
@@ -11,27 +21,41 @@ const REPO_ROOT = path.resolve(import.meta.dir, "../../../..");
 
 export type BuildManifest = { key: string; file: string; stamps: Record<string, string> };
 
+const UNSTAMPED_ENTRIES = new Set(["node_modules", ".git", ".cache", "out", "dist", "dist-electron"]);
+
 export const stampOf = async (file: string): Promise<string | null> => {
   try {
     const s = await stat(file);
-    return `${s.mtimeMs}:${s.size}`;
+    if (!s.isDirectory()) return `${s.mtimeMs}:${s.size}`;
+    const names = (await readdir(file)).filter((name) => !UNSTAMPED_ENTRIES.has(name)).sort();
+    return `d:${createHash("sha256").update(names.join("\0")).digest("hex").slice(0, 32)}`;
   } catch {
     return null;
   }
 };
 
-/** Stamps of the files, every folder holding one (up to the repo) and `extra`; null when one is missing. */
+const LOCKFILE = path.join(REPO_ROOT, "bun.lock");
+const inPackages = (file: string) => file.split(path.sep).includes("node_modules");
+const keyOf = (file: string) => {
+  const relative = path.relative(REPO_ROOT, file);
+  return relative.startsWith("..") || path.isAbsolute(relative) ? file : relative.split(path.sep).join("/");
+};
+const pathOf = (key: string) => path.resolve(REPO_ROOT, key);
+
+/** Stamps of the files, every folder holding one (below the repo) and `extra`; null when one is missing. */
 export async function stampAll(files: string[], extra: string[] = []): Promise<Record<string, string> | null> {
-  const paths = new Set<string>([...files, ...extra]);
+  const paths = new Set<string>();
+  for (const file of [...files, ...extra]) paths.add(inPackages(file) ? LOCKFILE : file);
   for (const file of files) {
-    for (let dir = path.dirname(file); dir.startsWith(REPO_ROOT) && !paths.has(dir); dir = path.dirname(dir)) paths.add(dir);
+    if (inPackages(file)) continue;
+    for (let dir = path.dirname(file); dir.startsWith(`${REPO_ROOT}${path.sep}`) && !paths.has(dir); dir = path.dirname(dir)) paths.add(dir);
   }
   const list = [...paths];
   const stamps = await Promise.all(list.map(stampOf));
   const out: Record<string, string> = {};
   for (let i = 0; i < list.length; i++) {
     if (stamps[i] === null) return null;
-    out[list[i]!] = stamps[i]!;
+    out[keyOf(list[i]!)] = stamps[i]!;
   }
   return out;
 }
@@ -44,9 +68,9 @@ export async function currentBuild(dir: string): Promise<BuildManifest | null> {
   } catch {
     return null;
   }
-  const paths = Object.keys(manifest.stamps);
-  const now = await Promise.all(paths.map(stampOf));
-  for (let i = 0; i < paths.length; i++) if (now[i] !== manifest.stamps[paths[i]!]) return null;
+  const keys = Object.keys(manifest.stamps);
+  const now = await Promise.all(keys.map((key) => stampOf(pathOf(key))));
+  for (let i = 0; i < keys.length; i++) if (now[i] !== manifest.stamps[keys[i]!]) return null;
   return { ...manifest, file: path.join(dir, manifest.file) };
 }
 

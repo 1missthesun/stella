@@ -1,5 +1,15 @@
 import { createHash } from "node:crypto";
-import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
+import {
+  closeSync,
+  existsSync,
+  openSync,
+  readdirSync,
+  readFileSync,
+  readSync,
+  renameSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import path from "node:path";
 
 /**
@@ -46,6 +56,7 @@ const STAMP_EXTRA_FILES = [
   "bun.lock",
   "package.json",
   "packages/runtime/scripts/build-worker-bytecode.mjs",
+  "scripts/lib/module-paths.mjs",
 ];
 
 const STAMP_EXTRA_DIRS = ["patches"];
@@ -167,6 +178,13 @@ export type RuntimeBytecodeBuild = {
   readonly bunSize: number;
   readonly bunMtimeMs: number;
   readonly builtAt: string;
+  /**
+   * Set on a build made ahead for an app bundle (scripts/build-app-bundle.mjs),
+   * on another computer: the build is good for any
+   * Bun binary with this digest, and the first check on this computer
+   * records the local one's path in its place.
+   */
+  readonly portable?: { readonly bunSha256: string };
 };
 
 export const readRuntimeBytecodeBuild = (
@@ -197,6 +215,47 @@ export type RuntimeBytecodeVerdict =
   | { readonly usable: true; readonly loaderPath: string; readonly stamp: string }
   | { readonly usable: false; readonly reason: string; readonly stamp: string | null };
 
+const fileSha256 = (file: string): string => {
+  const hash = createHash("sha256");
+  const fd = openSync(file, "r");
+  try {
+    const chunk = Buffer.allocUnsafe(4 * 1024 * 1024);
+    for (let read; (read = readSync(fd, chunk, 0, chunk.length, null)) > 0; ) {
+      hash.update(chunk.subarray(0, read));
+    }
+  } finally {
+    closeSync(fd);
+  }
+  return hash.digest("hex");
+};
+
+/** Takes a portable build for `bunPath` when that Bun is the one it was made with. */
+const adoptPortableBuild = (
+  stellaRoot: string,
+  build: RuntimeBytecodeBuild,
+  bunPath: string,
+): RuntimeBytecodeBuild | null => {
+  if (!build.portable) return null;
+  try {
+    if (fileSha256(bunPath) !== build.portable.bunSha256) return null;
+    const stat = statSync(bunPath);
+    const { portable: _portable, ...rest } = build;
+    const adopted: RuntimeBytecodeBuild = {
+      ...rest,
+      bunPath: path.resolve(bunPath),
+      bunSize: stat.size,
+      bunMtimeMs: Math.round(stat.mtimeMs),
+    };
+    const file = path.join(runtimeBytecodeDir(stellaRoot), "current.json");
+    const temp = `${file}.${process.pid}.tmp`;
+    writeFileSync(temp, `${JSON.stringify(adopted, null, 2)}\n`);
+    renameSync(temp, file);
+    return adopted;
+  } catch {
+    return null;
+  }
+};
+
 const sameFile = (a: string, b: string): boolean => {
   try {
     return path.resolve(a) === path.resolve(b);
@@ -218,7 +277,7 @@ export const checkRuntimeBytecode = (
   if (process.env.STELLA_RUNTIME_FROM_SOURCE === "1") {
     return { usable: false, reason: "disabled", stamp: null };
   }
-  const build = readRuntimeBytecodeBuild(stellaRoot);
+  let build = readRuntimeBytecodeBuild(stellaRoot);
   if (!build) return { usable: false, reason: "missing", stamp: null };
   if (build.platform !== process.platform || build.arch !== process.arch) {
     return { usable: false, reason: "platform", stamp: build.stamp };
@@ -234,7 +293,9 @@ export const checkRuntimeBytecode = (
   }
   const bun = bunBinaryPath?.trim();
   if (bun && bun !== "bun" && !sameFile(bun, build.bunPath)) {
-    return { usable: false, reason: "bun-path", stamp: build.stamp };
+    const adopted = adoptPortableBuild(stellaRoot, build, bun);
+    if (!adopted) return { usable: false, reason: "bun-path", stamp: build.stamp };
+    build = adopted;
   }
   try {
     const stat = statSync(build.bunPath);

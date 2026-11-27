@@ -3,12 +3,17 @@
 // sources (services/host-bundle.ts), else host/app.tsx from source.
 
 import "./services/stdio";
+import path from "node:path";
+import { defineAppRoot } from "../../../scripts/lib/module-paths.mjs";
 import { bootMark } from "./services/boot-trace";
 import { currentHostBundle } from "./services/host-bundle";
 import { pinReactBuild } from "./services/ui-mode";
 
 bootMark("host-start");
 pinReactBuild();
+// The host and UI bundles' paths are relative to the app folder they run from
+// (scripts/lib/module-paths.mjs): they may have been built in another folder.
+defineAppRoot(path.resolve(import.meta.dir, "../../.."));
 type Host = typeof import("./app");
 const fromBundle = (file: string): Host | null => {
   try {

@@ -5,9 +5,9 @@
 import { plugin, type BunPlugin } from "bun";
 import { readdirSync, readFileSync, realpathSync } from "node:fs";
 import path from "node:path";
-import { pathToFileURL } from "node:url";
 import { electronModule } from "./index";
 import * as uiohook from "./uiohook";
+import { atAppRoot, fromRoot, relocateModulePaths, MODULE_PATHS } from "../../../../scripts/lib/module-paths.mjs";
 
 const REPO_ROOT = path.resolve(import.meta.dir, "../../../..");
 const ELECTRON_DIR = path.join(REPO_ROOT, "packages/desktop/electron");
@@ -43,13 +43,20 @@ const applyOverrides = (file: string, source: string) => {
 const ELECTRON_SOURCE = new RegExp(`^${ELECTRON_DIR.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}[\\\\/](?!.*\\.page\\.ts$).*\\.(ts|js)$`);
 
 /** Master's sources see the dirname of the bundle Electron runs (BUNDLE_DIR). */
-const adaptElectronSource = (file: string, source: string) => {
-  source = applyOverrides(file, source).replaceAll("import.meta.dirname", JSON.stringify(BUNDLE_DIR));
+const adaptElectronSource = (file: string, source: string, bundleDir = JSON.stringify(BUNDLE_DIR)) => {
+  source = applyOverrides(file, source).replaceAll("import.meta.dirname", bundleDir);
   if (/\b__dirname\b/.test(source) && !/\b(?:const|let|var)\s+__dirname\b/.test(source)) {
-    source = `const __dirname = ${JSON.stringify(BUNDLE_DIR)};\n${source}`;
+    source = `const __dirname = ${bundleDir};\n${source}`;
   }
   return source;
 };
+
+/**
+ * In the host bundle a path is an expression on the app folder the bundle runs from
+ * (`globalThis.__stellaAppPath`, set by host/main.tsx), not the folder it was built in: a first
+ * install's app bundle carries a host bundle built elsewhere (scripts/build-app-bundle.mjs).
+ */
+const AT_APP = atAppRoot(REPO_ROOT);
 
 const browserScriptImports = (): Array<{ specifier: string; file: string }> => {
   const found: Array<{ specifier: string; file: string }> = [];
@@ -123,7 +130,6 @@ const browserPageText = async (file: string, inputs: Set<string>) => {
 /** React is one instance for the host's reconciler and the UI bundle, which requires it too. */
 const SHARED_WITH_UI = /^(react|react-dom|react-reconciler|scheduler)(\/|$)/;
 const LOADERS: Record<string, "ts" | "tsx" | "js" | "jsx"> = { ".ts": "ts", ".mts": "ts", ".cts": "ts", ".tsx": "tsx", ".js": "js", ".mjs": "js", ".cjs": "js", ".jsx": "jsx" };
-const MODULE_PATHS = /(?<!["'`\w]|[^.]\.)import\.meta\b|(?<![."'`\w])__(dirname|filename)\b/;
 
 /**
  * The host as one Bun bundle (services/host-bundle-build.ts) does what the runtime plugin above
@@ -165,25 +171,16 @@ export async function hostBundlePlugin(externals: Set<string>, pageInputs: Set<s
         if (!/[\\/]node_modules[\\/]/.test(real)) return undefined;
         if (!/\.node$/.test(real) && !SHARED_WITH_UI.test(args.path)) return { path: real };
         externals.add(real);
-        return { path: real, external: true };
+        // By name: it resolves from the bundle's folder to the app's node_modules, wherever that is.
+        return { path: args.path, external: true };
       });
       build.onLoad({ filter: /\.([cm]?[jt]sx?)$/ }, (args) => {
         const file = args.path;
         const electron = ELECTRON_SOURCE.test(file);
         let source = readFileSync(file, "utf8");
         if (!electron && !MODULE_PATHS.test(source)) return undefined;
-        if (electron) source = adaptElectronSource(file, source).replace(/^await import\((["'][^"']+["'])\);$/gm, "import $1;");
-        const dir = JSON.stringify(path.dirname(file));
-        const literal = JSON.stringify(file);
-        source = source
-          .replace(/(?<!["'`\w]|[^.]\.)import\.meta\.(dirname|dir)\b/g, dir)
-          .replace(/(?<!["'`\w]|[^.]\.)import\.meta\.(path|filename)\b/g, literal)
-          .replace(/(?<!["'`\w]|[^.]\.)import\.meta\.url\b/g, JSON.stringify(pathToFileURL(file).href));
-        if (/(?<!["'`\w]|[^.]\.)import\.meta\b/.test(source)) {
-          source = `var __runeImportMeta = { url: ${JSON.stringify(pathToFileURL(file).href)}, dir: ${dir}, dirname: ${dir}, path: ${literal}, filename: ${literal}, env: process.env, main: false };\n${source.replace(/(?<!["'`\w]|[^.]\.)import\.meta\b/g, "__runeImportMeta")}`;
-        }
-        if (/\b__filename\b/.test(source) && !/\b(?:const|let|var)\s+__filename\b/.test(source)) source = `var __filename = ${literal};\n${source}`;
-        if (/\b__dirname\b/.test(source) && !/\b(?:const|let|var)\s+__dirname\b/.test(source)) source = `var __dirname = ${dir};\n${source}`;
+        if (electron) source = adaptElectronSource(file, source, AT_APP.path(fromRoot(REPO_ROOT, BUNDLE_DIR))).replace(/^await import\((["'][^"']+["'])\);$/gm, "import $1;");
+        source = relocateModulePaths(source, file, REPO_ROOT, AT_APP, { wrapImportMeta: true });
         return { contents: source, loader: LOADERS[path.extname(file)] ?? "js" };
       });
     },

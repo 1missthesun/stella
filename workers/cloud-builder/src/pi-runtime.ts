@@ -6,6 +6,7 @@ import type { Api, Message, Model, ModelThinkingLevel } from "@earendil-works/pi
 import { createModels } from "@earendil-works/pi-ai/models";
 import { normalizeReasoningEffortLevel } from "@stella/contracts/reasoning-effort";
 import { parseReminderCard, reminderAssistantMessage } from "@stella/contracts/reminders";
+import { parseWelcomeCard, welcomeAssistantMessage, welcomeMarkOf } from "@stella/contracts/welcome-message";
 import {
   isOpusModel,
   isSafeguardBlock,
@@ -2223,6 +2224,20 @@ export class PiConversationRuntime {
             role: "assistant",
             hidden: false,
             message: reminderAssistantMessage(reminder, record.createdAtMs ?? Date.now()) as JournalMessage["message"],
+          });
+          continue;
+        }
+        const welcome = record.kind === "card" ? parseWelcomeCard(record.card) : null;
+        if (welcome) {
+          messages.push({
+            seq: record.seq,
+            turnId: record.turnId,
+            role: "assistant",
+            hidden: false,
+            message: welcomeAssistantMessage(
+              record.createdAtMs ?? Date.now(),
+              welcomeMarkOf(welcome),
+            ) as JournalMessage["message"],
           });
           continue;
         }

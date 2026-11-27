@@ -1410,9 +1410,8 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
   protected async journalStart(): Promise<JournalStart> {
     const checkpoint = await this.journalCheckpoint();
     return {
-      contextStartSeq: this.journal.contextStartSeq(
-        "",
-        CLOUD_HISTORY_TOKEN_BUDGET,
+      contextStartSeq: this.journal.importStartSeq(
+        this.journal.contextStartSeq("", CLOUD_HISTORY_TOKEN_BUDGET),
       ),
       ...(checkpoint ? { checkpoint } : {}),
     };

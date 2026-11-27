@@ -318,7 +318,7 @@ function ComposerImpl({
         clip={radius}
         {...(sidebar
           ? { gradient: look.gradient, border: isDragOver ? look.dragBorder : focused ? look.focusBorder : look.border, shadows: isDragOver ? [...look.shadows, ...look.dragRing] : look.shadows }
-          : { fx: chromeGlass(tokens).composer, onBackdrop: glassBackdrop, border: isDragOver ? look.dragBorder : undefined, shadows: isDragOver ? [...tokens.shadow.md, ...look.dragRing] : tokens.shadow.md })}
+          : { fx: chromeGlass(tokens).composer, onBackdrop: glassBackdrop, border: isDragOver ? look.dragBorder : chromeGlass(tokens).hairline, shadows: isDragOver ? look.dragRing : undefined })}
         motion={SHELL_SPRING}
         layout={SHELL_SPRING.dur}
         onFocusWithin={setFocused}

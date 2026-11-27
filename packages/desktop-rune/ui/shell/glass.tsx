@@ -1,18 +1,25 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
 import type { Backdrop, FxLayer } from "../../host/rune-jsx/props";
-import { derive, ModeScope, useTokens, type Tokens } from "../theme";
+import { alpha, derive, mix, ModeScope, useTokens, type Tokens } from "../theme";
 
-/** Liquid Glass for the chrome that floats over the chat: the top bar's capsules and the composer. */
+/**
+ * Liquid Glass for the chrome that floats over the chat (the top bar's capsules, the scroll button
+ * and the composer), fitted to the phone app's UIGlassEffect (`look-ios-refs/README.md` on
+ * `rune/look-ios-refs`): a heavy veil of the surface colour, a saturated hint of what is behind, a
+ * small blur, lensing within a few points of the edge, a faint rim, and no drop shadow on the
+ * composer, whose edge is the app's hairline instead.
+ */
 export function chromeGlass(t: Tokens) {
   return derive(t, "chrome-glass", (t) => {
-    const tint = t.c.overlaySurface;
+    const base = { dispersion: 0.08, frost: 0.1, frostSigma: 26, perceptual: true, adapt: 0.25 };
     const controls: FxLayer = {
-      glass: { bevel: 12, depth: 24, dispersion: 0.08, magnification: 1.05, rim: t.dark ? 0.2 : 0.3, shadow: t.dark ? 0.35 : 0.18, frost: 0.3, frostSigma: 6, veil: 0.7, tint, adapt: 0.6 },
+      glass: { ...base, bevel: 7, depth: 14, magnification: 1.04, saturation: 1.3, rim: t.dark ? 0.3 : 0.08, shadow: t.dark ? 0.15 : 0.05, veil: 0.75, tint: t.dark ? mix(t.c.overlaySurface, 12, t.c.background) : t.c.overlaySurface },
     };
     const composer: FxLayer = {
-      glass: { bevel: 16, depth: 28, dispersion: 0.08, magnification: 1.04, rim: t.dark ? 0.2 : 0.3, shadow: t.dark ? 0.2 : 0.1, frost: 0.3, frostSigma: 6, veil: 0.5, tint, adapt: 0.6 },
+      glass: { ...base, bevel: 8, depth: 16, magnification: 1.03, saturation: t.dark ? 1.6 : 1.7, rim: t.dark ? 0.2 : 0.04, shadow: 0, veil: t.dark ? 0.8 : 0.82, tint: t.dark ? mix(t.c.overlaySurface, 70, t.c.background) : t.c.overlaySurface },
     };
-    return { controls, composer };
+    const hairline = t.dark ? t.c.border : alpha(t.c.border, 0.6);
+    return { controls, composer, hairline };
   });
 }
 

@@ -44,7 +44,23 @@ pub struct MorphSpec {
     pub spring: Spring,
 }
 
-const MORPH_SPRING: Spring = Spring::new(0.5, 0.18);
+/// Opens in about 0.2 s, with no visible overshoot.
+const MORPH_SPRING: Spring = Spring::new(0.18, 0.06);
+
+/// The spring a morph goes back on: quicker than it opened, and critically damped.
+fn close_spring(open: Spring) -> Spring {
+    Spring::new((open.duration * 0.7).max(0.01), 0.0)
+}
+
+/// How far through a morph its glass is drawn: none at the source's shape, so the source
+/// (glass, icon and label) shows as itself at both ends, and all of it from `MORPH_SHOWN`.
+const MORPH_HIDDEN: f32 = 0.04;
+const MORPH_SHOWN: f32 = 0.55;
+
+fn morph_alpha(at: f32) -> f32 {
+    let t = ((at - MORPH_HIDDEN) / (MORPH_SHOWN - MORPH_HIDDEN)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
 
 #[derive(Clone, Debug)]
 pub struct FxSpec {
@@ -323,9 +339,26 @@ fn slot(id: u32, index: usize, role: f32, inset: f32, p: &Props) -> El {
     e
 }
 
+/// A `morphFrom` element's border and shadows, drawn by a child that fades in with its content
+/// once the glass has grown, and goes at once when it's removed (see `view::build_node`).
+fn morph_chrome(id: u32, p: &Props) -> El {
+    let chrome = Props { border: p.border, border_width: p.border_width, border_sides: p.border_sides, border_dash: p.border_dash, radius: p.radius, corners: p.corners, shadow: p.shadow, shadows: p.shadows.clone(), ..Props::default() };
+    crate::style::paint(rune::el(), &chrome).pin(Some(0.0), Some(0.0), Some(0.0), Some(0.0)).key(format!("fx{id}.chrome"))
+}
+
+/// Without its border and shadows, which a `morphFrom` element's chrome child draws.
+pub fn without_chrome(p: &Props) -> Props {
+    Props { border: None, border_sides: None, border_dash: None, shadow: None, shadows: None, ..p.clone() }
+}
+
 /// The slots painted under the element's children: its occluder mark (`lit`) and its `fx` layers
 /// placed under (the default).
 pub fn under(mut e: El, id: u32, p: &Props) -> El {
+    if let Some(spring) = morph_spring(p)
+        && (p.border.is_some() || p.shadow.is_some() || p.shadows.is_some())
+    {
+        e = e.child(crate::view::reveal_chrome(morph_chrome(id, p), spring));
+    }
     if p.lit.is_some() {
         e = e.child(slot(id, 0, OCCLUDER, 0.0, p));
     }
@@ -372,7 +405,7 @@ fn layer_slot(id: u32, i: usize, s: &FxSpec, p: &Props) -> El {
 fn window_has_fx(window: Option<u32>) -> Option<bool> {
     crate::engine::ENGINE.with(|e| {
         let e = e.try_borrow().ok()?;
-        let w = window.or(e.main_node)?;
+        let w = window.map(|w| e.window_now(w)).or(e.main_node)?;
         Some(e.tree.fx.iter().any(|n| e.tree.window_of(*n) == Some(w)))
     })
 }
@@ -437,6 +470,13 @@ impl Comp {
 thread_local! {
     /// Closing `morphFrom` elements whose glass is back in its source: removed at the next poll.
     static CLOSED: std::cell::RefCell<Vec<u32>> = const { std::cell::RefCell::new(Vec::new()) };
+    /// Each `morphFrom` element's size as last shown whole, which it keeps while it closes.
+    static WHOLE: std::cell::RefCell<HashMap<u32, [f32; 2]>> = std::cell::RefCell::new(HashMap::new());
+}
+
+/// The size `node` (a `morphFrom` element) was last shown at, while open.
+pub fn whole_size(node: u32) -> Option<[f32; 2]> {
+    WHOLE.with(|w| w.borrow().get(&node).copied())
 }
 
 /// How long a removed `morphFrom` element may stay to morph back before it goes regardless.
@@ -455,6 +495,7 @@ struct Morph {
     from_lens: Option<LensParams>,
     key: String,
     spring: Spring,
+    open: Spring,
     x0: f32,
     v0: f32,
     target: f32,
@@ -473,6 +514,12 @@ impl Morph {
         }
         let (x, v) = self.at(now);
         (self.x0, self.v0, self.target, self.t0) = (x, v, target, now);
+        self.spring = if target == 0.0 { close_spring(self.open) } else { self.open };
+    }
+
+    /// Whether it's done: a closing one once its glass is no longer drawn.
+    fn done(&self, now: f64) -> bool {
+        self.settled(now) || (self.target == 0.0 && self.at(now).0 <= MORPH_HIDDEN)
     }
 
     fn settled(&self, now: f64) -> bool {
@@ -480,10 +527,11 @@ impl Morph {
     }
 }
 
-/// Where the element keyed `key` was drawn last frame, with its corner radius, and its glass.
-fn source_shape(rt: &rune::Runtime<Win>, eng: &crate::engine::Engine, key: &str) -> Option<(Shape, Option<LensParams>)> {
+/// Where the element keyed `key` (in `node`'s window) was drawn last frame, with its corner radius, and its glass.
+fn source_shape(rt: &rune::Runtime<Win>, eng: &crate::engine::Engine, node: u32, key: &str) -> Option<(Shape, Option<LensParams>)> {
     let ([x, y, w, h], _) = rt.presented(key)?;
-    let p = eng.tree.find_key(key).and_then(|n| eng.tree.get(n)).map(|n| &*n.props);
+    let found = eng.tree.window_of(node).and_then(|w| eng.tree.find_key_in(key, w)).or_else(|| eng.tree.find_key(key));
+    let p = found.and_then(|n| eng.tree.get(n)).map(|n| &*n.props);
     let r = p.and_then(|p| p.corners.map(|c| c.iter().fold(0.0f32, |a, v| a.max(*v))).or(p.radius)).unwrap_or(0.0);
     let lens = p.and_then(|p| p.fx.as_ref()).and_then(|l| {
         l.0.iter().find_map(|s| match &s.effect {
@@ -492,6 +540,23 @@ fn source_shape(rt: &rune::Runtime<Win>, eng: &crate::engine::Engine, key: &str)
         })
     });
     Some((Shape::rounded(x, y, w, h, r), lens))
+}
+
+/// The glass group of the element keyed `key`, if its glass is in one.
+fn source_group(eng: &crate::engine::Engine, key: &str) -> Option<String> {
+    let p = eng.tree.find_key(key).and_then(|n| eng.tree.get(n)).map(|n| &*n.props)?;
+    p.fx.as_ref()?.0.iter().find_map(|s| match &s.effect {
+        Effect::Glass { group, .. } => group.clone(),
+        Effect::Fill(_) => None,
+    })
+}
+
+/// `own` at its own size and radius, moved just inside `source` where it's nearest: where a glass
+/// rises out of a larger member of its group (a button out of the composer) and sinks back.
+fn tucked(source: Shape, own: Shape) -> Shape {
+    let (s, o) = (source.rect, own.rect);
+    let fit = |at: f32, len: f32, lo: f32, room: f32| if len >= room { lo + (room - len) * 0.5 } else { at.clamp(lo, lo + room - len) };
+    Shape::rounded(fit(o.x, o.w, s.x, s.w), fit(o.y, o.h, s.y, s.h), o.w, o.h, own.radius)
 }
 
 fn mix_shape(a: Shape, b: Shape, t: f32) -> Shape {
@@ -567,11 +632,9 @@ impl Compositor<Win> for Comp {
         let mut watched: Vec<(usize, u32)> = Vec::new();
         let now = f.rt.t;
         let morphs = &mut self.morphs;
-        let mut hide: Vec<String> = Vec::new();
         let mut closed: Vec<u32> = Vec::new();
         let mut moving = false;
         let mut grouped: Vec<(String, usize, Shape)> = Vec::new();
-        let mut glass_keys: Vec<(usize, Option<String>)> = Vec::new();
         crate::engine::read(|eng| {
             for (n, i) in f.rt.instances.iter().enumerate() {
                 if i.params[1] != KIND_EFFECT {
@@ -587,6 +650,7 @@ impl Compositor<Win> for Comp {
                         let Some(s) = p.fx.as_ref().and_then(|l| l.0.get(i.uv[0] as usize)) else { continue };
                         let watch = matches!(s.effect, Effect::Glass { .. }) && p.on.iter().any(|h| h == "backdrop") && !watched.iter().any(|w| w.1 == node);
                         let mut shape = Shape::rounded(x, y, w, h, r);
+                        let mut alpha = 1.0;
                         let fx = match &s.effect {
                             Effect::Glass { lens, merge, group, morph } => {
                                 let mut lens = *lens;
@@ -596,9 +660,17 @@ impl Compositor<Win> for Comp {
                                     let source = ms.from.clone().or_else(|| p.anchor.as_ref().map(|a| a.to.clone()));
                                     let m = match (morphs.contains_key(&node), source) {
                                         (true, _) => morphs.get_mut(&node),
-                                        (false, Some(key)) if !closing => source_shape(f.rt, eng, &key).map(|(from, from_lens)| {
-                                            let start = if reduced { 1.0 } else { 0.0 };
-                                            morphs.entry(node).or_insert(Morph { from, to: shape, from_lens, key, spring: ms.spring, x0: start, v0: 0.0, target: 1.0, t0: now, seen: false })
+                                        (false, Some(key)) if !closing => source_shape(f.rt, eng, node, &key).map(|(from, from_lens)| {
+                                            // Reopened while the last one still goes back into the same source: carry on
+                                            // from where that one is drawn, and let it go.
+                                            let (mut x0, mut v0) = (if reduced { 1.0 } else { 0.0 }, 0.0);
+                                            let back = morphs.iter().find(|(n, m)| m.key == key && m.target == 0.0 && eng.tree.closing.contains_key(*n)).map(|(n, _)| *n);
+                                            if let Some(old) = back.filter(|_| !reduced).and_then(|n| morphs.remove(&n).map(|m| (n, m))) {
+                                                (x0, v0) = old.1.at(now);
+                                                closed.push(old.0);
+                                            }
+                                            WHOLE.with(|w| w.borrow_mut().insert(node, [shape.rect.w, shape.rect.h]));
+                                            morphs.entry(node).or_insert(Morph { from, to: shape, from_lens, key, spring: ms.spring, open: ms.spring, x0, v0, target: 1.0, t0: now, seen: false })
                                         }),
                                         _ => None,
                                     };
@@ -613,22 +685,29 @@ impl Compositor<Win> for Comp {
                                             if closing {
                                                 m.go(0.0, now);
                                                 shape = m.to;
-                                            } else {
+                                            } else if m.to != shape {
                                                 m.to = shape;
+                                                WHOLE.with(|w| w.borrow_mut().insert(node, [shape.rect.w, shape.rect.h]));
                                             }
-                                            let settled = reduced || m.settled(now);
+                                            let settled = reduced || m.done(now);
                                             if settled && m.target == 0.0 {
                                                 morphs.remove(&node);
                                                 closed.push(node);
                                                 continue;
                                             }
-                                            if !settled && let Some((from, _)) = source_shape(f.rt, eng, &m.key) {
+                                            if !settled && let Some((from, _)) = source_shape(f.rt, eng, node, &m.key) {
                                                 m.from = from;
                                             }
                                             let at = if settled { m.target } else { m.at(now).0 };
-                                            hide.push(m.key.clone());
+                                            let kin = group.is_some() && source_group(eng, &m.key) == *group;
+                                            // Out of a member of its own glass group it comes out of that glass (the
+                                            // union pinches it off), so there's nothing to fade.
+                                            if !kin {
+                                                alpha = morph_alpha(at);
+                                            }
                                             moving |= !settled;
-                                            shape = mix_shape(m.from, shape, at);
+                                            let from = if kin { tucked(m.from, shape) } else { m.from };
+                                            shape = mix_shape(from, shape, at);
                                             lens = mix_lens(&m.from_lens.unwrap_or(lens), &lens, at.clamp(0.0, 1.0));
                                         }
                                     }
@@ -636,12 +715,11 @@ impl Compositor<Win> for Comp {
                                 if let Some(g) = group {
                                     grouped.push((g.clone(), layers.len(), shape));
                                 }
-                                glass_keys.push((layers.len(), p.id.clone()));
                                 Fx::lens(lens)
                             }
                             Effect::Fill(fill) => Fx::fill(*fill),
                         };
-                        let mut l = fx.on(shape).at(t).seed(s.seed).reduced(reduced).opacity(s.opacity);
+                        let mut l = fx.on(shape).at(t).seed(s.seed).reduced(reduced).opacity(s.opacity * alpha);
                         l.place = rune_fx::Place::Over;
                         if watch {
                             watched.push((layers.len(), node));
@@ -687,15 +765,10 @@ impl Compositor<Win> for Comp {
             }
         });
         morphs.retain(|_, m| std::mem::take(&mut m.seen));
+        WHOLE.with(|w| w.borrow_mut().retain(|n, _| morphs.contains_key(n)));
         if !closed.is_empty() {
             CLOSED.with(|c| c.borrow_mut().extend(closed));
             moving = true;
-        }
-        // A morph's source shows no glass of its own while the morph holds it.
-        for (layer, key) in &glass_keys {
-            if key.as_ref().is_some_and(|k| hide.contains(k)) {
-                layers[*layer].opacity = 0.0;
-            }
         }
         // A glass group draws as one surface at its first member: the others' shapes join its union.
         grouped.sort_by(|a, b| a.0.cmp(&b.0).then(a.1.cmp(&b.1)));

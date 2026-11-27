@@ -162,6 +162,10 @@ export type BoxProps = {
   loop?: Loop;
   /** Changes inside land at once (search results). */
   instant?: boolean;
+  /** Shared-element motion: mounting in the commit that removes another element with this id, it starts where that one was drawn and springs (on `motion`) to its own place. A selection pill rendered only in the selected segment slides between them. */
+  matched?: string;
+  /** The `matched` element moves in its destination's paint order and clips (under the labels drawn after it) rather than above the window. */
+  matchedInPlace?: boolean;
   // Interaction
   cursor?: Cursor;
   /** pointer-events:none for the whole subtree. */
@@ -387,6 +391,8 @@ export type WindowProps = {
   visible?: boolean;
   /** Leaves the window out of screen captures and recordings (macOS sharingType none, Windows WDA_EXCLUDEFROMCAPTURE; Linux has none). */
   contentProtection?: boolean;
+  /** The window's element keys are its own: a command that names a key without naming this window never reaches inside it, so another window (the draft preview's copy of the app) can hold the same keys. */
+  isolated?: boolean;
   /** Window background (also `fill`). */
   bg?: Color; fill?: Color; gradient?: Gradient;
   /** Custom titlebar height: the app draws it, the window keeps its controls over it. */

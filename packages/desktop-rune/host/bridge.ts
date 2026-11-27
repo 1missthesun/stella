@@ -254,205 +254,213 @@ export type CaptureStart = {
 
 export type InputEvent = Record<string, unknown> & { type?: string; t?: number };
 
-const win = <T = void>(id: string, cmd: string, args: Record<string, unknown> = {}) => request<T>(`window.${cmd}`, { ...args, window: id });
+/**
+ * The engine API over `request` and `command`. The host's is `engine`; the draft preview's
+ * (services/draft-preview.ts) names its own window in every command.
+ */
+export function engineApi(request: <T = void>(cmd: string, args?: Record<string, unknown>) => Promise<T>, command: (v: Record<string, unknown>) => void) {
+  const win = <T = void>(id: string, cmd: string, args: Record<string, unknown> = {}) => request<T>(`window.${cmd}`, { ...args, window: id });
 
-export const engine = {
-  request, command, blob, freeBlob,
-  window: {
-    focus: (id: string) => win(id, "focus"),
-    show: (id: string) => win(id, "show"),
-    hide: (id: string) => win(id, "hide"),
-    close: (id: string) => win(id, "close"),
-    minimize: (id: string) => win(id, "minimize"),
-    restore: (id: string) => win(id, "restore"),
-    maximize: (id: string) => win(id, "maximize"),
-    unmaximize: (id: string) => win(id, "unmaximize"),
-    toggleMaximize: (id: string) => win(id, "toggleMaximize"),
-    setFullScreen: (id: string, on: boolean) => win(id, "setFullScreen", { on }),
-    center: (id: string) => win(id, "center"),
-    setTitle: (id: string, title: string) => win(id, "setTitle", { title }),
-    setAlwaysOnTop: (id: string, on: boolean) => win(id, "setAlwaysOnTop", { on }),
-    setBounds: (id: string, b: Partial<Rect>) => win(id, "setBounds", b),
-    getBounds: (id: string) => win<WindowBounds>(id, "getBounds"),
-    isMaximized: async (id: string) => (await win<WindowBounds>(id, "getBounds")).maximized,
-    isFocused: (id: string) => request<boolean>("window.isFocused", { window: id }),
-  },
-  clipboard: {
-    read: (window?: string) => request<ClipboardRead>("clipboard.read", { window }),
-    readText: async () => (await request<ClipboardRead>("clipboard.read")).text,
-    readHTML: async () => (await request<ClipboardRead>("clipboard.read")).html ?? "",
-    readFiles: async () => (await request<ClipboardRead>("clipboard.read")).files,
-    /** MIME types on the clipboard: text/plain, text/html, text/uri-list (files), image/png. */
-    availableFormats: async () => (await request<ClipboardRead>("clipboard.read")).formats,
-    /** The clipboard image as PNG bytes, or null. */
-    readImage: async (): Promise<Uint8Array | null> => {
-      const { image } = await request<ClipboardRead>("clipboard.read");
-      return image ? new Uint8Array(await Bun.file(image).arrayBuffer()) : null;
+  return {
+    request, command, blob, freeBlob,
+    window: {
+      focus: (id: string) => win(id, "focus"),
+      show: (id: string) => win(id, "show"),
+      hide: (id: string) => win(id, "hide"),
+      close: (id: string) => win(id, "close"),
+      minimize: (id: string) => win(id, "minimize"),
+      restore: (id: string) => win(id, "restore"),
+      maximize: (id: string) => win(id, "maximize"),
+      unmaximize: (id: string) => win(id, "unmaximize"),
+      toggleMaximize: (id: string) => win(id, "toggleMaximize"),
+      setFullScreen: (id: string, on: boolean) => win(id, "setFullScreen", { on }),
+      center: (id: string) => win(id, "center"),
+      setTitle: (id: string, title: string) => win(id, "setTitle", { title }),
+      setAlwaysOnTop: (id: string, on: boolean) => win(id, "setAlwaysOnTop", { on }),
+      setBounds: (id: string, b: Partial<Rect>) => win(id, "setBounds", b),
+      getBounds: (id: string) => win<WindowBounds>(id, "getBounds"),
+      isMaximized: async (id: string) => (await win<WindowBounds>(id, "getBounds")).maximized,
+      isFocused: (id: string) => request<boolean>("window.isFocused", { window: id }),
     },
-    writeText: (text: string) => request("clipboard.writeText", { text }),
-    writeHTML: (html: string, text = "") => request("clipboard.writeHTML", { html, text }),
-    writeImage: (png: Uint8Array) => { const id = blob(png); return request("clipboard.writeImage", { blob: id }).finally(() => freeBlob(id)); },
-  },
-  dialog: {
-    openFile: (o: DialogOptions & { multi?: boolean; directory?: boolean } = {}) => request<string[] | null>("dialog.openFile", o),
-    openFolder: (o: DialogOptions = {}) => request<string[] | null>("dialog.openFolder", o),
-    saveFile: (o: DialogOptions = {}) => request<string | null>("dialog.saveFile", o),
-  },
-  notify: (n: { id: string; title: string; body?: string; icon?: string; silent?: boolean; actions?: { id: string; label: string }[] }) => request("notify", n),
-  app: {
-    /** The app badge: macOS shows `label` on the Dock icon ("3", "99+"; null or "" clears it); Windows shows the count over the main window's taskbar button. Resolves false where nothing shows it (Linux). */
-    setBadge: (label: string | null, count?: number, description?: string) => request<boolean>("app.setBadge", { label: label ?? "", count, description }),
-    /** Windows: the process's AppUserModelID, which toasts post under; nothing elsewhere. */
-    setAppUserModelId: (id: string) => request("app.setAppUserModelId", { id }),
-  },
-  menu: {
-    /** A native pop-up menu at a window point, or under an element (`anchor` = its `id`). Resolves with the picked id. */
-    popup: (items: MenuItem[], at: { window?: string; x?: number; y?: number; anchor?: string }) =>
-      request<string | null>("menu.popup", { items, window: at.window, x: at.x, y: at.y, target: at.anchor }),
-    /** The macOS menu bar from an Electron-style template (top-level submenus; `role: "appMenu"` is the app menu). Picks arrive as `menu` events. A no-op off macOS. */
-    setApplicationMenu: (items: MenuItem[] | null) => request("menu.setApplicationMenu", { items: items ?? [] }),
-  },
-  tray: {
-    /** Resolves with the tray's id (`id`, or a generated one). `icon` is a PNG path or PNG bytes. */
-    create: (t: { id?: string; title?: string; icon: string | Uint8Array; tooltip?: string; template?: boolean; menu?: MenuItem[] | null }) => {
-      const b = typeof t.icon === "string" ? undefined : blob(t.icon);
-      const p = request<string>("tray.create", { ...t, menu: t.menu ?? [], icon: typeof t.icon === "string" ? t.icon : undefined, blob: b });
-      return b ? p.finally(() => freeBlob(b)) : p;
+    clipboard: {
+      read: (window?: string) => request<ClipboardRead>("clipboard.read", { window }),
+      readText: async () => (await request<ClipboardRead>("clipboard.read")).text,
+      readHTML: async () => (await request<ClipboardRead>("clipboard.read")).html ?? "",
+      readFiles: async () => (await request<ClipboardRead>("clipboard.read")).files,
+      /** MIME types on the clipboard: text/plain, text/html, text/uri-list (files), image/png. */
+      availableFormats: async () => (await request<ClipboardRead>("clipboard.read")).formats,
+      /** The clipboard image as PNG bytes, or null. */
+      readImage: async (): Promise<Uint8Array | null> => {
+        const { image } = await request<ClipboardRead>("clipboard.read");
+        return image ? new Uint8Array(await Bun.file(image).arrayBuffer()) : null;
+      },
+      writeText: (text: string) => request("clipboard.writeText", { text }),
+      writeHTML: (html: string, text = "") => request("clipboard.writeHTML", { html, text }),
+      writeImage: (png: Uint8Array) => { const id = blob(png); return request("clipboard.writeImage", { blob: id }).finally(() => freeBlob(id)); },
     },
-    setMenu: (id: string, menu: MenuItem[] | null) => request("tray.setMenu", { id, menu: menu ?? [] }),
-    setTooltip: (id: string, tooltip: string) => request("tray.setTooltip", { id, tooltip }),
-    setIcon: (id: string, icon: string | Uint8Array) => {
-      const b = typeof icon === "string" ? undefined : blob(icon);
-      const p = request("tray.setIcon", { id, icon: typeof icon === "string" ? icon : undefined, blob: b });
-      return b ? p.finally(() => freeBlob(b)) : p;
+    dialog: {
+      openFile: (o: DialogOptions & { multi?: boolean; directory?: boolean } = {}) => request<string[] | null>("dialog.openFile", o),
+      openFolder: (o: DialogOptions = {}) => request<string[] | null>("dialog.openFolder", o),
+      saveFile: (o: DialogOptions = {}) => request<string | null>("dialog.saveFile", o),
     },
-    destroy: (id: string) => request("tray.destroy", { id }),
-  },
-  shortcut: {
-    register: (accelerator: string) => request<boolean>("shortcut.register", { accelerator }),
-    unregister: (accelerator: string) => request("shortcut.unregister", { accelerator }),
-    unregisterAll: () => request("shortcut.unregisterAll"),
-  },
-  screen: {
-    displays: () => request<Display[]>("screen.displays"),
-    /** The primary display (the first one when none says primary). */
-    primary: async () => {
-      const all = await request<Display[]>("screen.displays");
-      const d = all.find((x) => x.primary) ?? all[0];
-      if (!d) throw new Error("no displays");
-      return d;
+    notify: (n: { id: string; title: string; body?: string; icon?: string; silent?: boolean; actions?: { id: string; label: string }[] }) => request("notify", n),
+    app: {
+      /** The app badge: macOS shows `label` on the Dock icon ("3", "99+"; null or "" clears it); Windows shows the count over the main window's taskbar button. Resolves false where nothing shows it (Linux). */
+      setBadge: (label: string | null, count?: number, description?: string) => request<boolean>("app.setBadge", { label: label ?? "", count, description }),
+      /** Windows: the process's AppUserModelID, which toasts post under; nothing elsewhere. */
+      setAppUserModelId: (id: string) => request("app.setAppUserModelId", { id }),
     },
-    /** Rejects: Rune reports the pointer only inside its own windows. */
-    cursorPoint: () => request<{ x: number; y: number }>("screen.cursorPoint"),
-  },
-  appearance: { get: () => request<{ dark: boolean; accentColor?: string }>("appearance.get") },
-  /** Screen capture (ScreenCaptureKit on macOS, Windows.Graphics.Capture on Windows). */
-  capture: {
-    sources: (o: { types: string[]; thumbnailSize?: { width: number; height: number } }) => request<CaptureSource[]>("capture.sources", o),
-    start: (o: CaptureStart) => request<{ startedAt: number; microphone: boolean; width: number; height: number }>("capture.start", o),
-    stop: (id: string) => request<{ file: string | null; mimeType?: string; frames: number; pcm: string | null; pcmStartAt: number | null; pcmRate: number }>("capture.stop", { id }),
-  },
-  /** Audio file playback (Linux and Windows; macOS plays through AVFoundation in the host). */
-  audio: {
-    play: (o: { id: string; path: string; volume: number; device: string | null }) =>
-      request<{ device: string | null; sampleRate: number; channels: number; duration: number | null }>("audio.play", o),
-    control: (o: { id: string; op: string; value?: unknown }) => request<{ playing: boolean }>("audio.control", o),
-    devices: () => request<Array<{ deviceId: string; kind: "audioinput" | "audiooutput"; label: string; groupId: string }>>("audio.devices"),
-  },
-  /** The default microphone as 16 kHz mono s16le, for dictation (Linux, Windows): `mic` events per generation. */
-  mic: {
-    start: (gen: number) => command({ cmd: "mic.start", gen }),
-    stop: (gen: number) => command({ cmd: "mic.stop", gen }),
-  },
-  /** Global input listening for the `uiohook-napi` module (macOS CGEventTap, Windows low-level hooks; rejects elsewhere or without Input Monitoring). */
-  inputHook: {
-    start: () => request<{ started: boolean }>("inputhook.start"),
-    stop: () => request<{ stopped: boolean }>("inputhook.stop"),
-  },
-  shell: {
-    openExternal: (url: string) => request("shell.openExternal", { url }),
-    /** Resolves "" on success, else the error (Electron's contract). */
-    openPath: (path: string) => request("shell.openPath", { path }).then(() => "", (e: Error) => e.message),
-    showItemInFolder: (path: string) => request("shell.showItemInFolder", { path }),
-  },
-  fonts: (f: { files: string[]; sans?: string; mono?: string }) => request<{ loaded: number; errors: string[] }>("fonts", f),
-  /** Overrides a window's background (default: the first window). */
-  background: (color: string, window?: string) => request("bg", { color, window }),
-  /** Makes the next commits' colour changes spring over `dur` seconds (theme switches); 0 turns it off. */
-  colorMotion: (dur: number) => request("colorMotion", { dur }),
-  scroll: {
-    to: (target: string, y: number | "end", o: { x?: number; animate?: boolean; spring?: number } = {}) => request("scrollTo", { target, y, ...o }),
-    intoView: (target: string) => request("scrollIntoView", { target }),
-    page: (target: string, pages: number) => request("scrollPage", { target, pages }),
-    stop: (target: string) => request("stopScroll", { target }),
-    /** Lands the element keyed `key` (`"row/mark"` for a mark inside a row, mounted or not) `at` points below the top of `target`'s viewport. Instant. */
-    toKey: (target: string, key: string, at = 0) => request("scrollKeyTo", { target, key, at }),
-    /** Holds `key` where it shows on screen across the next commit (a header that collapses its section). */
-    keepOnScreen: (key: string) => request("keepOnScreen", { target: key, key }),
-  },
-  selection: {
-    /** The text selected in a window (its `selectionGroup` or selectable texts), as copying takes it; null when nothing is. */
-    get: (window?: string) => request<{ text: string; rect?: SelectionRect } | null>("selection.get", { window }),
-    /** Copies the window's selection; false when nothing is selected. */
-    copy: async (window?: string) => {
-      const s = await request<{ text: string } | null>("selection.get", { window });
-      if (!s) return false;
-      await request("clipboard.writeText", { text: s.text, window });
-      return true;
+    menu: {
+      /** A native pop-up menu at a window point, or under an element (`anchor` = its `id`). Resolves with the picked id. */
+      popup: (items: MenuItem[], at: { window?: string; x?: number; y?: number; anchor?: string }) =>
+        request<string | null>("menu.popup", { items, window: at.window, x: at.x, y: at.y, target: at.anchor }),
+      /** The macOS menu bar from an Electron-style template (top-level submenus; `role: "appMenu"` is the app menu). Picks arrive as `menu` events. A no-op off macOS. */
+      setApplicationMenu: (items: MenuItem[] | null) => request("menu.setApplicationMenu", { items: items ?? [] }),
     },
-    /** macOS dictionary look-up of the selection; false where the platform has none (it isn't wired on macOS yet either). */
-    lookUp: (window?: string) => request<boolean>("selection.lookUp", { window }),
-  },
-  focus: (target: string, ring = false) => request("focus", { target, ring }),
-  blur: (window?: string) => request("blur", { window }),
-  input: {
-    get: (target: string) => request<{ value: string; start: number; end: number }>("input.get", { target }),
-    set: (target: string, value: string, sel?: { start: number; end: number }) => request("input.set", { target, value, ...sel }),
-    select: (target: string, start: number, end: number) => request("input.select", { target, start, end }),
-  },
-  media: {
-    play: (target: string) => request("media.play", { target }),
-    pause: (target: string) => request("media.pause", { target }),
-    seek: (target: string, time: number) => request("media.seek", { target, time }),
-    state: (target: string) =>
-      request<{ time: number; duration: number | null; playing: boolean; buffered: [number, number][]; error: string | null }>("media.state", { target }),
-    /** A clip's length and, with `poster`, a cover-cropped JPEG frame written to `poster.out`. */
-    probe: (path: string, poster?: { width: number; height: number; out: string }) =>
-      request<{ duration: number; size: { width: number; height: number } | null; poster: string | null }>("media.probe", { path, poster }),
-  },
-  webview: {
-    post: (target: string, data: unknown, origin?: string) => request("webview.post", { target, data, origin }),
-    eval: (target: string, js: string) => request("webview.eval", { target, js }),
-    load: (target: string, url: string) => request("webview.load", { target, url }),
-    loadHtml: (target: string, html: string) => request("webview.loadHtml", { target, html }),
-    reload: (target: string) => request("webview.reload", { target }),
-    back: (target: string) => request("webview.back", { target }),
-    forward: (target: string) => request("webview.forward", { target }),
-    focus: (target: string) => request("webview.focus", { target }),
-    blur: (target: string) => request("webview.blur", { target }),
-    zoom: (target: string, factor: number) => request("webview.zoom", { target, factor }),
-    /** Every page prefers this color scheme (the app's), as Chromium gives an iframe its owner's. */
-    colorScheme: (dark: boolean) => request("webview.colorScheme", { dark }),
-    url: (target: string) => request<string | null>("webview.url", { target }),
-    /** Why a native view shows or hides: its rect, whether it fits its scroll viewport (`clip`), and the overlays covering it. */
-    state: (target: string) =>
-      request<{ rect: number[]; shown: boolean; covered: boolean; covering: { node: number; rect: number[] }[]; fits: boolean; clip: { node: number; rect: number[] | null } | null }>("webview.state", { target }),
-    /** Answers a custom-scheme `request` event. */
-    respond: (rid: number, r: { status?: number; headers?: Record<string, string>; body?: string | Uint8Array }) => {
-      const b = r.body instanceof Uint8Array ? blob(r.body) : undefined;
-      const p = request("webview.respond", { req: rid, status: r.status, headers: r.headers, body: typeof r.body === "string" ? r.body : undefined, blob: b });
-      return b ? p.finally(() => freeBlob(b)) : p;
+    tray: {
+      /** Resolves with the tray's id (`id`, or a generated one). `icon` is a PNG path or PNG bytes. */
+      create: (t: { id?: string; title?: string; icon: string | Uint8Array; tooltip?: string; template?: boolean; menu?: MenuItem[] | null }) => {
+        const b = typeof t.icon === "string" ? undefined : blob(t.icon);
+        const p = request<string>("tray.create", { ...t, menu: t.menu ?? [], icon: typeof t.icon === "string" ? t.icon : undefined, blob: b });
+        return b ? p.finally(() => freeBlob(b)) : p;
+      },
+      setMenu: (id: string, menu: MenuItem[] | null) => request("tray.setMenu", { id, menu: menu ?? [] }),
+      setTooltip: (id: string, tooltip: string) => request("tray.setTooltip", { id, tooltip }),
+      setIcon: (id: string, icon: string | Uint8Array) => {
+        const b = typeof icon === "string" ? undefined : blob(icon);
+        const p = request("tray.setIcon", { id, icon: typeof icon === "string" ? icon : undefined, blob: b });
+        return b ? p.finally(() => freeBlob(b)) : p;
+      },
+      destroy: (id: string) => request("tray.destroy", { id }),
     },
-  },
-  control: {
-    /** Replays real input in a window through Rune's input paths (Rune script events). */
-    input: (events: InputEvent[], window?: string) => request("control.input", { events, window }),
-    /** Every element Rune drew in a window: keys, roles, labels, text, rects, focus. */
-    elements: (window?: string, key?: string) => request<ElementInfo[]>("control.elements", { window, key }),
-    /** Writes the window's next presented frame to `path` as a PNG, in physical pixels. */
-    screenshot: (path: string, window?: string) => request<FrameShot>("control.screenshot", { path, window }),
-    /** Writes the window's presented frames to `dir/frame-NNNNN.png` at `fps` for `seconds`. */
-    record: (dir: string, o: { fps?: number; seconds?: number; window?: string } = {}) => request<FrameRecording>("control.record", { dir, ...o }),
-  },
-  quit: () => command({ cmd: "quit" }),
-};
+    shortcut: {
+      register: (accelerator: string) => request<boolean>("shortcut.register", { accelerator }),
+      unregister: (accelerator: string) => request("shortcut.unregister", { accelerator }),
+      unregisterAll: () => request("shortcut.unregisterAll"),
+    },
+    screen: {
+      displays: () => request<Display[]>("screen.displays"),
+      /** The primary display (the first one when none says primary). */
+      primary: async () => {
+        const all = await request<Display[]>("screen.displays");
+        const d = all.find((x) => x.primary) ?? all[0];
+        if (!d) throw new Error("no displays");
+        return d;
+      },
+      /** Rejects: Rune reports the pointer only inside its own windows. */
+      cursorPoint: () => request<{ x: number; y: number }>("screen.cursorPoint"),
+    },
+    appearance: { get: () => request<{ dark: boolean; accentColor?: string }>("appearance.get") },
+    /** Screen capture (ScreenCaptureKit on macOS, Windows.Graphics.Capture on Windows). */
+    capture: {
+      sources: (o: { types: string[]; thumbnailSize?: { width: number; height: number } }) => request<CaptureSource[]>("capture.sources", o),
+      start: (o: CaptureStart) => request<{ startedAt: number; microphone: boolean; width: number; height: number }>("capture.start", o),
+      stop: (id: string) => request<{ file: string | null; mimeType?: string; frames: number; pcm: string | null; pcmStartAt: number | null; pcmRate: number }>("capture.stop", { id }),
+    },
+    /** Audio file playback (Linux and Windows; macOS plays through AVFoundation in the host). */
+    audio: {
+      play: (o: { id: string; path: string; volume: number; device: string | null }) =>
+        request<{ device: string | null; sampleRate: number; channels: number; duration: number | null }>("audio.play", o),
+      control: (o: { id: string; op: string; value?: unknown }) => request<{ playing: boolean }>("audio.control", o),
+      devices: () => request<Array<{ deviceId: string; kind: "audioinput" | "audiooutput"; label: string; groupId: string }>>("audio.devices"),
+    },
+    /** The default microphone as 16 kHz mono s16le, for dictation (Linux, Windows): `mic` events per generation. */
+    mic: {
+      start: (gen: number) => command({ cmd: "mic.start", gen }),
+      stop: (gen: number) => command({ cmd: "mic.stop", gen }),
+    },
+    /** Global input listening for the `uiohook-napi` module (macOS CGEventTap, Windows low-level hooks; rejects elsewhere or without Input Monitoring). */
+    inputHook: {
+      start: () => request<{ started: boolean }>("inputhook.start"),
+      stop: () => request<{ stopped: boolean }>("inputhook.stop"),
+    },
+    shell: {
+      openExternal: (url: string) => request("shell.openExternal", { url }),
+      /** Resolves "" on success, else the error (Electron's contract). */
+      openPath: (path: string) => request("shell.openPath", { path }).then(() => "", (e: Error) => e.message),
+      showItemInFolder: (path: string) => request("shell.showItemInFolder", { path }),
+    },
+    fonts: (f: { files: string[]; sans?: string; mono?: string }) => request<{ loaded: number; errors: string[] }>("fonts", f),
+    /** Overrides a window's background (default: the first window). */
+    background: (color: string, window?: string) => request("bg", { color, window }),
+    /** Makes the next commits' colour changes spring over `dur` seconds (theme switches); 0 turns it off. */
+    colorMotion: (dur: number) => request("colorMotion", { dur }),
+    scroll: {
+      to: (target: string, y: number | "end", o: { x?: number; animate?: boolean; spring?: number } = {}) => request("scrollTo", { target, y, ...o }),
+      intoView: (target: string) => request("scrollIntoView", { target }),
+      page: (target: string, pages: number) => request("scrollPage", { target, pages }),
+      stop: (target: string) => request("stopScroll", { target }),
+      /** Lands the element keyed `key` (`"row/mark"` for a mark inside a row, mounted or not) `at` points below the top of `target`'s viewport. Instant. */
+      toKey: (target: string, key: string, at = 0) => request("scrollKeyTo", { target, key, at }),
+      /** Holds `key` where it shows on screen across the next commit (a header that collapses its section). */
+      keepOnScreen: (key: string) => request("keepOnScreen", { target: key, key }),
+    },
+    selection: {
+      /** The text selected in a window (its `selectionGroup` or selectable texts), as copying takes it; null when nothing is. */
+      get: (window?: string) => request<{ text: string; rect?: SelectionRect } | null>("selection.get", { window }),
+      /** Copies the window's selection; false when nothing is selected. */
+      copy: async (window?: string) => {
+        const s = await request<{ text: string } | null>("selection.get", { window });
+        if (!s) return false;
+        await request("clipboard.writeText", { text: s.text, window });
+        return true;
+      },
+      /** macOS dictionary look-up of the selection; false where the platform has none (it isn't wired on macOS yet either). */
+      lookUp: (window?: string) => request<boolean>("selection.lookUp", { window }),
+    },
+    focus: (target: string, ring = false) => request("focus", { target, ring }),
+    blur: (window?: string) => request("blur", { window }),
+    input: {
+      get: (target: string) => request<{ value: string; start: number; end: number }>("input.get", { target }),
+      set: (target: string, value: string, sel?: { start: number; end: number }) => request("input.set", { target, value, ...sel }),
+      select: (target: string, start: number, end: number) => request("input.select", { target, start, end }),
+    },
+    media: {
+      play: (target: string) => request("media.play", { target }),
+      pause: (target: string) => request("media.pause", { target }),
+      seek: (target: string, time: number) => request("media.seek", { target, time }),
+      state: (target: string) =>
+        request<{ time: number; duration: number | null; playing: boolean; buffered: [number, number][]; error: string | null }>("media.state", { target }),
+      /** A clip's length and, with `poster`, a cover-cropped JPEG frame written to `poster.out`. */
+      probe: (path: string, poster?: { width: number; height: number; out: string }) =>
+        request<{ duration: number; size: { width: number; height: number } | null; poster: string | null }>("media.probe", { path, poster }),
+    },
+    webview: {
+      post: (target: string, data: unknown, origin?: string) => request("webview.post", { target, data, origin }),
+      eval: (target: string, js: string) => request("webview.eval", { target, js }),
+      load: (target: string, url: string) => request("webview.load", { target, url }),
+      loadHtml: (target: string, html: string) => request("webview.loadHtml", { target, html }),
+      reload: (target: string) => request("webview.reload", { target }),
+      back: (target: string) => request("webview.back", { target }),
+      forward: (target: string) => request("webview.forward", { target }),
+      focus: (target: string) => request("webview.focus", { target }),
+      blur: (target: string) => request("webview.blur", { target }),
+      zoom: (target: string, factor: number) => request("webview.zoom", { target, factor }),
+      /** Every page prefers this color scheme (the app's), as Chromium gives an iframe its owner's. */
+      colorScheme: (dark: boolean) => request("webview.colorScheme", { dark }),
+      url: (target: string) => request<string | null>("webview.url", { target }),
+      /** Why a native view shows or hides: its rect, whether it fits its scroll viewport (`clip`), and the overlays covering it. */
+      state: (target: string) =>
+        request<{ rect: number[]; shown: boolean; covered: boolean; covering: { node: number; rect: number[] }[]; fits: boolean; clip: { node: number; rect: number[] | null } | null }>("webview.state", { target }),
+      /** Answers a custom-scheme `request` event. */
+      respond: (rid: number, r: { status?: number; headers?: Record<string, string>; body?: string | Uint8Array }) => {
+        const b = r.body instanceof Uint8Array ? blob(r.body) : undefined;
+        const p = request("webview.respond", { req: rid, status: r.status, headers: r.headers, body: typeof r.body === "string" ? r.body : undefined, blob: b });
+        return b ? p.finally(() => freeBlob(b)) : p;
+      },
+    },
+    control: {
+      /** Replays real input in a window through Rune's input paths (Rune script events). */
+      input: (events: InputEvent[], window?: string) => request("control.input", { events, window }),
+      /** Every element Rune drew in a window: keys, roles, labels, text, rects, focus. */
+      elements: (window?: string, key?: string) => request<ElementInfo[]>("control.elements", { window, key }),
+      /** Writes the window's next presented frame to `path` as a PNG, in physical pixels. */
+      screenshot: (path: string, window?: string) => request<FrameShot>("control.screenshot", { path, window }),
+      /** Writes the window's presented frames to `dir/frame-NNNNN.png` at `fps` for `seconds`. */
+      record: (dir: string, o: { fps?: number; seconds?: number; window?: string } = {}) => request<FrameRecording>("control.record", { dir, ...o }),
+    },
+    quit: () => command({ cmd: "quit" }),
+  };
+}
+
+export const engine = engineApi(request, command);

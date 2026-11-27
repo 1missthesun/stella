@@ -17,7 +17,12 @@ import {
 } from "@stella/contracts/page-preview";
 import { renderDrivePagePreview } from "../../drive-page-preview.js";
 import { DEVICE_FILE_COPY_LIMITS } from "@stella/contracts/device-files";
-import { isChatAttachmentPath } from "@stella/contracts/chat-attachments";
+import {
+  chatAttachmentDisplayName,
+  isUnsavedAttachmentPath,
+  UNSAVED_ATTACHMENT_ROOT,
+  unsavedAttachmentPath,
+} from "@stella/contracts/chat-attachments";
 import {
   EVIDENCE_THUMBNAIL_DRIVE_ROOT,
   evidenceThumbnailDrivePath,
@@ -27,7 +32,7 @@ import { copyR2Object, presignR2Url, r2Signer, type R2Signer } from "../../r2-pr
 import { R2_PROXY_MAX_PUT_BYTES } from "../../r2-proxy.js";
 import { sha256Hex } from "../../hash.js";
 import { attachmentImageKey, prepareAttachmentImage } from "../../attachment-images.js";
-import { array, literal, number, object, optional, string } from "../args.js";
+import { array, boolean, literal, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
 import type { OwnerContext, OwnerDbReader, OwnerDomain } from "../registry.js";
@@ -46,40 +51,28 @@ const TB = 1024 * GB;
  */
 export const DRIVE_MAX_FILES = 1_000_000;
 
-/**
- * Files sent with chat messages are kept beside the Drive, not in it: they
- * never count against the plan's Drive size or its per-file limit. Their own
- * room exists only against abuse: as large as the plan's Drive, at least
- * 10 GB (thousands of screenshots), with files up to 2 GB each.
- */
-const ATTACHMENT_MIN_ROOM_BYTES = 10 * GB;
-const ATTACHMENT_MAX_FILE_BYTES = 2 * GB;
-
-type DriveQuota = {
-  totalBytes: number;
-  maxFileBytes: number;
-  attachmentBytes: number;
-  attachmentMaxFileBytes: number;
-};
+type DriveQuota = { totalBytes: number; maxFileBytes: number };
 
 const planQuota = (plan: BillingPlan): DriveQuota => {
   const { driveBytes, driveFileBytes } = PLAN_CATALOG[plan].limits;
-  return {
-    totalBytes: driveBytes,
-    maxFileBytes: driveFileBytes,
-    attachmentBytes: Math.max(ATTACHMENT_MIN_ROOM_BYTES, driveBytes),
-    attachmentMaxFileBytes: ATTACHMENT_MAX_FILE_BYTES,
-  };
+  return { totalBytes: driveBytes, maxFileBytes: driveFileBytes };
 };
 const UNLIMITED_QUOTA: DriveQuota = {
   totalBytes: 10 * TB,
   maxFileBytes: 2_048 * MB,
-  attachmentBytes: 10 * TB,
-  attachmentMaxFileBytes: ATTACHMENT_MAX_FILE_BYTES,
 };
 
-type FileKind = "drive" | "attachment";
-const fileKindOf = (path: string): FileKind => (isChatAttachmentPath(path) ? "attachment" : "drive");
+/**
+ * A full Drive must not stop someone asking about a photo. A chat image the
+ * Drive can't take goes to the model without being saved: it never enters
+ * drive_files (not in Files, not in the quota), it is prepared for the model
+ * at once, and its upload row deletes the object after UNSAVED_TTL_MS, by
+ * when the turn has copied the image into the conversation. Only images
+ * qualify: the model takes images and text, and every other file is read
+ * from the Drive. The live count is an abuse bound, not a quota.
+ */
+const UNSAVED_TTL_MS = 7 * 24 * 60 * 60_000;
+const UNSAVED_MAX_LIVE = 200;
 
 export const DRIVE_INLINE_FILE_LIMIT_BYTES = 8 * MB;
 const DRIVE_INLINE_REQUEST_LIMIT_BYTES = 32 * MB;
@@ -119,7 +112,7 @@ const TOMBSTONE_TTL_MS = 30 * 24 * 60 * 60_000;
 const TOMBSTONE_PRUNE_EVERY_MS = 24 * 60 * 60_000;
 
 const ATTACHMENT_MAX_COUNT = 4;
-/** The Images binding's input bound. */
+/** The Images binding's input bound, so also the largest image sent without saving. */
 const ATTACHMENT_MAX_BYTES = 20 * MB;
 const ATTACHMENT_URL_EXPIRES_SECONDS = 120;
 const REFERENCE_MAX_COUNT = 4;
@@ -266,8 +259,8 @@ export const DRIVE_USAGE_MIGRATION = {
   ],
 };
 
-/** SQL twin of isChatAttachmentPath, used once to sort the files stored before kinds existed. */
-/** SQL twin of isChatAttachmentPath, used once to sort the files stored before kinds existed.
+/** Superseded by drive.6: sorted chat attachments out of the Drive quota.
+ * Kept verbatim because new owners still run every migration in order.
  * Cloudflare's SQLite refuses long GLOB patterns, so the phone's
  * uploads/<yyyy-mm-dd>/<8 hex>-<name> shape is checked piece by piece. */
 const ATTACHMENT_PATH_SQL = `(path GLOB 'Chat Attachments/*'
@@ -278,16 +271,13 @@ const ATTACHMENT_PATH_SQL = `(path GLOB 'Chat Attachments/*'
       AND substr(path, 28, 1) = '-'
       AND instr(substr(path, 20), '/') = 0))`;
 
-const usageUpsert = (table: string, row: "NEW", kind: FileKind) =>
+const usageUpsert = (table: string, row: "NEW", kind: "drive" | "attachment") =>
   `INSERT INTO ${table} (space, files, bytes) SELECT ${row}.space, 1, ${row}.size_bytes WHERE ${row}.kind = '${kind}'
        ON CONFLICT (space) DO UPDATE SET files = files + 1, bytes = bytes + excluded.bytes;`;
-const usageRemove = (table: string, kind: FileKind) =>
+const usageRemove = (table: string, kind: "drive" | "attachment") =>
   `UPDATE ${table} SET files = files - 1, bytes = bytes - OLD.size_bytes WHERE space = OLD.space AND OLD.kind = '${kind}';`;
 
-/**
- * Chat attachments get their own kind and their own running totals, so the
- * Drive quota (drive_usage, which keeps its meaning) no longer sees them.
- */
+/** Superseded by drive.6 (see above). */
 export const DRIVE_ATTACHMENTS_MIGRATION = {
   id: "drive.5-attachment-kind",
   statements: [
@@ -326,6 +316,28 @@ export const DRIVE_ATTACHMENTS_MIGRATION = {
   ],
 };
 
+/**
+ * One Drive again: chat attachments are ordinary Drive files that count
+ * against the plan and show in Files. Folds drive.5's attachment totals back
+ * into drive_usage and drops its kind column and table, restoring drive.4's
+ * triggers.
+ */
+export const DRIVE_SINGLE_POOL_MIGRATION = {
+  id: "drive.6-single-pool",
+  statements: [
+    `DROP TRIGGER drive_usage_insert`,
+    `DROP TRIGGER drive_usage_delete`,
+    `DROP TRIGGER drive_usage_update`,
+    `DROP TABLE drive_attachment_usage`,
+    `ALTER TABLE drive_files DROP COLUMN kind`,
+    `DELETE FROM drive_usage`,
+    DRIVE_USAGE_MIGRATION.statements[1]!,
+    DRIVE_USAGE_MIGRATION.statements[2]!,
+    DRIVE_USAGE_MIGRATION.statements[3]!,
+    DRIVE_USAGE_MIGRATION.statements[4]!,
+  ],
+};
+
 export const PERSONAL_DRIVE_SPACE = "";
 
 const spaceOf = (ctx: Pick<OwnerContext, "crew">): string => ctx.crew?.space ?? PERSONAL_DRIVE_SPACE;
@@ -358,7 +370,6 @@ type FileRow = {
   upload_id: string | null;
   created_at: number;
   updated_at: number;
-  kind: string;
 };
 
 type UploadRow = {
@@ -366,7 +377,8 @@ type UploadRow = {
   space: string;
   path: string;
   r2_key: string;
-  status: "pending" | "cleanup";
+  /** "unsaved": an image sent to the model without saving (UNSAVED_TTL_MS). */
+  status: "pending" | "cleanup" | "unsaved";
   claimed_bytes: number;
   created_at: number;
   expires_at: number;
@@ -513,26 +525,12 @@ const NOT_THUMBNAIL = `path NOT LIKE '${EVIDENCE_THUMBNAIL_DRIVE_ROOT}/%'`;
 const isKeyReferenced = (db: OwnerDbReader, r2Key: string): boolean =>
   db.one("SELECT 1 AS present FROM drive_files WHERE r2_key = ? LIMIT 1", r2Key) !== null;
 
-type DriveUsage = {
-  fileCount: number;
-  totalBytes: number;
-  attachmentFiles: number;
-  attachmentBytes: number;
-};
-
-/** Kept by triggers on drive_files: one row per space in each table. */
-const usage = (db: OwnerDbReader): DriveUsage => {
-  const row = db.one<{ files: number | null; bytes: number | null; afiles: number | null; abytes: number | null }>(
-    `SELECT (SELECT SUM(files) FROM drive_usage) AS files, (SELECT SUM(bytes) FROM drive_usage) AS bytes,
-            (SELECT SUM(files) FROM drive_attachment_usage) AS afiles,
-            (SELECT SUM(bytes) FROM drive_attachment_usage) AS abytes`,
+/** Kept by triggers on drive_files (DRIVE_USAGE_MIGRATION): one row per space. */
+const usage = (db: OwnerDbReader): { fileCount: number; totalBytes: number } => {
+  const row = db.one<{ files: number | null; bytes: number | null }>(
+    "SELECT SUM(files) AS files, SUM(bytes) AS bytes FROM drive_usage",
   );
-  return {
-    fileCount: row?.files ?? 0,
-    totalBytes: row?.bytes ?? 0,
-    attachmentFiles: row?.afiles ?? 0,
-    attachmentBytes: row?.abytes ?? 0,
-  };
+  return { fileCount: row?.files ?? 0, totalBytes: row?.bytes ?? 0 };
 };
 
 const fileRecord = (row: FileRow): DriveFileRecord => ({
@@ -616,7 +614,8 @@ type WriteCandidate = { path: string; sizeBytes: number };
 
 type WriteVerdict = {
   accepted: WriteCandidate[];
-  skipped: Array<{ path: string; reason: string }>;
+  /** full: refused only because the Drive has no room left for it. */
+  skipped: Array<{ path: string; reason: string; full?: true }>;
 };
 
 const partitionWrite = (
@@ -627,61 +626,65 @@ const partitionWrite = (
   const quota = unlimited ? UNLIMITED_QUOTA : planQuota(plan);
   const proxied = !ctx.env.R2_ACCESS_KEY_ID?.trim() || !ctx.env.R2_SECRET_ACCESS_KEY?.trim();
   const label = planLabel(plan);
-  const used = usage(ctx.db);
-  let fileCount = used.fileCount + used.attachmentFiles;
-  const bytes: Record<FileKind, number> = { drive: used.totalBytes, attachment: used.attachmentBytes };
+  let { fileCount, totalBytes } = usage(ctx.db);
   const occurrences = new Map<string, number>();
   for (const file of files) occurrences.set(file.path, (occurrences.get(file.path) ?? 0) + 1);
   const accepted: WriteCandidate[] = [];
-  const skipped: Array<{ path: string; reason: string }> = [];
+  const skipped: WriteVerdict["skipped"] = [];
   for (const file of files) {
-    const kind = fileKindOf(file.path);
-    const skip = (reason: string) => skipped.push({ path: file.path, reason });
-    if ((occurrences.get(file.path) ?? 0) > 1) {
-      skip(`${file.path} appears more than once in the same write. Send one version per path.`);
+    if (isUnsavedAttachmentPath(file.path)) {
+      skipped.push({
+        path: file.path,
+        reason: `${UNSAVED_ATTACHMENT_ROOT} is reserved for images sent without saving. Choose another folder.`,
+      });
       continue;
     }
-    const maxFileBytes = kind === "attachment" ? quota.attachmentMaxFileBytes : quota.maxFileBytes;
-    if (file.sizeBytes > maxFileBytes) {
-      skip(
-        kind === "attachment"
-          ? `${file.path} is larger than ${formatStorageSize(maxFileBytes)}, the largest file a message can carry.`
-          : `${file.path} is larger than the ${formatMb(maxFileBytes)} per-file limit on your plan.`,
-      );
+    if ((occurrences.get(file.path) ?? 0) > 1) {
+      skipped.push({
+        path: file.path,
+        reason: `${file.path} appears more than once in the same write. Send one version per path.`,
+      });
+      continue;
+    }
+    if (file.sizeBytes > quota.maxFileBytes) {
+      skipped.push({
+        path: file.path,
+        reason: `${file.path} is larger than the ${formatMb(quota.maxFileBytes)} per-file limit on your plan.`,
+      });
       continue;
     }
     if (proxied && file.sizeBytes > R2_PROXY_MAX_PUT_BYTES) {
-      skip(`${file.path} is larger than ${formatMb(R2_PROXY_MAX_PUT_BYTES)}, the largest file this server takes without an R2 API token.`);
+      skipped.push({
+        path: file.path,
+        reason: `${file.path} is larger than ${formatMb(R2_PROXY_MAX_PUT_BYTES)}, the largest file this server takes without an R2 API token.`,
+      });
       continue;
     }
-    const prior = getFile(ctx.db, spaceOf(ctx), file.path);
-    const next = { ...bytes };
-    if (prior) next[prior.kind === "attachment" ? "attachment" : "drive"] -= prior.size_bytes;
-    next[kind] += file.sizeBytes;
+    const prior = getFile(ctx.db, spaceOf(ctx), file.path)?.size_bytes ?? null;
     const nextFileCount = prior === null ? fileCount + 1 : fileCount;
-    if (kind === "drive" && next.drive > quota.totalBytes) {
-      skip(
-        unlimited
+    const nextTotalBytes = totalBytes - (prior ?? 0) + file.sizeBytes;
+    if (nextTotalBytes > quota.totalBytes) {
+      skipped.push({
+        path: file.path,
+        full: true,
+        reason: unlimited
           ? `Your Drive is full at ${formatStorageSize(quota.totalBytes)}. Delete files to add more.`
           : `Your Drive is full: the ${label} plan includes ${formatStorageSize(quota.totalBytes)}. ${
               nextPlanUp(plan) ? "Delete files or upgrade to add more." : "Delete files to add more."
             }`,
-      );
-      continue;
-    }
-    if (kind === "attachment" && next.attachment > quota.attachmentBytes) {
-      skip(
-        `Files sent in chats take up ${formatStorageSize(quota.attachmentBytes)}, the most your account keeps. Delete old ones from Chat Attachments in Files to send more.`,
-      );
+      });
       continue;
     }
     if (nextFileCount > DRIVE_MAX_FILES) {
-      skip(`Your account holds ${DRIVE_MAX_FILES.toLocaleString("en-US")} files, the most it can keep. Delete files to add more.`);
+      skipped.push({
+        path: file.path,
+        full: true,
+        reason: `Your Drive holds ${DRIVE_MAX_FILES.toLocaleString("en-US")} files, the most one account can keep. Delete files to add more.`,
+      });
       continue;
     }
     fileCount = nextFileCount;
-    bytes.drive = next.drive;
-    bytes.attachment = next.attachment;
+    totalBytes = nextTotalBytes;
     accepted.push(file);
   }
   return { accepted, skipped };
@@ -690,9 +693,13 @@ const partitionWrite = (
 const quotaExceeded = (message: string) =>
   new RpcError("FORBIDDEN", message, { reason: "quota_exceeded" });
 
+/** Images the model can take straight from a chat message when the Drive can't keep them. */
+const sendableWithoutSaving = (contentType: string, sizeBytes: number): boolean =>
+  contentType.toLowerCase().startsWith("image/") && sizeBytes <= ATTACHMENT_MAX_BYTES;
+
 const prepareUpload = async (
   ctx: OwnerContext,
-  args: { path: string; sizeBytes: number; contentType?: string },
+  args: { path: string; sizeBytes: number; contentType?: string; sendWithoutSavingIfFull?: boolean },
 ) => {
   enforceOwnerRateLimit(
     ctx.db,
@@ -703,8 +710,15 @@ const prepareUpload = async (
   );
   const path = normalizeDrivePath(args.path);
   const sizeBytes = normalizeSize(args.sizeBytes);
+  const contentType = normalizeContentType(args.contentType);
   const verdict = partitionWrite(ctx, [{ path, sizeBytes }]);
-  if (verdict.skipped.length > 0) throw quotaExceeded(verdict.skipped[0]!.reason);
+  const refused = verdict.skipped[0];
+  if (refused) {
+    if (refused.full && args.sendWithoutSavingIfFull && sendableWithoutSaving(contentType, sizeBytes)) {
+      return await prepareUnsavedUpload(ctx, { name: chatAttachmentDisplayName(path), sizeBytes, contentType });
+    }
+    throw quotaExceeded(refused.reason);
+  }
   const signer = signerOf(ctx);
   const uploadId = crypto.randomUUID();
   const r2Key = `${await driveOwnerPrefix(ctx.ownerId)}uploads/${uploadId}/${path}`;
@@ -726,7 +740,134 @@ const prepareUpload = async (
     now + PENDING_UPLOAD_TTL_MS,
   );
   armJob(ctx, DRIVE_CLEANUP_JOB, now + PENDING_UPLOAD_TTL_MS);
-  return { path, uploadId, uploadUrl, contentType: normalizeContentType(args.contentType) };
+  return { path, uploadId, uploadUrl, contentType };
+};
+
+/**
+ * Stages an image that goes to the model without entering the Drive. Its
+ * path names the upload, so fileUrl and turnAttachments find it by path
+ * like a Drive file; cleanup deletes it with its row.
+ */
+const prepareUnsavedUpload = async (
+  ctx: OwnerContext,
+  input: { name: string; sizeBytes: number; contentType: string },
+) => {
+  const live = ctx.db.one<{ n: number }>(
+    "SELECT COUNT(*) AS n FROM drive_uploads WHERE status = 'unsaved'",
+  )?.n ?? 0;
+  if (live >= UNSAVED_MAX_LIVE) {
+    throw quotaExceeded("Your Drive is full, and too many images were sent without saving this week. Delete files to send more.");
+  }
+  const uploadId = crypto.randomUUID();
+  const path = normalizeDrivePath(unsavedAttachmentPath(uploadId, input.name));
+  const r2Key = `${await driveOwnerPrefix(ctx.ownerId)}unsaved/${uploadId}`;
+  const uploadUrl = await presignR2Url(signerOf(ctx), {
+    method: "PUT",
+    key: r2Key,
+    expiresInSeconds: UPLOAD_URL_EXPIRES_SECONDS,
+  });
+  const now = Date.now();
+  ctx.db.run(
+    `INSERT INTO drive_uploads (upload_id, space, path, r2_key, status, claimed_bytes, created_at, expires_at)
+     VALUES (?, ?, ?, ?, 'pending', ?, ?, ?)`,
+    uploadId,
+    spaceOf(ctx),
+    path,
+    r2Key,
+    input.sizeBytes,
+    now,
+    now + PENDING_UPLOAD_TTL_MS,
+  );
+  armJob(ctx, DRIVE_CLEANUP_JOB, now + PENDING_UPLOAD_TTL_MS);
+  return { path, uploadId, uploadUrl, contentType: input.contentType, savedToDrive: false as const };
+};
+
+const unsavedRecord = (row: UploadRow, contentType: string): DriveFileRecord => ({
+  path: row.path,
+  name: fileNameFromPath(row.path),
+  sizeBytes: row.claimed_bytes,
+  contentType,
+  updatedAt: row.created_at,
+});
+
+const finalizeUnsavedUpload = async (
+  ctx: OwnerContext,
+  args: { path: string; uploadId: string; contentType?: string },
+): Promise<DriveFileRecord> => {
+  const row = ctx.db.one<UploadRow>("SELECT * FROM drive_uploads WHERE upload_id = ?", args.uploadId);
+  if (!row || row.path !== args.path || row.space !== spaceOf(ctx) || (row.status !== "pending" && row.status !== "unsaved")) {
+    throw new RpcError("NOT_FOUND", "That upload is no longer pending. Start the upload again.", {
+      reason: "upload_not_found",
+    });
+  }
+  const bucket = bucketOf(ctx);
+  const staged = await bucket.head(row.r2_key);
+  const contentType = normalizeContentType(args.contentType ?? staged?.httpMetadata?.contentType);
+  if (row.status === "unsaved") return unsavedRecord(row, contentType);
+  if (!staged) {
+    throw new RpcError("NOT_FOUND", "That upload did not reach storage. Try uploading again.", {
+      reason: "upload_not_found",
+    });
+  }
+  const refuse = (error: RpcError): never => {
+    retirePendingUpload(ctx, row, Date.now());
+    throw error;
+  };
+  if (staged.size > row.claimed_bytes || !sendableWithoutSaving(contentType, staged.size)) {
+    refuse(new RpcError("CONFLICT", "That upload changed after it was prepared. Start the upload again.", {
+      reason: "upload_size_mismatch",
+    }));
+  }
+  const prepared = await prepareAttachmentImage(ctx.env, {
+    ownerId: ctx.ownerId,
+    driveKey: row.r2_key,
+    contentType,
+    sizeBytes: staged.size,
+  }).catch(() => null);
+  if (!prepared) {
+    refuse(quotaExceeded(
+      "Your Drive is full, and this image couldn't be sent without saving it. Delete files or upgrade to send it.",
+    ));
+  }
+  const now = Date.now();
+  ctx.db.run(
+    `UPDATE drive_uploads SET status = 'unsaved', claimed_bytes = ?, expires_at = ?, lease_id = NULL, lease_expires_at = NULL
+     WHERE upload_id = ? AND status = 'pending'`,
+    staged.size,
+    now + UNSAVED_TTL_MS,
+    row.upload_id,
+  );
+  armJob(ctx, DRIVE_CLEANUP_JOB, now + UNSAVED_TTL_MS);
+  return unsavedRecord({ ...row, claimed_bytes: staged.size }, contentType);
+};
+
+/** An image sent without saving, found by its path while its row lives. */
+const getUnsaved = (ctx: OwnerContext, path: string): UploadRow | null =>
+  ctx.db.one<UploadRow>(
+    "SELECT * FROM drive_uploads WHERE space = ? AND path = ? AND status = 'unsaved' LIMIT 1",
+    spaceOf(ctx),
+    path,
+  );
+
+/** A Drive file, or an image sent without saving, resolved for reading. */
+const readableFile = async (
+  ctx: OwnerContext,
+  path: string,
+): Promise<{ name: string; sizeBytes: number; contentType: string; r2Key: string } | null> => {
+  if (!isUnsavedAttachmentPath(path)) {
+    const row = getFile(ctx.db, spaceOf(ctx), path);
+    return row ? { name: row.name, sizeBytes: row.size_bytes, contentType: row.content_type, r2Key: row.r2_key } : null;
+  }
+  const row = getUnsaved(ctx, path);
+  if (!row) return null;
+  const head = await bucketOf(ctx).head(row.r2_key);
+  if (!head) return null;
+  return {
+    name: fileNameFromPath(path),
+    sizeBytes: head.size,
+    contentType: normalizeContentType(head.httpMetadata?.contentType),
+    r2Key: row.r2_key,
+  };
 };
 
 const finalizeUpload = async (
@@ -736,6 +877,7 @@ const finalizeUpload = async (
   const path = normalizeDrivePath(args.path);
   const uploadId = args.uploadId.trim();
   if (!uploadId) throw invalid("An upload id is required.");
+  if (isUnsavedAttachmentPath(path)) return await finalizeUnsavedUpload(ctx, { path, uploadId, contentType: args.contentType });
   const pendingRow = (): UploadRow | null =>
     ctx.db.one<UploadRow>("SELECT * FROM drive_uploads WHERE upload_id = ?", uploadId);
   const space = spaceOf(ctx);
@@ -806,7 +948,7 @@ const finalizeUpload = async (
   if (existing) {
     ctx.db.run(
       `UPDATE drive_files SET r2_key = ?, name = ?, size_bytes = ?, content_type = ?, source = ?,
-         origin = ?, upload_id = ?, write_key = NULL, updated_at = ?, kind = ?
+         origin = ?, upload_id = ?, write_key = NULL, updated_at = ?
        WHERE space = ? AND path = ?`,
       finalKey,
       name,
@@ -816,7 +958,6 @@ const finalizeUpload = async (
       source === "upload" ? "upload" : existing.origin,
       uploadId,
       now,
-      fileKindOf(path),
       space,
       path,
     );
@@ -826,8 +967,8 @@ const finalizeUpload = async (
   } else {
     ctx.db.run(
       `INSERT INTO drive_files (space, path, r2_key, name, size_bytes, content_type, source, origin,
-         write_key, upload_id, created_at, updated_at, kind)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?, ?)`,
+         write_key, upload_id, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, ?)`,
       space,
       path,
       finalKey,
@@ -839,7 +980,6 @@ const finalizeUpload = async (
       uploadId,
       now,
       now,
-      fileKindOf(path),
     );
   }
   ctx.db.run("DELETE FROM drive_uploads WHERE upload_id = ?", debtId);
@@ -882,17 +1022,17 @@ const fileVersions = (
 
 const fileUrl = async (ctx: OwnerContext, args: { path: string }): Promise<DriveFileUrl> => {
   const path = normalizeDrivePath(args.path);
-  const row = getFile(ctx.db, spaceOf(ctx), path);
-  if (!row) throw new RpcError("NOT_FOUND", "That file is not in your drive.");
+  const file = await readableFile(ctx, path);
+  if (!file) throw new RpcError("NOT_FOUND", "That file is not in your drive.");
   const now = Date.now();
   return {
     path,
-    name: row.name,
-    sizeBytes: row.size_bytes,
-    contentType: row.content_type,
-    url: await signGet(signerOf(ctx), row.r2_key, DOWNLOAD_URL_EXPIRES_SECONDS, row.name, now),
+    name: file.name,
+    sizeBytes: file.sizeBytes,
+    contentType: file.contentType,
+    url: await signGet(signerOf(ctx), file.r2Key, DOWNLOAD_URL_EXPIRES_SECONDS, file.name, now),
     expiresAt: now + DOWNLOAD_URL_EXPIRES_SECONDS * 1_000,
-    version: fileVersion(row.r2_key),
+    version: fileVersion(file.r2Key),
   };
 };
 
@@ -1387,7 +1527,7 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
     if (existing) {
       ctx.db.run(
         `UPDATE drive_files SET r2_key = ?, name = ?, size_bytes = ?, content_type = ?, source = ?,
-           origin = ?, write_key = ?, upload_id = ?, updated_at = ?, kind = ?
+           origin = ?, write_key = ?, upload_id = ?, updated_at = ?
          WHERE space = ? AND path = ?`,
         entry.r2Key,
         entry.name,
@@ -1398,7 +1538,6 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
         writeKey ?? null,
         entry.uploadId,
         now,
-        fileKindOf(entry.path),
         space,
         entry.path,
       );
@@ -1412,8 +1551,8 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
     } else {
       ctx.db.run(
         `INSERT INTO drive_files (space, path, r2_key, name, size_bytes, content_type, source, origin,
-           write_key, upload_id, created_at, updated_at, kind)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+           write_key, upload_id, created_at, updated_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         space,
         entry.path,
         entry.r2Key,
@@ -1426,7 +1565,6 @@ const turnFiles = async (ctx: OwnerContext, raw: unknown): Promise<DriveTurnFile
         entry.uploadId,
         now,
         now,
-        fileKindOf(entry.path),
       );
     }
     written.push(entry);
@@ -1853,25 +1991,25 @@ const turnAttachments = async (ctx: OwnerContext, raw: unknown) => {
   const skipped: DriveSkip[] = [];
   const now = Date.now();
   for (const path of paths) {
-    const row = getFile(ctx.db, spaceOf(ctx), path);
+    const row = await readableFile(ctx, path);
     if (!row) {
       skipped.push({ path, reason: "not in the drive" });
       continue;
     }
-    if (!row.content_type.toLowerCase().startsWith("image/")) {
+    if (!row.contentType.toLowerCase().startsWith("image/")) {
       skipped.push({ path, reason: "not an image" });
       continue;
     }
-    if (row.size_bytes > ATTACHMENT_MAX_BYTES) {
+    if (row.sizeBytes > ATTACHMENT_MAX_BYTES) {
       skipped.push({ path, reason: "too large to inline" });
       continue;
     }
     attachments.push({
       path,
-      contentType: row.content_type,
-      sizeBytes: row.size_bytes,
-      key: row.r2_key,
-      url: await signGet(signerOf(ctx), row.r2_key, ATTACHMENT_URL_EXPIRES_SECONDS, row.name, now),
+      contentType: row.contentType,
+      sizeBytes: row.sizeBytes,
+      key: row.r2Key,
+      url: await signGet(signerOf(ctx), row.r2Key, ATTACHMENT_URL_EXPIRES_SECONDS, row.name, now),
     });
   }
   return { attachments, skipped };
@@ -1893,12 +2031,12 @@ const signImages = async (ctx: OwnerContext, raw: unknown): Promise<{ urls: stri
       : now;
   const urls: string[] = [];
   for (const path of paths) {
-    const row = getFile(ctx.db, spaceOf(ctx), path);
+    const row = await readableFile(ctx, path);
     if (!row) throw invalid(`${path} is not in the user's drive.`);
-    if (!row.content_type.toLowerCase().startsWith("image/")) {
-      throw invalid(`${path} is not an image (${row.content_type}).`);
+    if (!row.contentType.toLowerCase().startsWith("image/")) {
+      throw invalid(`${path} is not an image (${row.contentType}).`);
     }
-    urls.push(await signGet(signerOf(ctx), row.r2_key, REFERENCE_URL_EXPIRES_SECONDS, row.name, signedAt));
+    urls.push(await signGet(signerOf(ctx), row.r2Key, REFERENCE_URL_EXPIRES_SECONDS, row.name, signedAt));
   }
   return { urls };
 };
@@ -2030,6 +2168,7 @@ export const driveDomain = {
     DRIVE_SPACES_MIGRATION,
     DRIVE_USAGE_MIGRATION,
     DRIVE_ATTACHMENTS_MIGRATION,
+    DRIVE_SINGLE_POOL_MIGRATION,
   ],
   calls: {
     "drive.prepareUpload": {
@@ -2038,6 +2177,7 @@ export const driveDomain = {
         path: pathArg,
         sizeBytes: number({ min: 0 }),
         contentType: optional(string({ max: 1_000 })),
+        sendWithoutSavingIfFull: optional(boolean()),
       }),
       handler: prepareUpload,
     },

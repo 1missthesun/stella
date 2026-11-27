@@ -14,6 +14,11 @@ type Direct = Record<string, unknown>;
 class Instance {
   json = "";
   handlers: Handlers = {};
+  /** Its root's scope (`createScopedRoot`): "" for the app's own tree. */
+  scope = "";
+  /** Props its root forces onto a `<window>`, and the prefix of its id. */
+  forced?: Record<string, unknown>;
+  prefix = "";
   /** The `<image src>` whose blob it holds (`srcBlobs`). */
   src?: string;
   direct?: Direct;
@@ -41,7 +46,12 @@ function scheduleDirectFlush() {
     if (opsPending()) flushFrame(true);
   });
 }
-type Container = { id: 0 };
+/**
+ * A root's container: every root's windows are children of the engine's root node. A scoped root
+ * (the draft preview's) keys its elements' layouts apart and forces `window` props onto its
+ * `<window>`s, its `windowPrefix` in front of each window id.
+ */
+type Container = { id: 0; scope: string; window?: Record<string, unknown>; windowPrefix?: string };
 
 let nextId = 1;
 const instances = new Map<number, Instance>();
@@ -195,7 +205,8 @@ const KEEPS_FALSE = new Set(["visible", "resizable", "spellcheck", "dark", "chec
 
 function serialize(inst: Instance, reactProps: Record<string, any>): string {
   inst.react = reactProps;
-  const props = inst.direct ? { ...reactProps, ...inst.direct } : reactProps;
+  let props = inst.direct ? { ...reactProps, ...inst.direct } : reactProps;
+  if (inst.forced) props = { ...props, ...inst.forced, id: prefixed(inst.prefix, props.id) };
   const out: Record<string, unknown> = {};
   const on: string[] = [];
   inst.handlers = {};
@@ -234,41 +245,65 @@ export const pressedByKeys = () => pressKeys;
 type Rect = { x: number; y: number; w: number; h: number };
 /** The rect each `id`'d element last reported (`owner` is its instance; null when two live elements share the id). */
 const layoutById = new Map<string, { rect: Rect; owner: number | null }>();
+const layoutKey = (inst: Instance): string | undefined => (typeof inst.react.id === "string" ? (inst.scope ? `${inst.scope}\0${inst.react.id}` : inst.react.id) : undefined);
 
 function noteLayout(inst: Instance, e: ElementEvent) {
-  const id = inst.react.id;
-  if (typeof id !== "string") return;
+  const id = layoutKey(inst);
+  if (id === undefined) return;
   const seen = layoutById.get(id);
   const owner = seen && seen.owner !== inst.id && seen.owner !== null && instances.has(seen.owner) ? null : inst.id;
   layoutById.set(id, { rect: { x: Number(e.x), y: Number(e.y), w: Number(e.w), h: Number(e.h) }, owner });
 }
 
 /** Rune reports an element's layout when its rect changes under the same key, and an `id` is the
- *  key: an element remounted under the same id in the same place (a hot swap) is never told its
- *  rect. While `replayLayouts(true)` holds, each such element mounted is handed the rect its
- *  predecessor last heard. */
-let fresh: Instance[] | null = null;
+ *  key: an element remounted under the same id in the same place is never told its rect. Each
+ *  such element is handed the rect its predecessor last heard: when the predecessor went in the
+ *  same commit (a loading placeholder and the list replacing it, sharing one id), and for every
+ *  remount while `replayLayouts(true)` holds (a hot swap, whose old tree goes over several). */
+let swapping = false;
+let fresh: Instance[] = [];
+/** The ids whose reporting element was released since the last replay. */
+const gone = new Set<string>();
 export function replayLayouts(on: boolean) {
-  fresh = on ? [] : null;
+  swapping = on;
   if (!on) for (const [id, seen] of layoutById) if (seen.owner !== null && !instances.has(seen.owner)) layoutById.delete(id);
 }
 
 function replayFresh() {
   const list = fresh;
-  if (!list?.length) return;
+  const left = [...gone];
   fresh = [];
+  gone.clear();
   for (const inst of list) {
-    const id = inst.react.id;
-    const seen = typeof id === "string" ? layoutById.get(id) : undefined;
-    if (!seen || seen.owner === null || seen.owner === inst.id || instances.has(seen.owner) || !inst.handlers.layout) continue;
+    const id = layoutKey(inst);
+    const seen = id !== undefined ? layoutById.get(id) : undefined;
+    if (id === undefined || !seen || seen.owner === null || seen.owner === inst.id || instances.has(seen.owner) || !instances.has(inst.id) || !inst.handlers.layout) continue;
+    if (!swapping && !left.includes(id)) continue;
     layoutById.set(id, { rect: seen.rect, owner: inst.id });
     dispatchElement({ t: "ev", n: inst.id, e: "layout", seq: 0, at: performance.timeOrigin + performance.now(), ...seen.rect });
   }
+  // Outside a swap, a rect no successor took is never handed on.
+  if (!swapping) for (const id of left) { const seen = layoutById.get(id); if (seen && seen.owner !== null && !instances.has(seen.owner)) layoutById.delete(id); }
+}
+
+/** The live element holding each `id` with a layout handler, and the ids of released ones, so
+ *  a layout reaching the host after its element was replaced under the same id (the engine drew
+ *  the old element while the host was still committing its successor; Rune won't report the
+ *  same key and rect again) goes to the successor, when that hasn't heard one yet. */
+const layoutHolder = new Map<string, Instance>();
+const releasedIds = new Map<number, string>();
+
+function heir(e: ElementEvent): Instance | undefined {
+  if (e.e !== "layout") return undefined;
+  const id = releasedIds.get(e.n);
+  const next = id !== undefined ? layoutHolder.get(id) : undefined;
+  return next && layoutById.get(id!)?.owner !== next.id ? next : undefined;
 }
 
 setElementDispatch(dispatchElement);
 function dispatchElement(e: ElementEvent) {
-  const inst = instances.get(e.n);
+  let inst = instances.get(e.n);
+  if (!inst && (inst = heir(e))) e = { ...e, n: inst.id };
   if (inst && e.e === "layout") noteLayout(inst, e);
   const fn = inst?.handlers[e.e];
   if (!fn) return;
@@ -294,6 +329,13 @@ function dispatchElement(e: ElementEvent) {
 let currentPriority = DefaultEventPriority;
 
 function release(inst: Instance) {
+  const id = layoutKey(inst);
+  if (id !== undefined && layoutById.get(id)?.owner === inst.id) gone.add(id);
+  if (id !== undefined && inst.handlers.layout) {
+    if (layoutHolder.get(id) === inst) layoutHolder.delete(id);
+    releasedIds.set(inst.id, id);
+    if (releasedIds.size > 256) releasedIds.delete(releasedIds.keys().next().value!);
+  }
   instances.delete(inst.id);
   dropSrc(inst);
 }
@@ -313,13 +355,23 @@ const config: any = {
   NotPendingTransition: null,
   HostTransitionContext: createContext(null),
 
-  createInstance(type: string, props: any): Instance {
+  createInstance(type: string, props: any, root: Container): Instance {
     const inst = new Instance(nextId++, type);
     instances.set(inst.id, inst);
+    if (root?.scope) {
+      inst.scope = root.scope;
+      if (type === "window") {
+        inst.forced = root.window ?? {};
+        inst.prefix = root.windowPrefix ?? "";
+      }
+    }
     ops.create(inst.id, type);
     inst.json = serialize(inst, props);
     ops.props(inst.id, inst.json);
-    if (fresh && typeof props.id === "string" && inst.handlers.layout) fresh.push(inst);
+    if (typeof props.id === "string" && inst.handlers.layout) {
+      fresh.push(inst);
+      layoutHolder.set(layoutKey(inst)!, inst);
+    }
     return inst;
   },
   createTextInstance(text: string): Instance {
@@ -362,7 +414,8 @@ const config: any = {
   prepareForCommit: () => null,
   resetAfterCommit: () => {
     flushFrame(true);
-    if (fresh?.length) queueMicrotask(replayFresh);
+    if (fresh.length && (swapping || gone.size)) queueMicrotask(replayFresh);
+    else if (!swapping) { fresh = []; gone.clear(); }
   },
   preparePortalMount() {},
   getCurrentUpdatePriority: () => currentPriority,
@@ -394,7 +447,7 @@ const reconciler = Reconciler(config) as ReturnType<typeof Reconciler> & {
   updateContainerSync(el: ReactNode, root: unknown, parent: null, cb: null): void;
   flushSyncWork(): void;
 };
-const container: Container = { id: 0 };
+const container: Container = { id: 0, scope: "" };
 // A concurrent root batches a task's updates into one render, as createRoot does in a browser;
 // discrete element events flush before returning, so each one is answered by its own commit.
 const root = reconciler.createContainer(container, ConcurrentRoot, null, false, null, "", console.error, console.error, console.error, () => {}, null);
@@ -410,6 +463,42 @@ export const batched = (fn: () => void) => reconciler.batchedUpdates(fn, null);
 /** Renders `children` (a `<window>`) as a root child from anywhere in the tree, keeping context. */
 export function windowPortal(children: ReactNode, key?: string | null): ReactNode {
   return reconciler.createPortal(children, container, null, key ?? null) as unknown as ReactNode;
+}
+
+const prefixed = (prefix: string, id: unknown) => {
+  const own = typeof id === "string" ? id : "";
+  return own.startsWith(prefix) ? own : `${prefix}${own}`;
+};
+
+export type ScopedRoot = {
+  render(el: ReactNode): void;
+  windowPortal(children: ReactNode, key?: string | null): ReactNode;
+  unmount(): void;
+};
+
+/**
+ * A root of its own beside the app's (the draft preview's): its windows get `window` props (an
+ * isolated off-screen window), ids starting with `windowPrefix`, and its elements' layouts are
+ * kept apart from the app's, which uses the same ids. A render that throws unmounts only this
+ * root and reaches `onError`.
+ */
+export function createScopedRoot(scope: string, window: Record<string, unknown>, windowPrefix: string, onError: (error: unknown) => void): ScopedRoot {
+  const own: Container = { id: 0, scope, window, windowPrefix };
+  const report = (error: unknown) => onError(error);
+  const r = reconciler.createContainer(own, ConcurrentRoot, null, false, null, `${scope}:`, report, report, console.error, () => {}, null);
+  return {
+    render(el) {
+      reconciler.updateContainerSync(el, r, null, null);
+      reconciler.flushSyncWork();
+    },
+    windowPortal(children, key) {
+      return reconciler.createPortal(children, own, null, key ?? null) as unknown as ReactNode;
+    },
+    unmount() {
+      reconciler.updateContainerSync(null, r, null, null);
+      reconciler.flushSyncWork();
+    },
+  };
 }
 
 /** What a ref to a host element gives. */

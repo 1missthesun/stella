@@ -6,10 +6,13 @@ import path from "node:path";
 import { viteCompat } from "../vite-compat";
 import { writeUiCache, type UiCacheSpec } from "./ui-cache";
 import { uiBuildMode } from "./ui-mode";
+import { buildModules, writeModulesFiles } from "./ui-modules-build";
+import type { ModulesBuild, ModulesRequest } from "./ui-modules-format";
 
-export type UiBuildRequest = { id: number; entry: string; tsconfig: string; external: string[]; cache?: boolean; writeCache?: string[] };
+/** `modules` asks for the UI as separate modules (ui-registry.ts); a builder that predates them answers with `code`. */
+export type UiBuildRequest = { id: number; entry: string; tsconfig: string; external: string[]; cache?: boolean; writeCache?: string[]; modules?: ModulesRequest };
 export type UiBuildReply =
-  | { id: number; ok: true; code: string; inputs?: string[]; rssMb: number }
+  | { id: number; ok: true; code: string; modules?: ModulesBuild; inputs?: string[]; rssMb: number }
   | { id: number; ok: false; error: string; rssMb: number };
 
 const send = (reply: UiBuildReply) => process.send!(reply);
@@ -32,23 +35,35 @@ const inputsOf = (result: Awaited<ReturnType<typeof Bun.build>>) =>
 
 const writeCache = (spec: UiCacheSpec, inputs: string[]) =>
   writeUiCache(spec, inputs, async (outdir, footer) => {
+    if (spec.modules) {
+      const modules = await buildModules(spec, { have: {}, deps: null });
+      const written = await writeModulesFiles(modules, outdir);
+      return written ? { inputs: modules.inputs, file: written.file } : null;
+    }
     const result = await bundle(spec, { bytecode: true, outdir, footer });
     const file = result.outputs.find((o) => o.path.endsWith(".js"))?.path;
     return result.success && file ? { inputs: inputsOf(result), file } : null;
   });
 
 process.on("message", async (request: UiBuildRequest) => {
-  const spec: UiCacheSpec = { entry: request.entry, tsconfig: request.tsconfig, external: request.external };
+  const spec: UiCacheSpec = { entry: request.entry, tsconfig: request.tsconfig, external: request.external, modules: !!request.modules };
   try {
     if (request.writeCache) {
       await writeCache(spec, request.writeCache).catch((error) => console.error("[ui] boot bundle not written:", error));
       return send({ id: request.id, ok: true, code: "", rssMb: rssMb() });
     }
+    if (request.modules) {
+      const modules = await buildModules(spec, request.modules);
+      return send({ id: request.id, ok: true, code: "", modules, inputs: request.cache ? modules.inputs : undefined, rssMb: rssMb() });
+    }
     const result = await bundle(spec, {});
     if (!result.success) return send({ id: request.id, ok: false, error: result.logs.map(String).join("\n"), rssMb: rssMb() });
     send({ id: request.id, ok: true, code: await result.outputs[0]!.text(), inputs: request.cache ? inputsOf(result) : undefined, rssMb: rssMb() });
   } catch (error) {
-    const inner = (error as { errors?: Array<{ message?: string; position?: { file?: string; line?: number } }> }).errors ?? [];
+    const all = (error as { errors?: Array<{ message?: string; level?: string; position?: { file?: string; line?: number } }> }).errors ?? [];
+    // Warnings (a deprecated JSX form somewhere else) ride along; the errors are what broke.
+    const errors = all.filter((e) => e.level === "error");
+    const inner = errors.length ? errors : all;
     const detail = inner.map((e) => `${e.message ?? String(e)}${e.position?.file ? ` (${e.position.file}:${e.position.line})` : ""}`).join("\n");
     const message = detail || (error instanceof Error ? error.stack ?? error.message : String(error));
     send({ id: request.id, ok: false, error: message, rssMb: rssMb() });

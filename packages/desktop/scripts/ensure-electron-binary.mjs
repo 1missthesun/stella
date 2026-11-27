@@ -1,4 +1,4 @@
-import { spawnSync } from "node:child_process";
+import { spawn, spawnSync } from "node:child_process";
 import {
   constants as fsConstants,
   copyFileSync,
@@ -51,7 +51,7 @@ function getPlatformPath(platform) {
   }
 }
 
-function readElectronVersion() {
+export function readElectronVersion() {
   const pkg = JSON.parse(
     readFileSync(path.join(electronDir, "package.json"), "utf8"),
   );
@@ -93,13 +93,18 @@ export function isElectronBinaryHealthy() {
 const DEFAULT_RELEASES_URL = "https://pub-a319aaada8144dc9be5a83625033769c.r2.dev";
 const ELECTRON_GITHUB = "https://github.com/electron/electron/releases/download/";
 
+// Stella's mirror of Electron's GitHub releases first, then GitHub itself.
+export function electronMirrors() {
+  const releases = (process.env.STELLA_RELEASES_URL || DEFAULT_RELEASES_URL).replace(/\/+$/, "");
+  return [`${releases}/runtimes/github/electron/electron/releases/download/`, ELECTRON_GITHUB];
+}
+
 // GitHub release downloads answer 502/504 or time out for minutes at a time,
 // so Electron comes from Stella's mirror of that release path first
 // (scripts/mirror-runtimes.mjs), then from GitHub, for a few rounds with a
 // growing pause. checksums.json verifies the zip from either source.
 async function downloadElectronZip(downloadArtifact, details) {
-  const releases = (process.env.STELLA_RELEASES_URL || DEFAULT_RELEASES_URL).replace(/\/+$/, "");
-  const mirrors = [`${releases}/runtimes/github/electron/electron/releases/download/`, ELECTRON_GITHUB];
+  const mirrors = electronMirrors();
   let lastError;
   for (const pauseSeconds of [0, 5, 15, 30]) {
     if (pauseSeconds) {
@@ -118,7 +123,7 @@ async function downloadElectronZip(downloadArtifact, details) {
   throw lastError;
 }
 
-function resolveDownloadArch() {
+export function resolveDownloadArch() {
   let arch =
     process.env.ELECTRON_INSTALL_ARCH ||
     process.env.npm_config_arch ||
@@ -144,10 +149,7 @@ function resolveDownloadArch() {
   return arch;
 }
 
-function extractZipNatively(zipPath, distDir) {
-  rmSync(distDir, { force: true, recursive: true });
-  mkdirSync(distDir, { recursive: true });
-
+function zipExtractors(zipPath, distDir) {
   const attempts =
     process.platform === "darwin"
       ? [["ditto", ["-x", "-k", zipPath, distDir]]]
@@ -165,7 +167,7 @@ function extractZipNatively(zipPath, distDir) {
             ],
           ]
         : [
-            ["unzip", ["-o", zipPath, "-d", distDir]],
+            ["unzip", ["-q", "-o", zipPath, "-d", distDir]],
             ["tar", ["-xf", zipPath, "-C", distDir]],
           ];
 
@@ -177,6 +179,13 @@ function extractZipNatively(zipPath, distDir) {
       if (key.toLowerCase() === "psmodulepath") delete env[key];
     }
   }
+  return { attempts, env };
+}
+
+export function extractZipNatively(zipPath, distDir) {
+  rmSync(distDir, { force: true, recursive: true });
+  mkdirSync(distDir, { recursive: true });
+  const { attempts, env } = zipExtractors(zipPath, distDir);
 
   let lastError = "no extraction tool succeeded";
   for (const [command, args] of attempts) {
@@ -187,6 +196,26 @@ function extractZipNatively(zipPath, distDir) {
     lastError = result.error
       ? result.error.message
       : `${command} exited with code ${result.status}`;
+  }
+
+  throw new Error(`Failed to extract Electron zip: ${lastError}`);
+}
+
+// The same, without blocking the caller's event loop.
+export async function extractZipNativelyAsync(zipPath, distDir) {
+  rmSync(distDir, { force: true, recursive: true });
+  mkdirSync(distDir, { recursive: true });
+  const { attempts, env } = zipExtractors(zipPath, distDir);
+
+  let lastError = "no extraction tool succeeded";
+  for (const [command, args] of attempts) {
+    const outcome = await new Promise((resolve) => {
+      const child = spawn(command, args, { stdio: "ignore", env });
+      child.once("error", (error) => resolve(error.message));
+      child.once("close", (status) => resolve(status === 0 ? null : `${command} exited with code ${status}`));
+    });
+    if (!outcome) return;
+    lastError = outcome;
   }
 
   throw new Error(`Failed to extract Electron zip: ${lastError}`);
@@ -247,6 +276,56 @@ function cloneSharedDist(zipPath, distDir, platformPath) {
   }
 }
 
+// Unpacks a downloaded Electron zip into node_modules/electron/dist and
+// records path.txt, as Electron's own installer would.
+// `shared: false` skips the copy-on-write clone for a zip that is about to be
+// deleted.
+export async function installElectronZip(
+  zipPath,
+  platform = process.platform,
+  { shared = true } = {},
+) {
+  const platformPath = getPlatformPath(platform);
+  // node_modules/electron is a link into bun's store. Windows' tar.exe
+  // (November 2026 and later) refuses to extract through it ("too many
+  // symbolic link levels"), so write into the store folder itself.
+  const distDir = path.join(realpathSync(electronDir), "dist");
+  if (shared && cloneSharedDist(zipPath, distDir, platformPath)) {
+    log("Cloned the shared unpacked Electron (copy-on-write).");
+  } else {
+    extractZipNatively(zipPath, distDir);
+  }
+  await finishElectronDist(distDir, platformPath);
+}
+
+// Moves an Electron zip already unpacked into `unpackedDir` (on the same
+// volume as node_modules) into place.
+export async function adoptUnpackedElectron(unpackedDir, platform = process.platform) {
+  const platformPath = getPlatformPath(platform);
+  if (!existsSync(path.join(unpackedDir, platformPath))) {
+    throw new Error(`${unpackedDir} has no ${platformPath}`);
+  }
+  const distDir = path.join(realpathSync(electronDir), "dist");
+  rmSync(distDir, { force: true, recursive: true });
+  renameSync(unpackedDir, distDir);
+  await finishElectronDist(distDir, platformPath);
+}
+
+async function finishElectronDist(distDir, platformPath) {
+  const srcTypeDefPath = path.join(distDir, "electron.d.ts");
+  if (existsSync(srcTypeDefPath)) {
+    renameSync(srcTypeDefPath, path.join(electronDir, "electron.d.ts"));
+  }
+
+  await fsPromises.writeFile(path.join(electronDir, "path.txt"), platformPath);
+
+  if (!isElectronBinaryHealthy()) {
+    throw new Error(
+      "Electron binary still looks incomplete after re-extraction.",
+    );
+  }
+}
+
 export async function ensureElectronBinary() {
   if (usesSignedElectron(repoRootDir)) {
     return;
@@ -276,7 +355,6 @@ export async function ensureElectronBinary() {
     process.env.npm_config_platform ||
     process.platform;
   const arch = resolveDownloadArch();
-  const platformPath = getPlatformPath(platform);
 
   let checksums;
   try {
@@ -294,28 +372,7 @@ export async function ensureElectronBinary() {
     arch,
   });
 
-  // node_modules/electron is a link into bun's store. Windows' tar.exe
-  // (November 2026 and later) refuses to extract through it ("too many
-  // symbolic link levels"), so write into the store folder itself.
-  const distDir = path.join(realpathSync(electronDir), "dist");
-  if (cloneSharedDist(zipPath, distDir, platformPath)) {
-    log("Cloned the shared unpacked Electron (copy-on-write).");
-  } else {
-    extractZipNatively(zipPath, distDir);
-  }
-
-  const srcTypeDefPath = path.join(distDir, "electron.d.ts");
-  if (existsSync(srcTypeDefPath)) {
-    renameSync(srcTypeDefPath, path.join(electronDir, "electron.d.ts"));
-  }
-
-  await fsPromises.writeFile(path.join(electronDir, "path.txt"), platformPath);
-
-  if (!isElectronBinaryHealthy()) {
-    throw new Error(
-      "Electron binary still looks incomplete after re-extraction.",
-    );
-  }
+  await installElectronZip(zipPath, platform);
 
   log(`Repaired Electron ${version} (${platform}/${arch}).`);
 }

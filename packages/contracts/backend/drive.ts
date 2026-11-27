@@ -59,8 +59,13 @@ export type DeviceFileRecordInput = {
 
 export type DriveCalls = {
   "drive.prepareUpload": {
-    args: { path: string; sizeBytes: number; contentType?: string };
-    result: { path: string; uploadId: string; uploadUrl: string; contentType: string };
+    /**
+     * sendWithoutSavingIfFull: a chat image the full Drive can't take is
+     * staged for the model instead, under a server-chosen path in
+     * UNSAVED_ATTACHMENT_ROOT (result savedToDrive false). Finalize it the same way.
+     */
+    args: { path: string; sizeBytes: number; contentType?: string; sendWithoutSavingIfFull?: boolean };
+    result: { path: string; uploadId: string; uploadUrl: string; contentType: string; savedToDrive?: false };
   };
   "drive.finalizeUpload": {
     args: { path: string; uploadId: string; contentType?: string; source?: string };

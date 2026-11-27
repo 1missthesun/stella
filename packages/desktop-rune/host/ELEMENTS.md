@@ -47,7 +47,8 @@ unmounted. Render windows from anywhere with `windowPortal(<window …/>, key)` 
 
 `<window>` props: `id`, `kind` (`main` | `panel` | `overlay` | `background`), `title`, `w`, `h`, `minSize`,
 `maxSize`, `position`, `resizable`, `frameless`, `transparent`, `alwaysOnTop`, `clickThrough`,
-`visible`, `contentProtection` (left out of screen captures; macOS and Windows), `bg`/`fill`/`gradient`, `titlebar` (height of an app-drawn titlebar; the window keeps
+`visible`, `contentProtection` (left out of screen captures; macOS and Windows), `isolated` (its keys are its own: a
+command naming a key with no `window` never reaches inside it, so another window can hold the same keys), `bg`/`fill`/`gradient`, `titlebar` (height of an app-drawn titlebar; the window keeps
 its controls over it), `trafficLights` (macOS inset), `dark` (native chrome scheme), `zoom` (page zoom
 factor, as Electron's `setZoomFactor`), `dir`, `keys` +
 `onKey` (window-level chords).
@@ -138,6 +139,12 @@ dumps. An element with an `id` is memoized: it rebuilds only when it or somethin
   element or an ancestor, a change lands at once, as in CSS.
 - `enter` / `exit`: a preset (`fade rise drop blur scale pop slide`) or `{opacity, scale, x, y,
   blur, dur, bounce}`.
+- `matched: "id"` (SwiftUI `matchedGeometryEffect`): an element that mounts in the same commit
+  another with that id leaves starts where the old one was drawn, with its velocity, radius, fill
+  and opacity, and springs on its `motion` to its own place; neither plays `enter`/`exit`.
+  `matchedInPlace` keeps it in its destination's paint order and clips while it moves, so a
+  selection pill rendered only inside the selected tab slides under the labels to the next one,
+  across a scrolling strip too. Reduce Motion lands it at once.
 - `loop`: `opacity`, `rotation`, `slide`, or `sequence {period, delay, ease, frames:[{at, x, y, scale,
   opacity, rotate}]}`. `at` ≤ 1 is a fraction of the period. `scaleX` / `scaleY` are averaged,
   since Rune scales uniformly. `ease` (`linear ease easeIn easeOut easeInOut`, default `easeInOut`)
@@ -220,9 +227,16 @@ these props. Types are in `host/rune-jsx/props.ts` (`FxLayer`, `Glass`, `Lightin
 - Morphing: `morphFrom: "id"` (or `true`: the element's `anchor.to`) grows the glass out of that
   element's shape when it mounts, lensing the whole way, and shrinks it back into it when it's
   removed: the engine keeps the element on screen, inert, until the glass is home (at most 3 s).
-  The source's own glass hides while the morph holds it. The element's children fade in once the
-  glass has grown most of the way and fade out at once on removal, so give the element itself no
-  `enter`/`exit`. `morphMotion: { dur, bounce }` is the spring (0.5 s, 0.18); Reduce Motion skips
+  The source stays as it is the whole time: the morphing glass fades in over it as it leaves the
+  source's shape and out as it gets back, so the morph starts and ends as the source itself, its
+  icon and label included. The element's children are there to press from the first frame and
+  fade and scale in as the glass starts to grow; its border and shadows come in as the glass
+  nears its size. On removal the children fade out at once (the element keeps its size
+  meanwhile), so give the element itself no `enter`/`exit`. Opening it again while it goes back
+  carries on from where the glass is. The glass is clipped as the element's children are, so a
+  menu that scrolls puts `scrollY` on an inner `col` rather than on the morphing element.
+  `morphMotion: { dur, bounce }` is the opening spring (0.18 s, 0.06; it goes back on 0.7× that,
+  critically damped); Reduce Motion skips
   it. A menu anchored to its button:
   `<col anchor={{ to: "plus", side: "top" }} fx={{ glass: { …recipe, morphFrom: true } }}>`.
   `demo/gallery/GlassMorph.tsx` shows a menu, a group and a sliding tab pill

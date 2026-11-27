@@ -23,18 +23,26 @@ fn rid_of(v: &Value) -> Option<u64> {
     v.get("rid").and_then(|r| r.as_u64())
 }
 
-/// The node a command names: `target` (an element `id` prop) or `n` (a node number).
+/// The node a command names: `target` (an element `id` prop, in the `window` it names) or `n` (a
+/// node number).
 pub fn target(v: &Value) -> Option<u32> {
     if let Some(n) = v.get("n").and_then(|n| n.as_u64()) {
         return Some(n as u32);
     }
     let key = v.get("target").and_then(|t| t.as_str())?;
-    engine::read(|e| e.tree.find_key(key))
+    match v.get("window").and_then(|w| w.as_str()) {
+        Some(w) => engine::read(|e| match e.tree.find_window(w) {
+            Some(w) if e.tree.get(w).is_some_and(|n| n.props.isolated) => e.tree.find_key_in(key, w),
+            Some(w) => e.tree.find_key_in(key, w).or_else(|| e.tree.find_key(key)),
+            None => e.tree.find_key(key),
+        }),
+        None => engine::read(|e| e.tree.find_key(key)),
+    }
 }
 
 fn window_named(v: &Value) -> Option<u32> {
     if let Some(w) = v.get("window").and_then(|w| w.as_str()) {
-        return engine::read(|e| e.tree.find_key(w).filter(|n| e.windows.contains_key(n)));
+        return engine::read(|e| e.tree.find_window(w).filter(|n| e.windows.contains_key(n)));
     }
     if let Some(w) = v.get("window").and_then(|w| w.as_u64()) {
         return Some(w as u32);

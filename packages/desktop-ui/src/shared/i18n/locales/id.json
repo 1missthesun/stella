@@ -885,68 +885,6 @@
         "discard": "Buang"
       },
       "tagline": "Bicara dan menggambarlah untuk menunjukkan maksud Anda kepada Stella."
-    },
-    "welcomeDemos": {
-      "play": "Putar demo ini",
-      "replay": "Putar ulang demo ini",
-      "errands": {
-        "title": "Tur singkat",
-        "tablist": "Demo kemampuan",
-        "chapters": {
-          "errands": {
-            "word": "Urusan",
-            "title": "Minta sekali. Anggap beres.",
-            "caption": "Saya menemukan tempat yang tepat, mengisi formulirnya, dan memasukkannya ke kalender Anda, persis seperti yang akan Anda lakukan."
-          },
-          "shopping": {
-            "word": "Belanja",
-            "title": "Saya bisa membeli barang, dengan persetujuan Anda.",
-            "caption": "Saya menemukannya dan membawanya sampai ke checkout. Anda mengonfirmasi totalnya, lalu saya memesan."
-          },
-          "work": {
-            "word": "Kerja",
-            "title": "File sungguhan. Beberapa pekerjaan sekaligus.",
-            "caption": "Saya bekerja di dalam aplikasi sungguhan di komputer ini, dan bisa menjalankan lebih dari satu pekerjaan sekaligus."
-          },
-          "build": {
-            "word": "Bangun",
-            "title": "Katakan saja. Saya yang membuatnya.",
-            "caption": "Aplikasi dan situs web sesuai pesanan. Jelaskan dengan kata-kata sederhana, lalu saya akan membuatnya, menjalankannya, dan menayangkannya."
-          },
-          "routines": {
-            "word": "Rutinitas",
-            "title": "Minta sekali. Terjadi setiap hari.",
-            "caption": "Jadwalkan apa saja dan saya akan mengerjakannya tepat waktu, bahkan saat Anda tidur."
-          }
-        }
-      },
-      "customize": {
-        "title": "Saya bisa mengubah diri sendiri",
-        "body": "Ada fitur yang kurang, atau ingin sesuatu bekerja dengan cara lain? Cukup minta. Saya akan menulis ulang kode saya sendiri, Anda mencobanya, dan Anda yang memutuskan apakah akan dipertahankan.",
-        "hint": "Perubahan tetap berada di komputer ini.",
-        "steps": {
-          "ask": {
-            "title": "Minta",
-            "body": "Jelaskan perubahannya dengan kata-kata sederhana."
-          },
-          "preview": {
-            "title": "Pratinjau",
-            "body": "Sebuah tugas membuatnya dan membuka pratinjau langsung."
-          },
-          "update": {
-            "title": "Perbarui",
-            "body": "Satu klik untuk menerapkannya. Urungkan kapan saja."
-          }
-        }
-      },
-      "memory": {
-        "title": "Satu percakapan",
-        "titleChatbot": "Anda pasti tahu ini",
-        "bodyChatbot": "Chat baru setiap kali, sidebar penuh chat lama, dan tidak ingat apa yang Anda katakan minggu lalu.",
-        "titleStella": "Bersama saya, cukup satu percakapan",
-        "bodyStella": "Tanpa chat baru, tanpa utas. Semua yang pernah Anda katakan ada di satu tempat, jadi saat Anda bertanya soal minggu lalu, saya mencarinya.",
-        "showStella": "Sekarang tanya saya"
-      }
     }
   },
   "global": {
@@ -1030,7 +968,6 @@
       }
     },
     "localMode": {
-      "banner": "Obrolanmu tetap di komputer ini. Masuk untuk memakai Stella di ponselmu dan menjaga semuanya tetap sinkron.",
       "needsAccount": "Ini berjalan di cloud Stella, jadi perlu akun Stella.",
       "syncFailed": "Tidak bisa menambahkan obrolan ini ke akunmu. Obrolan masih ada di komputer ini.",
       "synced": "Obrolan ini sudah ditambahkan ke akunmu."
@@ -1806,6 +1743,43 @@
   },
   "onboarding": {
     "chat": {
+      "composerPlaceholder": "Or just ask me something to get started",
+      "extras": {
+        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
+        "accessibilityTitle": "Accessibility",
+        "enable": "Enable",
+        "enabled": "Enabled",
+        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionOpened": "Opened",
+        "extensionTitle": "Stella for Chrome",
+        "getExtension": "Get extension",
+        "hint": "All of this lives in Settings too.",
+        "restart": "Restart Stella",
+        "restartHint": "Screen access needs a quick restart to take effect.",
+        "screenDesc": "So I can see the screen when you ask me to.",
+        "screenTitle": "Screen Recording",
+        "settledTitle": "Extras",
+        "heading": "Tambahan opsional",
+        "lead": "Tidak ada yang wajib, tapi masing-masing membuatku lebih berguna.",
+        "start": "Mulai mengobrol"
+      },
+      "gmail": {
+        "body": "Cari email, ikuti percakapan, dan buat draf balasan, cukup dengan meminta.",
+        "connect": "Hubungkan Gmail",
+        "connected": "Terhubung",
+        "connecting": "Menunggu Google…",
+        "error": "Gagal menghubungkan Gmail. Coba lagi, atau lewati dulu.",
+        "title": "Gmail"
+      },
+      "messages": {
+        "extras": "Almost done. A little housekeeping, then we start.",
+        "signin": "Halo, saya Stella. Pertama, pilih cara aku berpikir: paket Claude atau ChatGPT yang sudah kamu punya, kunci milikmu sendiri, atau akun Stella."
+      },
+      "progress": "Kemajuan penyiapan",
+      "replies": {
+        "signinDone": "Selesai."
+      },
+      "send": "Send",
       "signin": {
         "body": "Salah satunya sudah cukup. Anda bisa menambahkan yang lain nanti.",
         "claudeCliMissing": "Pasang Claude Code terlebih dahulu, lalu coba lagi.",
@@ -1841,7 +1815,8 @@
         "settledNone": "Belum ada AI yang dipilih",
         "settledNoneDesc": "Masuk atau hubungkan paket kapan saja untuk mulai mengobrol.",
         "fineOwnPlan": "ChatGPT dan Claude Code memakai langganan Anda sendiri di OpenAI atau Anthropic. Ubah kapan saja di Pengaturan."
-      }
+      },
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "Dengan menggunakan Stella, Anda menyetujui {terms} dan {privacy} kami.",
     "privacyPolicy": "Kebijakan Privasi",
@@ -2428,6 +2403,11 @@
         "twinkle": "Kerlip"
       },
       "title": "Suara pesan"
+    },
+    "onboardingReplay": {
+      "action": "Replay",
+      "description": "Jalankan orientasi lagi. Data Anda tetap ada.",
+      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3412,9 +3392,11 @@
     },
     "onboarding": {
       "link": "Punya server Stella sendiri? Hubungkan",
+      "prose": "Anda terhubung ke {name} sebagai pemiliknya. Sekarang pilih apa yang saya gunakan untuk berpikir: paket Claude atau ChatGPT Anda, atau kunci API Anda sendiri.",
       "title": "Terhubung ke {name}",
       "body": "Anda masuk sebagai pemilik. Pilih apa yang dipakai Stella untuk berpikir. Satu saja cukup.",
-      "bodyOptional": "Anda masuk sebagai pemilik. Server ini punya model sendiri, jadi ini opsional: Anda juga bisa memakai paket Claude atau ChatGPT, atau kunci API."
+      "bodyOptional": "Anda masuk sebagai pemilik. Server ini punya model sendiri, jadi ini opsional: Anda juga bisa memakai paket Claude atau ChatGPT, atau kunci API.",
+      "settled": "Terhubung ke {name}"
     }
   },
   "contextMenu": {
@@ -3881,21 +3863,6 @@
     "phoneApp": {
       "title": "Stella juga ada di ponselmu",
       "detail": "Dapatkan aplikasinya untuk mengirim pesan ke Stella dan memantau tugasmu saat kamu jauh dari komputer ini."
-    }
-  },
-  "welcome": {
-    "actions": {
-      "getExtension": "Dapatkan Stella for Chrome",
-      "connectGmail": "Hubungkan Gmail",
-      "gmailWaiting": "Menunggu Google…",
-      "gmailRetry": "Coba Gmail lagi",
-      "watchErrands": "Lihat cara kerjanya",
-      "signIn": "Masuk",
-      "getPhoneApp": "Dapatkan aplikasi ponsel",
-      "watchMemory": "Lihat caranya",
-      "connectPlan": "Hubungkan paket",
-      "changeLook": "Ubah tampilanku",
-      "watchCustomize": "Lihat perubahannya"
     }
   }
 }

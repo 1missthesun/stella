@@ -305,6 +305,7 @@ const uploadOne = async (
       path,
       sizeBytes: file.size,
       contentType,
+      sendWithoutSavingIfFull: true,
     });
     await putWithProgress(
       preparedUpload,

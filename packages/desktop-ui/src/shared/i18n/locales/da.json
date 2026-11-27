@@ -893,68 +893,6 @@
         "discard": "Kassér"
       },
       "tagline": "Tal og tegn for at vise Stella, hvad du mener."
-    },
-    "welcomeDemos": {
-      "play": "Afspil denne demo",
-      "replay": "Afspil demoen igen",
-      "errands": {
-        "title": "Den hurtige rundtur",
-        "tablist": "Demoer af det, jeg kan",
-        "chapters": {
-          "errands": {
-            "word": "Ærinder",
-            "title": "Spørg én gang. Så er det klaret.",
-            "caption": "Jeg finder det rette sted, udfylder formularen og sætter det i din kalender, ligesom du selv ville gøre."
-          },
-          "shopping": {
-            "word": "Indkøb",
-            "title": "Jeg kan købe ting, med din godkendelse.",
-            "caption": "Jeg finder det og bringer det helt til kassen. Du bekræfter beløbet, og jeg afgiver ordren."
-          },
-          "work": {
-            "word": "Arbejde",
-            "title": "Rigtige filer. Flere opgaver på én gang.",
-            "caption": "Jeg arbejder i de rigtige apps på denne computer, og jeg kan køre mere end én opgave ad gangen."
-          },
-          "build": {
-            "word": "Byg",
-            "title": "Sig det. Jeg bygger det.",
-            "caption": "Apps og hjemmesider efter mål. Beskriv det med almindelige ord, så bygger jeg det, kører det og lægger det online."
-          },
-          "routines": {
-            "word": "Rutiner",
-            "title": "Bed om det én gang. Det sker hver dag.",
-            "caption": "Planlæg hvad som helst, så gør jeg det til tiden, selv mens du sover."
-          }
-        }
-      },
-      "customize": {
-        "title": "Jeg kan ændre mig selv",
-        "body": "Mangler du en funktion, eller vil du have noget til at fungere anderledes? Bare spørg. Jeg omskriver min egen kode, lader dig prøve den, og du bestemmer, om du vil beholde den.",
-        "hint": "Ændringer bliver på denne computer.",
-        "steps": {
-          "ask": {
-            "title": "Spørg",
-            "body": "Beskriv ændringen med almindelige ord."
-          },
-          "preview": {
-            "title": "Forhåndsvis",
-            "body": "En opgave bygger den og åbner en live-forhåndsvisning."
-          },
-          "update": {
-            "title": "Opdater",
-            "body": "Ét klik for at anvende den. Fortryd når som helst."
-          }
-        }
-      },
-      "memory": {
-        "title": "Én samtale",
-        "titleChatbot": "Den her kender du",
-        "bodyChatbot": "En ny chat hver gang, en sidebjælke fuld af gamle, og ingen hukommelse om, hvad du sagde i sidste uge.",
-        "titleStella": "Med mig er det én samtale",
-        "bodyStella": "Ingen nye chats, ingen tråde. Alt, hvad du nogensinde har fortalt mig, er samme sted, så når du spørger om sidste uge, finder jeg det.",
-        "showStella": "Spørg mig nu"
-      }
     }
   },
   "global": {
@@ -1039,7 +977,6 @@
       }
     },
     "localMode": {
-      "banner": "Dine chats bliver på denne computer. Log ind for at bruge Stella på din telefon og holde alt synkroniseret.",
       "needsAccount": "Det kører i Stellas cloud og kræver derfor en Stella-konto.",
       "syncFailed": "Chatten kunne ikke føjes til din konto. Den er stadig på denne computer.",
       "synced": "Chatten er føjet til din konto."
@@ -1816,6 +1753,43 @@
   },
   "onboarding": {
     "chat": {
+      "composerPlaceholder": "Or just ask me something to get started",
+      "extras": {
+        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
+        "accessibilityTitle": "Accessibility",
+        "enable": "Enable",
+        "enabled": "Enabled",
+        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionOpened": "Opened",
+        "extensionTitle": "Stella for Chrome",
+        "getExtension": "Get extension",
+        "hint": "All of this lives in Settings too.",
+        "restart": "Restart Stella",
+        "restartHint": "Screen access needs a quick restart to take effect.",
+        "screenDesc": "So I can see the screen when you ask me to.",
+        "screenTitle": "Screen Recording",
+        "settledTitle": "Extras",
+        "heading": "Valgfrie ekstra",
+        "lead": "Intet af dette er påkrævet, men hver af dem gør mig mere nyttig.",
+        "start": "Begynd at chatte"
+      },
+      "gmail": {
+        "body": "Find e-mails, indhent tråde og skriv udkast til svar, bare ved at spørge.",
+        "connect": "Forbind Gmail",
+        "connected": "Forbundet",
+        "connecting": "Venter på Google…",
+        "error": "Gmail kunne ikke forbindes. Prøv igen, eller spring over indtil videre.",
+        "title": "Gmail"
+      },
+      "messages": {
+        "extras": "Almost done. A little housekeeping, then we start.",
+        "signin": "Hej, jeg er Stella. Vælg først, hvordan jeg tænker: dit Claude- eller ChatGPT-abonnement, din egen nøgle eller en Stella-konto."
+      },
+      "progress": "Opsætningsforløb",
+      "replies": {
+        "signinDone": "Færdig."
+      },
+      "send": "Send",
       "signin": {
         "body": "Én af disse er nok. Du kan tilføje de andre senere.",
         "claudeCliMissing": "Installer Claude Code først, og prøv så igen.",
@@ -1851,7 +1825,8 @@
         "settledNone": "Ingen AI valgt endnu",
         "settledNoneDesc": "Log ind eller forbind et abonnement når som helst for at begynde at chatte.",
         "fineOwnPlan": "ChatGPT og Claude Code bruger dit eget abonnement hos OpenAI eller Anthropic. Du kan ændre det når som helst i Indstillinger."
-      }
+      },
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "Ved at bruge Stella accepterer du vores {terms} og {privacy}.",
     "privacyPolicy": "Privatlivspolitik",
@@ -2438,6 +2413,11 @@
         "twinkle": "Glimt"
       },
       "title": "Beskedlyd"
+    },
+    "onboardingReplay": {
+      "action": "Replay",
+      "description": "Kør introduktionen igen. Dine data bevares.",
+      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3446,9 +3426,11 @@
     },
     "onboarding": {
       "link": "Har du din egen Stella-server? Forbind den",
+      "prose": "Du er forbundet til {name} og logget ind som ejer. Vælg nu, hvad jeg tænker med: dit Claude- eller ChatGPT-abonnement eller din egen API-nøgle.",
       "title": "Forbundet til {name}",
       "body": "Du er logget ind som ejer. Vælg, hvad Stella tænker med. Én er nok.",
-      "bodyOptional": "Du er logget ind som ejer. Denne server har sine egne modeller, så dette er valgfrit: du kan også bruge dit Claude- eller ChatGPT-abonnement eller en API-nøgle."
+      "bodyOptional": "Du er logget ind som ejer. Denne server har sine egne modeller, så dette er valgfrit: du kan også bruge dit Claude- eller ChatGPT-abonnement eller en API-nøgle.",
+      "settled": "Forbundet til {name}"
     }
   },
   "contextMenu": {
@@ -3940,21 +3922,6 @@
     "phoneApp": {
       "title": "Stella er også på din telefon",
       "detail": "Hent appen for at skrive til Stella og følge dine opgaver, når du er væk fra denne computer."
-    }
-  },
-  "welcome": {
-    "actions": {
-      "getExtension": "Hent Stella for Chrome",
-      "connectGmail": "Forbind Gmail",
-      "gmailWaiting": "Venter på Google…",
-      "gmailRetry": "Prøv Gmail igen",
-      "watchErrands": "Se den arbejde",
-      "signIn": "Log ind",
-      "getPhoneApp": "Hent telefonappen",
-      "watchMemory": "Se hvordan",
-      "connectPlan": "Forbind et abonnement",
-      "changeLook": "Skift mit udseende",
-      "watchCustomize": "Se den ændre sig"
     }
   }
 }

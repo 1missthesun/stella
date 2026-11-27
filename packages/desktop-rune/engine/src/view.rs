@@ -6,7 +6,7 @@ use rune::{El, GrowthSpec, Tx, col, el, row};
 use serde_json::json;
 
 use crate::engine::{Engine, element_event, utf16_of};
-use crate::props::{Kind, Props};
+use crate::props::{Kind, Props, Size};
 use crate::tree::Node;
 use crate::windows::Win;
 use crate::{keys, media, style, text};
@@ -39,8 +39,8 @@ pub fn children(s: &Win, eng: &Engine, n: &Node, mut e: El) -> El {
             .filter_map(|(i, c)| eng.tree.get(*c).filter(|x| x.kind == Kind::Webview || eng.tree.web_above.contains(c)).map(|x| (i, paint_order(&x.props))))
             .collect()
     };
-    // A `morphFrom` glass grows from its source with its content fading in a beat behind.
-    let reveal = crate::fx::morph_spring(&n.props).map(|m| (m.duration * 0.3, rune::Spring::new(m.duration * 0.6, 0.0)));
+    let morph = crate::fx::morph_spring(&n.props);
+    let grow_from = morph.map(|_| source_origin(&n.props));
     for (i, c) in n.children.iter().enumerate() {
         let Some(child) = eng.tree.get(*c) else {
             e = e.child(build(s, eng, *c));
@@ -55,8 +55,8 @@ pub fn children(s: &Win, eng: &Engine, n: &Node, mut e: El) -> El {
             && !toward_web.iter().any(|(j, _)| *j == i)
             && toward_web.iter().any(|(j, order)| paint_order(p) > *order || (paint_order(p) == *order && i > *j));
         let mut ce = if over { build_over(s, eng, *c) } else { build(s, eng, *c) };
-        if let Some((delay, fade)) = reveal.filter(|_| p.enter.is_none() && p.exit.is_none()) {
-            ce = ce.transition(rune::Transition::opacity().springs(rune::SpringPair::new(fade, rune::Spring::new(0.14, 0.0)))).enter_delay(delay);
+        if let Some(spring) = morph.filter(|_| p.enter.is_none() && p.exit.is_none()) {
+            ce = reveal(ce, spring, grow_from.unwrap_or(([0.5, 0.5], None)));
         }
         e = e.child(ce);
     }
@@ -96,10 +96,53 @@ fn sees_through(p: &Props) -> bool {
     p.backdrop_blur.is_some_and(|b| b > 0.0) || p.fill.as_ref().is_some_and(|c| c.0.a < 1.0)
 }
 
+/// Brings a `morphFrom` glass's content in with the glass: there to press from the first frame,
+/// growing out of the source's side (see `source_origin`) on the glass's own spring as it fades in.
+/// It's uncovered from the source's edge as it grows, so it stays inside the growing glass.
+pub fn reveal(e: El, spring: rune::Spring, (from, edge): ([f32; 2], Option<rune::Edge>)) -> El {
+    let mut grow = rune::Transition::scale_anchor(0.8, rune::Vec2::new(from[0], from[1])).allow_small_scale();
+    if let Some(edge) = edge {
+        grow = grow.combined(rune::Transition::reveal(edge));
+    }
+    e.transition(grow.springs(rune::SpringPair::new(spring, CONTENT_OUT)))
+}
+
+/// Where a `morphFrom` element's source sits, in units of the element's size, for its content
+/// to grow out of, and the edge it's on: the anchor's side and alignment (a menu above its
+/// button, aligned to the start, grows from its bottom-left corner); its centre without an anchor.
+fn source_origin(p: &Props) -> ([f32; 2], Option<rune::Edge>) {
+    let Some(a) = &p.anchor else { return ([0.5, 0.5], None) };
+    let along = match a.align.as_deref() {
+        Some("center") => 0.5,
+        Some("end") => 1.0,
+        _ => 0.0,
+    };
+    match a.side.as_deref() {
+        Some("top") => ([along, 1.0], Some(rune::Edge::Bottom)),
+        Some("left") => ([1.0, along], Some(rune::Edge::Trailing)),
+        Some("right") => ([0.0, along], Some(rune::Edge::Leading)),
+        _ => ([along, 0.0], Some(rune::Edge::Top)),
+    }
+}
+
+/// A `morphFrom` glass's border and shadows, which only fit its own shape: they come in as the
+/// glass nears it.
+pub fn reveal_chrome(e: El, spring: rune::Spring) -> El {
+    let fade = rune::Spring::new((spring.duration * 0.35).max(0.01), 0.0);
+    e.transition(rune::Transition::opacity().springs(rune::SpringPair::new(fade, CONTENT_OUT))).enter_delay(spring.duration * 0.5)
+}
+
+/// How fast a closing `morphFrom` glass's content goes, ahead of the glass shrinking back.
+const CONTENT_OUT: rune::Spring = rune::Spring::new(0.045, 0.0);
+
 /// A closing `morphFrom` element (`Tree::closing`): its glass morphing back, nothing to press,
 /// focus or dismiss.
-fn closing_props(p: &crate::props::Props) -> crate::props::Props {
+fn closing_props(id: u32, p: &crate::props::Props) -> crate::props::Props {
     let mut c = p.clone();
+    if let Some([w, h]) = crate::fx::whole_size(id) {
+        (c.w, c.h, c.min_h, c.max_h) = (Some(Size::Pt(w)), Some(Size::Pt(h)), None, None);
+        (c.min_w, c.max_w) = (None, None);
+    }
     c.modal = None;
     c.inert = true;
     c.focusable = false;
@@ -109,14 +152,14 @@ fn closing_props(p: &crate::props::Props) -> crate::props::Props {
     c.on.clear();
     c.enter = None;
     c.exit = None;
-    c
+    crate::fx::without_chrome(&c)
 }
 
 fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
     let held;
     let closing = eng.tree.closing.contains_key(&id);
     let p = if closing {
-        held = closing_props(&n.props);
+        held = closing_props(id, &n.props);
         &held
     } else {
         &*n.props
@@ -138,7 +181,7 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
     }
     let e = build_kind(s, eng, id, n, p);
     OVER.set(over);
-    let e = style::apply(e, p);
+    let e = if !closing && crate::fx::morphs(p) { style::apply(e, &crate::fx::without_chrome(p)) } else { style::apply(e, p) };
     let mut e = handlers(e, id, p, false);
     #[cfg(feature = "webview")]
     if eng.tree.clippers.contains(&id) {
@@ -150,7 +193,7 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
         e = e.transition(rune::Transition::none());
     }
     if closing {
-        e = e.transition(rune::Transition::none()).child_exit(rune::Transition::opacity().springs(rune::SpringPair::new(rune::Spring::new(0.16, 0.0), rune::Spring::new(0.14, 0.0))));
+        e = e.transition(rune::Transition::none()).child_exit(rune::Transition::opacity().springs(rune::SpringPair::new(CONTENT_OUT, CONTENT_OUT)));
     }
     e.key(rune_key(id, p))
 }

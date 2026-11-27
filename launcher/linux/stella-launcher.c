@@ -2039,6 +2039,71 @@ static int extract_zip(const char *archive, const char *dir) {
     return ok ? 0 : -1;
 }
 
+/* Downloads Bun <version> into runtimes/bun-<version>/bun. Also run on a
+ * thread while the app source clones (bun_prefetch), so nothing here may
+ * touch the UI. */
+static int install_bun(const char *version, const char *url, const char *sha, const char *member) {
+    char *dir = xasprintf("%s/bun-%s", P.runtimes, version);
+    char *bin = xasprintf("%s/bun", dir);
+    char *archive = xasprintf("%s/bun-%s.zip", P.runtimes, version);
+    char *staging = xasprintf("%s/.bun-%s.partial", P.runtimes, version);
+    char *member_path = NULL;
+    int rc = -1;
+    LOG("install: downloading bun %s from %s", version, url);
+    mkdirs(P.runtimes, 0755);
+    if (download(url, archive, sha) != 0) goto out;
+    remove_tree(staging);
+    if (extract_zip(archive, staging) != 0) goto out;
+    member_path = xasprintf("%s/%s", staging, member ? member : "bun");
+    mkdirs(dir, 0755);
+    unlink(bin);
+    if (rename(member_path, bin) != 0) {
+        set_error("Bun's archive has no %s.", member ? member : "bun");
+        goto out;
+    }
+    chmod(bin, 0755);
+    remove_tree(staging);
+    LOG("install: bun %s ready", version);
+    rc = 0;
+out:
+    unlink(archive);
+    free(member_path); free(archive); free(staging); free(dir); free(bin);
+    return rc;
+}
+
+/* The launcher's own Bun pin is almost always the one the app source asks
+ * for, so a first install fetches it while git clones. */
+static pthread_t g_bun_prefetch;
+static int g_bun_prefetching;
+
+static void *bun_prefetch_main(void *arg) {
+    size_t i;
+    const char *key = platform_key();
+    (void)arg;
+    for (i = 0; i < sizeof(BUN_ASSETS) / sizeof(BUN_ASSETS[0]); i++)
+        if (!strcmp(BUN_ASSETS[i].key, key)) {
+            if (install_bun(BUN_VERSION, BUN_ASSETS[i].url, BUN_ASSETS[i].sha256, BUN_ASSETS[i].member) != 0)
+                LOG("install: early bun download failed (%s); trying again after the clone", last_error());
+            break;
+        }
+    return NULL;
+}
+
+static void start_bun_prefetch(void) {
+    char *bin;
+    if (O.local_bun || g_bun_prefetching) return;
+    bin = xasprintf("%s/bun-%s/bun", P.runtimes, BUN_VERSION);
+    if (!is_executable(bin) && pthread_create(&g_bun_prefetch, NULL, bun_prefetch_main, NULL) == 0)
+        g_bun_prefetching = 1;
+    free(bin);
+}
+
+static void join_bun_prefetch(void) {
+    if (!g_bun_prefetching) return;
+    pthread_join(g_bun_prefetch, NULL);
+    g_bun_prefetching = 0;
+}
+
 static int ensure_bun(void) {
     const char *key = platform_key();
     const char *version = BUN_VERSION, *url = NULL, *sha = NULL, *member = NULL;
@@ -2096,32 +2161,13 @@ static int ensure_bun(void) {
         goto out;
     }
 
+    join_bun_prefetch();
     dir = xasprintf("%s/bun-%s", P.runtimes, version);
     bin = xasprintf("%s/bun", dir);
     if (!is_executable(bin)) {
-        char *archive = xasprintf("%s/bun-%s.zip", P.runtimes, version);
-        char *staging = xasprintf("%s/.bun-%s.partial", P.runtimes, version);
-        char *member_path;
-        if (!url || !sha) { set_error("No Bun %s for %s.", version, key); free(archive); free(staging); goto out; }
+        if (!url || !sha) { set_error("No Bun %s for %s.", version, key); goto out; }
         progress_show("Getting things ready…", 0.30, 0.40);
-        LOG("install: downloading bun %s from %s", version, url);
-        mkdirs(P.runtimes, 0755);
-        if (download(url, archive, sha) != 0) { free(archive); free(staging); goto out; }
-        remove_tree(staging);
-        if (extract_zip(archive, staging) != 0) { free(archive); free(staging); goto out; }
-        member_path = xasprintf("%s/%s", staging, member ? member : "bun");
-        mkdirs(dir, 0755);
-        unlink(bin);
-        if (rename(member_path, bin) != 0) {
-            set_error("Bun's archive has no %s.", member ? member : "bun");
-            free(member_path); free(archive); free(staging);
-            goto out;
-        }
-        chmod(bin, 0755);
-        remove_tree(staging);
-        unlink(archive);
-        free(member_path); free(archive); free(staging);
-        LOG("install: bun %s ready", version);
+        if (install_bun(version, url, sha, member) != 0) goto out;
     }
     free(g_bun_bin); g_bun_bin = xstrdup(bin);
     free(g_bun_version); g_bun_version = xstrdup(version);
@@ -2148,8 +2194,10 @@ static int engine_requested(void) {
 }
 
 /* launcher.json "stellaEngine": {"version", "assets": {<platform>: {"url", "sha256", "member"?}}};
- * an asset without "member" is the bare binary, one with it is a zip holding it. */
-static int ensure_engine(void) {
+ * an asset without "member" is the bare binary, one with it is a zip holding it.
+ * Also run on a thread while dependencies install (engine_prefetch), with
+ * show_progress 0, so nothing here may touch the UI then. */
+static int install_engine(int show_progress) {
     const char *key = strcmp(platform_key(), "linux-x64-baseline") ? platform_key() : "linux-x64";
     char *manifest_path = xasprintf("%s/packages/desktop/launcher.json", P.app);
     char *manifest = read_file(manifest_path, NULL);
@@ -2183,7 +2231,7 @@ static int ensure_engine(void) {
     bin = xasprintf("%s/stella-engine", dir);
     if (!is_executable(bin)) {
         char *download_path = xasprintf("%s/.stella-engine-%s.download", P.runtimes, version);
-        progress_show("Getting things ready…", 0.30, 0.40);
+        if (show_progress) progress_show("Getting things ready…", 0.30, 0.40);
         LOG("install: downloading stella-engine %s from %s", version, url);
         mkdirs(dir, 0755);
         if (download(url, download_path, sha) != 0) { free(download_path); goto out; }
@@ -2209,8 +2257,10 @@ static int ensure_engine(void) {
         chmod(bin, 0755);
         LOG("install: stella-engine %s ready", version);
     }
-    free(g_engine_bin); g_engine_bin = xstrdup(bin);
-    free(g_engine_version); g_engine_version = xstrdup(version);
+    if (show_progress) {
+        free(g_engine_bin); g_engine_bin = xstrdup(bin);
+        free(g_engine_version); g_engine_version = xstrdup(version);
+    }
     rc = 0;
 out:
     mj_free(json);
@@ -2218,6 +2268,34 @@ out:
     free(dir);
     free(bin);
     return rc;
+}
+
+/* A first install fetches the engine while dependencies install. It starts
+ * once the cloned source is verified, since the engine's URL and checksum
+ * come from that source's launcher.json, and is joined before the launch. */
+static pthread_t g_engine_prefetch;
+static int g_engine_prefetching;
+
+static void *engine_prefetch_main(void *arg) {
+    (void)arg;
+    if (install_engine(0) != 0) LOG("install: early stella-engine download failed (%s); trying again", last_error());
+    return NULL;
+}
+
+static void start_engine_prefetch(void) {
+    if (O.engine_bin || g_engine_prefetching || !engine_requested()) return;
+    if (pthread_create(&g_engine_prefetch, NULL, engine_prefetch_main, NULL) == 0) g_engine_prefetching = 1;
+}
+
+static void join_engine_prefetch(void) {
+    if (!g_engine_prefetching) return;
+    pthread_join(g_engine_prefetch, NULL);
+    g_engine_prefetching = 0;
+}
+
+static int ensure_engine(void) {
+    join_engine_prefetch();
+    return install_engine(1);
 }
 
 static int bootstrap_access(char **remote, char **token) {
@@ -2359,7 +2437,9 @@ static void install_desktop_entry(void) {
     free(installed);
 }
 
-static char *prepare(void) {
+/* Returns Electron's binary. With rune set (the Rune engine starts instead)
+ * Electron is neither fetched nor needed, and this returns "". */
+static char *prepare(int rune) {
     char *lock = xasprintf("%s/bun.lock", P.app);
     char *lock_hash = sha256_file(lock);
     char *electron_pkg = xasprintf("%s/node_modules/electron/package.json", P.app);
@@ -2370,15 +2450,30 @@ static char *prepare(void) {
     if (!lock_hash) goto out;
     if (!S.bun_lock_hash || strcmp(S.bun_lock_hash, lock_hash) != 0 || !file_exists(electron_pkg)) {
         StrList env = base_environment();
-        char *argv[] = {g_bun_bin, "install", "--frozen-lockfile", NULL};
+        /* install-deps.mjs (newer app sources) starts bun's cache from a
+         * per-platform seed and fetches Electron and the prepare-install
+         * helpers alongside; older sources get a plain bun install. */
+        char *install_deps = xasprintf("%s/packages/desktop/scripts/install-deps.mjs", P.app);
+        int seeded = file_exists(install_deps);
+        char *plain_argv[] = {g_bun_bin, "install", "--frozen-lockfile", NULL};
+        char *seeded_argv[] = {g_bun_bin, install_deps, NULL};
+        char **argv = seeded ? seeded_argv : plain_argv;
         CmdResult r;
         double started = now_seconds();
         progress_show("Installing Stella…", 0.40, 0.82);
-        LOG("prepare: bun install --frozen-lockfile (lock %.12s)", lock_hash);
+        LOG("prepare: %s (lock %.12s)", seeded ? "install-deps.mjs" : "bun install --frozen-lockfile", lock_hash);
         env_set(&env, "STELLA_SKIP_BROWSER_HYDRATE", "1");
         env_set(&env, "STELLA_SKIP_OFFICE_HYDRATE", "1");
-        if (run_cmd(argv, P.app, env.items, P.install_log, 30 * 60, &r) != 0) { sl_free(&env); goto out; }
+        /* base_environment() strips the engine choice; install-deps.mjs
+         * skips Electron and its bundle for Rune. */
+        if (rune) env_set(&env, "STELLA_LAUNCHER_ENGINE", "rune");
+        if (run_cmd(argv, P.app, env.items, P.install_log, 30 * 60, &r) != 0) {
+            sl_free(&env);
+            free(install_deps);
+            goto out;
+        }
         sl_free(&env);
+        free(install_deps);
         if (r.timed_out || r.code != 0) {
             char *tail = last_lines(r.err, 20);
             if (r.timed_out) set_error("bun install timed out after 30 minutes:\n%s", tail);
@@ -2417,6 +2512,25 @@ static char *prepare(void) {
         sl_free(&env);
     }
 
+    if (rune) {
+        result = xstrdup("");
+        goto out;
+    }
+    if (!is_executable(electron)) {
+        /* Dependencies installed for Rune have no Electron binary; fetch it
+         * now that Electron starts instead. */
+        char *ensure = xasprintf("%s/packages/desktop/scripts/ensure-electron-binary.mjs", P.app);
+        if (file_exists(ensure)) {
+            StrList env = base_environment();
+            char *argv[] = {g_bun_bin, ensure, NULL};
+            CmdResult r;
+            progress_show("Getting things ready…", 0.90, 0.96);
+            LOG("prepare: Electron is missing; running ensure-electron-binary.mjs");
+            if (run_cmd(argv, P.app, env.items, P.install_log, 10 * 60, &r) == 0) cmd_free(&r);
+            sl_free(&env);
+        }
+        free(ensure);
+    }
     if (!is_executable(electron)) {
         set_error("Electron is not installed (missing %s).", electron);
         goto out;
@@ -3290,12 +3404,21 @@ static Command recover(const char *reason, const StrList *output) {
 
 static OutsideChanges g_outside;
 
+static char *prepare_for_launch_steps(void);
+
 static char *prepare_for_launch(void) {
+    char *result = prepare_for_launch_steps();
+    join_engine_prefetch();
+    return result;
+}
+
+static char *prepare_for_launch_steps(void) {
     char *git_dir;
     int found;
     mkdirs(P.root, 0755);
     mkdirs(P.logs, 0755);
     mkdirs(P.runtimes, 0755);
+    start_bun_prefetch();
     if (ensure_git() != 0) return NULL;
     if (!g_signer && !(g_signer = signer_create())) return NULL;
     follow_server_file();
@@ -3328,10 +3451,12 @@ static char *prepare_for_launch(void) {
         return NULL;
     }
     LOG("verify: HEAD signed and clean");
+    start_engine_prefetch();
     if (ensure_bun() != 0) return NULL;
     {
-        char *electron = prepare();
-        if (!electron || !engine_requested()) return electron;
+        int rune = engine_requested();
+        char *electron = prepare(rune);
+        if (!electron || !rune) return electron;
         free(electron);
         if (ensure_engine() != 0) return NULL;
         LOG("launcher: starting stella-engine %s (%s) instead of Electron", g_engine_version, g_engine_bin);

@@ -21,8 +21,7 @@ export type DisplayTabKind =
   | "download"
   | "text"
   | "folder"
-  | "trash"
-  | "demo";
+  | "trash";
 
 export type DisplayTabSpec = {
   id: string;

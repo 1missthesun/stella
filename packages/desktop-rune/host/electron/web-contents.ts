@@ -70,6 +70,7 @@ class Debugger extends EventEmitter {
   }
   async sendCommand(method: string, params?: Record<string, unknown>, sessionId?: string): Promise<any> {
     if (!this.session) throw new Error("No target available");
+    if (method === "Page.captureScreenshot") await this.contents.beforeCapture?.().catch(() => {});
     return await (await this.session).send(method, params, sessionId);
   }
 }
@@ -120,6 +121,9 @@ export class WebContents extends EventEmitter {
   private livePage: ChromiumPage | null = null;
   private userAgentSet = false;
   private viewport: { width: number; height: number } | null = null;
+  private appInChromium = false;
+  /** Runs before the page is captured (the draft preview brings the frame it shows up to date). */
+  beforeCapture: (() => Promise<void>) | null = null;
 
   /**
    * `browser`: web pages load in the on-demand Chromium (a WebContentsView, an offscreen window, a
@@ -150,7 +154,15 @@ export class WebContents extends EventEmitter {
     all.set(this.id, this);
   }
 
-  get kind(): ContentsKind { return contentsKindOf(this.url); }
+  get kind(): ContentsKind { return this.appInChromium ? "web" : contentsKindOf(this.url); }
+
+  /**
+   * Its Stella (`stella-app:`) pages load in Chromium, served by its session, and it is a web page
+   * to every caller: the draft preview's tab, which shows the draft's window there.
+   */
+  showsAppInChromium() {
+    if (this.browser) this.appInChromium = true;
+  }
 
   /** Its web pages are Chromium pages: debugger, capturePage and input are the real ones. */
   get isBrowserBacked() { return this.browser && this.kind === "web"; }
@@ -361,6 +373,7 @@ export class WebContents extends EventEmitter {
       throw new Error("capturePage is available only for pages in the on-demand Chromium browser.");
     }
     const usable = rect && rect.width > 0 && rect.height > 0 ? rect : undefined;
+    await this.beforeCapture?.().catch(() => {});
     return nativeImage.createFromBuffer(await (await this.chromiumPage()).capture(usable));
   }
   getMediaSourceId() { return `rune:${this.id}`; }
@@ -413,7 +426,7 @@ export class WebContents extends EventEmitter {
 
   async loadURL(url: string, _options?: unknown): Promise<void> {
     if (this.destroyed) throw new Error("WebContents was destroyed");
-    if (this.browser && contentsKindOf(String(url)) === "web") return await this.loadInChromium(String(url));
+    if (this.browser && (this.appInChromium || contentsKindOf(String(url)) === "web")) return await this.loadInChromium(String(url));
     const previous = this.url;
     this.url = String(url);
     this.loading = true;

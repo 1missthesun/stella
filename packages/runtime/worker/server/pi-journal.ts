@@ -87,6 +87,7 @@ const uploadRelayed = async (auth: () => SiteAuth | null, message: RelayedMessag
         path: `Chat Attachments/relayed/${message.clientMsgId}/${String(index + 1).padStart(2, "0")}-${safeName(item.name)}`,
         sizeBytes: item.bytes.byteLength,
         contentType: item.contentType,
+        sendWithoutSavingIfFull: true,
       });
       const response = await putSignedUpload({
         url: prepared.uploadUrl,

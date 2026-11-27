@@ -885,68 +885,6 @@
         "discard": "ทิ้ง"
       },
       "tagline": "พูดและวาดเพื่อให้ Stella เห็นสิ่งที่คุณหมายถึง"
-    },
-    "welcomeDemos": {
-      "play": "เล่นเดโมนี้",
-      "replay": "เล่นเดโมนี้อีกครั้ง",
-      "errands": {
-        "title": "ทัวร์ฉบับย่อ",
-        "tablist": "เดโมความสามารถ",
-        "chapters": {
-          "errands": {
-            "word": "ธุระ",
-            "title": "ขอครั้งเดียว ถือว่าเรียบร้อย",
-            "caption": "ฉันหาที่ที่ใช่ กรอกแบบฟอร์ม และใส่ลงในปฏิทินของคุณ เหมือนที่คุณทำเอง"
-          },
-          "shopping": {
-            "word": "ช้อปปิ้ง",
-            "title": "ฉันซื้อของได้ เมื่อคุณอนุมัติ",
-            "caption": "ฉันหาสินค้าและพาไปจนถึงหน้าชำระเงิน คุณยืนยันยอดรวม แล้วฉันจะสั่งซื้อให้"
-          },
-          "work": {
-            "word": "งาน",
-            "title": "ไฟล์จริง งานหลายอย่างพร้อมกัน",
-            "caption": "ฉันทำงานในแอปจริงบนคอมพิวเตอร์เครื่องนี้ และทำได้มากกว่าหนึ่งงานในเวลาเดียวกัน"
-          },
-          "build": {
-            "word": "สร้าง",
-            "title": "บอกมา ฉันสร้างให้",
-            "caption": "แอปและเว็บไซต์ตามสั่ง อธิบายด้วยคำง่าย ๆ แล้วฉันจะสร้าง รัน และนำขึ้นออนไลน์ให้"
-          },
-          "routines": {
-            "word": "งานประจำ",
-            "title": "บอกครั้งเดียว แล้วทำให้ทุกวัน",
-            "caption": "ตั้งเวลาอะไรก็ได้ แล้วฉันจะทำให้ตรงเวลา แม้ตอนคุณหลับ"
-          }
-        }
-      },
-      "customize": {
-        "title": "ฉันเปลี่ยนแปลงตัวเองได้",
-        "body": "ขาดฟีเจอร์ หรืออยากให้บางอย่างทำงานต่างออกไป แค่บอกฉัน ฉันจะเขียนโค้ดของตัวเองใหม่ ให้คุณลองใช้ แล้วคุณเป็นคนตัดสินว่าจะเก็บไว้หรือไม่",
-        "hint": "การเปลี่ยนแปลงจะอยู่บนคอมพิวเตอร์เครื่องนี้",
-        "steps": {
-          "ask": {
-            "title": "ขอ",
-            "body": "อธิบายสิ่งที่อยากเปลี่ยนด้วยคำง่าย ๆ"
-          },
-          "preview": {
-            "title": "ดูตัวอย่าง",
-            "body": "งานหนึ่งสร้างให้และเปิดตัวอย่างสดให้ดู"
-          },
-          "update": {
-            "title": "อัปเดต",
-            "body": "คลิกเดียวเพื่อใช้ เลิกทำได้ทุกเมื่อ"
-          }
-        }
-      },
-      "memory": {
-        "title": "บทสนทนาเดียว",
-        "titleChatbot": "อันนี้คุณรู้จักดี",
-        "bodyChatbot": "แชทใหม่ทุกครั้ง แถบด้านข้างเต็มไปด้วยแชทเก่า และจำไม่ได้ว่าคุณพูดอะไรไว้เมื่อสัปดาห์ก่อน",
-        "titleStella": "กับฉันมีแค่บทสนทนาเดียว",
-        "bodyStella": "ไม่มีแชทใหม่ ไม่มีเธรด ทุกอย่างที่คุณเคยบอกฉันอยู่ในที่เดียว เมื่อคุณถามถึงสัปดาห์ก่อน ฉันจะไปหามาให้",
-        "showStella": "ทีนี้ถามฉันสิ"
-      }
     }
   },
   "global": {
@@ -1030,7 +968,6 @@
       }
     },
     "localMode": {
-      "banner": "แชทของคุณอยู่บนคอมพิวเตอร์เครื่องนี้ ลงชื่อเข้าใช้เพื่อใช้ Stella บนโทรศัพท์และซิงค์ทุกอย่างให้ตรงกัน",
       "needsAccount": "ฟีเจอร์นี้ทำงานบนคลาวด์ของ Stella จึงต้องใช้บัญชี Stella",
       "syncFailed": "เพิ่มแชทนี้ลงในบัญชีของคุณไม่ได้ แชทยังอยู่ในคอมพิวเตอร์เครื่องนี้",
       "synced": "เพิ่มแชทนี้ลงในบัญชีของคุณแล้ว"
@@ -1806,6 +1743,43 @@
   },
   "onboarding": {
     "chat": {
+      "composerPlaceholder": "Or just ask me something to get started",
+      "extras": {
+        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
+        "accessibilityTitle": "Accessibility",
+        "enable": "Enable",
+        "enabled": "Enabled",
+        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionOpened": "Opened",
+        "extensionTitle": "Stella for Chrome",
+        "getExtension": "Get extension",
+        "hint": "All of this lives in Settings too.",
+        "restart": "Restart Stella",
+        "restartHint": "Screen access needs a quick restart to take effect.",
+        "screenDesc": "So I can see the screen when you ask me to.",
+        "screenTitle": "Screen Recording",
+        "settledTitle": "Extras",
+        "heading": "ส่วนเสริมที่ไม่บังคับ",
+        "lead": "ไม่มีข้อใดจำเป็น แต่แต่ละข้อช่วยให้ฉันมีประโยชน์มากขึ้น",
+        "start": "เริ่มแชท"
+      },
+      "gmail": {
+        "body": "ค้นหาอีเมล ตามอ่านเธรด และร่างคำตอบ แค่บอกมา",
+        "connect": "เชื่อมต่อ Gmail",
+        "connected": "เชื่อมต่อแล้ว",
+        "connecting": "กำลังรอ Google…",
+        "error": "เชื่อมต่อ Gmail ไม่สำเร็จ ลองอีกครั้ง หรือข้ามไปก่อน",
+        "title": "Gmail"
+      },
+      "messages": {
+        "extras": "Almost done. A little housekeeping, then we start.",
+        "signin": "สวัสดี ฉันคือ Stella ก่อนอื่นเลือกวิธีคิดของฉัน: แพ็กเกจ Claude หรือ ChatGPT ที่คุณมีอยู่ คีย์ของคุณเอง หรือบัญชี Stella"
+      },
+      "progress": "ความคืบหน้าการตั้งค่า",
+      "replies": {
+        "signinDone": "เรียบร้อย"
+      },
+      "send": "Send",
       "signin": {
         "body": "ใช้อย่างใดอย่างหนึ่งก็พอ ส่วนอื่นเพิ่มทีหลังได้",
         "claudeCliMissing": "ติดตั้ง Claude Code ก่อน แล้วลองอีกครั้ง",
@@ -1841,7 +1815,8 @@
         "settledNone": "ยังไม่ได้เลือก AI",
         "settledNoneDesc": "ลงชื่อเข้าใช้หรือเชื่อมต่อแพ็กเกจได้ทุกเมื่อเพื่อเริ่มแชท",
         "fineOwnPlan": "ChatGPT และ Claude Code ใช้การสมัครสมาชิกของคุณเองกับ OpenAI หรือ Anthropic เปลี่ยนได้ทุกเมื่อในการตั้งค่า"
-      }
+      },
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "การใช้ Stella ถือว่าคุณยอมรับ{terms}และ{privacy}ของเรา",
     "privacyPolicy": "นโยบายความเป็นส่วนตัว",
@@ -2428,6 +2403,11 @@
         "twinkle": "ประกาย"
       },
       "title": "เสียงข้อความ"
+    },
+    "onboardingReplay": {
+      "action": "Replay",
+      "description": "เริ่มการแนะนำใหม่ ข้อมูลของคุณยังอยู่",
+      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3412,9 +3392,11 @@
     },
     "onboarding": {
       "link": "มีเซิร์ฟเวอร์ Stella ของตัวเองไหม? เชื่อมต่อเลย",
+      "prose": "คุณเชื่อมต่อกับ {name} ในฐานะเจ้าของแล้ว ต่อไปเลือกสิ่งที่ฉันใช้คิด: แพ็กเกจ Claude หรือ ChatGPT ที่คุณมี หรือคีย์ API ของคุณเอง",
       "title": "เชื่อมต่อกับ {name} แล้ว",
       "body": "คุณลงชื่อเข้าใช้ในฐานะเจ้าของ เลือกสิ่งที่ Stella ใช้คิด เลือกอย่างเดียวก็พอ",
-      "bodyOptional": "คุณลงชื่อเข้าใช้ในฐานะเจ้าของ เซิร์ฟเวอร์นี้มีโมเดลของตัวเอง จึงเป็นตัวเลือกเสริม: คุณยังใช้แพ็กเกจ Claude หรือ ChatGPT หรือคีย์ API ได้"
+      "bodyOptional": "คุณลงชื่อเข้าใช้ในฐานะเจ้าของ เซิร์ฟเวอร์นี้มีโมเดลของตัวเอง จึงเป็นตัวเลือกเสริม: คุณยังใช้แพ็กเกจ Claude หรือ ChatGPT หรือคีย์ API ได้",
+      "settled": "เชื่อมต่อกับ {name} แล้ว"
     }
   },
   "contextMenu": {
@@ -3881,21 +3863,6 @@
     "phoneApp": {
       "title": "Stella อยู่บนโทรศัพท์ของคุณด้วย",
       "detail": "ดาวน์โหลดแอปเพื่อส่งข้อความถึง Stella และติดตามงานของคุณเมื่ออยู่ห่างจากคอมพิวเตอร์เครื่องนี้"
-    }
-  },
-  "welcome": {
-    "actions": {
-      "getExtension": "รับ Stella for Chrome",
-      "connectGmail": "เชื่อมต่อ Gmail",
-      "gmailWaiting": "กำลังรอ Google…",
-      "gmailRetry": "ลองเชื่อมต่อ Gmail อีกครั้ง",
-      "watchErrands": "ดูการทำงาน",
-      "signIn": "ลงชื่อเข้าใช้",
-      "getPhoneApp": "รับแอปบนโทรศัพท์",
-      "watchMemory": "ดูวิธีการ",
-      "connectPlan": "เชื่อมต่อแพ็กเกจ",
-      "changeLook": "เปลี่ยนหน้าตาของฉัน",
-      "watchCustomize": "ดูการเปลี่ยนแปลง"
     }
   }
 }

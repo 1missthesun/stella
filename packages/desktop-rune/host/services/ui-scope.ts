@@ -24,6 +24,9 @@ type ListenerRecord = { target: WeakRef<object>; listener: WeakRef<object>; type
 
 const generations = new Map<number, Generation>();
 const GENERATION_FRAME = /\?swap=(\d+)/;
+/** A file of many modules (the UI's boot file, ui-registry.ts): which generation a line's code belongs to. */
+const FILE_FRAME = /([^\s(]+\?swapfile):(\d+):\d+/;
+const fileLines = new Map<string, (line: number) => number | undefined>();
 /** Host files the UI reaches a registration through (DOM stand-ins, its electronAPI and renderer IPC, this file); the frame past them decides. */
 const TRANSPARENT_FRAME = /[/\\]host[/\\](dom[/\\]|services[/\\](ui-scope|renderer-api)\.|electron[/\\]ipc\.)|[/\\]contracts[/\\]desktop[/\\]electron-api\.|\(native|at native|\[native code\]/;
 const holder: { stack?: string } = {};
@@ -55,6 +58,11 @@ function callerGeneration(fn: Function): Generation | null {
     const line = stack.slice(start + 1, end < 0 ? undefined : end);
     const owner = GENERATION_FRAME.exec(line);
     if (owner) return generations.get(Number(owner[1])) ?? null;
+    const inFile = fileLines.size > 0 ? FILE_FRAME.exec(line) : null;
+    if (inFile) {
+      const id = fileLines.get(inFile[1]!)?.(Number(inFile[2]));
+      return id === undefined ? null : generations.get(id) ?? null;
+    }
     if (!TRANSPARENT_FRAME.test(line)) return null;
     start = end;
   }
@@ -359,6 +367,12 @@ export function ownByCaller(fn: Function, close: Disposer): "live" | "host" | "r
 }
 
 export type UiScope = { dispose(): void };
+
+/** Code in `url` (a sourceURL ending in `?swapfile`) belongs to the generation `owner` gives for its line; `null` forgets the file. */
+export function mapFileLines(url: string, owner: ((line: number) => number | undefined) | null) {
+  if (owner) fileLines.set(url, owner);
+  else fileLines.delete(url);
+}
 
 /** Opens generation `id` (the `?swap=<id>` in its code's sourceURL) and runs `evaluate`; the scope undoes everything it registers. */
 export function evaluateInScope<T>(id: number, evaluate: () => T): { value: T; scope: UiScope } {

@@ -16,15 +16,17 @@ const BUTTON: Glass = { ...GLASS, veil: 0.3 };
 
 const ITEMS = ["Add photos & files", "Take screenshot", "Record screen", "Connect apps"];
 
-function Menu({ close }: { close: () => void }) {
+function Menu({ close, pick }: { close: () => void; pick: (label: string) => void }) {
   return (
     <col id="plus-menu" anchor={{ to: "plus", side: "top", align: "start", gap: 10 }} raise={10000} modal={{ clickOutside: true }} onDismiss={close}
-      w={240} pad={6} gap={2} radius={22} fx={{ glass: { ...GLASS, morphFrom: true, morphMotion: { dur: 0.5 * SLOW, bounce: 0.18 } } }}>
-      {ITEMS.map((label) => (
-        <row key={label} h={40} px={12} align="center" radius={14} hover="#ffffff1f" onPress={close}>
-          <text size={14} weight={500} color={INK}>{label}</text>
-        </row>
-      ))}
+      w={240} pad={6} radius={22} border="#ffffff2e" shadows={[{ x: 0, y: 12, blur: 36, spread: -6, color: "rgba(0,0,0,0.45)" }]} fx={{ glass: { ...GLASS, morphFrom: true, ...(SLOW === 1 ? {} : { morphMotion: { dur: 0.18 * SLOW, bounce: 0.06 } }) } }}>
+      <col w="full" gap={2}>
+        {ITEMS.map((label) => (
+          <row key={label} h={40} px={12} align="center" radius={14} hover="#ffffff1f" onPress={() => pick(label)}>
+            <text size={14} weight={500} color={INK}>{label}</text>
+          </row>
+        ))}
+      </col>
     </col>
   );
 }
@@ -33,10 +35,10 @@ function Capsules({ together }: { together: boolean }) {
   const glass = { glass: { ...BUTTON, group: "pair", spacing: 26 } };
   return (
     <box w={360} h={64}>
-      <row absolute={{ left: 0, top: 0 }} x={together ? 96 : 0} motion={{ dur: 0.9 * SLOW, bounce: 0.15 }} w={120} h={56} radius={28} fx={glass} align="center" justify="center">
+      <row absolute={{ left: 0, top: 0 }} w={120} h={56} radius={28} fx={glass} align="center" justify="center">
         <text size={15} weight={600} color={INK}>Share</text>
       </row>
-      <box absolute={{ left: 240, top: 0 }} x={together ? -96 : 0} motion={{ dur: 0.9 * SLOW, bounce: 0.15 }} w={56} h={56} radius={28} fx={glass} align="center" justify="center">
+      <box absolute={{ left: 240, top: 0 }} x={together ? -106 : 0} motion={{ dur: 0.9 * SLOW, bounce: 0.15 }} w={56} h={56} radius={28} fx={glass} align="center" justify="center">
         <text size={20} weight={500} color={INK}>♥</text>
       </box>
     </box>
@@ -62,6 +64,7 @@ function Tabs({ at, pick }: { at: number; pick: (i: number) => void }) {
 
 export function Root() {
   const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState("");
   const [together, setTogether] = useState(false);
   const [tab, setTab] = useState(0);
   useEffect(() => {
@@ -95,7 +98,8 @@ export function Root() {
         <box id="plus" absolute={{ left: 48, bottom: 48 }} w={48} h={48} radius={24} fx={{ glass: BUTTON }} align="center" justify="center" onPress={() => setOpen((o) => !o)}>
           <text size={24} weight={400} color={INK}>+</text>
         </box>
-        {open ? <Menu close={() => setOpen(false)} /> : null}
+        {picked ? <text id="picked" absolute={{ left: 112, bottom: 62 }} size={13} color={DIM}>{picked}</text> : null}
+        {open ? <Menu close={() => setOpen(false)} pick={(label) => { setPicked(label); setOpen(false); }} /> : null}
       </box>
     </window>
   );

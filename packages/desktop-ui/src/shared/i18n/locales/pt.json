@@ -901,68 +901,6 @@
         "discard": "Descartar"
       },
       "tagline": "Fale e desenhe para mostrar à Stella o que quer dizer."
-    },
-    "welcomeDemos": {
-      "play": "Reproduzir esta demonstração",
-      "replay": "Rever esta demo",
-      "errands": {
-        "title": "O tour rápido",
-        "tablist": "Demos do que posso fazer",
-        "chapters": {
-          "errands": {
-            "word": "Tarefas",
-            "title": "Peça uma vez. Considere feito.",
-            "caption": "Encontro o lugar certo, preencho o formulário e coloco na sua agenda, do mesmo jeito que você faria."
-          },
-          "shopping": {
-            "word": "Compras",
-            "title": "Posso comprar coisas, com o seu OK.",
-            "caption": "Eu encontro e levo até o checkout. Você confirma o total, e eu faço o pedido."
-          },
-          "work": {
-            "word": "Trabalho",
-            "title": "Arquivos reais. Várias tarefas ao mesmo tempo.",
-            "caption": "Trabalho dentro dos apps reais deste computador e posso executar mais de uma tarefa por vez."
-          },
-          "build": {
-            "word": "Criar",
-            "title": "Diga. Eu crio.",
-            "caption": "Apps e sites sob medida. Descreva com suas palavras e eu crio, coloco para rodar e publico."
-          },
-          "routines": {
-            "word": "Rotinas",
-            "title": "Peça uma vez. Acontece todos os dias.",
-            "caption": "Agende qualquer coisa e eu faço na hora certa, até enquanto você dorme."
-          }
-        }
-      },
-      "customize": {
-        "title": "Posso mudar a mim mesma",
-        "body": "Sente falta de um recurso, ou quer que algo funcione de outro jeito? É só pedir. Eu reescrevo meu próprio código, deixo você testar e você decide se quer manter.",
-        "hint": "As alterações ficam neste computador.",
-        "steps": {
-          "ask": {
-            "title": "Peça",
-            "body": "Descreva a mudança em palavras simples."
-          },
-          "preview": {
-            "title": "Prévia",
-            "body": "Uma tarefa cria e abre uma prévia ao vivo."
-          },
-          "update": {
-            "title": "Atualizar",
-            "body": "Um clique para aplicar. Desfaça quando quiser."
-          }
-        }
-      },
-      "memory": {
-        "title": "Uma só conversa",
-        "titleChatbot": "Você já conhece isto",
-        "bodyChatbot": "Um chat novo toda vez, uma barra lateral cheia de chats antigos e nenhuma lembrança do que você disse na semana passada.",
-        "titleStella": "Comigo é uma só conversa",
-        "bodyStella": "Sem chats novos, sem threads. Tudo o que você já me disse fica no mesmo lugar, então quando você pergunta sobre a semana passada, eu vou lá e encontro.",
-        "showStella": "Agora me pergunte"
-      }
     }
   },
   "global": {
@@ -1048,7 +986,6 @@
       }
     },
     "localMode": {
-      "banner": "Suas conversas ficam neste computador. Entre para usar a Stella no celular e manter tudo sincronizado.",
       "needsAccount": "Isso roda na nuvem da Stella, então precisa de uma conta Stella.",
       "syncFailed": "Não foi possível adicionar esta conversa à sua conta. Ela continua neste computador.",
       "synced": "Esta conversa foi adicionada à sua conta."
@@ -1826,6 +1763,43 @@
   },
   "onboarding": {
     "chat": {
+      "composerPlaceholder": "Or just ask me something to get started",
+      "extras": {
+        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
+        "accessibilityTitle": "Accessibility",
+        "enable": "Enable",
+        "enabled": "Enabled",
+        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
+        "extensionOpened": "Opened",
+        "extensionTitle": "Stella for Chrome",
+        "getExtension": "Get extension",
+        "hint": "All of this lives in Settings too.",
+        "restart": "Restart Stella",
+        "restartHint": "Screen access needs a quick restart to take effect.",
+        "screenDesc": "So I can see the screen when you ask me to.",
+        "screenTitle": "Screen Recording",
+        "settledTitle": "Extras",
+        "heading": "Extras opcionais",
+        "lead": "Nada disso é obrigatório, mas cada um me torna mais útil.",
+        "start": "Começar a conversar"
+      },
+      "gmail": {
+        "body": "Encontre e-mails, acompanhe conversas e crie rascunhos de respostas, só pedindo.",
+        "connect": "Conectar Gmail",
+        "connected": "Conectado",
+        "connecting": "Aguardando o Google…",
+        "error": "Não foi possível conectar o Gmail. Tente de novo ou pule por enquanto.",
+        "title": "Gmail"
+      },
+      "messages": {
+        "extras": "Almost done. A little housekeeping, then we start.",
+        "signin": "Olá, eu sou a Stella. Primeiro, escolha como eu penso: o plano do Claude ou do ChatGPT que você já tem, sua própria chave ou uma conta Stella."
+      },
+      "progress": "Progresso da configuração",
+      "replies": {
+        "signinDone": "Pronto."
+      },
+      "send": "Send",
       "signin": {
         "body": "Qualquer uma destas basta. Você pode adicionar as outras depois.",
         "claudeCliMissing": "Instale o Claude Code primeiro e tente novamente.",
@@ -1861,7 +1835,8 @@
         "settledNone": "Nenhuma IA escolhida ainda",
         "settledNoneDesc": "Entre ou conecte um plano a qualquer momento para começar a conversar.",
         "fineOwnPlan": "O ChatGPT e o Claude Code usam sua própria assinatura da OpenAI ou da Anthropic. Mude isso quando quiser em Ajustes."
-      }
+      },
+      "skipSetup": "Skip setup"
     },
     "legalFooter": "Ao usar a Stella, você concorda com nossos {terms} e {privacy}.",
     "privacyPolicy": "Política de privacidade",
@@ -2448,6 +2423,11 @@
         "twinkle": "Brilho"
       },
       "title": "Som de mensagens"
+    },
+    "onboardingReplay": {
+      "action": "Replay",
+      "description": "Refaça a introdução. Seus dados são mantidos.",
+      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3478,9 +3458,11 @@
     },
     "onboarding": {
       "link": "Tem seu próprio servidor Stella? Conecte-o",
+      "prose": "Você está conectado a {name} como proprietário. Agora escolha com o que eu penso: seu plano do Claude ou do ChatGPT, ou sua própria chave de API.",
       "title": "Conectado a {name}",
       "body": "Você entrou como proprietário. Escolha com o que a Stella pensa. Basta um.",
-      "bodyOptional": "Você entrou como proprietário. Este servidor tem modelos próprios, então isso é opcional: você também pode usar seu plano do Claude ou do ChatGPT, ou uma chave de API."
+      "bodyOptional": "Você entrou como proprietário. Este servidor tem modelos próprios, então isso é opcional: você também pode usar seu plano do Claude ou do ChatGPT, ou uma chave de API.",
+      "settled": "Conectado a {name}"
     }
   },
   "contextMenu": {
@@ -3997,21 +3979,6 @@
     "phoneApp": {
       "title": "A Stella também está no seu celular",
       "detail": "Baixe o app para mandar mensagens à Stella e acompanhar suas tarefas quando estiver longe deste computador."
-    }
-  },
-  "welcome": {
-    "actions": {
-      "getExtension": "Obter o Stella for Chrome",
-      "connectGmail": "Conectar Gmail",
-      "gmailWaiting": "Aguardando o Google…",
-      "gmailRetry": "Tentar o Gmail de novo",
-      "watchErrands": "Ver em ação",
-      "signIn": "Entrar",
-      "getPhoneApp": "Obter o app do celular",
-      "watchMemory": "Ver como",
-      "connectPlan": "Conectar um plano",
-      "changeLook": "Mudar minha aparência",
-      "watchCustomize": "Ver a mudança"
     }
   }
 }

@@ -26,6 +26,7 @@ const OVERRIDES: Array<{ file: string; name: string; from: string }> = [
   { file: "services/offscreen-media-probe.ts", name: "offscreenVideoPoster", from: path.resolve(import.meta.dir, "../services/media-probe.ts") },
   { file: "services/offscreen-media-probe.ts", name: "offscreenMediaDurationMs", from: path.resolve(import.meta.dir, "../services/media-probe.ts") },
   { file: "services/microphone-capture.ts", name: "MicrophoneCapture", from: path.resolve(import.meta.dir, "../services/microphone-capture.ts") },
+  { file: "services/app-source/draft-preview.ts", name: "openDraftPreview", from: path.resolve(import.meta.dir, "../services/draft-preview.ts") },
 ];
 
 const applyOverrides = (file: string, source: string) => {

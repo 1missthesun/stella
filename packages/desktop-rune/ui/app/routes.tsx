@@ -6,11 +6,13 @@ import { useCloudApps } from "@/features/cloud/use-cloud-apps";
 import { SETTINGS_TAB_KEYS, type SettingsTab } from "@/global/settings/settings-tabs";
 import { look, fontSize, useTokens } from "../theme";
 import { RouteErrorRecovery } from "../shell/RouteErrorRecovery";
-import { mounted, Nothing } from "./mount";
+import { lazyScreen } from "../kit/lazy";
+import { Nothing } from "./mount";
 import { RootLayout } from "./routes/root";
 
-const BillingScreen = mounted(import.meta.glob("../replace/global/billing/BillingScreen.tsx", { eager: true }), "BillingScreen", Nothing);
-const SettingsApp = mounted(import.meta.glob("../replace/app/settings/App.tsx", { eager: true }), "SettingsApp", Nothing);
+// Both routes bounce to /chat (root.tsx): Settings and Billing open as dialogs.
+const BillingScreen = lazyScreen(() => import("../replace/global/billing/BillingScreen"), (module) => module.BillingScreen);
+const SettingsApp = lazyScreen(() => import("../replace/app/settings/App"), (module) => module.SettingsApp);
 
 type RootSearch = { dialog?: "auth" | "connect" };
 type ChatSearch = { c?: string };
@@ -65,13 +67,13 @@ function CloudAppDeepLink() {
 
 const appSlugRoute = createRoute({ getParentRoute: () => appsRoute, path: "$slug", component: CloudAppDeepLink });
 
-const billingRoute = createRoute({ getParentRoute: () => rootRoute, path: "/billing", component: BillingScreen as () => null });
+const billingRoute = createRoute({ getParentRoute: () => rootRoute, path: "/billing", component: BillingScreen as unknown as () => null });
 
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
   validateSearch: (search: Record<string, unknown>): SettingsSearch => (isSettingsTab(search.tab) ? { tab: search.tab } : {}),
-  component: SettingsApp as () => null,
+  component: SettingsApp as unknown as () => null,
 });
 
 const routeTree = rootRoute.addChildren([indexRoute, chatRoute, appsRoute.addChildren([appSlugRoute]), billingRoute, settingsRoute]);

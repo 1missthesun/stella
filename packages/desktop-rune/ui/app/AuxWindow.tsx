@@ -4,13 +4,15 @@ import { UiStateProvider } from "@/context/ui-state";
 import type { WindowSnapshot } from "../../host/electron/browser-window";
 import { ThemeProvider } from "../theme";
 import { ErrorBoundary } from "./ErrorBoundary";
-import { mounted, Nothing } from "./mount";
+import { lazyScreen, useLazyReady, type LazyScreen } from "../kit/lazy";
 import { AuxWindowProvider } from "../shell/aux-window";
 import { OverlayRoot } from "../shell/overlay/OverlayRoot";
 import { VoiceRuntimeRoot } from "@/features/voice/runtime/VoiceRuntimeRoot";
 
-const CompanionMarkRoot = mounted(import.meta.glob("../shell/companion/CompanionMarkRoot.tsx", { eager: true }), "CompanionMarkRoot", Nothing);
-const CompanionPanelRoot = mounted(import.meta.glob("../shell/companion/CompanionPanelRoot.tsx", { eager: true }), "CompanionPanelRoot", Nothing);
+const CompanionMarkRoot = lazyScreen(() => import("../shell/companion/CompanionMarkRoot"), (module) => module.CompanionMarkRoot);
+const CompanionPanelRoot = lazyScreen(() => import("../shell/companion/CompanionPanelRoot"), (module) => module.CompanionPanelRoot);
+/** Companion windows load their surface when one opens. */
+const LAZY_BODY: Record<string, LazyScreen<object>> = { companion: CompanionMarkRoot, "companion-panel": CompanionPanelRoot };
 
 function AuxProviders({ children }: { children: ReactNode }) {
   return (
@@ -35,7 +37,9 @@ const bodyFor = (mode: string | null) => {
 export const AuxWindow = memo(function AuxWindow({ snapshot }: { snapshot: WindowSnapshot }) {
   const api = useMemo(() => stella.host?.apiFor(snapshot.id) ?? null, [snapshot.id]);
   const aux = useMemo(() => ({ snapshot, api }), [snapshot, api]);
-  const body = bodyFor(snapshot.mode);
+  const lazyBody = snapshot.mode ? LAZY_BODY[snapshot.mode] : undefined;
+  const ready = useLazyReady(Boolean(lazyBody), ...(lazyBody ? [lazyBody] : []));
+  const body = ready ? bodyFor(snapshot.mode) : null;
   if (!body) return <col w="full" h="full" fill={snapshot.transparent ? undefined : snapshot.backgroundColor} />;
   return (
     <AuxWindowProvider value={aux}>

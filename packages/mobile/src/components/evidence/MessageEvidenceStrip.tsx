@@ -276,36 +276,14 @@ export const MessageEvidenceStrip = memo(function MessageEvidenceStrip({
           {pills.map((card) => {
             const primary = card.sourcePaths[0] ?? "";
             return (
-              <Pressable
+              <DocumentPill
                 key={card.id}
-                accessibilityRole="button"
+                icon={pillIcon(card)}
+                title={primary ? fileDisplayName(primary) : card.title}
                 accessibilityLabel={`Open ${card.title}`}
-                disabled={!onOpen || !primary}
+                colors={colors}
                 onPress={onOpen && primary ? () => onOpen(primary) : undefined}
-                style={({ pressed }) => [
-                  styles.pill,
-                  {
-                    backgroundColor: fadeHex(colors.assistantBubbleText, 0.12),
-                    opacity: pressed ? 0.78 : 1,
-                  },
-                ]}
-              >
-                <Icon
-                  name={pillIcon(card)}
-                  size={14}
-                  color={fadeHex(colors.assistantBubbleText, 0.8)}
-                />
-                <Text
-                  style={[
-                    styles.pillTitle,
-                    { color: colors.assistantBubbleText },
-                  ]}
-                  numberOfLines={1}
-                  maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
-                >
-                  {primary ? fileDisplayName(primary) : card.title}
-                </Text>
-              </Pressable>
+              />
             );
           })}
         </View>
@@ -321,6 +299,46 @@ export const MessageEvidenceStrip = memo(function MessageEvidenceStrip({
     </View>
   );
 });
+
+/** The pill a document gets under the message that made it. */
+export function DocumentPill({
+  icon,
+  title,
+  accessibilityLabel,
+  colors,
+  onPress,
+}: {
+  icon: IconName;
+  title: string;
+  accessibilityLabel: string;
+  colors: Colors;
+  onPress?: () => void;
+}) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={accessibilityLabel}
+      disabled={!onPress}
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.pill,
+        {
+          backgroundColor: fadeHex(colors.assistantBubbleText, 0.12),
+          opacity: pressed ? 0.78 : 1,
+        },
+      ]}
+    >
+      <Icon name={icon} size={14} color={fadeHex(colors.assistantBubbleText, 0.8)} />
+      <Text
+        style={[styles.pillTitle, { color: colors.assistantBubbleText }]}
+        numberOfLines={1}
+        maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}
+      >
+        {title}
+      </Text>
+    </Pressable>
+  );
+}
 
 const styles = StyleSheet.create({
   cardTitle: {

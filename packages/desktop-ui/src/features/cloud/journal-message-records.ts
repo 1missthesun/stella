@@ -17,6 +17,7 @@ import {
   withoutSafeguardRemoved,
 } from "@stella/contracts/safeguard-block";
 import { journalAgentTitles } from "@stella/contracts/agent-titles";
+import { withCodeShownCalls } from "@stella/contracts/code-nested-tools";
 import {
   agentToolResultThreadId,
   bareToolName,
@@ -291,7 +292,7 @@ const terminalNoticeEvent = (
 export const journalRecordsToMessageRecords = (
   journaled: readonly JournalRecord[],
 ): MessageRecord[] => {
-  const records = withoutSafeguardRemoved(journaled);
+  const records = withCodeShownCalls(withoutSafeguardRemoved(journaled));
   const byTurn = new Map<string, JournalRecord[]>();
   const recordsBySeq = new Map<number, JournalMessageRecord>();
   const agentTitles = journalAgentTitles(records);
@@ -500,8 +501,12 @@ export const journalRecordsToMessageRecords = (
           : "tool";
       const resultText = messageText(record.payload);
       const details = asRecord(record.payload.details);
+      const shownIn = record.payload.shownIn;
       events.push({
-        _id: `cloud:${turnId}:tool-result:${record.seq}`,
+        _id:
+          typeof shownIn === "string"
+            ? `cloud:${turnId}:tool-result:${record.seq}:${toolCallId}`
+            : `cloud:${turnId}:tool-result:${record.seq}`,
         timestamp,
         type: "tool_result",
         requestId: toolCallId,

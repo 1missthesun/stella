@@ -16,14 +16,10 @@ import type {
 import { TOOL_RESULT_AUTHORIZED_IMAGES } from "../tools/types.js";
 import type { RuntimeStore } from "../storage/runtime-store.js";
 import { TOOL_IDS } from "@stella/contracts/agent-runtime";
-import { resolveAgentWorkingDirectory, textFromUnknown } from "./shared.js";
+import { resolveAgentWorkingDirectory } from "./shared.js";
+import { formatToolResult } from "../tools/tool-result-format.js";
 import { dispatchLocalTool } from "../tools/local-tool-dispatch.js";
 import { runToolCallPipeline } from "../tools/tool-call-pipeline.js";
-import {
-  sanitizeToolError,
-  sanitizeToolResult,
-  sanitizeToolVisibleText,
-} from "../tools/safety.js";
 import { resolveImageMimeType } from "../shared/image-mime.js";
 import { readImageFileSettled } from "../shared/read-image-file.js";
 import { formatDimensionNote, resizeImage } from "../shared/image-resize.js";
@@ -108,28 +104,6 @@ const modelVisibleLimitsFor = (
   containsCommandOutput(toolName, toolResult)
     ? commandResultLimitsFor(toolResult)
     : undefined;
-
-const formatToolResult = (
-  toolResult: ToolResult,
-  toolName: string,
-): { text: string; details: unknown } => {
-  if (toolResult.error) {
-    const error = sanitizeToolError(toolResult.error);
-    return {
-      text: `Error: ${error}`,
-      details: sanitizeToolResult(toolResult.details ?? { error }),
-    };
-  }
-
-  const result = sanitizeToolResult(toolResult.result);
-  return {
-    text: sanitizeToolVisibleText(textFromUnknown(result)),
-    details: sanitizeToolResult(
-      toolResult.details ??
-        (COMMAND_OUTPUT_TOOL_NAMES.has(toolName) ? undefined : result),
-    ),
-  };
-};
 
 type ModelVisibleLimits =
   | number
@@ -910,7 +884,7 @@ export const executeModelToolCall = async (
     signal,
     onUpdate: onUpdate
       ? (partialResult: ToolResult) => {
-          const formattedPartial = formatToolResult(partialResult, toolName);
+          const formattedPartial = formatToolResult(partialResult, !COMMAND_OUTPUT_TOOL_NAMES.has(toolName));
           const truncatedPartial = truncateModelVisibleToolText(
             formattedPartial.text,
             modelVisibleLimitsFor(toolName, partialResult),
@@ -922,7 +896,7 @@ export const executeModelToolCall = async (
         }
       : undefined,
   });
-  const formatted = formatToolResult(toolResult, toolName);
+  const formatted = formatToolResult(toolResult, !COMMAND_OUTPUT_TOOL_NAMES.has(toolName));
   const { text: forwardedText, images: legacyImages } =
     opts.executionHost === "sandbox"
       ? {

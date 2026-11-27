@@ -1,3 +1,4 @@
+import { codeShownCalls } from "@stella/contracts/code-nested-tools";
 import { safeguardCardLabel } from "@stella/contracts/safeguard-block";
 import { SAFEGUARD_ENTRY_KIND, type SafeguardEntryData } from "../stella/safeguard.ts";
 import type { Context } from "@earendil-works/chord/context";
@@ -448,6 +449,26 @@ export async function localLogMirror(args: {
               ...(message.details !== undefined ? { details: message.details } : {}),
               ...(message.isError ? { isError: true } : {}),
             });
+            for (const [index, call] of codeShownCalls(message.toolName, message.details).entries()) {
+              await log.write({
+                key: `${key}:shown:${index}`,
+                role: "tool_request",
+                timestamp: message.timestamp + index * 2 + 1,
+                toolCallId: call.id,
+                toolName: call.toolName,
+                args: call.args,
+              });
+              await log.write({
+                key: `${key}:shown:${index}:result`,
+                role: "tool_result",
+                timestamp: message.timestamp + index * 2 + 2,
+                toolCallId: call.id,
+                toolName: call.toolName,
+                text: call.text,
+                ...(call.details !== undefined ? { details: call.details } : {}),
+                ...(call.isError ? { isError: true } : {}),
+              });
+            }
             const threadId = message.toolName === "spawn_agent" && !message.isError ? spawnedThreadId(message.details, text) : undefined;
             if (threadId) {
               const description =

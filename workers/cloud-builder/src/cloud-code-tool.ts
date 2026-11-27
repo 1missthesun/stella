@@ -61,6 +61,7 @@ import type {
 } from "./cloud-browser.js";
 import type { ToolReplayPolicy } from "./tool-replay.js";
 import { historyReadView } from "@stella/contracts/history-search";
+import { CHAT_SHOWN_TOOLS, shownCallArgs, type CodeShownCall } from "@stella/contracts/code-nested-tools";
 import { cloudBrowserCodeSentence } from "@stella/contracts/cloud-browser";
 
 const CLOUD_CODE_MODEL_OUTPUT_MAX_BYTES = 50_000;
@@ -266,10 +267,13 @@ const loadTypeBoxValue = (): Promise<TypeBoxValueModule> =>
     (module) => module.Value,
   ));
 
+/** What one `code` execution lifts out of its nested calls for the chat: map cards and chat-shown calls. */
+type LiftedArtifacts = { maps: MapRouteArtifact[]; shownCalls: CodeShownCall[] };
+
 const definitionForAgentTool = (
   tool: CloudCodeSourceAgentTool,
   value: TypeBoxValueModule,
-  liftedMaps: Map<string, MapRouteArtifact[]>,
+  lifted: Map<string, LiftedArtifacts>,
 ): CloudCodeToolDefinition => ({
   rawName: tool.name,
   description: tool.description,
@@ -294,8 +298,20 @@ const definitionForAgentTool = (
       input as Record<string, unknown>,
       context.signal,
     );
-    const sink = liftedMaps.get(context.executionId);
-    if (sink) collectLiftedMaps(result.details, sink);
+    const sink = lifted.get(context.executionId);
+    if (sink) {
+      collectLiftedMaps(result.details, sink.maps);
+      if (CHAT_SHOWN_TOOLS.has(tool.name)) {
+        sink.shownCalls.push({
+          id: context.toolCallId,
+          toolName: tool.name,
+          args: shownCallArgs(tool.name, asRecord(input)),
+          text: textOfContent(result.content) ?? "",
+          ...(result.details !== undefined ? { details: result.details } : {}),
+          ...(result.isError ? { isError: true as const } : {}),
+        });
+      }
+    }
     return nestedValueForCode(tool.name, result);
   },
 });
@@ -526,10 +542,10 @@ export const createCloudCodeAgentTool = async (
 ): Promise<CloudCodeAgentTool> => {
   const sourceTools = options.tools.filter(isCloudCodeReachableTool);
   const value = await loadTypeBoxValue();
-  const liftedMaps = new Map<string, MapRouteArtifact[]>();
+  const lifted = new Map<string, LiftedArtifacts>();
   const liftedScreenshots = new Map<string, LiftedScreenshot[]>();
   const definitions = sourceTools.map((tool) =>
-    definitionForAgentTool(tool, value, liftedMaps),
+    definitionForAgentTool(tool, value, lifted),
   );
   const prepared = await prepareCloudCodeTools(definitions);
   const preparedWithout = new Map<string, ReturnType<typeof prepareCloudCodeTools>>();
@@ -577,8 +593,8 @@ export const createCloudCodeAgentTool = async (
       const executionId = `code:${await sha256Hex(
         `${options.executionScope}\0${toolCallId}`,
       )}`;
-      const sink: MapRouteArtifact[] = [];
-      liftedMaps.set(executionId, sink);
+      const sink: LiftedArtifacts = { maps: [], shownCalls: [] };
+      lifted.set(executionId, sink);
       const screenshots: LiftedScreenshot[] = [];
       liftedScreenshots.set(executionId, screenshots);
       const connectorTools = connect
@@ -617,13 +633,13 @@ export const createCloudCodeAgentTool = async (
           ...(signal ? { signal } : {}),
         });
       } finally {
-        liftedMaps.delete(executionId);
+        lifted.delete(executionId);
         liftedScreenshots.delete(executionId);
       }
       const suspension = options.browser?.suspension();
       if (suspension) throw new AgentToolSuspendedError(suspension);
       const text = modelTextForResult(result);
-      const maps = sink;
+      const { maps, shownCalls } = sink;
       return {
         content: [
           { type: "text", text },
@@ -645,6 +661,7 @@ export const createCloudCodeAgentTool = async (
                 toolCallId,
               },
           ...(maps.length > 0 ? { maps } : {}),
+          ...(shownCalls.length > 0 ? { shownCalls } : {}),
         },
         isError: !result.ok,
       };

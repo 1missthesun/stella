@@ -46,6 +46,9 @@ export const createCodeTool = (options: CodeToolOptions): ToolDefinition => {
       ...(observation.mapArtifacts && observation.mapArtifacts.length > 1
         ? { maps: [...observation.mapArtifacts] }
         : {}),
+      ...(observation.shownCalls?.length
+        ? { shownCalls: [...observation.shownCalls] }
+        : {}),
     };
   };
   const withDetails = <T extends Record<string, unknown>>(

@@ -1,5 +1,6 @@
 import { steadyNow } from "@stella/contracts/server-clock";
 import { extractLocalFileLinkPaths } from "@stella/contracts/local-file-links";
+import { codeShownCalls } from "@stella/contracts/code-nested-tools";
 
 const READ_BATCH = 200;
 const MAX_RECORDS = 4_000;
@@ -60,6 +61,11 @@ export const journalRecordFilePaths = (raw: unknown): string[] => {
     ) {
       const details = asRecord(payload.details);
       if (typeof details?.filePath === "string") paths.push(details.filePath);
+    } else if (role === "toolResult" && payload.isError !== true) {
+      for (const call of codeShownCalls(payload.toolName, payload.details)) {
+        const filePath = asRecord(call.details)?.filePath;
+        if (DISPLAY_TOOLS.has(call.toolName) && !call.isError && typeof filePath === "string") paths.push(filePath);
+      }
     }
     return paths;
   }

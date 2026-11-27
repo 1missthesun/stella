@@ -30,6 +30,7 @@ import {
   storedJournalReplyRefs,
 } from "@stella/contracts/conversation-journal-projection";
 import { isMapRouteArtifact } from "@stella/contracts/map-artifact";
+import { withCodeShownCalls } from "@stella/contracts/code-nested-tools";
 import { isPiAgentText, isPiAskFirstText } from "@stella/contracts/pi-chat";
 import type { ToolStep } from "./tool-activity";
 import {
@@ -306,13 +307,14 @@ export const latestDestinationSwitch = (
 
 const projectTurn = (
   turnId: string,
-  turn: readonly JournalRecord[],
+  recorded: readonly JournalRecord[],
   context: {
     conversationId?: string;
     recordsBySeq: () => Pick<ReadonlyMap<number, JournalRecord>, "get">;
     reactions: ReadonlyMap<number, { emoji: string; at: number }>;
   },
 ): ChatMessage[] => {
+  const turn = withCodeShownCalls(recorded);
   const { recordsBySeq, reactions } = context;
   const args = { conversationId: context.conversationId };
   const out: ChatMessage[] = [];

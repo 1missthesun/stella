@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { AGENT_IDS, getAgentDefinition } from "@stella/contracts/agent-runtime";
+import { CHAT_SHOWN_TOOLS } from "@stella/contracts/code-nested-tools";
 
 import type { Api, Model } from "@earendil-works/pi-ai";
 import {
@@ -351,8 +352,8 @@ export const createToolHost = ({
       }
     },
     executeTool: executeNestedToolCall,
-    toolAwaitsUser: (toolName) =>
-      toolCatalog.get(toolName)?.awaitsUser === true,
+    toolHoldsCell: (toolName) =>
+      toolCatalog.get(toolName)?.awaitsUser === true || CHAT_SHOWN_TOOLS.has(toolName),
     searchTools: async (query, context, limit) =>
       searchToolCatalog(
         [

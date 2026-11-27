@@ -121,6 +121,8 @@ import {
 import type { ReplConnectClient } from "../connectors/connect-service.js";
 import { resolveToolFallbackCwd } from "../tools/cwd.js";
 import { AGENT_IDS } from "@stella/contracts/agent-runtime";
+import { CHAT_SHOWN_TOOLS, type CodeShownCall } from "@stella/contracts/code-nested-tools";
+import { codeShownCall } from "../tools/tool-result-format.js";
 
 const DEFAULT_EVAL_TIMEOUT_MS = 11 * 60_000;
 const DEFAULT_COMMAND_TIMEOUT_MS = 30_000;
@@ -158,6 +160,7 @@ export type NodeReplCellObservation = Readonly<{
   reset?: NodeReplResetReceipt;
   error?: string;
   mapArtifacts?: readonly MapRouteArtifact[];
+  shownCalls?: readonly CodeShownCall[];
   responseMeta?: BrowserUseResponseMeta;
 }>;
 
@@ -184,7 +187,7 @@ export type NodeReplKernelManagerOptions = {
     signal?: AbortSignal,
     onUpdate?: ToolUpdateCallback,
   ) => Promise<ToolResult>;
-  toolAwaitsUser?: (toolName: string) => boolean;
+  toolHoldsCell?: (toolName: string) => boolean;
   connectClient?: ReplConnectClient;
   cloudBrowser?: CloudBrowserBridge;
   searchTools?: (
@@ -231,6 +234,7 @@ export type EvaluateOptions = {
   onToolUpdate?: ToolUpdateCallback;
   onResponseMeta?: (meta: BrowserUseResponseMeta) => void;
   onContent?: (item: NodeReplContentItem, cursor: number) => void;
+  onShownCall?: (call: CodeShownCall) => void;
 };
 
 class KernelTerminatedError extends Error {
@@ -344,7 +348,7 @@ type ActiveEvaluation = {
   timeoutMs: number;
   remainingMs: number;
   clockStartedAt: number;
-  awaitingUser: number;
+  held: number;
   signal?: AbortSignal;
   onAbort?: () => void;
   resolve: (result: NodeReplEvaluationResult) => void;
@@ -360,6 +364,7 @@ type ActiveEvaluation = {
   content: NodeReplContentItem[];
   nextContentCursor: number;
   onContent?: (item: NodeReplContentItem, cursor: number) => void;
+  onShownCall?: (call: CodeShownCall) => void;
   browserActivity: {
     callCount: number;
     mutated: boolean;
@@ -705,8 +710,8 @@ class NodeReplKernel {
   private browserBackend: BrowserBackend = "in-app";
   private readonly requestBrowserExtensionConnect?: BrowserExtensionConnectRequester;
   private readonly executeTool?: NodeReplKernelManagerOptions["executeTool"];
-  private readonly toolAwaitsUser?: NodeReplKernelManagerOptions["toolAwaitsUser"];
-  private readonly awaitingUserListeners = new Set<() => void>();
+  private readonly toolHoldsCell?: NodeReplKernelManagerOptions["toolHoldsCell"];
+  private readonly heldListeners = new Set<() => void>();
   private readonly searchTools?: NodeReplKernelManagerOptions["searchTools"];
   private readonly describeTool?: NodeReplKernelManagerOptions["describeTool"];
   private readonly queryHistory?: NodeReplKernelManagerOptions["queryHistory"];
@@ -749,7 +754,7 @@ class NodeReplKernel {
       ) => BrowserSessionClient;
       requestBrowserExtensionConnect?: BrowserExtensionConnectRequester;
       executeTool?: NodeReplKernelManagerOptions["executeTool"];
-      toolAwaitsUser?: NodeReplKernelManagerOptions["toolAwaitsUser"];
+      toolHoldsCell?: NodeReplKernelManagerOptions["toolHoldsCell"];
       searchTools?: NodeReplKernelManagerOptions["searchTools"];
       describeTool?: NodeReplKernelManagerOptions["describeTool"];
       queryHistory?: NodeReplKernelManagerOptions["queryHistory"];
@@ -772,7 +777,7 @@ class NodeReplKernel {
     this.requestBrowserExtensionConnect =
       options.requestBrowserExtensionConnect;
     this.executeTool = options.executeTool;
-    this.toolAwaitsUser = options.toolAwaitsUser;
+    this.toolHoldsCell = options.toolHoldsCell;
     this.searchTools = options.searchTools;
     this.describeTool = options.describeTool;
     this.queryHistory = options.queryHistory;
@@ -1027,6 +1032,7 @@ class NodeReplKernel {
         options.onToolUpdate,
         options.onResponseMeta,
         options.onContent,
+        options.onShownCall,
         connectorToolNames,
       );
     };
@@ -1062,6 +1068,7 @@ class NodeReplKernel {
     onToolUpdate?: ToolUpdateCallback,
     onResponseMeta?: (meta: BrowserUseResponseMeta) => void,
     onContent?: (item: NodeReplContentItem, cursor: number) => void,
+    onShownCall?: (call: CodeShownCall) => void,
     connectorToolNames: readonly string[] = [],
   ): Promise<NodeReplEvaluationResult> {
     if (signal?.aborted) {
@@ -1087,7 +1094,7 @@ class NodeReplKernel {
         timeoutMs,
         remainingMs: timeoutMs,
         clockStartedAt: performance.now(),
-        awaitingUser: 0,
+        held: 0,
         signal,
         resolve,
         reject,
@@ -1097,6 +1104,7 @@ class NodeReplKernel {
         onToolUpdate,
         onResponseMeta,
         onContent,
+        onShownCall,
         content: [],
         nextContentCursor: 1,
         mapArtifacts: [],
@@ -1161,36 +1169,36 @@ class NodeReplKernel {
     });
   }
 
-  get awaitingUser(): boolean {
-    return (this.active?.awaitingUser ?? 0) > 0;
+  get held(): boolean {
+    return (this.active?.held ?? 0) > 0;
   }
 
-  onAwaitingUserChange(listener: () => void): () => void {
-    this.awaitingUserListeners.add(listener);
-    return () => this.awaitingUserListeners.delete(listener);
+  onHeldChange(listener: () => void): () => void {
+    this.heldListeners.add(listener);
+    return () => this.heldListeners.delete(listener);
   }
 
-  private async whileAwaitingUser<T>(
+  private async whileHeld<T>(
     active: ActiveEvaluation,
     task: () => Promise<T>,
   ): Promise<T> {
-    active.awaitingUser += 1;
-    if (active.awaitingUser === 1) {
+    active.held += 1;
+    if (active.held === 1) {
       active.cancelTimeout();
       active.cancelTimeout = () => {};
       active.remainingMs = Math.max(
         1,
         active.remainingMs - (performance.now() - active.clockStartedAt),
       );
-      for (const listener of [...this.awaitingUserListeners]) listener();
+      for (const listener of [...this.heldListeners]) listener();
     }
     try {
       return await task();
     } finally {
-      active.awaitingUser -= 1;
-      if (active.awaitingUser === 0) {
+      active.held -= 1;
+      if (active.held === 0) {
         if (this.active === active) this.startClock(active);
-        for (const listener of [...this.awaitingUserListeners]) listener();
+        for (const listener of [...this.heldListeners]) listener();
       }
     }
   }
@@ -1413,7 +1421,7 @@ class NodeReplKernel {
           toolCallId: active.context.requestId,
         },
         {
-          awaitUser: (task) => this.whileAwaitingUser(active, task),
+          awaitUser: (task) => this.whileHeld(active, task),
           signal: active.controller.signal,
         },
       ) ?? shared
@@ -1488,7 +1496,7 @@ class NodeReplKernel {
       const run = () =>
         bridge.call(message.method, args, active.controller.signal);
       let value = bridge.awaitsUser(message.method)
-        ? await this.whileAwaitingUser(active, run)
+        ? await this.whileHeld(active, run)
         : await run();
       const image = this.recordValue(this.recordValue(value)?.image);
       if (
@@ -1693,7 +1701,7 @@ class NodeReplKernel {
       try {
         value = await this.executeBrowserMessage(active, outgoing);
       } catch (error) {
-        const outcome = await this.whileAwaitingUser(active, () =>
+        const outcome = await this.whileHeld(active, () =>
           maybeRequestBrowserExtensionConnect({
             output: error instanceof Error ? error.message : String(error),
             command: "stella-browser node_repl",
@@ -2483,8 +2491,8 @@ class NodeReplKernel {
             }
           },
         );
-      const result = this.toolAwaitsUser?.(message.toolName)
-        ? await this.whileAwaitingUser(active, execute)
+      const result = this.toolHoldsCell?.(message.toolName)
+        ? await this.whileHeld(active, execute)
         : await execute();
       if (!this.closed && this.active === active) {
         const details =
@@ -2495,6 +2503,16 @@ class NodeReplKernel {
             : undefined;
         if (isMapRouteArtifact(details?.map)) {
           active.mapArtifacts.push(details.map);
+        }
+        if (CHAT_SHOWN_TOOLS.has(message.toolName)) {
+          active.onShownCall?.(
+            codeShownCall(
+              `code-call:${randomUUID()}`,
+              message.toolName,
+              message.args,
+              result,
+            ),
+          );
         }
         active.onToolResult?.(result);
       }
@@ -2966,6 +2984,8 @@ type NodeReplCellRecord = {
   lastObservedAt: number;
   outcome?: NodeReplCellOutcome;
   settled: Promise<void>;
+  shownCalls: CodeShownCall[];
+  shownCallsDelivered: number;
 };
 
 const notifyCellObservers = (cell: NodeReplCellRecord): void => {
@@ -3189,6 +3209,8 @@ export class NodeReplKernelRegistry {
       listeners: new Set(),
       lastObservedAt: steadyNow(),
       settled: Promise.resolve(),
+      shownCalls: [],
+      shownCallsDelivered: 0,
     };
     const callerOnContent = options.onContent;
     const evaluation = this.runKernelEvaluation(id, kernel, code, context, {
@@ -3201,6 +3223,9 @@ export class NodeReplKernelRegistry {
         } finally {
           notifyCellObservers(cell);
         }
+      },
+      onShownCall: (call) => {
+        cell.shownCalls.push(call);
       },
     });
     cell.settled = evaluation.then(
@@ -3226,7 +3251,7 @@ export class NodeReplKernelRegistry {
     );
     this.cells.set(cellId, cell);
     this.runningCellByOwner.set(id, cellId);
-    const stopWatchingUser = kernel.onAwaitingUserChange(() =>
+    const stopWatchingUser = kernel.onHeldChange(() =>
       notifyCellObservers(cell),
     );
     void cell.settled.finally(() => {
@@ -3327,7 +3352,7 @@ export class NodeReplKernelRegistry {
         requestBrowserExtensionConnect:
           this.options.requestBrowserExtensionConnect,
         executeTool: this.options.executeTool,
-        toolAwaitsUser: this.options.toolAwaitsUser,
+        toolHoldsCell: this.options.toolHoldsCell,
         searchTools: this.options.searchTools,
         describeTool: this.options.describeTool,
         queryHistory: this.options.queryHistory,
@@ -3428,7 +3453,7 @@ export class NodeReplKernelRegistry {
     );
     while (
       !cell.outcome &&
-      cell.kernel.awaitingUser &&
+      cell.kernel.held &&
       !(wakeOnContent && cell.cursor > fromCursor)
     ) {
       await waitForCellChange(
@@ -3437,9 +3462,9 @@ export class NodeReplKernelRegistry {
         Number.POSITIVE_INFINITY,
         signal,
         wakeOnContent,
-        () => !cell.kernel.awaitingUser,
+        () => !cell.kernel.held,
       );
-      if (cell.outcome || cell.kernel.awaitingUser) continue;
+      if (cell.outcome || cell.kernel.held) continue;
       await waitForCellChange(
         cell,
         fromCursor,
@@ -3452,6 +3477,9 @@ export class NodeReplKernelRegistry {
     const cursor = cell.cursor;
     const content = cell.content.slice(fromCursor, cursor);
     cell.deliveredCursor = Math.max(cell.deliveredCursor, cursor);
+    const shownCalls = cell.shownCalls.slice(cell.shownCallsDelivered);
+    cell.shownCallsDelivered = cell.shownCalls.length;
+    const shown = shownCalls.length > 0 ? { shownCalls } : {};
     cell.lastObservedAt = steadyNow();
     const elapsedMs = steadyNow() - cell.startedAt;
     if (!cell.outcome) {
@@ -3465,6 +3493,7 @@ export class NodeReplKernelRegistry {
         ...(content.length > 0
           ? { output: formatNodeReplContent(content), content }
           : {}),
+        ...shown,
       };
     }
     if (cell.outcome.ok) {
@@ -3486,6 +3515,7 @@ export class NodeReplKernelRegistry {
         ...(cell.outcome.value.responseMeta
           ? { responseMeta: cell.outcome.value.responseMeta }
           : {}),
+        ...shown,
       };
     }
     return {
@@ -3495,6 +3525,7 @@ export class NodeReplKernelRegistry {
       elapsedMs,
       fromCursor,
       cursor,
+      ...shown,
       ...(content.length > 0
         ? { output: formatNodeReplContent(content), content }
         : {}),

@@ -159,11 +159,11 @@ real-display numbers for performance) before it is ticked. Source of truth is ma
 
 ## Measured vs Electron (same machine, same window)
 - [ ] Cold start, RSS/PSS, idle CPU, active CPU, input latency, scroll/resize/animation fps, hot-swap latency, memory after 50 swaps
-  - Linux (omarchy real display, 1100×760, the same 28-turn seeded chat; ~/.stella/outputs/stella-rune/linux/measure/summary.json, harness in measure/harness):
-    - Cold start to the first content frame: 160 ms with the boot bundles (478 ms from source), against Electron's 512 ms to its first app paint. The window maps at 94 ms. Measured 2026-11-26, rune/desktop 8556daaab, n=5.
-    - Whole-tree PSS: 352 MB (engine ~125, host ~117, runtime worker ~99) against 591 MB; RSS: 507 MB against 1276 MB. No WebView runs at launch or idle (dictation captures the mic natively).
-    - Idle CPU: 1.2% in the first minute and 0.3–0.4% settled (engine 0.0, host 0.15, runtime worker 0.13–0.15), against 4.7%.
-    - Scrolling at 2400 px/s: 240 fps with p95 5.1 ms and 46% CPU, against 238 fps with p95 4.2 ms and 46% CPU.
-    - Key to frame submitted: p95 4.3 ms. Electron's key to presented is p95 16.9 ms. The two aren't comparable: the engine has no presented time on Linux.
-    - Resize: 372 fps at 62 changes/s and 218 fps at 125/s, but 28 fps at 250/s, and the UI freezes at 500/s. Electron reaches 186 fps at 442/s. Gap (engine).
-    - Hot swap: the old frame stays painted until the new tree has its data, then the change lands in one frame (no blank or fade). Swap to frame: 347 ms p50, 445 ms max over 50 swaps (Xvfb, held frame included). Memory after 50 swaps: 372 MB total PSS (engine 125, flat; host 139, levels off after ~50; the builder exits 20 s after the last swap).
+  - Linux (omarchy real display, 1100×760, the same 28-turn seeded chat; rune/desktop 9155411d6, Rune ac0d0a42, measured 2026-11-26; ~/.stella/outputs/stella-rune/linux/measure/summary.json, raw in measure/final2, harness in measure/harness). Since the master merge a cold start lands on the chat, not a separate home. The engine's NVIDIA shader cache lives in ~/.cache; a first launch without it compiles every shader and keeps ~130 MB more until restart (277 against 145 MB), so session homes now have one.
+    - Cold start to the first content frame: 172 ms (n=5; 147 ms before the merge), against Electron's 512 ms to its first app paint. The window maps at 91 ms.
+    - Whole-tree PSS 10 s after the first frame: 376 MB (engine ~145, host ~128, runtime worker ~101) against 591 MB; RSS: 546 MB against 1276 MB. No WebView runs at launch or idle.
+    - Idle CPU: 1.7% in the first minute (UI 1.3, runtime worker 0.4) and 0.5% settled (engine 0.1, host 0.23, runtime worker 0.13), against 4.7%.
+    - Scrolling at 2400 px/s: 240 fps with p95 5.2 ms, against 238 fps with p95 4.2 ms. CPU 46% on a quiet machine (before the merge), against Electron's 46%. On the merge head 70–92% with another agent's engine at 118–508% and load 12–19; the UI thread's frame CPU was unchanged (p50 0.9–2.1 ms).
+    - Key to presented (X Present completion on XWayland): p50 3.8 ms, p95 9.0 ms, against Electron's p50 11.7, p95 16.9 ms (Chromium's presentation feedback on Wayland). Key to frame submitted: p95 2.5 ms.
+    - Resize (Hyprland dispatches): 527 fps at 62 changes/s, 720 at 125/s, 516 at 250/s and 394 at 500/s (p95 ≤ 4.4 ms). Electron reaches 186 fps at 442/s.
+    - Hot swap: the old frame stays painted until the new tree has its data, then the change lands in one frame (no blank or fade). 50 swaps on the real display: 465 ms p50, 630 ms max (host bundling under load; apply wait ≤ 3.3 ms, applied to frame ≤ 12 ms). Memory over 50 swaps without a page: engine flat (191 → 195 MB), total 477 → 444 MB once the builder exits. With the chat's two live pages, swaps take 732 ms p50 and the engine grows 85 MB (~1.7 MB a swap), as each page is recreated. Gap (engine).

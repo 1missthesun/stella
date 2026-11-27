@@ -19,6 +19,7 @@ import { InlineWorkingIndicator, type InlineIndicatorPhase, type InlineWorkingIn
 import { AssistantMessageRow, UserMessageRow } from "./MessageRow";
 import { UserAskRecordCard } from "./UserAskRecordCard";
 import { panelSurface } from "./surfaces";
+import { isViewFile } from "../views/ViewTabContent";
 
 type LegendSummedPadding = "padding" | "paddingTop" | "paddingRight" | "paddingBottom" | "paddingLeft";
 
@@ -192,6 +193,19 @@ export const ChatTimeline = memo(function ChatTimeline({
     }
     return null;
   }, [rows]);
+  // A view lives in one card, in the newest reply that made or changed it; older replies keep a chip.
+  const liveViewRowIds = useMemo(() => {
+    const ids = new Set<string>();
+    const seen = new Set<string>();
+    for (let index = rows.length - 1; index >= 0; index -= 1) {
+      const row = rows[index];
+      const payload = row?.kind === "assistant" ? row.resourcePayload : undefined;
+      if (!row || payload?.kind !== "canvas-html" || payload.driveBacked || !isViewFile(payload.filePath) || seen.has(payload.filePath)) continue;
+      seen.add(payload.filePath);
+      ids.add(row.id);
+    }
+    return ids;
+  }, [rows]);
   const tailUserRowId = useMemo(() => {
     for (let index = rows.length - 1; index >= 0; index -= 1) {
       const row = rows[index];
@@ -266,7 +280,7 @@ export const ChatTimeline = memo(function ChatTimeline({
           {item.row.kind === "user" ? (
             <UserMessageRow row={item.row} />
           ) : (
-            <AssistantMessageRow row={item.row} conversationId={conversationId} latestMedia={item.row.id === latestMediaRowId} />
+            <AssistantMessageRow row={item.row} conversationId={conversationId} latestMedia={item.row.id === latestMediaRowId} liveView={liveViewRowIds.has(item.row.id)} />
           )}
           {flashItemId === item.id ? <JumpFlash /> : null}
         </box>

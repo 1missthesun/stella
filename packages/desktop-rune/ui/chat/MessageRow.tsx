@@ -51,6 +51,9 @@ import { MapRouteCards } from "./cards/MapRouteCard";
 import { OfficePreviewCard } from "./cards/OfficePreviewCard";
 import { InlineGeneratedImageStrip } from "./cards/InlineGeneratedImageCard";
 import { SourceDiffEndResource } from "./cards/SourceDiffEndResource";
+import { ViewChatCard, isViewFile } from "../views/ViewTabContent";
+import { getDisplayPayloadTitle } from "@stella/contracts/desktop/display-payload";
+import { openDisplayPayloadTab } from "@/features/workspace-display/open-payload";
 import { previewCard, pillColors } from "./surfaces";
 
 
@@ -388,7 +391,7 @@ function useReplyArrival(justArrived: boolean, finalAnswer: boolean) {
 }
 
 export const AssistantMessageRow = memo(
-  function AssistantMessageRow({ row, conversationId, latestMedia = false }: { row: AssistantRowViewModel; conversationId?: string | null; latestMedia?: boolean }) {
+  function AssistantMessageRow({ row, conversationId, latestMedia = false, liveView = false }: { row: AssistantRowViewModel; conversationId?: string | null; latestMedia?: boolean; liveView?: boolean }) {
     const tokens = useTokens();
     const surface = useChatSurfaceLook();
     const reply = useMessageReply();
@@ -418,6 +421,7 @@ export const AssistantMessageRow = memo(
     const linkTargets = hasText ? extractFileLinkTargets(text) : [];
     const resourcePayload = row.resourcePayload;
     const canvasPage = resourcePayload?.kind === "canvas-html" && isHtmlPagePath(resourcePayload.filePath) ? resourcePayload : null;
+    const viewPage = liveView && resourcePayload?.kind === "canvas-html" && !resourcePayload.driveBacked && globalThis.stella.views && isViewFile(resourcePayload.filePath) ? resourcePayload : null;
     const canvasDrivePath = canvasPage?.driveBacked ? canvasPage.filePath.replace(/^\/+/, "") : null;
     const canvasLocalPath = canvasPage && !canvasPage.driveBacked ? canvasPage.filePath : null;
     const evidencePaths = [...new Set([...linkTargets.filter((target) => !driveLinkPath(target)), ...(canvasLocalPath ? [canvasLocalPath] : [])])];
@@ -444,6 +448,7 @@ export const AssistantMessageRow = memo(
       !resourcePayload ||
       resourcePayload.kind === "source-diff" ||
       canvasLocalPath !== null ||
+      viewPage !== null ||
       (canvasDrivePath !== null && previewedDrivePaths.has(canvasDrivePath)) ||
       (resourcePayload.kind === "media" && resourcePayload.presentation === "inline-image") ||
       (resourcePayload.kind === "office" && Boolean(row.officePreviewRef));
@@ -496,6 +501,7 @@ export const AssistantMessageRow = memo(
               {!row.isIntraTurn ? <MessageActions text={text} messageKey={row.id} showReadAloud align="start" timestampMs={row.timestampMs} onReply={reply ?? undefined} /> : null}
             </row>
           ) : null}
+          {viewPage ? <ViewChatCard filePath={viewPage.filePath} title={getDisplayPayloadTitle(viewPage)} onOpen={() => openDisplayPayloadTab(viewPage)} /> : null}
           {row.reminder ? <ReminderFireCard mark={row.reminder} text={text} firedAtMs={row.timestampMs} /> : null}
           {hasBody && (inlineImageStrip || hasMedia) ? (
             <col w="full" gap={PART_GAP}>
@@ -520,5 +526,5 @@ export const AssistantMessageRow = memo(
       </col>
     );
   },
-  (prev, next) => prev.conversationId === next.conversationId && prev.latestMedia === next.latestMedia && eventRowEqual(prev.row, next.row),
+  (prev, next) => prev.conversationId === next.conversationId && prev.latestMedia === next.latestMedia && prev.liveView === next.liveView && eventRowEqual(prev.row, next.row),
 );

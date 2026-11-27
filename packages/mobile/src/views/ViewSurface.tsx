@@ -1,17 +1,20 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import { ActivityIndicator, Alert, Modal, Platform, Pressable, ScrollView, Share, StyleSheet, View, type LayoutChangeEvent } from "react-native";
+import type { IndexedViewSource } from "@stella/contracts/backend/view-index";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import type { ViewTheme } from "@stella/views/protocol";
 import type { ViewSession, ViewSnapshot } from "@stella/views/session";
 import { Text } from "../components/Text";
 import { useT } from "../i18n";
-import { selectionTick } from "../lib/haptics";
+import { getBackendClient } from "../lib/backend";
+import { notifyError, notifySuccess, selectionTick, tapLight } from "../lib/haptics";
+import { useViewShare } from "../lib/use-view-share";
 import { fonts } from "../theme/fonts";
 import { useColors, useTheme } from "../theme/theme-context";
 import type { Colors } from "../theme/colors";
 import { NativeKeyCapture, viewsAvailable } from "./native-vm";
 import { chordTable } from "./view-keys";
-import { closeViewFullScreen, openViewFullScreen, useFullScreenView, useIsLiveView, useNewestView, useViewHistory, useViewSession } from "./view-host";
+import { closeAppView, closeViewFullScreen, conversationViewId, openViewFullScreen, useAppView, useAppViewSession, useFullScreenView, useIsLiveView, useNewestView, useViewHistory, useViewSession, type AppViewRef } from "./view-host";
 import { HeaderButton, ViewPreviewBar, ViewUndoButton, ViewVersionList } from "./ViewHistory";
 import { ViewIcon } from "./ViewIcon";
 import { ViewRoot } from "./ViewRenderer";
@@ -175,7 +178,61 @@ export function ViewChip({ file, title }: { file: string; title: string }) {
   );
 }
 
-function FullScreenFrame({ title, actions, onClose, children }: { title: string; actions?: ReactNode; onClose: () => void; children: ReactNode }) {
+/** Share in a full-screen view's header: a public stella.sh link that runs the view in any browser. */
+function ViewShareAction({ viewId, title }: { viewId: string | null; title: string }) {
+  const t = useT();
+  const colors = useColors();
+  const share = useViewShare(viewId);
+  if (!share) return null;
+  const send = (url: string) => void Share.share(Platform.OS === "ios" ? { url, title } : { message: url, title }).catch(() => undefined);
+  const publish = async () => {
+    try {
+      const url = await share.publish();
+      notifySuccess();
+      send(url);
+    } catch (error) {
+      notifyError();
+      Alert.alert(t("mobile.views.shareFailed"), error instanceof Error ? error.message : undefined);
+    }
+  };
+  const onPress = () => {
+    tapLight();
+    if (!share.isPublic || !share.link) {
+      void publish();
+      return;
+    }
+    const url = share.link.url;
+    Alert.alert(t("mobile.views.publicLinkTitle"), url, [
+      { text: t("mobile.views.shareLink"), onPress: () => send(url) },
+      {
+        text: t("mobile.views.makePrivate"),
+        style: "destructive",
+        onPress: () =>
+          void share.makePrivate().catch((error: unknown) => {
+            notifyError();
+            Alert.alert(t("mobile.views.shareFailed"), error instanceof Error ? error.message : undefined);
+          }),
+      },
+      { text: t("common.cancel"), style: "cancel" },
+    ]);
+  };
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={share.busy}
+      hitSlop={8}
+      accessibilityRole="button"
+      accessibilityLabel={t(share.isPublic ? "mobile.views.publicLinkTitle" : "mobile.views.share")}
+      accessibilityState={{ busy: share.busy }}
+      testID="view-share"
+      style={({ pressed }) => ({ width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: pressed ? mix(colors.text, 8, colors.background) : "transparent" })}
+    >
+      {share.busy ? <ActivityIndicator size="small" color={colors.textMuted} /> : <ViewIcon name={share.isPublic ? "globe" : "share"} size={16} color={share.isPublic ? colors.accent : colors.textMuted} />}
+    </Pressable>
+  );
+}
+
+function FullScreenFrame({ title, onClose, actions, children }: { title: string; onClose: () => void; actions?: ReactNode; children: ReactNode }) {
   const t = useT();
   const colors = useColors();
   const insets = useSafeAreaInsets();
@@ -195,7 +252,7 @@ function FullScreenFrame({ title, actions, onClose, children }: { title: string;
   );
 }
 
-function FullScreenBody({ file, title }: { file: string; title: string }) {
+function FullScreenBody({ file, title, viewId }: { file: string; title: string; viewId: string | null }) {
   const t = useT();
   const colors = useColors();
   const theme = useViewTheme();
@@ -211,6 +268,7 @@ function FullScreenBody({ file, title }: { file: string; title: string }) {
     <>
       {listing ? null : <ViewUndoButton file={file} versions={versions} preview={preview} colors={colors} />}
       {versions.length > 1 ? <HeaderButton icon="clock" label={t("shell.display.viewHistory.title")} colors={colors} active={listing || preview !== null} onPress={() => setListing((on) => !on)} /> : null}
+      <ViewShareAction viewId={viewId} title={title} />
     </>
   );
   return (
@@ -234,7 +292,7 @@ export function ViewFullScreenHost() {
   const visible = file !== null && ref !== null;
   return (
     <Modal visible={visible} animationType="slide" presentationStyle={Platform.OS === "ios" ? "pageSheet" : "fullScreen"} onRequestClose={closeViewFullScreen}>
-      {visible ? <FullScreenBody key={file} file={file} title={ref.title} /> : null}
+      {visible ? <FullScreenBody key={file} file={file} title={ref.title} viewId={conversationViewId(ref)} /> : null}
     </Modal>
   );
 }
@@ -243,4 +301,70 @@ export function ViewFullScreenHost() {
 export function ChatMessageView({ file, title, messageId }: { file: string; title: string; messageId: string }) {
   const live = useIsLiveView(file, messageId);
   return live ? <ViewChatCard file={file} title={title} /> : <ViewChip file={file} title={title} />;
+}
+
+// ------------------------------------------------------------------ apps
+
+const appViewRef = (view: IndexedViewSource): AppViewRef => ({
+  id: view.id,
+  conversationId: view.conversationId,
+  filePath: view.filePath,
+  slug: view.slug,
+  title: view.title,
+  source: view.source,
+  ...(view.data !== undefined ? { data: view.data } : {}),
+  createdAt: view.updatedAt,
+  toolCallId: `app:${view.id}:${view.version}`,
+});
+
+/** The newest version of a view in the account's index, live: a newer one swaps in while it's open. */
+function useIndexedView(id: string | null): { view: AppViewRef | null; missing: boolean } {
+  const [state, setState] = useState<{ id: string | null; view: AppViewRef | null; missing: boolean }>({ id: null, view: null, missing: false });
+  useEffect(() => {
+    if (!id) return;
+    try {
+      return getBackendClient().watch(
+        "viewIndex.get",
+        { id },
+        (value) => setState((prior) => ({ id, view: value ? (prior.id === id && prior.view?.source === value.source && prior.view?.createdAt === value.updatedAt ? prior.view : appViewRef(value)) : null, missing: !value })),
+        () => setState((prior) => ({ ...prior, id, missing: prior.view === null })),
+      );
+    } catch {
+      setState({ id, view: null, missing: true });
+      return undefined;
+    }
+  }, [id]);
+  return state.id === id ? { view: state.view, missing: state.missing } : { view: null, missing: false };
+}
+
+function AppViewBody({ view }: { view: AppViewRef }) {
+  const colors = useColors();
+  const theme = useViewTheme();
+  const { session, snapshot } = useAppViewSession(view, theme);
+  const report = useCallback((w: number, h: number) => session?.setViewport(Math.round(w - CARD_PAD * 2), Math.round(h - CARD_PAD * 2)), [session]);
+  return <ViewBody session={session} snapshot={snapshot} colors={colors} dark={theme.dark} covered={false} scroll="fill" onArea={report} />;
+}
+
+/** A view opened from Apps, full screen and live outside its chat; mounted once on the Apps page. */
+export function AppViewHost() {
+  const t = useT();
+  const colors = useColors();
+  const open = useAppView();
+  const { view, missing } = useIndexedView(open?.id ?? null);
+  const title = view?.title ?? open?.title ?? "";
+  return (
+    <Modal visible={open !== null} animationType="slide" presentationStyle={Platform.OS === "ios" ? "pageSheet" : "fullScreen"} onRequestClose={closeAppView}>
+      {open ? (
+        <FullScreenFrame title={title} onClose={closeAppView} actions={<ViewShareAction viewId={open.id} title={title} />}>
+          {view && viewsAvailable() ? (
+            <AppViewBody view={view} />
+          ) : missing || view ? (
+            <Text style={{ padding: 20, fontFamily: fonts.sans.regular, fontSize: 15, color: colors.textMuted }}>{t("mobile.views.missing")}</Text>
+          ) : (
+            <ActivityIndicator color={colors.textMuted} style={{ marginTop: 32 }} />
+          )}
+        </FullScreenFrame>
+      ) : null}
+    </Modal>
+  );
 }

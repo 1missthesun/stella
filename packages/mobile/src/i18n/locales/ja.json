@@ -871,6 +871,14 @@
       "problem": "デバイスを確認できません",
       "startOverTitle": "最初からやり直しますか？",
       "startOverBody": "このスマートフォンだけの新しいリストになります。ほかのデバイスはそれぞれもう一度許可する必要があります。"
+    },
+    "views": {
+      "share": "共有",
+      "publicLinkTitle": "公開リンク",
+      "shareLink": "リンクを共有",
+      "makePrivate": "非公開にする",
+      "shareFailed": "リンクを変更できませんでした",
+      "missing": "このビューはもうアプリにありません。"
     }
   },
   "settings": {

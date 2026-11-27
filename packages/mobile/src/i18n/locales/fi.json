@@ -872,6 +872,14 @@
       "problem": "Laitteitasi ei voi tarkistaa",
       "startOverTitle": "Aloitetaanko alusta?",
       "startOverBody": "Tämä aloittaa uuden luettelon, jossa on vain tämä puhelin. Muut laitteesi on sallittava uudelleen yksitellen."
+    },
+    "views": {
+      "share": "Jaa",
+      "publicLinkTitle": "Julkinen linkki",
+      "shareLink": "Jaa linkki",
+      "makePrivate": "Tee yksityiseksi",
+      "shareFailed": "Linkkiä ei voitu muuttaa",
+      "missing": "Tämä näkymä ei ole enää sovelluksissasi."
     }
   },
   "settings": {

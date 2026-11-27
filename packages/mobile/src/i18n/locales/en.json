@@ -872,6 +872,14 @@
       "problem": "Can’t check your devices",
       "startOverTitle": "Start over?",
       "startOverBody": "This starts a new list with only this phone. Your other devices will each need to be allowed again."
+    },
+    "views": {
+      "share": "Share",
+      "publicLinkTitle": "Public link",
+      "shareLink": "Share link",
+      "makePrivate": "Make private",
+      "shareFailed": "Couldn't change the link",
+      "missing": "This view isn't in your Apps any more."
     }
   },
   "settings": {

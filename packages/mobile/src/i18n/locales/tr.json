@@ -872,6 +872,14 @@
       "problem": "Cihazların kontrol edilemiyor",
       "startOverTitle": "Baştan başlansın mı?",
       "startOverBody": "Yalnızca bu telefonun olduğu yeni bir liste başlar. Diğer cihazlarının her birine yeniden izin verilmesi gerekir."
+    },
+    "views": {
+      "share": "Paylaş",
+      "publicLinkTitle": "Herkese açık bağlantı",
+      "shareLink": "Bağlantıyı paylaş",
+      "makePrivate": "Özel yap",
+      "shareFailed": "Bağlantı değiştirilemedi",
+      "missing": "Bu görünüm artık uygulamalarında değil."
     }
   },
   "settings": {

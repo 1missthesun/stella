@@ -871,6 +871,14 @@
       "problem": "無法核對你的裝置",
       "startOverTitle": "重新開始？",
       "startOverBody": "這會建立一份只有這支手機的新清單。你的其他裝置都需要重新允許。"
+    },
+    "views": {
+      "share": "分享",
+      "publicLinkTitle": "公開連結",
+      "shareLink": "分享連結",
+      "makePrivate": "設為私人",
+      "shareFailed": "無法變更連結",
+      "missing": "此檢視已不在你的應用程式中。"
     }
   },
   "settings": {

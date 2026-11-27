@@ -872,6 +872,14 @@
       "problem": "Kan ikke tjekke dine enheder",
       "startOverTitle": "Start forfra?",
       "startOverBody": "Det starter en ny liste med kun denne telefon. Dine andre enheder skal hver især tillades igen."
+    },
+    "views": {
+      "share": "Del",
+      "publicLinkTitle": "Offentligt link",
+      "shareLink": "Del link",
+      "makePrivate": "Gør privat",
+      "shareFailed": "Kunne ikke ændre linket",
+      "missing": "Denne visning er ikke længere i dine apps."
     }
   },
   "settings": {

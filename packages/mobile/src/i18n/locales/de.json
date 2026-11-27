@@ -872,6 +872,14 @@
       "problem": "Deine Geräte lassen sich nicht prüfen",
       "startOverTitle": "Neu anfangen?",
       "startOverBody": "Damit beginnt eine neue Liste, auf der nur dieses Handy steht. Deine anderen Geräte müssen einzeln wieder erlaubt werden."
+    },
+    "views": {
+      "share": "Teilen",
+      "publicLinkTitle": "Öffentlicher Link",
+      "shareLink": "Link teilen",
+      "makePrivate": "Privat machen",
+      "shareFailed": "Link konnte nicht geändert werden",
+      "missing": "Diese Ansicht ist nicht mehr in deinen Apps."
     }
   },
   "settings": {

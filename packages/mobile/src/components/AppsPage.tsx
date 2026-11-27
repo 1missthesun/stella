@@ -6,7 +6,12 @@ import {
   View,
 } from "react-native";
 import { useIsFocused, useRouter } from "expo-router";
+import type { IndexedView } from "@stella/contracts/backend/view-index";
 import { useT } from "../i18n";
+import { useBackendView } from "../lib/backend";
+import { AppViewHost } from "../views/ViewSurface";
+import { openAppView } from "../views/view-host";
+import { ViewIcon } from "../views/ViewIcon";
 import { authClient } from "../lib/auth-client";
 import { useAppsPage } from "../lib/apps-page-store";
 import { startChatWith } from "../lib/ask-stella";
@@ -34,17 +39,23 @@ export function AppsPage() {
   const emailOn = useEmailFeature();
   const session = authClient.useSession();
   const page = useAppsPage();
+  const signedIn = Boolean(session.data?.user);
+  const views = useBackendView("viewIndex.list", signedIn ? {} : "skip", { rememberFor: session.data?.user?.id ?? null, persist: true }).value;
+  const hasViews = (views?.length ?? 0) > 0;
 
-  if (!page) {
-    return session.isPending || session.data?.user ? (
+  if (!page && !hasViews) {
+    return session.isPending || signedIn ? (
       <ActivityIndicator color={colors.textMuted} style={local.loading} />
     ) : (
       <Text style={styles.detail}>Apps are unavailable. Please try again.</Text>
     );
   }
 
-  const { apps, error, opening, open } = page;
-  const empty = apps?.length === 0 && !error;
+  const apps = page?.apps ?? (hasViews ? [] : null);
+  const error = page?.error ?? null;
+  const opening = page?.opening ?? null;
+  const open = page?.open;
+  const empty = !hasViews && views !== undefined && apps?.length === 0 && !error;
   const email =
     emailOn && !wide ? (
       <EmailEntry onPress={() => router.push(MAIN_TAB_HREFS.email)} />
@@ -75,8 +86,13 @@ export function AppsPage() {
       showsVerticalScrollIndicator={false}
     >
       {email}
-      {email && apps ? <Hairline space={16} /> : <View style={local.lead} />}
-      {apps === null && !error ? (
+      {email && (apps || hasViews) ? <Hairline space={16} /> : <View style={local.lead} />}
+      {views?.map((view) => (
+        <ViewRow key={view.id} view={view} />
+      ))}
+      {hasViews && apps && apps.length > 0 ? <Hairline space={16} /> : null}
+      <AppViewHost />
+      {apps === null && !hasViews && !error ? (
         <ActivityIndicator color={colors.textMuted} style={local.loading} />
       ) : null}
       {error ? (
@@ -95,8 +111,8 @@ export function AppsPage() {
             accessibilityRole="button"
             accessibilityLabel={app.title}
             accessibilityState={{ busy: opening === app.slug, disabled: !ready }}
-            disabled={opening !== null || !ready}
-            onPress={() => open(app)}
+            disabled={opening !== null || !ready || !open}
+            onPress={() => open?.(app)}
             style={({ pressed }) => [
               styles.row,
               local.row,
@@ -138,6 +154,29 @@ export function AppsPage() {
         );
       })}
     </ScrollView>
+  );
+}
+
+function ViewRow({ view }: { view: IndexedView }) {
+  const colors = useColors();
+  const styles = useAiryList();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={view.title}
+      onPress={() => openAppView(view)}
+      style={({ pressed }) => [styles.row, local.row, pressed && styles.pressed]}
+      testID={`mobile-view-${view.slug}`}
+    >
+      <View style={local.glyph}>
+        {view.icon ? <ViewIcon name={view.icon} size={26} color={colors.text} strokeWidth={1.75} /> : <Icon name="apps" size={26} color={colors.text} />}
+      </View>
+      <View style={styles.copy}>
+        <Text style={styles.title} numberOfLines={1} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+          {view.title}
+        </Text>
+      </View>
+    </Pressable>
   );
 }
 

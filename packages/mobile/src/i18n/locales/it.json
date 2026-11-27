@@ -873,6 +873,14 @@
       "problem": "Impossibile controllare i tuoi dispositivi",
       "startOverTitle": "Ricominciare?",
       "startOverBody": "Verrà creato un nuovo elenco con solo questo telefono. Dovrai consentire di nuovo ciascuno degli altri dispositivi."
+    },
+    "views": {
+      "share": "Condividi",
+      "publicLinkTitle": "Link pubblico",
+      "shareLink": "Condividi link",
+      "makePrivate": "Rendi privato",
+      "shareFailed": "Impossibile modificare il link",
+      "missing": "Questa vista non è più nelle tue app."
     }
   },
   "settings": {

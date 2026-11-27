@@ -873,6 +873,14 @@
       "problem": "Dispozitivele tale nu pot fi verificate",
       "startOverTitle": "O iei de la capăt?",
       "startOverBody": "Începe o listă nouă doar cu acest telefon. Fiecare dintre celelalte dispozitive va trebui permis din nou."
+    },
+    "views": {
+      "share": "Distribuie",
+      "publicLinkTitle": "Link public",
+      "shareLink": "Distribuie linkul",
+      "makePrivate": "Fă-l privat",
+      "shareFailed": "Nu s-a putut schimba linkul",
+      "missing": "Această vizualizare nu mai este în aplicațiile tale."
     }
   },
   "settings": {

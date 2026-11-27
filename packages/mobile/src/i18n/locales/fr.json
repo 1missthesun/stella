@@ -873,6 +873,14 @@
       "problem": "Impossible de vérifier tes appareils",
       "startOverTitle": "Recommencer ?",
       "startOverBody": "Cela crée une nouvelle liste avec ce téléphone seulement. Tes autres appareils devront chacun être autorisés de nouveau."
+    },
+    "views": {
+      "share": "Partager",
+      "publicLinkTitle": "Lien public",
+      "shareLink": "Partager le lien",
+      "makePrivate": "Rendre privé",
+      "shareFailed": "Impossible de modifier le lien",
+      "missing": "Cette vue n'est plus dans tes apps."
     }
   },
   "settings": {

@@ -872,6 +872,14 @@
       "problem": "Kan je apparaten niet controleren",
       "startOverTitle": "Opnieuw beginnen?",
       "startOverBody": "Dit begint een nieuwe lijst met alleen deze telefoon. Je andere apparaten moeten elk opnieuw worden toegestaan."
+    },
+    "views": {
+      "share": "Delen",
+      "publicLinkTitle": "Openbare link",
+      "shareLink": "Link delen",
+      "makePrivate": "Privé maken",
+      "shareFailed": "Kan de link niet wijzigen",
+      "missing": "Deze weergave staat niet meer in je apps."
     }
   },
   "settings": {

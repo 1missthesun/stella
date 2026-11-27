@@ -873,6 +873,14 @@
       "problem": "Não foi possível verificar seus dispositivos",
       "startOverTitle": "Começar de novo?",
       "startOverBody": "Isso cria uma nova lista só com este telefone. Cada um dos seus outros dispositivos precisará ser permitido de novo."
+    },
+    "views": {
+      "share": "Compartilhar",
+      "publicLinkTitle": "Link público",
+      "shareLink": "Compartilhar link",
+      "makePrivate": "Tornar privado",
+      "shareFailed": "Não foi possível alterar o link",
+      "missing": "Esta visualização não está mais nos seus apps."
     }
   },
   "settings": {

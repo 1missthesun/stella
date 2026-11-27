@@ -874,6 +874,14 @@
       "problem": "Nie można sprawdzić twoich urządzeń",
       "startOverTitle": "Zacząć od nowa?",
       "startOverBody": "Powstanie nowa lista tylko z tym telefonem. Na każde z pozostałych urządzeń trzeba będzie zezwolić ponownie."
+    },
+    "views": {
+      "share": "Udostępnij",
+      "publicLinkTitle": "Link publiczny",
+      "shareLink": "Udostępnij link",
+      "makePrivate": "Ustaw jako prywatny",
+      "shareFailed": "Nie udało się zmienić linku",
+      "missing": "Tego widoku nie ma już w Twoich aplikacjach."
     }
   },
   "settings": {

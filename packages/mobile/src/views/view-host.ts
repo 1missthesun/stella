@@ -25,6 +25,8 @@ type Newest = { messageId: string; ref: ChatViewRef };
 
 let scope = "";
 let generation = 0;
+/** Views opened from Apps, by view id (see "apps" below). */
+const appEntries = new Map<string, Entry>();
 let newest = new Map<string, Newest>();
 let lastMessages: readonly ChatMessage[] | null = null;
 const newestListeners = new Set<() => void>();
@@ -156,6 +158,14 @@ export function useNewestView(file: string | null): ChatViewRef | null {
   return useSyncExternalStore(subscribeNewest, () => (file ? (newest.get(viewLiveKey(file))?.ref ?? null) : null));
 }
 
+/** The synced identity (`<conversationId>/<slug>`) of a view in the open conversation, which its link shares. */
+export function conversationViewId(ref: ChatViewRef | null): string | null {
+  if (!ref) return null;
+  const named = viewIdentityFromPath(ref.filePath);
+  if (named) return syncedViewId(named.conversationId, named.slug);
+  return scope ? syncedViewId(scope, ref.slug || viewSlugFromPath(ref.filePath)) : null;
+}
+
 // ------------------------------------------------------------------ storage
 
 const storageKey = (file: string) => `stella-views:v1:${viewKey(file)}`;
@@ -245,9 +255,11 @@ const connectSync = () => {
       if (state === "active") sync.retryNow();
     });
   }
-  if (sync.connect(account, account ? remote : null) && entries.size > 0) {
+  if (sync.connect(account, account ? remote : null) && entries.size + appEntries.size > 0) {
     for (const entry of entries.values()) entry.dispose();
     entries.clear();
+    for (const entry of appEntries.values()) entry.dispose();
+    appEntries.clear();
     generation += 1;
     for (const listener of newestListeners) listener();
   }
@@ -282,9 +294,9 @@ class Entry {
     readonly file: string,
     ref: ChatViewRef,
     theme: ViewTheme,
-    storage?: ViewStorage,
+    private readonly options: { storage?: ViewStorage; onClosed?: () => void } = {},
   ) {
-    this.storage = storage ?? viewStorage(file, ref);
+    this.storage = options.storage ?? viewStorage(file, ref);
     this.session = new ViewSession({
       id: file,
       title: ref.title,
@@ -331,7 +343,8 @@ class Entry {
     this.closeTimer = setTimeout(() => {
       if (this.refs > 0) return;
       this.dispose();
-      entries.delete(this.key);
+      if (this.options.onClosed) this.options.onClosed();
+      else entries.delete(this.key);
     }, KEEP_ALIVE_MS);
   }
 
@@ -364,7 +377,7 @@ export function useViewSession(file: string, theme: ViewTheme): { session: ViewS
     if (!entry) {
       if (preview) {
         const ref: ChatViewRef = { ...current, title: preview.title, source: preview.source, createdAt: preview.createdAt, by: preview.by };
-        entry = new Entry(entryKey, current.filePath, ref, themeRef.current, previewStorage(entries.get(key)?.storage ?? viewStorage(current.filePath, current)));
+        entry = new Entry(entryKey, current.filePath, ref, themeRef.current, { storage: previewStorage(entries.get(key)?.storage ?? viewStorage(current.filePath, current)) });
       } else {
         entry = new Entry(key, current.filePath, current, themeRef.current);
       }
@@ -402,3 +415,66 @@ const subscribeFullScreen = (listener: () => void) => {
 export const openViewFullScreen = (file: string) => setFullScreen(file);
 export const closeViewFullScreen = () => setFullScreen(null);
 export const useFullScreenView = () => useSyncExternalStore(subscribeFullScreen, () => fullScreen);
+
+// ------------------------------------------------------------------ apps
+
+// A view opened from Apps runs outside any chat: its own session per view, its newest version from
+// the account's view index, and its storage synced under its own conversation, as in the chat
+// (`appEntries`, declared above with the chat's sessions).
+
+export type AppViewRef = ChatViewRef & { id: string; conversationId: string };
+
+/** The running session of a view opened from Apps (its newest version) while the caller is mounted. */
+export function useAppViewSession(view: AppViewRef | null, theme: ViewTheme): { session: ViewSession | null; snapshot: ViewSnapshot | null } {
+  const [session, setSession] = useState<ViewSession | null>(null);
+  const [snapshot, setSnapshot] = useState<ViewSnapshot | null>(null);
+  const themeRef = useRef(theme);
+  themeRef.current = theme;
+  const viewRef = useRef(view);
+  viewRef.current = view;
+  const id = view?.id ?? null;
+  // An account switch disposes every running view; a new generation starts this one again.
+  const scopeGeneration = useSyncExternalStore(subscribeNewest, () => generation);
+  useEffect(() => {
+    const current = viewRef.current;
+    if (!id || !current) return;
+    let entry = appEntries.get(id);
+    if (!entry) {
+      connectSync();
+      const storage = sync.storage(id, () => legacyPhoneStorage(current.filePath));
+      entry = new Entry(`app:${id}`, current.filePath, current, themeRef.current, { storage, onClosed: () => appEntries.delete(id) });
+      appEntries.set(id, entry);
+    }
+    entry.acquire();
+    const held = entry;
+    setSession(held.session);
+    setSnapshot(held.session.current);
+    const off = held.session.subscribe(setSnapshot);
+    return () => {
+      off();
+      held.release();
+    };
+  }, [id, scopeGeneration]);
+  useEffect(() => {
+    if (id && view) appEntries.get(id)?.load(view);
+  }, [id, view]);
+  useEffect(() => {
+    session?.setTheme(theme);
+  }, [session, theme]);
+  return { session, snapshot };
+}
+
+let appView: { id: string; title: string } | null = null;
+const appViewListeners = new Set<() => void>();
+const setAppView = (next: { id: string; title: string } | null) => {
+  appView = next;
+  for (const listener of appViewListeners) listener();
+};
+const subscribeAppView = (listener: () => void) => {
+  appViewListeners.add(listener);
+  return () => void appViewListeners.delete(listener);
+};
+
+export const openAppView = (view: { id: string; title: string }) => setAppView({ id: view.id, title: view.title });
+export const closeAppView = () => setAppView(null);
+export const useAppView = () => useSyncExternalStore(subscribeAppView, () => appView);

@@ -871,6 +871,14 @@
       "problem": "无法核对你的设备",
       "startOverTitle": "重新开始？",
       "startOverBody": "这会新建一个只有这部手机的列表。你的其他设备都需要重新允许。"
+    },
+    "views": {
+      "share": "分享",
+      "publicLinkTitle": "公开链接",
+      "shareLink": "分享链接",
+      "makePrivate": "设为私密",
+      "shareFailed": "无法更改链接",
+      "missing": "此视图已不在你的应用中。"
     }
   },
   "settings": {

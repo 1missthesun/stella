@@ -874,6 +874,14 @@
       "problem": "Tvá zařízení nelze ověřit",
       "startOverTitle": "Začít znovu?",
       "startOverBody": "Vznikne nový seznam jen s tímto telefonem. Ostatní zařízení bude potřeba znovu povolit."
+    },
+    "views": {
+      "share": "Sdílet",
+      "publicLinkTitle": "Veřejný odkaz",
+      "shareLink": "Sdílet odkaz",
+      "makePrivate": "Nastavit jako soukromé",
+      "shareFailed": "Odkaz se nepodařilo změnit",
+      "missing": "Toto zobrazení už ve vašich aplikacích není."
     }
   },
   "settings": {

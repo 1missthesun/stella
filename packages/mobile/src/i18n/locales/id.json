@@ -871,6 +871,14 @@
       "problem": "Tidak bisa memeriksa perangkat Anda",
       "startOverTitle": "Mulai ulang?",
       "startOverBody": "Ini memulai daftar baru yang hanya berisi ponsel ini. Setiap perangkat Anda yang lain perlu diizinkan lagi."
+    },
+    "views": {
+      "share": "Bagikan",
+      "publicLinkTitle": "Tautan publik",
+      "shareLink": "Bagikan tautan",
+      "makePrivate": "Jadikan pribadi",
+      "shareFailed": "Tidak dapat mengubah tautan",
+      "missing": "Tampilan ini sudah tidak ada di Aplikasimu."
     }
   },
   "settings": {

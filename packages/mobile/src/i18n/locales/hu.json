@@ -872,6 +872,14 @@
       "problem": "Nem sikerült ellenőrizni az eszközeidet",
       "startOverTitle": "Újrakezded?",
       "startOverBody": "Ez új listát kezd, amelyen csak ez a telefon szerepel. A többi eszközödet egyenként újra engedélyezni kell."
+    },
+    "views": {
+      "share": "Megosztás",
+      "publicLinkTitle": "Nyilvános link",
+      "shareLink": "Link megosztása",
+      "makePrivate": "Priváttá tétel",
+      "shareFailed": "Nem sikerült módosítani a linket",
+      "missing": "Ez a nézet már nincs az appjaid között."
     }
   },
   "settings": {

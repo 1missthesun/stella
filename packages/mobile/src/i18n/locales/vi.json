@@ -871,6 +871,14 @@
       "problem": "Không kiểm tra được các thiết bị của bạn",
       "startOverTitle": "Bắt đầu lại?",
       "startOverBody": "Thao tác này tạo danh sách mới chỉ có điện thoại này. Từng thiết bị khác của bạn sẽ cần được cho phép lại."
+    },
+    "views": {
+      "share": "Chia sẻ",
+      "publicLinkTitle": "Liên kết công khai",
+      "shareLink": "Chia sẻ liên kết",
+      "makePrivate": "Đặt riêng tư",
+      "shareFailed": "Không thể thay đổi liên kết",
+      "missing": "Chế độ xem này không còn trong Ứng dụng của bạn."
     }
   },
   "settings": {

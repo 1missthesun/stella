@@ -17,7 +17,7 @@ export const useMenuClose = () => useContext(MenuClose);
 /** desktop-ui's dropdown chrome (`[data-component="dropdown-menu-content"]`) as Liquid Glass (`menuGlass`). */
 export function menuSurface(t: Tokens) {
   const g = menuGlass(t);
-  return { radius: MENU_GLASS_RADIUS, border: g.border, fx: g.fx, shadows: g.shadows, enter: g.enter } as const;
+  return { radius: MENU_GLASS_RADIUS, border: g.border, fx: g.morph, shadows: g.shadows } as const;
 }
 
 /**
@@ -92,11 +92,12 @@ function MenuPanelGlass({ id, triggerId, side, align, sideOffset, minW, maxW, ma
       minW={minW}
       maxW={maxW}
       maxH={maxH}
-      scrollY
       pad={6 + 1}
       {...menuSurface(t)}
     >
-      <DismissLayer.Provider value={close}>{children}</DismissLayer.Provider>
+      <col w="full" minH={0} shrink scrollY>
+        <DismissLayer.Provider value={close}>{children}</DismissLayer.Provider>
+      </col>
     </col>
   );
 }
@@ -360,9 +361,8 @@ function PopoverGlass({ id, triggerId, side, align, sideOffset, width, padded, c
       maxW={width ?? 320}
       radius={POPOVER_GLASS_RADIUS}
       border={g.border}
-      fx={g.fx}
+      fx={g.morph}
       shadows={g.shadows}
-      enter={g.enter}
       pad={padded ? 12 + 1 : 1}
     >
       <DismissLayer.Provider value={close}>{children}</DismissLayer.Provider>

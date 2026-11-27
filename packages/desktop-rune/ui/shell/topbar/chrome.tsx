@@ -82,7 +82,7 @@ export type PanelProps = {
   children: ReactNode;
 };
 
-/** desktop-ui's `PopoverContent` as Liquid Glass (`menuGlass`), in the app's own mode even when its trigger's capsule took the other; opens and closes instantly. */
+/** desktop-ui's `PopoverContent` as Liquid Glass (`menuGlass`), in the app's own mode even when its trigger's capsule took the other; grows out of its anchor and back into it. */
 export function Panel(props: PanelProps) {
   if (!props.open) return null;
   return (
@@ -115,14 +115,14 @@ function PanelGlass({ id, anchor, onClose, side = "bottom", align = "end", gap =
         h={h}
         maxH={maxH}
         radius={r}
-        clip={r}
         border={g.border}
-        fx={g.fx}
+        fx={g.morph}
         shadows={g.shadows}
-        enter={g.enter}
         pad={1}
       >
-        <DismissLayer.Provider value={onClose}>{children}</DismissLayer.Provider>
+        <col w="full" grow={1} minH={0} shrink clip={r - 1}>
+          <DismissLayer.Provider value={onClose}>{children}</DismissLayer.Provider>
+        </col>
       </col>
     </MenuCloseProvider>
   );

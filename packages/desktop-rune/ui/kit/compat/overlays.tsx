@@ -258,14 +258,15 @@ function FloatingMenu({ side, align, sideOffset, label, style, children }: { sid
       focusGroup
       {...entry}
       minW={180}
-      scrollY
       pad={6 + 1}
       {...menuSurface(t)}
       {...style}
     >
-      <DismissLayer.Provider value={() => setOpen(false)}>
-        <TextScope base={BODY_TEXT}>{children}</TextScope>
-      </DismissLayer.Provider>
+      <col w="full" minH={0} shrink scrollY>
+        <DismissLayer.Provider value={() => setOpen(false)}>
+          <TextScope base={BODY_TEXT}>{children}</TextScope>
+        </DismissLayer.Provider>
+      </col>
     </col>
   );
 }
@@ -297,9 +298,8 @@ function PopoverGlass({ side = "bottom", align = "center", sideOffset = 4, ancho
       maxW={320}
       radius={POPOVER_GLASS_RADIUS}
       border={g.border}
-      fx={g.fx}
+      fx={g.morph}
       shadows={g.shadows}
-      enter={g.enter}
       pad={1}
       {...style}
     >

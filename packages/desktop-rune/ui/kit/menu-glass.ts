@@ -1,4 +1,4 @@
-import type { Effect, FxLayer } from "../../host/rune-jsx/props";
+import type { Effect, FxLayer, Glass } from "../../host/rune-jsx/props";
 import { alpha, derive, mix, mixOklch, type Tokens } from "../theme";
 
 /** Corner radius of a glass menu; its items are pills inset by the menu's padding. */
@@ -11,9 +11,10 @@ export const POPOVER_GLASS_RADIUS = 18;
  * (`tintColor = fadeHex(surface, 0.78)`, packages/mobile glass.tsx): the composer's material under
  * a denser surface veil, so rows stay readable over any content. One glass element per menu,
  * anchored to its trigger. The glass carries no shadow of its own: menus clip and scroll, and a
- * clip cuts the slab's shadow, so the element's `shadows` lift it instead. It opens by scaling
- * rather than fading: an element below full opacity paints in an isolated layer, where glass
- * sees no backdrop and reads as a grey slab until the fade ends.
+ * clip cuts the slab's shadow, so the element's `shadows` lift it instead. An anchored one grows
+ * out of its trigger (`morph`: `morphFrom` the anchor) and goes back into it; anything else opens
+ * by scaling rather than fading: an element below full opacity paints in an isolated layer, where
+ * glass sees no backdrop and reads as a grey slab until the fade ends.
  */
 export function menuGlass(t: Tokens) {
   return derive(t, "menu-glass", (t) => {
@@ -36,6 +37,8 @@ export function menuGlass(t: Tokens) {
     };
     return {
       fx,
+      /** `fx` growing out of the element's anchor: a menu's or popover's own entrance, with no `enter`. */
+      morph: { glass: { ...(fx.glass as Glass), morphFrom: true } } satisfies FxLayer,
       enter: { scale: 0.96, dur: 0.18 } satisfies Effect,
       border: t.dark ? t.c.border : alpha(t.c.border, 0.6),
       shadows: t.dark ? [{ x: 0, y: 12, blur: 36, spread: -6, color: "rgba(0,0,0,0.5)" }] : [{ x: 0, y: 10, blur: 30, spread: -6, color: "rgba(0,0,0,0.14)" }],

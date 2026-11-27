@@ -589,8 +589,18 @@ export function useFullShellChat({
     );
   const welcomeOnlyRef = useRef(welcomeOnly);
   welcomeOnlyRef.current = welcomeOnly;
+  // History can arrive a record at a time (the phone replays it), so a chat may hold only the
+  // welcome for a moment while it opens. Once more than the welcome is there, it follows the end
+  // again, unless the person has scrolled since.
+  const releasedForWelcomeRef = useRef(false);
+  useEffect(() => {
+    if (welcomeOnly || !releasedForWelcomeRef.current) return;
+    releasedForWelcomeRef.current = false;
+    if (!isUserScrolling) scrollToBottom("instant");
+  }, [isUserScrolling, scrollToBottom, welcomeOnly]);
   useEffect(() => {
     if (!welcomeOnly || isPlacingInitialScroll) return;
+    releasedForWelcomeRef.current = true;
     releaseFollow();
     let frames = 0;
     let frame = requestAnimationFrame(function toTop() {

@@ -33,12 +33,14 @@ const BAR_FADE = 10;
 const PILL_W = 62;
 const PILL_H = 38;
 const SHEET_RAISE = 40;
+const TAPER_TAIL = 24;
 
 /** The bottom bar's capsule floats this far above the window bottom (packages/mobile `bottomBarPadding`). */
 /** The bar's padding under its row, over the home indicator (the RN app's `bottomBarPadding`). */
 export const barPad = (safeBottom: number) => Math.max(safeBottom - 6, 4);
 /** What a page keeps free at its bottom for the bar. */
-export const barSpace = (i: PhoneInsets) => (i.keyboard > 0 ? i.keyboard : BAR_ROW + barPad(i.bottom));
+/** What a page keeps free at its bottom: the bar, or the keyboard once it rises past the bar. */
+export const barSpace = (i: PhoneInsets) => Math.max(i.keyboard, BAR_ROW + barPad(i.bottom));
 
 /** packages/mobile's drawer travel: three quarters of the window, 320–400pt. */
 const drawerWidth = (w: number) => Math.round(Math.max(Math.min(w * 0.75, 320), Math.min(w * 0.6, 400)));
@@ -102,6 +104,16 @@ function TopBar({ width, insets, tab, onWidth }: { width: number; insets: PhoneI
   );
 }
 
+/** The app's background behind the top bar, solid through the status bar and the buttons' middle
+ * and fading out just under them, so a message scrolled up passes beneath Stella's activity instead of
+ * through it (packages/mobile ChatPane's top taper). */
+function TopTaper({ insets, tab }: { insets: PhoneInsets; tab: PhoneTab }) {
+  const bg = useTokens().c.background;
+  const h = insets.top + PHONE_TOPBAR_H + TAPER_TAIL;
+  const solid = (insets.top + PHONE_TOPBAR_H * 0.85) / h;
+  return <box id="phone-top-taper" fixed absolute={{ left: 0, top: 0, right: 0 }} h={h} raise={SHEET_RAISE - 1} hidden={tab !== "chat"} inert gradient={{ angle: 180, stops: [[0, bg], [solid, bg], [1, alpha(bg, 0)]] }} />;
+}
+
 function BottomBar({ insets, tab }: { insets: PhoneInsets; tab: PhoneTab }) {
   const t = useTokens();
   const pad = barPad(insets.bottom);
@@ -110,7 +122,7 @@ function BottomBar({ insets, tab }: { insets: PhoneInsets; tab: PhoneTab }) {
   // The React Native app's bar: flush with the bottom edge over the app's own background,
   // which fades in over its top 10 points; no glass.
   return (
-    <col id="phone-bottom-bar-dock" fixed absolute={{ left: 0, right: 0, bottom: 0 }} h={BAR_ROW + pad} pb={pad} raise={SHEET_RAISE + 1} hidden={insets.keyboard > 0}>
+    <col id="phone-bottom-bar-dock" fixed absolute={{ left: 0, right: 0, bottom: 0 }} h={BAR_ROW + pad} pb={pad} raise={SHEET_RAISE + 1} opacity={Math.max(0, 1 - insets.keyboard / (BAR_ROW + pad))} inert={insets.keyboard > 0}>
       <box absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} gradient={{ angle: 180, stops: [[0, alpha(bg, 0)], [BAR_FADE / (BAR_ROW + pad), bg], [1, bg]] }} />
       <row id="phone-bottom-bar" role="tablist" w="full" maxW={BAR_MAX_W} selfAlign="center" h={BAR_ROW} px={34} align="center" justify="center">
         {PHONE_TABS.map((id) => {
@@ -237,6 +249,7 @@ export const ShellTopBarFull = memo(function PhoneChrome(_props: { onSignIn?: ()
   return (
     <>
       <TabPages insets={insets} tab={tab} />
+      <TopTaper insets={insets} tab={tab} />
       <TopBar width={width} insets={insets} tab={tab} onWidth={(w) => setWidth((old) => (Math.abs(old - w) < 0.5 ? old : w))} />
       <BottomBar insets={insets} tab={tab} />
       <PhoneViewScreen width={width} insets={insets} raise={SHEET_RAISE + 2} BackButton={ViewBackButton} />

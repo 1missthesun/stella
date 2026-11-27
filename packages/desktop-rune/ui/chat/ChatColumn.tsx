@@ -26,7 +26,7 @@ import { WaitingMessages } from "@/global/local-mode/WaitingMessages";
 import { Icon, Icons, withStroke } from "../kit";
 import { derive, mix, useTokens } from "../theme";
 import { UnderGlassContext, type LegendContentStyle } from "./ChatTimeline";
-import { SHELL_TOPBAR_HEIGHT } from "../shell/metrics";
+import { CHAT_TOP_PAD, SHELL_TOPBAR_HEIGHT } from "../shell/metrics";
 import { AdaptiveGlass, chromeGlass, composerGroupGlass, GlassSheen, useGlassBackdrop } from "../shell/glass";
 import { useFileDrop } from "./use-file-drop";
 import { COMPOSER_GAP, COMPOSER_NARROW_W, COMPOSER_PAD_TOP, composerShellMaxW } from "./Composer";
@@ -48,7 +48,7 @@ const FULL_CHAT_CONTENT_STYLE: LegendContentStyle = {
   marginRight: "auto",
   paddingLeft: 24,
   paddingRight: 24,
-  paddingTop: SHELL_TOPBAR_HEIGHT + 112,
+  paddingTop: CHAT_TOP_PAD,
   paddingBottom: CONTENT_PAD_BOTTOM,
 };
 

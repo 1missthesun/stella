@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useMemo } from "react";
 import { FullWindow } from "../../desktop-rune/ui/app/FullWindow";
 import { usePhoneInsets } from "./phone/insets";
 import { barSpace } from "./phone/PhoneChrome";
@@ -10,13 +10,16 @@ import { barSpace } from "./phone/PhoneChrome";
  */
 export function PhoneRoot() {
   const insets = usePhoneInsets();
+  // One element for the life of the window, so the keyboard moving the insets each frame re-lays
+  // out the app without re-rendering it.
+  const app = useMemo(() => <FullWindow />, []);
   useEffect(() => {
     document.documentElement.dataset.stellaPhone = "true";
   }, []);
   return (
     <window id="main">
       <col id="phone-safe-area" w="full" h="full" pt={insets.top} pb={barSpace(insets)} pl={insets.left} pr={insets.right}>
-        <FullWindow />
+        {app}
       </col>
     </window>
   );

@@ -218,6 +218,12 @@ export function useChatScrollManagement({
       const next: Metrics = { y: pos.y, maxY: pos.maxY, viewport: pos.viewport[1] };
       const prev = metricsRef.current;
       metricsRef.current = next;
+      // The viewport shrank or grew under a list that follows its end (the phone's keyboard rising,
+      // a window resized): it stays on the latest message, frame by frame as the edge moves.
+      if (prev && Math.abs(next.viewport - prev.viewport) >= 0.5 && followRef.current && prev.maxY - prev.y <= AT_END_PX && next.maxY - next.y > AT_END_PX) {
+        programmaticUntilRef.current = performance.now() + PROGRAMMATIC_MS;
+        void engine().scroll.to(scrollId, "end", { animate: false });
+      }
       const distFromEnd = Math.max(0, next.maxY - next.y);
       const atEnd = distFromEnd <= AT_END_PX;
       const nearBottom = atEnd || distFromEnd <= AT_BOTTOM_TOLERANCE_PX;
@@ -261,7 +267,7 @@ export function useChatScrollManagement({
       }
       if (!followRearmBlockedRef.current && (atEnd || distFromEnd <= FOLLOW_REARM_THRESHOLD_PX)) setFollow(true);
     },
-    [attemptHistoryLoad, noteManualScroll, setFollow, updateThumb],
+    [attemptHistoryLoad, noteManualScroll, scrollId, setFollow, updateThumb],
   );
 
   const markProgrammatic = () => {

@@ -196,20 +196,78 @@ enum Haptics {
   }
 }
 
-/// The keyboard's overlap with the window, for the composer to sit on it.
+/// The keyboard's overlap with the window, for the composer to sit on it. It moves with the
+/// keyboard rather than jumping: a hidden probe view runs UIKit's own keyboard animation (its
+/// duration and curve), and each display frame hands the probe's in-flight value to Rune.
 final class KeyboardWatch {
   static let shared = KeyboardWatch()
+  private let probe = UIView(frame: .zero)
+  private var link: CADisplayLink?
+  private var sent: CGFloat = 0
+  private var until: CFTimeInterval = 0
+
   func start() {
-    NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillChangeFrameNotification, object: nil, queue: .main) { n in
+    probe.isHidden = true
+    probe.isUserInteractionEnabled = false
+    NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillChangeFrameNotification, object: nil, queue: .main) { [weak self] n in
       guard let end = (n.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue, let w = App.shared.window else { return }
-      let overlap = max(0, w.bounds.maxY - end.minY)
-      if let h = App.shared.rune?.host { sme_keyboard(h, Float(overlap)) }
-      App.shared.rune?.wake()
+      self?.move(to: max(0, w.bounds.maxY - end.minY), n.userInfo, in: w)
     }
-    NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillHideNotification, object: nil, queue: .main) { _ in
-      if let h = App.shared.rune?.host { sme_keyboard(h, 0) }
-      App.shared.rune?.wake()
+    NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillHideNotification, object: nil, queue: .main) { [weak self] n in
+      guard let w = App.shared.window else { return }
+      self?.move(to: 0, n.userInfo, in: w)
     }
+  }
+
+  private func move(to overlap: CGFloat, _ info: [AnyHashable: Any]?, in window: UIWindow) {
+    if probe.superview !== window { window.addSubview(probe) }
+    let dur = (info?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0
+    let curve = (info?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt) ?? 7
+    guard dur > 0 else {
+      probe.layer.removeAllAnimations()
+      probe.frame = CGRect(x: 0, y: overlap, width: 1, height: 1)
+      send(overlap)
+      return
+    }
+    UIView.animate(withDuration: dur, delay: 0, options: [UIView.AnimationOptions(rawValue: curve << 16), .beginFromCurrentState]) {
+      self.probe.frame = CGRect(x: 0, y: overlap, width: 1, height: 1)
+    }
+    // What the probe reads reaches the screen a couple of frames later (Rune lays out on the next
+    // frame after JS hears it), so the probe runs the keyboard's own animation that far ahead.
+    let frame = link.map { $0.targetTimestamp - $0.timestamp } ?? (1.0 / Double(max(60, window.screen.maximumFramesPerSecond)))
+    let lead = 2 * max(frame, 1.0 / 120)
+    let now = probe.layer.convertTime(CACurrentMediaTime(), from: nil)
+    for key in probe.layer.animationKeys() ?? [] {
+      guard let a = probe.layer.animation(forKey: key)?.mutableCopy() as? CAAnimation else { continue }
+      a.beginTime = now - lead
+      probe.layer.add(a, forKey: key)
+    }
+    until = CACurrentMediaTime() + dur + 0.05
+    if link == nil {
+      let l = CADisplayLink(target: self, selector: #selector(tick))
+      l.preferredFrameRateRange = CAFrameRateRange(minimum: 80, maximum: 120, preferred: 120)
+      l.add(to: .main, forMode: .common)
+      link = l
+    }
+  }
+
+  @objc private func tick() {
+    // Until the animation is committed there is no presentation layer; the model value then is
+    // where the keyboard ends up, not where it is.
+    if let y = probe.layer.presentation()?.frame.minY { send(y) }
+    if CACurrentMediaTime() >= until {
+      send(probe.frame.minY)
+      link?.invalidate()
+      link = nil
+    }
+  }
+
+  private func send(_ overlap: CGFloat) {
+    let v = max(0, overlap.rounded())
+    guard v != sent, let h = App.shared.rune?.host else { return }
+    sent = v
+    sme_keyboard(h, Float(v))
+    App.shared.rune?.wake()
   }
 }
 

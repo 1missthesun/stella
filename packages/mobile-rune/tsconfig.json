@@ -27,6 +27,7 @@
   ],
   "include": [
     "js/**/*.ts",
+    "js/**/*.tsx",
     "ui/**/*.ts",
     "ui/**/*.tsx"
   ]

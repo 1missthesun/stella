@@ -1,4 +1,5 @@
 import { journalLifecycleEvent } from "./journal-activity-files";
+import { userMessageEventId } from "./sent-message-ids";
 import type {
   Attachment,
   EventRecord,
@@ -41,8 +42,7 @@ import {
 } from "@stella/contracts/conversation-journal-projection";
 import { splitMessageReplyRefs, type ReplyRef } from "@stella/contracts/reply-refs";
 
-const userEventId = (record: JournalMessageRecord): string =>
-  record.clientMsgId ?? `cloud:${record.turnId}:message:${record.seq}`;
+const userEventId = userMessageEventId;
 
 const messageEventId = (record: JournalMessageRecord): string =>
   record.role === "user"
@@ -253,8 +253,7 @@ export const activeCloudUserMessageIds = (
     };
     if (record.kind === "turn") turn.phase = record.phase;
     if (record.kind === "message" && record.role === "user") {
-      turn.userMessageId =
-        record.clientMsgId ?? `cloud:${record.turnId}:message:${record.seq}`;
+      turn.userMessageId = userEventId(record);
     }
     turns.set(record.turnId, turn);
   }
@@ -379,8 +378,7 @@ export const journalRecordsToMessageRecords = (
       const timestamp = journalMessageTimestamp(record, turnUserRecord);
       if (record.role === "user") {
         turnUserRecord = record;
-        userMessageId =
-          record.clientMsgId ?? `cloud:${turnId}:message:${record.seq}`;
+        userMessageId = userEventId(record);
         const message = journalUserMessage(record.payload);
         const userText = message.text;
         const attachments = userAttachments(message);

@@ -12,8 +12,8 @@ no engine build.
   `useTokens()` in `ui/theme`. The chat composer is `ui/chat/Composer.tsx`.
 - Typecheck from the draft root: `bun packages/desktop-rune/scripts/typecheck.ts`.
 - Check in the skill's preview: `stella-preview://<name>` runs the draft's `ui/` in an off-screen
-  engine window of its own and shows it in the tab, which you click, type into and screenshot as
-  usual. Edits under `ui/` rebuild it by themselves (`tab.reload()` does too); a broken one shows
+  engine window of its own and shows it in the tab (a new one, or `goto` in one you have open),
+  which you click, type into and screenshot as usual. Edits under `ui/` rebuild it by themselves (`tab.reload()` does too); a broken one shows
   its error over the last good frame. The window takes the tab's size. Computer use never drives
   Stella's own window, so look through the preview.
 

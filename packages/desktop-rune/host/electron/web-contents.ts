@@ -8,7 +8,7 @@ import { EventEmitter } from "node:events";
 import { RendererIpc } from "./ipc";
 import { defaultSession, fetchProtocolIn, sessionFor, type Session } from "./session";
 import { warnOnce } from "./engine";
-import { ChromiumPage, type PageKey, type PagePointer, type PageWheel, type ScreencastFrame } from "./chromium-page";
+import { ChromiumPage, toStandIn, type PageKey, type PagePointer, type PageWheel, type ScreencastFrame } from "./chromium-page";
 import { chromiumTargetFor } from "./chromium-profiles";
 import { nativeImage } from "./native-image";
 
@@ -29,6 +29,29 @@ export type WebContentsHost = {
 };
 
 const all = new Map<number, WebContents>();
+
+/**
+ * A custom scheme every page of the on-demand browser loads, whatever its session: an agent's tab
+ * can open it, navigate to it and reload it like any web address (the draft preview's
+ * `stella-preview:`). `beforeCapture` runs before a page showing it is captured.
+ */
+export type BrowserScheme = {
+  fetch(request: Request, contents: WebContents): Response | null | Promise<Response | null>;
+  beforeCapture?(contents: WebContents): Promise<void> | void;
+};
+const browserSchemes = new Map<string, BrowserScheme>();
+
+/** Serves `scheme` in every browser page from now on; returns the undo. */
+export function serveInBrowser(scheme: string, server: BrowserScheme) {
+  const key = scheme.toLowerCase();
+  browserSchemes.set(key, server);
+  return () => { if (browserSchemes.get(key) === server) browserSchemes.delete(key); };
+}
+
+const schemeOf = (url: string) => {
+  const i = url.indexOf(":");
+  return i > 0 ? url.slice(0, i).toLowerCase() : "";
+};
 
 const zoomOrigin = (url: string) => {
   try { return new URL(url).host || null; } catch { return null; }
@@ -70,7 +93,9 @@ class Debugger extends EventEmitter {
   }
   async sendCommand(method: string, params?: Record<string, unknown>, sessionId?: string): Promise<any> {
     if (!this.session) throw new Error("No target available");
-    if (method === "Page.captureScreenshot") await this.contents.beforeCapture?.().catch(() => {});
+    if (method === "Page.captureScreenshot") await this.contents.prepareCapture();
+    // An agent navigating to one of the host's schemes reaches it at its stand-in, as a load does.
+    if (method === "Page.navigate" && typeof params?.url === "string") params = { ...params, url: await this.contents.standInFor(params.url) };
     return await (await this.session).send(method, params, sessionId);
   }
 }
@@ -121,8 +146,8 @@ export class WebContents extends EventEmitter {
   private livePage: ChromiumPage | null = null;
   private userAgentSet = false;
   private viewport: { width: number; height: number } | null = null;
-  private appInChromium = false;
-  /** Runs before the page is captured (the draft preview brings the frame it shows up to date). */
+  private appStandIn = false;
+  /** Runs before the page is captured. */
   beforeCapture: (() => Promise<void>) | null = null;
 
   /**
@@ -154,14 +179,32 @@ export class WebContents extends EventEmitter {
     all.set(this.id, this);
   }
 
-  get kind(): ContentsKind { return this.appInChromium ? "web" : contentsKindOf(this.url); }
+  get kind(): ContentsKind { return this.appStandIn ? "web" : contentsKindOf(this.url); }
 
   /**
-   * Its Stella (`stella-app:`) pages load in Chromium, served by its session, and it is a web page
-   * to every caller: the draft preview's tab, which shows the draft's window there.
+   * Carries a Stella page's identity (its `stella-app:` URL, so its IPC is the app's) without
+   * showing anything, and is never the app to the host (a reload doesn't swap the UI): the draft
+   * preview's renderer, whose window the engine draws.
    */
-  showsAppInChromium() {
-    if (this.browser) this.appInChromium = true;
+  actsAsAppRenderer(url: string) {
+    if (this.browser) throw new Error("A browser page can't stand in for the app's renderer.");
+    this.appStandIn = true;
+    this.url = url;
+  }
+
+  /** Brings what the page shows up to date before it is captured (an agent's screenshot). */
+  async prepareCapture() {
+    await this.beforeCapture?.().catch(() => {});
+    await Promise.resolve(browserSchemes.get(schemeOf(this.url))?.beforeCapture?.(this)).catch(() => {});
+  }
+
+  /** `url` as the page loads it: a scheme the host serves goes to its stand-in, which the page serves from then on. */
+  async standInFor(url: string) {
+    const server = this.schemeServer();
+    if (!server.schemes.includes(schemeOf(url))) return url;
+    const page = await this.chromiumPage();
+    if (!page.servesScheme(schemeOf(url))) await page.serveSchemes(server);
+    return toStandIn(url, server.schemes);
   }
 
   /** Its web pages are Chromium pages: debugger, capturePage and input are the real ones. */
@@ -373,7 +416,7 @@ export class WebContents extends EventEmitter {
       throw new Error("capturePage is available only for pages in the on-demand Chromium browser.");
     }
     const usable = rect && rect.width > 0 && rect.height > 0 ? rect : undefined;
-    await this.beforeCapture?.().catch(() => {});
+    await this.prepareCapture();
     return nativeImage.createFromBuffer(await (await this.chromiumPage()).capture(usable));
   }
   getMediaSourceId() { return `rune:${this.id}`; }
@@ -426,7 +469,7 @@ export class WebContents extends EventEmitter {
 
   async loadURL(url: string, _options?: unknown): Promise<void> {
     if (this.destroyed) throw new Error("WebContents was destroyed");
-    if (this.browser && (this.appInChromium || contentsKindOf(String(url)) === "web")) return await this.loadInChromium(String(url));
+    if (this.browser && contentsKindOf(String(url)) === "web") return await this.loadInChromium(String(url));
     const previous = this.url;
     this.url = String(url);
     this.loading = true;
@@ -441,8 +484,18 @@ export class WebContents extends EventEmitter {
   }
 
   private schemeServer() {
-    const schemes = [...new Set([...this.session.protocol.handlers.keys(), ...defaultSession().protocol.handlers.keys()])].filter((s) => !BROWSER_SCHEMES.has(s));
-    return { schemes, fetch: (request: Request) => fetchProtocolIn(this.session, request) };
+    const schemes = [...new Set([...this.session.protocol.handlers.keys(), ...defaultSession().protocol.handlers.keys(), ...browserSchemes.keys()])].filter((s) => !BROWSER_SCHEMES.has(s));
+    return {
+      schemes,
+      fetch: async (request: Request) => {
+        const scheme = schemeOf(request.url);
+        if (!this.session.protocol.handlers.has(scheme)) {
+          const server = browserSchemes.get(scheme);
+          if (server) return await server.fetch(request, this);
+        }
+        return await fetchProtocolIn(this.session, request);
+      },
+    };
   }
 
   private async loadInChromium(url: string) {

@@ -44,26 +44,30 @@ export type SchemeServer = { schemes: readonly string[]; fetch(request: Request)
 /**
  * Chromium knows nothing of the host's custom schemes, so a page loads `scheme://host/path` from
  * `https://host.scheme.localhost/path` (a secure origin per scheme host, which relative URLs keep)
- * and the host answers those requests through CDP Fetch.
+ * and the host answers those requests through CDP Fetch. A host that isn't one lowercase DNS label
+ * (a draft named `Fix_v2.1`) travels hex-encoded as `x--<hex>`.
  */
-const standInHost = (scheme: string, host: string) => `${host}.${scheme}.localhost`;
+const standInHost = (scheme: string, host: string) => `${encodeHost(host)}.${scheme}.localhost`;
 const LABEL = /^[a-z0-9-]+$/;
+const ENCODED = "x--";
+const encodeHost = (host: string) => (LABEL.test(host) && !host.startsWith(ENCODED) ? host : ENCODED + Buffer.from(host, "utf8").toString("hex"));
+const decodeHost = (label: string) => (label.startsWith(ENCODED) && /^[0-9a-f]*$/.test(label.slice(ENCODED.length)) ? Buffer.from(label.slice(ENCODED.length), "hex").toString("utf8") : label);
 
-const toStandIn = (url: string, schemes: readonly string[]): string => {
+export const toStandIn = (url: string, schemes: readonly string[]): string => {
   let u: URL;
   try { u = new URL(url); } catch { return url; }
   const scheme = u.protocol.slice(0, -1).toLowerCase();
-  if (!schemes.includes(scheme) || !LABEL.test(scheme) || !LABEL.test(u.hostname)) return url;
-  return `https://${standInHost(scheme, u.hostname)}${u.pathname}${u.search}${u.hash}`;
+  if (!schemes.includes(scheme) || !LABEL.test(scheme) || !u.hostname) return url;
+  return `https://${standInHost(scheme, u.hostname)}${u.pathname || "/"}${u.search}${u.hash}`;
 };
 
-const fromStandIn = (url: string, schemes: readonly string[]): string => {
+export const fromStandIn = (url: string, schemes: readonly string[]): string => {
   let u: URL;
   try { u = new URL(url); } catch { return url; }
   if (u.protocol !== "https:") return url;
   const scheme = schemes.find((s) => u.hostname.endsWith(`.${s}.localhost`));
   if (!scheme) return url;
-  return `${scheme}://${u.hostname.slice(0, -`.${scheme}.localhost`.length)}${u.pathname}${u.search}${u.hash}`;
+  return `${scheme}://${decodeHost(u.hostname.slice(0, -`.${scheme}.localhost`.length))}${u.pathname}${u.search}${u.hash}`;
 };
 
 const NET_ERRORS: Record<string, number> = {

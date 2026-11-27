@@ -1,17 +1,22 @@
-// Rune's `openDraftPreview` (master: services/app-source/draft-preview.ts), what the in-app
-// browser opens for `stella-preview://<draft>`. Electron serves the draft's desktop-ui to a
-// WebContentsView; on Rune the interface is `ui/`, drawn by the engine, so the draft's `ui/` is
-// built and rendered here, in a root of its own (reconciler.ts createScopedRoot) whose window is
-// off screen and isolated (its element ids are its own). The draft's code gets its own globals: a
-// `window` and `document` whose events stay its own, in-memory storage seeded from the app's (the
-// isolated partition Electron gives a preview), the preview tab's electronAPI, and a `stella`
+// Rune's `openDraftPreview` (master: services/app-source/draft-preview.ts) and the
+// `stella-preview://<draft>` pages of the in-app browser. Electron serves the draft's desktop-ui
+// to a WebContentsView; on Rune the interface is `ui/`, drawn by the engine, so the draft's `ui/`
+// is built and rendered here, in a root of its own (reconciler.ts createScopedRoot) whose window
+// is off screen and isolated (its element ids are its own). The draft's code gets its own
+// globals: a `window` and `document` whose events stay its own, in-memory storage seeded from the
+// app's (the isolated partition Electron gives a preview), an electronAPI of its own renderer (a
+// WebContents that stands in for the app's, so its IPC is trusted as the app's), and a `stella`
 // whose engine commands name its window and whose host shows only that window.
 //
-// The tab is a page in the on-demand Chromium at the app's own URL, so the in-app browser's
-// preview guards hold. It shows the window's frames under an accessible layer of its elements and
-// hands its pointer and keys to the window: the agent's screenshots, snapshots, clicks and typing
-// work as on Electron. Reloading the tab rebuilds the draft, edits rebuild it as they land, and a
-// build or render error is shown in the tab with the last good frame.
+// Every page of the on-demand Chromium serves `stella-preview:` (web-contents.ts serveInBrowser),
+// so the preview is a web address like any other: `browser.tabs.new(url)` opens it, `goto(url)`
+// navigates an open tab to it, and the tab reports it as its URL. The page shows the window's
+// frames under an accessible layer of its elements and hands its pointer and keys to the window:
+// the agent's screenshots, snapshots, clicks and typing work as on Electron. One preview per
+// draft serves every page showing it; it closes once no page has shown it for a while and no
+// preview tab holds it, or when the draft is gone. Reloading a page rebuilds the draft, edits
+// rebuild it as they land, and a build or render error is shown in the page with the last good
+// frame.
 
 import { existsSync, rmSync, watch, type FSWatcher } from "node:fs";
 import os from "node:os";
@@ -22,8 +27,7 @@ import { createScopedRoot, pressedByKeys, type ScopedRoot } from "../reconciler"
 import { createStore, makeUseStore, type AppState, type Store } from "../store";
 import { MemoryStorage } from "../dom/storage";
 import { WebContentsView, type WindowSnapshot } from "../electron/browser-window";
-import type { WebContents } from "../electron/web-contents";
-import { sessionFor } from "../electron/session";
+import { serveInBrowser, WebContents } from "../electron/web-contents";
 import { createUiLoader } from "./ui-loader";
 import { scopeUiFacing } from "./ui-scope";
 import { rendererApiFor } from "./renderer-api";
@@ -32,7 +36,7 @@ import { previewPage } from "./draft-preview-page";
 import { DRAFT_REF_PREFIX, isDraftName, listWorktrees } from "../../../desktop/electron/services/app-source/git";
 import { prepareDraftDependencies } from "../../../desktop/electron/services/app-source/draft-deps";
 import { getSourceUrl } from "../../../desktop/electron/windows/window-load";
-import { RENDERER_SCHEME } from "../../../desktop/electron/source/origin";
+import { mainContext } from "./main-context";
 
 export type DraftPreview = {
   view: WebContentsView;
@@ -60,6 +64,14 @@ const SETTLE_AFTER_MS = 3000;
 const SETTLE_MAX_MS = 2000;
 const READS = ["get", "useStore", "now", "snapshot", "pressedByKeys"];
 const API_PATH = "/__preview/";
+const SCHEME = "stella-preview";
+/** The page's API answers only its own page: a header no other page can send without asking first (CORS). */
+const API_HEADER = "x-stella-preview";
+/** A preview no tab holds closes once no page has asked for frames this long (a page asks at least every 10 s). */
+const IDLE_CLOSE_MS = 30_000;
+const IDLE_CHECK_MS = 5_000;
+/** How long a page of a draft that doesn't exist waits before asking again. */
+const MISSING_POLL_MS = 10_000;
 
 let opened = 0;
 
@@ -76,6 +88,8 @@ const pageElements = (list: ElementInfo[]): PageElement[] =>
 
 class Preview {
   readonly engineId: string;
+  /** The draft's renderer: its IPC identity, never shown. */
+  private readonly renderer: WebContents;
   private readonly loader: ReturnType<typeof createUiLoader>;
   private readonly root: ScopedRoot;
   private readonly snapshot: WindowSnapshot;
@@ -101,16 +115,25 @@ class Preview {
   private lastActive = 0;
   private pageLoads = 0;
   private renderedAt = 0;
+  /** Preview tabs holding it open; with none, it closes once no page asks for frames. */
+  private holds = 0;
+  private readonly createdAt = Date.now();
+  private readonly idleTimer: ReturnType<typeof setInterval>;
 
-  constructor(readonly name: string, readonly worktree: string, readonly contents: WebContents, readonly url: string) {
+  constructor(readonly name: string, readonly worktree: string, private readonly onClosed: () => void) {
     const n = ++opened;
     this.engineId = `preview:${name}`;
+    const url = getSourceUrl("full");
+    this.renderer = new WebContents({ partition: `stella-preview-${name}` });
+    this.renderer.actsAsAppRenderer(url);
+    // The draft reloading itself (Reload in its menus, ui.reload) rebuilds it.
+    this.renderer.on("did-start-loading", () => void this.build());
     this.shotPath = path.join(os.tmpdir(), `stella-preview-${process.pid}-${n}.png`);
     this.root = createScopedRoot(this.engineId, { kind: "background", isolated: true, position: OFF_SCREEN }, this.engineId, (error) => this.fail(error));
     this.snapshot = {
       id: this.engineId,
       engineId: this.engineId,
-      contentsId: contents.id,
+      contentsId: this.renderer.id,
       kind: "app",
       mode: "full",
       url,
@@ -150,6 +173,8 @@ class Preview {
       globals: () => this.globals,
     });
     this.loader.warm();
+    this.idleTimer = setInterval(() => this.closeIfIdle(), IDLE_CHECK_MS);
+    this.idleTimer.unref?.();
     for (const dir of [path.join(ui, "ui"), path.join(worktree, "packages/desktop-ui/src")]) {
       if (!existsSync(dir)) continue;
       try {
@@ -185,7 +210,7 @@ class Preview {
         if (key !== null) localStorage.setItem(key, seed.getItem(key) ?? "");
       }
     } catch {}
-    const electronAPI = rendererApiFor(this.contents);
+    const electronAPI = rendererApiFor(this.renderer);
     // The draft's writes stay in `own`; methods read from the real object stay bound to it.
     const shadow = (target: object, own: Record<PropertyKey, unknown>) => {
       const bound = new WeakMap<Function, Function>();
@@ -275,11 +300,19 @@ class Preview {
     this.rebuildTimer = setTimeout(() => { this.rebuildTimer = null; void this.build(); }, 60);
   }
 
+  /** Finished or removed: its pages say so, and it closes. */
+  private closeIfGone() {
+    if (existsSync(this.worktree)) return false;
+    this.error = `The draft "${this.name}" is no longer in progress (it was finished or removed).`;
+    console.error(`[preview] ${this.name}: the draft is gone`);
+    this.close();
+    return true;
+  }
+
   private async buildOnce() {
-    if (this.disposed) return;
+    if (this.disposed || this.closeIfGone()) return;
     const t0 = now();
     try {
-      await this.navigated();
       const mod = await this.loader.load();
       if (this.disposed) return;
       const tree = mod.Root ? createElement(mod.Root as ComponentType) : mod.App ? createElement("window", { id: this.engineId }, createElement(mod.App as ComponentType)) : null;
@@ -296,20 +329,12 @@ class Preview {
       const { kind, swap } = this.loader.lastLoad();
       console.error(`[preview] ${this.name}: built and rendered in ${(now() - t0).toFixed(0)} ms (${kind}${swap && kind !== "fresh" ? `, ${swap.evaluated} modules` : ""})`);
     } catch (error) {
+      // The draft went away mid-build (finished while an edit's rebuild ran).
+      if (this.closeIfGone()) return;
       this.fail(error);
     }
     this.active();
     void this.capture(true);
-  }
-
-  /** IPC is trusted from the tab only once it shows the app's URL. */
-  private async navigated() {
-    if (this.contents.getURL().startsWith(`${RENDERER_SCHEME}:`)) return;
-    await new Promise<void>((resolve) => {
-      const done = () => { clearTimeout(timer); this.contents.off("did-navigate", done); resolve(); };
-      const timer = setTimeout(done, 5000);
-      this.contents.on("did-navigate", done);
-    });
   }
 
   private fail(error: unknown) {
@@ -413,13 +438,18 @@ class Preview {
   async serve(req: Request): Promise<Response> {
     const url = new URL(req.url);
     if (!url.pathname.startsWith(API_PATH)) {
-      if (url.pathname !== "/" && !url.pathname.endsWith(".html")) return new Response(null, { status: 404 });
-      // The page itself: its first load builds the draft, a reload builds it again.
+      if (req.method !== "GET" || (url.pathname !== "/" && !url.pathname.endsWith(".html"))) return new Response(null, { status: 404 });
+      // The page itself: its first load builds the draft, a reload builds it again. A capture
+      // waits for the new page's first poll, not an earlier page's.
       if (this.pageLoads++ > 0 || !this.rendered) void this.build();
-      return new Response(previewPage(this.name), { headers: { "content-type": "text/html; charset=utf-8", "cache-control": "no-store" } });
+      this.lastPoll = 0;
+      return new Response(previewPage(this.name), { headers: PAGE_HEADERS });
     }
+    if (req.headers.get(API_HEADER) !== "1") return new Response(null, { status: 403 });
     const route = url.pathname.slice(API_PATH.length);
     if (route === "next") {
+      // A page that outlived an earlier preview of this draft starts this one.
+      if (!this.rendered && !this.building && !this.error) void this.build();
       const seen = Number(url.searchParams.get("seen") ?? 0);
       this.lastPoll = Date.now();
       this.acked(seen);
@@ -451,9 +481,32 @@ class Preview {
     return new Response(null, { status: 404 });
   }
 
-  dispose() {
+  hold() {
+    this.holds++;
+  }
+
+  release() {
+    this.holds = Math.max(0, this.holds - 1);
+    this.closeIfIdle();
+  }
+
+  private closeIfIdle() {
+    if (this.disposed || this.holds > 0) return;
+    const since = Math.max(this.lastPoll, this.createdAt);
+    if (Date.now() - since >= IDLE_CLOSE_MS) this.close();
+  }
+
+  /** Closes it and takes it out of the registry; a page asking again opens a new one. */
+  close() {
+    if (this.disposed) return;
+    this.dispose();
+    this.onClosed();
+  }
+
+  private dispose() {
     if (this.disposed) return;
     this.disposed = true;
+    clearInterval(this.idleTimer);
     for (const w of this.watchers.splice(0)) w.close();
     for (const t of [this.rebuildTimer, this.resizeTimer, this.loopTimer]) if (t) clearTimeout(t);
     this.wake();
@@ -461,10 +514,86 @@ class Preview {
     try { this.root.unmount(); } catch (error) { console.error(`[preview] ${this.name}: unmount failed:`, error); }
     this.loader.retireAll();
     this.loader.dispose();
+    this.renderer.destroy();
     rmSync(this.shotPath, { force: true });
     console.error(`[preview] ${this.name}: closed`);
   }
 }
+
+const PAGE_HEADERS = {
+  "content-type": "text/html; charset=utf-8",
+  "cache-control": "no-store",
+  // Shown only as a page of its own: no other page can frame it and drive it.
+  "content-security-policy": "frame-ancestors 'none'",
+  "x-frame-options": "DENY",
+};
+
+// ------------------------------------------------------------------ one preview per draft
+
+const previews = new Map<string, Promise<Preview>>();
+
+const stellaAppDir = (): string | null => {
+  const context = mainContext();
+  return (context?.state.stellaAppDir as string | undefined) ?? (context?.config.stellaAppDir as string | undefined) ?? null;
+};
+
+/** The draft's preview, opened (its dependencies ready) on first use. */
+const previewFor = (name: string, appDir: string): Promise<Preview> => {
+  let opening = previews.get(name);
+  if (opening) return opening;
+  opening = (async () => {
+    if (!isDraftName(name)) throw new Error(`"${name}" is not a valid draft name.`);
+    const branch = `${DRAFT_REF_PREFIX}${name}`;
+    const worktree = (await listWorktrees(appDir)).find((tree) => tree.branch === branch);
+    if (!worktree) throw new Error(`No draft named "${name}" is in progress (no worktree on draft/${name}).`);
+    const deps = await prepareDraftDependencies({ draftRoot: worktree.path, appRoot: appDir });
+    console.error(`[preview] ${name}: dependencies ${deps.mode} in ${deps.ms} ms`);
+    const preview: Preview = new Preview(name, worktree.path, () => { if (previews.get(name) === opening) previews.delete(name); });
+    return preview;
+  })();
+  previews.set(name, opening);
+  opening.catch(() => { if (previews.get(name) === opening) previews.delete(name); });
+  return opening;
+};
+
+/** The preview a `stella-preview:` URL shows, already open. */
+const openPreviewAt = async (url: string): Promise<Preview | null> => {
+  let name: string;
+  try { name = new URL(url).hostname; } catch { return null; }
+  return (await previews.get(name)?.catch(() => null)) ?? null;
+};
+
+/** What a page asking for a draft that can't be previewed shows: the reason, and asks again now and then. */
+const unavailable = async (req: Request, name: string, error: unknown): Promise<Response> => {
+  const url = new URL(req.url);
+  const message = errorText(error).split("\n")[0]!;
+  if (!url.pathname.startsWith(API_PATH)) return new Response(previewPage(name), { headers: PAGE_HEADERS });
+  if (req.headers.get(API_HEADER) !== "1") return new Response(null, { status: 403 });
+  if (url.pathname.slice(API_PATH.length) !== "next") return new Response(null, { status: 404 });
+  const seen = Number(url.searchParams.get("seen") ?? 0);
+  if (seen > 0) await Bun.sleep(MISSING_POLL_MS);
+  return Response.json({ seq: seen + 1, png: 0, width: DEFAULT_SIZE.width, height: DEFAULT_SIZE.height, elements: [], error: message, building: false }, { headers: { "cache-control": "no-store" } });
+};
+
+serveInBrowser(SCHEME, {
+  async fetch(req) {
+    let name = "";
+    try { name = new URL(req.url).hostname; } catch {}
+    const appDir = stellaAppDir();
+    if (!appDir) return await unavailable(req, name, new Error("Stella previews are available only when Stella runs from source."));
+    try {
+      return await (await previewFor(name, appDir)).serve(req);
+    } catch (error) {
+      return await unavailable(req, name, error);
+    }
+  },
+  async beforeCapture(contents) {
+    await (await openPreviewAt(contents.getURL()))?.fresh();
+  },
+});
+
+/** The address of a draft's preview. */
+const previewUrl = (name: string) => `${SCHEME}://${name}/`;
 
 export const openDraftPreview = async (options: {
   name: string;
@@ -472,30 +601,18 @@ export const openDraftPreview = async (options: {
   preloadPath: string;
   offscreen?: { deviceScaleFactor: number };
 }): Promise<DraftPreview> => {
-  if (!isDraftName(options.name)) throw new Error(`"${options.name}" is not a valid draft name.`);
-  const branch = `${DRAFT_REF_PREFIX}${options.name}`;
-  const worktree = (await listWorktrees(options.stellaAppDir)).find((tree) => tree.branch === branch);
-  if (!worktree) throw new Error(`No draft named "${options.name}" is in progress (no worktree on draft/${options.name}).`);
-  const deps = await prepareDraftDependencies({ draftRoot: worktree.path, appRoot: options.stellaAppDir });
-  console.error(`[preview] ${options.name}: dependencies ${deps.mode} in ${deps.ms} ms`);
-  const partition = `stella-preview-${options.name}`;
-  const view = new WebContentsView({ webPreferences: { partition, offscreen: options.offscreen } });
-  const contents = view.webContents as unknown as WebContents;
-  contents.showsAppInChromium();
-  const url = getSourceUrl("full");
-  const preview = new Preview(options.name, worktree.path, contents, url);
-  sessionFor(partition).protocol.handle(RENDERER_SCHEME, (req) => preview.serve(req));
-  contents.beforeCapture = () => preview.fresh();
-  let disposed = false;
+  const preview = await previewFor(options.name, options.stellaAppDir);
+  preview.hold();
+  // The tab is an ordinary browser page at the preview's address, in a partition of its own.
+  const view = new WebContentsView({ webPreferences: { partition: `stella-preview-${options.name}`, offscreen: options.offscreen } });
+  let released = false;
   return {
     view,
-    url,
+    url: previewUrl(options.name),
     dispose: () => {
-      if (disposed) return;
-      disposed = true;
-      contents.beforeCapture = null;
-      sessionFor(partition).protocol.unhandle(RENDERER_SCHEME);
-      preview.dispose();
+      if (released) return;
+      released = true;
+      preview.release();
     },
   };
 };

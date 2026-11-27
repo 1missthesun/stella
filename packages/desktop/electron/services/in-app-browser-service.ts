@@ -37,7 +37,7 @@ import { trimInAppBrowserStorage } from "./in-app-browser/storage-hygiene.js";
 import { keepSessionCookies } from "./in-app-browser/session-cookie-keeper.js";
 import {
   DebuggerTargetProxy,
-  isRendererUrl,
+  isPreviewTabUrl,
   type FileChooserOpened,
 } from "./in-app-browser/debugger-target-proxy.js";
 import { InAppBrowserDownloads } from "./in-app-browser/downloads.js";
@@ -1116,7 +1116,7 @@ export class InAppBrowserService {
     });
     contents.on("will-navigate", (event) => {
       const allowed = tab.preview
-        ? isRendererUrl(event.url)
+        ? isPreviewTabUrl(event.url)
         : isAllowedNavigationUrl(event.url);
       if (!allowed) event.preventDefault();
     });

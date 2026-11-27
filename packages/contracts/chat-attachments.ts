@@ -6,17 +6,17 @@ export const CHAT_ATTACHMENT_FOLDERS = {
 const MAX_FILE_NAME_CHARS = 180;
 
 /**
- * Files sent with a chat message live in these reserved folders: the web
- * and desktop composers' Chat Attachments (including messages relayed to
- * where Stella runs), the phone's dated uploads, and attachments carried to
- * another device with a placed chat. The server keeps them apart from the
- * Drive, so they never count against or wait on the Drive quota.
+ * An image sent to the model without being saved, because the Drive was
+ * full. The server names it under this reserved folder; it never appears in
+ * the Drive and expires after a week.
  */
-const CHAT_ATTACHMENT_PATH = new RegExp(
-  `^(?:${CHAT_ATTACHMENT_FOLDERS.web}/|execution-attachments/|${CHAT_ATTACHMENT_FOLDERS.mobile}/\\d{4}-\\d{2}-\\d{2}/[0-9a-f]{8}-[^/]+$)`,
-);
+export const UNSAVED_ATTACHMENT_ROOT = "Sent without saving";
 
-export const isChatAttachmentPath = (path: string): boolean => CHAT_ATTACHMENT_PATH.test(path);
+export const unsavedAttachmentPath = (uploadId: string, name: string): string =>
+  `${UNSAVED_ATTACHMENT_ROOT}/${uploadId}/${chatAttachmentFileName(name, "image")}`;
+
+export const isUnsavedAttachmentPath = (path: string): boolean =>
+  path.startsWith(`${UNSAVED_ATTACHMENT_ROOT}/`);
 
 export const chatAttachmentFileName = (
   name: string,

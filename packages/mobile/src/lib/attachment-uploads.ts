@@ -95,6 +95,7 @@ const uploadFromFile = async (
     path,
     sizeBytes,
     contentType,
+    sendWithoutSavingIfFull: true,
   });
   const task = new UploadTask(file, prepared.uploadUrl, {
     httpMethod: "PUT",

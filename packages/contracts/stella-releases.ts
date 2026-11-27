@@ -58,11 +58,11 @@ export const stellaReleases: readonly StellaRelease[] = [
   {
     date: "2026-11-27",
     title: "Start in the chat, with a much bigger Drive",
-    summary: "Stella now opens straight on your chat with a welcome message, files you send in a chat no longer need Drive space, and Drive holds up to 2 TB with no file limit.",
+    summary: "Stella now opens straight on your chat with a welcome message, a full Drive no longer stops you sending a photo, and Drive holds up to 2 TB with no file limit.",
     tags: ["Polish", "Fixes"],
     highlights: [
       "The first time you open Stella you land right in the chat. Stella's welcome message carries buttons for what it describes: connect Gmail or a plan you already pay for, get Stella for Chrome or the phone app, change how Stella looks, and watch the demos. The step-by-step setup is gone.",
-      "Files and screenshots you send in a chat no longer use your Drive, so they send even when the Drive is full or you're on Free.",
+      "When your Drive is full, images you send in a chat still reach Stella: they're sent without being saved to the Drive.",
       "Drive storage grows to 100 GB on Plus, 500 GB on Pro and 2 TB on Max (Free gets 2 GB), and there's no longer a limit on how many files it holds.",
     ],
     more: [

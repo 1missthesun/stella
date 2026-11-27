@@ -1319,6 +1319,7 @@ export class StellaRuntimeHost {
         path: drivePath,
         sizeBytes: attachment.bytes.byteLength,
         contentType: attachment.contentType,
+        sendWithoutSavingIfFull: true,
       });
       const response = await putSignedUpload({
         url: prepared.uploadUrl,

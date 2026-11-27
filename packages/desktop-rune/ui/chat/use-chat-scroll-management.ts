@@ -10,6 +10,8 @@ import {
 import type { ScrollPos } from "../rune";
 
 import { rune as engine } from "./engine";
+import { chatAtEnd } from "./chat-at-end";
+import { onPhone } from "../shell/phone";
 
 
 const SCROLL_BUTTON_THRESHOLD = 180;
@@ -227,6 +229,7 @@ export function useChatScrollManagement({
       const distFromEnd = Math.max(0, next.maxY - next.y);
       const atEnd = distFromEnd <= AT_END_PX;
       const nearBottom = atEnd || distFromEnd <= AT_BOTTOM_TOLERANCE_PX;
+      chatAtEnd.current = nearBottom;
       const showButton = distFromEnd > SCROLL_BUTTON_THRESHOLD;
       if (isAtBottomRef.current !== atEnd) {
         isAtBottomRef.current = atEnd;
@@ -335,7 +338,7 @@ export function useChatScrollManagement({
   };
   const getShouldFollowSend = useCallback(() => {
     // On a phone a sent message always comes into view, as in the phone app.
-    if ((globalThis as { stella?: { phone?: unknown } }).stella?.phone) return true;
+    if (onPhone()) return true;
     const d = distanceFromBottom();
     return d === null ? followRef.current : shouldFollowSend({ distanceFromBottomPx: d, isFollowingLatest: followRef.current });
   }, []);

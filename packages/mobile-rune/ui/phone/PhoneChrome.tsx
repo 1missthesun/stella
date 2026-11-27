@@ -35,12 +35,12 @@ const PILL_H = 38;
 const SHEET_RAISE = 40;
 const TAPER_TAIL = 24;
 
-/** The bottom bar's capsule floats this far above the window bottom (packages/mobile `bottomBarPadding`). */
 /** The bar's padding under its row, over the home indicator (the RN app's `bottomBarPadding`). */
 export const barPad = (safeBottom: number) => Math.max(safeBottom - 6, 4);
 /** What a page keeps free at its bottom for the bar. */
+export const barBase = (i: PhoneInsets) => BAR_ROW + barPad(i.bottom);
 /** What a page keeps free at its bottom: the bar, or the keyboard once it rises past the bar. */
-export const barSpace = (i: PhoneInsets) => Math.max(i.keyboard, BAR_ROW + barPad(i.bottom));
+export const barSpace = (i: PhoneInsets) => Math.max(i.keyboard, barBase(i));
 
 /** packages/mobile's drawer travel: three quarters of the window, 320–400pt. */
 const drawerWidth = (w: number) => Math.round(Math.max(Math.min(w * 0.75, 320), Math.min(w * 0.6, 400)));

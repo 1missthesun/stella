@@ -32,6 +32,7 @@ import { AdaptiveGlass, chromeGlass, GlassSheen, useGlassBackdrop } from "../she
 import { useFileDrop } from "./use-file-drop";
 import { COMPOSER_GAP, COMPOSER_NARROW_W, COMPOSER_PAD_TOP, composerShellMaxW } from "./Composer";
 import { reportComposerArea } from "../replace/shell/workspace-stage/viewer-geometry";
+import { reportChatColumnEdges } from "../shell/chat-column-edges";
 import type { Layout } from "../../host/rune-jsx/props";
 import type { ChatScrollThumb, ChatScrollThumbHandle } from "./use-chat-scroll-management";
 import { useStaticHomeLook } from "./static-home";
@@ -39,6 +40,8 @@ import { useStaticHomeLook } from "./static-home";
 export type { ChatColumnProps };
 
 const CONTENT_PAD_BOTTOM = 28;
+
+const CHAT_COLUMN_MAX_W = 16 * 50;
 
 const FULL_CHAT_CONTENT_STYLE: LegendContentStyle = {
   maxWidth: "min(50rem, 100%)",
@@ -50,6 +53,11 @@ const FULL_CHAT_CONTENT_STYLE: LegendContentStyle = {
   paddingBottom: CONTENT_PAD_BOTTOM,
 };
 
+const reportColumn = (r: Layout) => {
+  const w = Math.min(CHAT_COLUMN_MAX_W, r.w);
+  const left = r.x + (r.w - w) / 2;
+  reportChatColumnEdges({ left, right: left + w });
+};
 const COMPOSER_OVERLAP = 12;
 const SCROLL_BUTTON_SIZE = 32;
 const SCROLL_BUTTON_BOTTOM = 28;
@@ -291,7 +299,7 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
             <SignedOutBanner />
             <SessionPausedBanner />
           </col>
-          <box grow={1} minH={0} w="full" clip={0}>
+          <box grow={1} minH={0} w="full" clip={0} onLayout={reportColumn}>
             <box w="full" h="full" hidden={scroll.isOpeningScroll} inert={Boolean(focus)}>
               <MessageReplyContext.Provider value={handleReplyToMessage}>
                 <UnderGlassContext.Provider value>

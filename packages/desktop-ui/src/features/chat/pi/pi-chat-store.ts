@@ -126,6 +126,11 @@ const resolveSafeguard = async (conversationId: string, action: SafeguardAction)
 
 const presentEvents = (conversationId: string, events: readonly PiChatEvent[]) => {
   for (const event of events) {
+    if (event.type === "model_picked") {
+      // The runtime saved the pick; the pickers and the account's model re-read it.
+      window.dispatchEvent(new CustomEvent("stella:local-model-preferences-changed"));
+      continue;
+    }
     if (event.type === "safeguard") {
       presentSafeguardBlock(conversationId, event.notice, (action) => resolveSafeguard(conversationId, action));
       continue;

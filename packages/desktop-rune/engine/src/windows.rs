@@ -749,6 +749,16 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
     #[cfg(target_os = "windows")]
     crate::webview::tick();
     drain(s.node);
+    let closed = crate::fx::take_closed();
+    if engine::with(|e| {
+        let held = !e.tree.closing.is_empty();
+        if held {
+            e.tree.finish_closing(&closed);
+        }
+        held
+    }) {
+        wake_dirty(s.node);
+    }
     let decoded = crate::media::decoded_since_built();
     let sized = !decoded.is_empty();
     if sized {

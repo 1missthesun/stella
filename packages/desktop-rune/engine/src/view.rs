@@ -39,6 +39,8 @@ pub fn children(s: &Win, eng: &Engine, n: &Node, mut e: El) -> El {
             .filter_map(|(i, c)| eng.tree.get(*c).filter(|x| x.kind == Kind::Webview || eng.tree.web_above.contains(c)).map(|x| (i, paint_order(&x.props))))
             .collect()
     };
+    // A `morphFrom` glass grows from its source with its content fading in a beat behind.
+    let reveal = crate::fx::morph_spring(&n.props).map(|m| (m.duration * 0.3, rune::Spring::new(m.duration * 0.6, 0.0)));
     for (i, c) in n.children.iter().enumerate() {
         let Some(child) = eng.tree.get(*c) else {
             e = e.child(build(s, eng, *c));
@@ -52,7 +54,11 @@ pub fn children(s: &Win, eng: &Engine, n: &Node, mut e: El) -> El {
         let over = positioned
             && !toward_web.iter().any(|(j, _)| *j == i)
             && toward_web.iter().any(|(j, order)| paint_order(p) > *order || (paint_order(p) == *order && i > *j));
-        e = e.child(if over { build_over(s, eng, *c) } else { build(s, eng, *c) });
+        let mut ce = if over { build_over(s, eng, *c) } else { build(s, eng, *c) };
+        if let Some((delay, fade)) = reveal.filter(|_| p.enter.is_none() && p.exit.is_none()) {
+            ce = ce.transition(rune::Transition::opacity().springs(rune::SpringPair::new(fade, rune::Spring::new(0.14, 0.0)))).enter_delay(delay);
+        }
+        e = e.child(ce);
     }
     e
 }
@@ -90,8 +96,31 @@ fn sees_through(p: &Props) -> bool {
     p.backdrop_blur.is_some_and(|b| b > 0.0) || p.fill.as_ref().is_some_and(|c| c.0.a < 1.0)
 }
 
+/// A closing `morphFrom` element (`Tree::closing`): its glass morphing back, nothing to press,
+/// focus or dismiss.
+fn closing_props(p: &crate::props::Props) -> crate::props::Props {
+    let mut c = p.clone();
+    c.modal = None;
+    c.inert = true;
+    c.focusable = false;
+    c.auto_focus = false;
+    c.tab_index = None;
+    c.keys.clear();
+    c.on.clear();
+    c.enter = None;
+    c.exit = None;
+    c
+}
+
 fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
-    let p = &*n.props;
+    let held;
+    let closing = eng.tree.closing.contains_key(&id);
+    let p = if closing {
+        held = closing_props(&n.props);
+        &held
+    } else {
+        &*n.props
+    };
     if n.kind == Kind::Input {
         let e = crate::input::build(s, id, p);
         #[cfg(feature = "webview")]
@@ -116,6 +145,12 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
         e = crate::webview::clipper(e, id, if p.scroll_x || p.scroll_y { 0.0 } else { p.clip.unwrap_or(0.0) });
     } else if marks || hits {
         e = crate::webview::over(e, s.node, id, p.corners.unwrap_or([p.radius.unwrap_or(0.0); 4]), marks, marks && sees_through(p));
+    }
+    if !closing && p.enter.is_none() && crate::fx::morphs(p) {
+        e = e.transition(rune::Transition::none());
+    }
+    if closing {
+        e = e.transition(rune::Transition::none()).child_exit(rune::Transition::opacity().springs(rune::SpringPair::new(rune::Spring::new(0.16, 0.0), rune::Spring::new(0.14, 0.0))));
     }
     e.key(rune_key(id, p))
 }

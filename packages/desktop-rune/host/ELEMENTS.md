@@ -212,6 +212,21 @@ these props. Types are in `host/rune-jsx/props.ts` (`FxLayer`, `Glass`, `Lightin
   `veil` in sRGB, as UIKit does, so tints measured from iOS carry over), `tint` + `tintAmount`, `veil` (0..1: mixes the
   body toward `tint` so labels stay legible), `merge: {x,y,w,h,radius}` + `unionK` (22) + `morph`
   (a second shape it flows into, in the element's points).
+- Glass groups: glass elements with the same `group` (a string) in a window draw as one surface,
+  like Apple's `GlassEffectContainer`. Shapes closer than `spacing` points (`unionK`, 22) bridge
+  into each other and pinch apart as they move away, so two capsules sliding together (`x` +
+  `motion`) merge and separate with no per-frame commits. The first member in tree order supplies
+  the glass settings for the whole group; up to 8 others join it.
+- Morphing: `morphFrom: "id"` (or `true`: the element's `anchor.to`) grows the glass out of that
+  element's shape when it mounts, lensing the whole way, and shrinks it back into it when it's
+  removed: the engine keeps the element on screen, inert, until the glass is home (at most 3 s).
+  The source's own glass hides while the morph holds it. The element's children fade in once the
+  glass has grown most of the way and fade out at once on removal, so give the element itself no
+  `enter`/`exit`. `morphMotion: { dur, bounce }` is the spring (0.5 s, 0.18); Reduce Motion skips
+  it. A menu anchored to its button:
+  `<col anchor={{ to: "plus", side: "top" }} fx={{ glass: { …recipe, morphFrom: true } }}>`.
+  `demo/gallery/GlassMorph.tsx` shows a menu, a group and a sliding tab pill
+  (`MORPH_AUTO=1` loops them).
 - Adaptive dimming: `adapt` (0..1, default 0, off) measures what is behind the glass on every
   frame that draws it and scales `veil` and `shadow` from it, after Apple's regular glass: a
   denser veil and shadow over busy content (text, images) or content far from `tint`, a lighter

@@ -564,7 +564,8 @@ static const char *USAGE =
     "STELLA_LAUNCHER_BACKEND_URL (wins over <root>/server.json), STELLA_LAUNCHER_STABLE_SECONDS,\n"
     "STELLA_LAUNCHER_READY_TIMEOUT_SECONDS, STELLA_LAUNCHER_PREPARE_TIMEOUT_SECONDS,\n"
     "STELLA_LAUNCHER_PACKAGED=1 (a distribution package provides the menu entry and icon),\n"
-    "STELLA_LAUNCHER_ENGINE=rune or the file <root>/rune-engine (start the Rune engine instead of Electron),\n"
+    "STELLA_LAUNCHER_ENGINE=rune|electron or the file <root>/rune-engine or <root>/electron-engine\n"
+    "(the engine; by default Rune wherever the source pins a stella-engine build for this platform),\n"
     "STELLA_LAUNCHER_ENGINE_BIN (a local stella-engine binary; implies rune).\n";
 
 static void parse_options(int argc, char **argv) {
@@ -2182,15 +2183,44 @@ out:
 static char *g_engine_bin;
 static char *g_engine_version;
 
+static const char *engine_platform_key(void) {
+    return strcmp(platform_key(), "linux-x64-baseline") ? platform_key() : "linux-x64";
+}
+
+/* Whether this source can run on the Rune engine here: it has the Rune app and
+ * its launcher.json pins a stella-engine build for this platform. Sources from
+ * before Rune, and platforms without a published engine, start Electron. */
+static int engine_available(void) {
+    char *host = xasprintf("%s/packages/desktop-rune/host/main.tsx", P.app);
+    char *manifest_path = xasprintf("%s/packages/desktop/launcher.json", P.app);
+    char *manifest = file_exists(host) ? read_file(manifest_path, NULL) : NULL;
+    mj_value *json = manifest ? mj_parse(manifest, strlen(manifest)) : NULL;
+    const mj_value *engine = mj_get(json, "stellaEngine");
+    const mj_value *asset = mj_get(mj_get(engine, "assets"), engine_platform_key());
+    int ok = mj_get_string(engine, "version") && mj_get_string(asset, "url") && mj_get_string(asset, "sha256");
+    mj_free(json);
+    free(manifest);
+    free(manifest_path);
+    free(host);
+    return ok;
+}
+
+/* Rune is the engine wherever the source supports it. --engine, the
+ * environment and the files <root>/electron-engine and <root>/rune-engine
+ * choose one by hand. */
 static int engine_requested(void) {
     char *flag;
     int on;
     if (O.engine) return !strcmp(O.engine, "rune");
     if (O.engine_bin) return 1;
+    flag = xasprintf("%s/electron-engine", P.root);
+    on = file_exists(flag);
+    free(flag);
+    if (on) return 0;
     flag = xasprintf("%s/rune-engine", P.root);
     on = file_exists(flag);
     free(flag);
-    return on;
+    return on || engine_available();
 }
 
 /* launcher.json "stellaEngine": {"version", "assets": {<platform>: {"url", "sha256", "member"?}}};
@@ -2198,7 +2228,7 @@ static int engine_requested(void) {
  * Also run on a thread while dependencies install (engine_prefetch), with
  * show_progress 0, so nothing here may touch the UI then. */
 static int install_engine(int show_progress) {
-    const char *key = strcmp(platform_key(), "linux-x64-baseline") ? platform_key() : "linux-x64";
+    const char *key = engine_platform_key();
     char *manifest_path = xasprintf("%s/packages/desktop/launcher.json", P.app);
     char *manifest = read_file(manifest_path, NULL);
     mj_value *json = manifest ? mj_parse(manifest, strlen(manifest)) : NULL;

@@ -319,10 +319,15 @@ final class Launcher {
         return electron
     }
 
+    /// Rune is the engine wherever the source supports it; --engine, the environment and the files
+    /// <root>/electron-engine and <root>/rune-engine choose one by hand.
     private var engineRequested: Bool {
         if let engine = options.engine { return engine == "rune" }
         if options.engineBin != nil { return true }
-        return FileManager.default.fileExists(atPath: paths.root.appendingPathComponent("rune-engine").path)
+        let fm = FileManager.default
+        if fm.fileExists(atPath: paths.root.appendingPathComponent("electron-engine").path) { return false }
+        if fm.fileExists(atPath: paths.root.appendingPathComponent("rune-engine").path) { return true }
+        return Install.engineAvailable(paths: paths)
     }
 
     private func tools() throws -> (GitTool, TreeSigner) {

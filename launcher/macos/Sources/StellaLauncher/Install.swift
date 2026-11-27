@@ -163,8 +163,10 @@ enum Install {
         return (bin, version)
     }
 
-    /// launcher.json "stellaEngine": {"version", "assets": {<platform>: {"url", "sha256", "member"?}}};
-    /// an asset without "member" is the bare binary, one with it is a zip holding it.
+    /// launcher.json "stellaEngine": {"version", "assets": {<platform>: {"url", "sha256", "member"?, "app"?}}};
+    /// an asset without "member" is the bare binary, one with it is a zip holding it. One with "app"
+    /// is a zip holding the signed Stella.app whose Contents/MacOS/stella-engine is the engine: the
+    /// bundle gives it Stella's identity (TCC grants, Dock, menu bar, notifications).
     static func ensureEngine(paths: LauncherPaths, localBin: String?, progress: (String) -> Void) throws -> (bin: URL, version: String) {
         let fm = FileManager.default
         let host = paths.app.appendingPathComponent("packages/desktop-rune/host/main.tsx")
@@ -181,6 +183,20 @@ enum Install {
     }
 
     private static let engineLock = NSLock()
+
+    /// Whether this source can run on the Rune engine here: it has the Rune app and its launcher.json
+    /// pins a stella-engine build for this platform. Sources from before Rune start Electron.
+    static func engineAvailable(paths: LauncherPaths) -> Bool {
+        let host = paths.app.appendingPathComponent("packages/desktop-rune/host/main.tsx")
+        guard FileManager.default.fileExists(atPath: host.path),
+              let data = try? Data(contentsOf: paths.app.appendingPathComponent("packages/desktop/launcher.json")),
+              let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+              let engine = json["stellaEngine"] as? [String: Any],
+              engine["version"] is String,
+              let entry = (engine["assets"] as? [String: Any])?[Pins.platformKey] as? [String: Any]
+        else { return false }
+        return entry["url"] is String && entry["sha256"] is String
+    }
 
     /// A first install fetches the engine while dependencies install. It
     /// starts once the source is verified, since the engine's URL and checksum
@@ -213,13 +229,34 @@ enum Install {
               let sha = entry["sha256"] as? String
         else { throw LauncherError("This version of Stella has no Rune engine for \(Pins.platformKey).") }
         let dir = paths.runtimes.appendingPathComponent("stella-engine-\(version)")
-        let bin = dir.appendingPathComponent("stella-engine")
+        let appName = entry["app"] as? String
+        let bin = appName.map { dir.appendingPathComponent("\($0)/Contents/MacOS/stella-engine") }
+            ?? dir.appendingPathComponent("stella-engine")
         if fm.isExecutableFile(atPath: bin.path) { return (bin, version) }
         progress("Getting things ready…")
         log("install: downloading stella-engine \(version) from \(rawURL)")
         try fm.createDirectory(at: dir, withIntermediateDirectories: true)
         let downloaded = paths.runtimes.appendingPathComponent(".stella-engine-\(version).download")
         try Net.download(url, to: downloaded, sha256: sha)
+        defer { try? fm.removeItem(at: downloaded) }
+        if let appName {
+            let staging = paths.runtimes.appendingPathComponent(".stella-engine-\(version).partial")
+            try? fm.removeItem(at: staging)
+            defer { try? fm.removeItem(at: staging) }
+            let unzip = try Shell.run("/usr/bin/ditto", ["-x", "-k", downloaded.path, staging.path], env: [:])
+            guard unzip.code == 0 else { throw LauncherError("Could not unpack stella-engine: \(unzip.stderr)") }
+            let app = staging.appendingPathComponent(appName)
+            if !ElectronIdentity.unsignedOptIn {
+                let verify = try Shell.run(
+                    "/usr/bin/codesign", ["--verify", "--deep", "--strict", "-R=\(ElectronIdentity.requirement)", app.path], env: [:])
+                guard verify.code == 0 else { throw LauncherError("stella-engine's signature check failed: \(verify.stderr)") }
+            }
+            let target = dir.appendingPathComponent(appName)
+            try? fm.removeItem(at: target)
+            try fm.moveItem(at: app, to: target)
+            log("install: stella-engine \(version) ready")
+            return (bin, version)
+        }
         try? fm.removeItem(at: bin)
         if let member = entry["member"] as? String {
             let staging = paths.runtimes.appendingPathComponent(".stella-engine-\(version).partial")
@@ -228,7 +265,6 @@ enum Install {
             guard unzip.code == 0 else { throw LauncherError("Could not unpack stella-engine: \(unzip.stderr)") }
             try fm.moveItem(at: staging.appendingPathComponent(member), to: bin)
             try? fm.removeItem(at: staging)
-            try? fm.removeItem(at: downloaded)
         } else {
             try fm.moveItem(at: downloaded, to: bin)
         }

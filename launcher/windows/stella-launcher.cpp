@@ -508,7 +508,8 @@ static const char *kUsage =
     "STELLA_LAUNCHER_INSTALL_DIR (instead of %LOCALAPPDATA%\\Programs\\Stella),\n"
     "STELLA_LAUNCHER_UPDATE_URL, STELLA_LAUNCHER_UPDATE_DELAY_SECONDS and\n"
     "STELLA_LAUNCHER_UPDATE_SKIP_SIGNATURE=1 (with an update URL; for testing),\n"
-    "STELLA_LAUNCHER_ENGINE=rune or the file <root>\\rune-engine (start the Rune engine instead of Electron),\n"
+    "STELLA_LAUNCHER_ENGINE=rune|electron or the file <root>\\rune-engine or <root>\\electron-engine\n"
+    "(the engine; by default Rune wherever the source pins a stella-engine build for this platform),\n"
     "STELLA_LAUNCHER_ENGINE_BIN (a local stella-engine.exe; implies rune).\n";
 
 static void parseOptions() {
@@ -2458,10 +2459,33 @@ static void joinBunPrefetch() {
 static wstring gEngineBin;
 static string gEngineVersion;
 
+static string enginePlatformKey() {
+    string key = bunPlatformKey();
+    return key == "win-x64-baseline" ? "win-x64" : key;
+}
+
+// Whether this source can run on the Rune engine here: it has the Rune app and its launcher.json
+// pins a stella-engine build for this platform. Sources from before Rune start Electron.
+static bool engineAvailable() {
+    if (!exists(P.app() + L"\\packages\\desktop-rune\\host\\main.tsx")) return false;
+    string manifest;
+    if (!readFile(P.app() + L"\\packages\\desktop\\launcher.json", manifest)) return false;
+    mj_value *json = mj_parse(manifest.data(), manifest.size());
+    const mj_value *engine = mj_get(json, "stellaEngine");
+    const mj_value *asset = mj_get(mj_get(engine, "assets"), enginePlatformKey().c_str());
+    bool ok = mj_get_string(engine, "version") && mj_get_string(asset, "url") && mj_get_string(asset, "sha256");
+    mj_free(json);
+    return ok;
+}
+
+// Rune is the engine wherever the source supports it; --engine, the environment and the files
+// <root>\electron-engine and <root>\rune-engine choose one by hand.
 static bool engineRequested() {
     if (!O.engine.empty()) return O.engine == L"rune";
     if (!O.engineBin.empty()) return true;
-    return exists(P.root + L"\\rune-engine");
+    if (exists(P.root + L"\\electron-engine")) return false;
+    if (exists(P.root + L"\\rune-engine")) return true;
+    return engineAvailable();
 }
 
 static bool isEngine(const wstring &exe) { return !gEngineBin.empty() && exe == gEngineBin; }
@@ -2471,8 +2495,7 @@ static bool isEngine(const wstring &exe) { return !gEngineBin.empty() && exe == 
 // Also runs on a thread while dependencies install (startEnginePrefetch), with
 // showProgress false, so nothing here may touch the UI then.
 static void installEngine(bool showProgress) {
-    string key = bunPlatformKey();
-    if (key == "win-x64-baseline") key = "win-x64";
+    string key = enginePlatformKey();
     wstring host = P.app() + L"\\packages\\desktop-rune\\host\\main.tsx";
     if (!exists(host)) fail("This version of Stella has no Rune app (" + utf8(host) + " is missing).");
     if (!O.engineBin.empty()) {

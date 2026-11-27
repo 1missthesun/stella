@@ -25,8 +25,9 @@ STELLA_LAUNCHER_READY_TIMEOUT_SECONDS, STELLA_LAUNCHER_UPDATE_URL (check this
 launcher/stable/ instead, even for a local build or a test root),
 STELLA_LAUNCHER_UPDATE_DELAY_SECONDS, STELLA_LAUNCHER_UPDATE_REQUIREMENT (with
 STELLA_LAUNCHER_UPDATE_URL only: the code requirement an update must meet),
-STELLA_LAUNCHER_ENGINE=rune or the file <root>/rune-engine (start the Rune
-engine instead of Electron), STELLA_LAUNCHER_ENGINE_BIN (a local
+STELLA_LAUNCHER_ENGINE=rune|electron or the file <root>/rune-engine or
+<root>/electron-engine (the engine; by default Rune wherever the source pins a
+stella-engine build for this platform), STELLA_LAUNCHER_ENGINE_BIN (a local
 stella-engine binary; implies rune).
 """
 

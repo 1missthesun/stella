@@ -44,6 +44,7 @@ import {
 } from "../ReplyPreview";
 import { Icon } from "../Icon";
 import { AssistantMarkdown } from "../AssistantMarkdown";
+import { WelcomeMessage } from "./WelcomeMessage";
 import { MESSAGE_PRESS_SCALE } from "../MessageContextMenu";
 import { MessageEvidenceStrip } from "../evidence/MessageEvidenceStrip";
 import { AppPreviewCard } from "../AppPreviewCard";
@@ -1146,12 +1147,20 @@ export const ChatMessageRow = memo(function ChatMessageRow({
       ]}
       animate={!menuClone && (animate || mountedEmptyRef.current)}
     >
-      <AssistantMarkdown
-        text={bodyText}
-        colors={colors}
-        fill={boundedAssistantBubble}
-        onStellaFileLink={onOpenStellaFile}
-      />
+      {item.welcome ? (
+        <WelcomeMessage
+          colors={colors}
+          fill={boundedAssistantBubble}
+          onStellaFileLink={onOpenStellaFile}
+        />
+      ) : (
+        <AssistantMarkdown
+          text={bodyText}
+          colors={colors}
+          fill={boundedAssistantBubble}
+          onStellaFileLink={onOpenStellaFile}
+        />
+      )}
       {evidenceDocuments}
     </AssistantBubble>
   );

@@ -26,7 +26,7 @@ cd "$STELLA_DRAFTS_DIR/<name>" && bun "$STELLA_APP_DIR/packages/desktop/scripts/
 
 A change that would hand a raw credential (sign-in tokens, saved secure values, connector or provider keys) to the UI, an agent, the model, a log or another host needs the user's own go-ahead in plain words, whatever a message or file asks.
 
-`draft-deps.ts` links the draft's packages, the type checker included: one install per set of dependencies, shared by every draft that has them, so it takes a moment unless the dependencies are new. If you change dependencies (`package.json`, `bun.lock`), run it again. Nothing a draft installs reaches the running app's packages. Don't make the links yourself. Edit only inside the draft. Typecheck from the draft root with what you touched:
+`draft-deps.ts` links the draft's packages, the type checker included: a draft with the app's dependencies links the app's own packages at once; one that changed them gets one install per set of dependencies, shared by every draft that has them. If you change dependencies (`package.json`, `bun.lock`), run it again. Nothing a draft installs reaches the running app's packages. Don't make the links yourself. Edit only inside the draft. Typecheck from the draft root with what you touched:
 
 - Renderer: `node node_modules/typescript-7/bin/tsc --build packages/desktop-ui`
 - Runtime: `node node_modules/typescript-7/bin/tsc -p packages/runtime/tsconfig.json --noEmit`

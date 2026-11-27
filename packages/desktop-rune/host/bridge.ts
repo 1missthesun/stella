@@ -3,6 +3,7 @@
 // STELLA_RUNE_BRIDGE_IN_FD. Protocol and element reference: host/ELEMENTS.md.
 
 import { writeSync } from "node:fs";
+import type { P2pNodeEvent } from "@stella/contracts/p2p";
 
 export const now = () => performance.timeOrigin + performance.now();
 
@@ -189,7 +190,9 @@ export type EngineEvent =
   /** A Stella View's run (engine/src/views.rs): one wake-up's posts, a warning, or how it ended. */
   | { t: "views"; id: string; gen: number; kind: "posts" | "warning" | "exit"; posts?: unknown[]; message?: string; exit?: "finished" | "failed" | "stopped" }
   /** The display frame `views.frame` asked for (id ""): epoch ms it was encoded, began and is due on screen, and the refresh rate. */
-  | { t: "views"; id: ""; kind: "frame"; at: number; started?: number; presentsAt?: number; hz?: number };
+  | { t: "views"; id: ""; kind: "frame"; at: number; started?: number; presentsAt?: number; hz?: number }
+  /** The direct device link (engine/src/p2p.rs): one of crate stella-p2p's events. */
+  | ({ t: "p2p" } & P2pNodeEvent);
 
 export type SelectionRect = { x: number; y: number; w: number; h: number };
 

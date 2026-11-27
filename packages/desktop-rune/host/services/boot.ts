@@ -58,7 +58,8 @@ export async function bootRuneServices(options: ElectronMainOptions): Promise<Ru
   });
 
   const g = globalThis as Record<string, unknown>;
-  g.electronAPI = api;
+  const routed = engine() ? (await import("./p2p")).startP2p(api) : api;
+  g.electronAPI = routed;
   Object.defineProperty(g, "__stellaUiState", { configurable: true, get: () => uiStateSnapshot(contents) });
 
   nativeTheme.on("updated", () => dom.setAppearance({ dark: nativeTheme.shouldUseDarkColors }));
@@ -73,5 +74,5 @@ export async function bootRuneServices(options: ElectronMainOptions): Promise<Ru
   win.on("move", () => dom.setViewport(viewportOf(win)));
 
   bootMark("dom");
-  return { api, window: win, dom };
+  return { api: routed, window: win, dom };
 }

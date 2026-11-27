@@ -12,6 +12,8 @@ import { WebContents } from "../electron/web-contents";
 import type { PageKey, PagePointer, PageWheel } from "../electron/chromium-page";
 import { rendererApiFor, type ElectronApi } from "./renderer-api";
 import { mediaPage, voicePage, type MediaPage } from "../media/media-page";
+import type { P2pApi } from "@stella/contracts/p2p";
+import { p2pApi } from "./p2p";
 
 export type ImagePreview = { dataUrl: string; width: number; height: number };
 
@@ -28,6 +30,8 @@ export type UiHost = {
   imagePreview(file: string, maxEdge: number): Promise<ImagePreview | null>;
   windows: { subscribe(listener: () => void): () => void; snapshot(): WindowSnapshot[] };
   apiFor(windowId: string): ElectronApi | null;
+  /** Pairing with phones and other computers directly, without an account (services/p2p). */
+  p2p: P2pApi;
   /** Focus changes of a host window (a DOM window's `focus` / `blur` for an aux window's tree); returns the stop. */
   onFocusChange(windowId: string, listener: (focused: boolean) => void): () => void;
   isFocused(windowId: string): boolean;
@@ -201,6 +205,7 @@ export function createUiHost(): UiHost {
       const win = hostWindows.get(windowId);
       return win ? rendererApiFor(win.webContents) : null;
     },
+    p2p: p2pApi(),
     onFocusChange(windowId, listener) {
       const win = hostWindows.get(windowId);
       if (!win) return () => {};

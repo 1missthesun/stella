@@ -33,10 +33,10 @@ function Capsules({ together }: { together: boolean }) {
   const glass = { glass: { ...BUTTON, group: "pair", spacing: 26 } };
   return (
     <box w={360} h={64}>
-      <row absolute={{ left: 0, top: 0 }} x={together ? 96 : 0} motion={{ dur: 0.9 * SLOW, bounce: 0.15 }} w={120} h={56} radius={28} fx={glass} align="center" justify="center">
+      <row absolute={{ left: 0, top: 0 }} w={120} h={56} radius={28} fx={glass} align="center" justify="center">
         <text size={15} weight={600} color={INK}>Share</text>
       </row>
-      <box absolute={{ left: 240, top: 0 }} x={together ? -96 : 0} motion={{ dur: 0.9 * SLOW, bounce: 0.15 }} w={56} h={56} radius={28} fx={glass} align="center" justify="center">
+      <box absolute={{ left: 240, top: 0 }} x={together ? -106 : 0} motion={{ dur: 0.9 * SLOW, bounce: 0.15 }} w={56} h={56} radius={28} fx={glass} align="center" justify="center">
         <text size={20} weight={500} color={INK}>♥</text>
       </box>
     </box>

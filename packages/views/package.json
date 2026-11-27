@@ -12,6 +12,8 @@
     "./runtime": "./src/runtime.gen.ts",
     "./types/view.d.ts": "./types/view.d.ts",
     "./files": "./src/files.ts",
+    "./paths": "./src/paths.ts",
+    "./conversation": "./src/conversation.ts",
     "./icons": "./src/icons.ts"
   },
   "scripts": {

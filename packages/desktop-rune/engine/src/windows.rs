@@ -289,7 +289,7 @@ pub fn app_spec(p: &Props) -> AppSpec<Win> {
 const DEFAULT_BAND: f32 = if cfg!(target_os = "macos") { 28.0 } else { 32.0 };
 
 pub fn decorate_main(app: rune::App<Win>, p: &Props) -> rune::App<Win> {
-    let app = decorate(app, p);
+    let app = decorate(app, p, None);
     if p.titlebar.is_none() && !p.frameless && p.kind.as_deref() != Some("overlay") {
         app.titlebar(titlebar(DEFAULT_BAND))
     } else {
@@ -312,6 +312,30 @@ fn visibility(s: &mut Win, shown: bool, _tx: &mut Tx) {
     }
 }
 
+/// Electron's `move` event, with the bounds `getBounds` answers after it.
+fn moved(node: Option<u32>, h: &rune::WindowHandle) {
+    let Some(node) = node.or_else(|| engine::read(|e| e.main_node)) else { return };
+    // A minimized window sits off screen at -32000 on Windows; Electron reports no move there.
+    let Some(p) = h.placement().filter(|p| !p.minimized) else { return };
+    let k = if p.scale > 0.0 { p.scale } else { 1.0 };
+    let pt = |v: f64| (v / k).round();
+    let bounds = json!({ "x": pt(p.position.0 as f64), "y": pt(p.position.1 as f64), "width": pt(p.content_size.0 as f64), "height": pt(p.content_size.1 as f64) });
+    window_event(node, "move", json!({ "bounds": bounds }));
+}
+
+/// Puts the window's content in the middle of the primary display's work area, as Electron places
+/// Stella's full window; the frame's invisible resize borders stay outside it.
+pub fn centre_in_work_area(h: &rune::WindowHandle) {
+    let Some(p) = h.placement() else { return };
+    let Some(d) = rune::displays().into_iter().find(|d| d.primary) else { return };
+    let ((wx, wy), (ww, wh)) = d.work_area();
+    let (cw, ch) = (p.content_size.0 as i32, p.content_size.1 as i32);
+    let x = wx + (ww as i32 - cw).max(0) / 2;
+    let y = wy + (wh as i32 - ch).max(0) / 2;
+    let (dx, dy) = (p.content_position.0 - p.position.0, p.content_position.1 - p.position.1);
+    h.set_position((x - dx, y - dy));
+}
+
 /// The default band's height on a main window whose tree asks for no titlebar: its content
 /// stays below the band and moves the window by it, as under a native title bar.
 fn default_band(s: &Win, cx: &Cx<Win>) -> Option<f32> {
@@ -321,8 +345,9 @@ fn default_band(s: &Win, cx: &Cx<Win>) -> Option<f32> {
     Some(cx.chrome_insets().height).filter(|h| *h > 0.0)
 }
 
-pub fn decorate(app: rune::App<Win>, p: &Props) -> rune::App<Win> {
-    let mut app = app.on_close_request(close_request).on_visibility(visibility);
+/// `node` is None for the main window, whose node the tree names later.
+pub fn decorate(app: rune::App<Win>, p: &Props, node: Option<u32>) -> rune::App<Win> {
+    let mut app = app.on_close_request(close_request).on_visibility(visibility).on_moved(move |h| moved(node, h));
     if let Some(h) = p.titlebar {
         app = app.titlebar(titlebar(h));
     }
@@ -342,7 +367,7 @@ fn open(node: u32, p: &Props) {
     let spec = WindowSpec::new(format!("w{node}"), app_spec(p))
         .options(options(p))
         .state(Win { node, main: false, inputs: HashMap::new(), bg: None })
-        .map_app(move |a| decorate(a, &props));
+        .map_app(move |a| decorate(a, &props, Some(node)));
     let handle = rune::open_window(spec);
     engine::with(|e| {
         let slot = e.windows.entry(node).or_default();

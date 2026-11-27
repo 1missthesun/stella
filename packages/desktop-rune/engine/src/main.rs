@@ -338,7 +338,13 @@ fn main() {
     rune::url_schemes(schemes.split(',').map(str::trim).filter(|s| !s.is_empty()));
     let app = app.on_open_url(|_s: &mut Win, url: &str, _tx| engine::send(serde_json::json!({ "t": "open-url", "url": url })));
     let _ = services::APP.set(app.handle());
-    app.on_window(|h| {
+    // Electron opens the full window centred in the primary work area (full-window.js) when no
+    // place is given; the system's default would cascade it.
+    let centre = std::cell::Cell::new(p.position.is_none());
+    app.on_window(move |h| {
+        if centre.replace(false) {
+            windows::centre_in_work_area(h);
+        }
         let h = h.clone();
         engine::with(|e| {
             e.main_handle = Some(h.clone());

@@ -54,6 +54,10 @@ export type Glass = {
   tint?: Color; tintAmount?: number; veil?: number;
   /** 0..1 adaptive dimming (0, off): scales `veil` and `shadow` from what is behind the glass, denser over busy content or content far from `tint`, lighter over a plain backdrop. */
   adapt?: number;
+  /** Saturation of what shows through, after the blur and before `tint` and `veil` (1; Apple's regular glass is about 1.6). */
+  saturation?: number;
+  /** Apply `saturation` and `veil` to sRGB-encoded values, as UIKit composites its glass (false: linear light), so tints measured from iOS carry over as is. */
+  perceptual?: boolean;
   /** A second shape the glass flows into (a gooey merge), in the element's points; `unionK` is the merge radius (22), `morph` 0..1 moves toward it alone. */
   merge?: { x: number; y: number; w: number; h: number; radius?: number }; unionK?: number; morph?: number;
 };

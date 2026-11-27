@@ -151,6 +151,8 @@ fn glass(v: &J) -> Result<Effect, String> {
             ("tintAmount", Some(x)) => lens.tint_amount = x,
             ("veil", Some(x)) => lens.veil = x,
             ("adapt", Some(x)) => lens.adapt = x,
+            ("saturation", Some(x)) => lens.saturation = x,
+            ("perceptual", _) => lens.perceptual = val.as_bool().ok_or("glass `perceptual` is true or false")?,
             ("unionK", Some(x)) => lens.union_k = x,
             ("morph", Some(x)) => lens.morph = x,
             ("tint", _) => lens.tint = rgb(val).ok_or("glass `tint` is a colour")?,

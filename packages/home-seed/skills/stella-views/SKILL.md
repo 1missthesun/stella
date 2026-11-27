@@ -50,7 +50,7 @@ export default function App() {
 - **Layout:** Column, Row, Grid, Stack, Scroll, Spacer, Divider, Pressable. Spacing is in points; sizes take points, `"full"`, `"fit"` or `"50%"`.
 - **Content:** Text (variants display, title, heading, subheading, body, label, caption, mono), Markdown, Image, Icon, Code, Video, Audio, Progress.
 - **Inputs:** Button, TextField, Checkbox, Switch, Slider, Select, Segmented, Tabs, Disclosure, Modal.
-- **Data:** Table (sortable, formatted columns), List (long lists stay fast), Chart (line, area, bar, pie, scatter), Canvas (drawing and pointer input; animate it with `useFrame`).
+- **Data:** Table (sortable, formatted columns; `format: "currency"` with `currency: "EUR"` etc., defaulting to the user's locale), List (long lists stay fast), Chart (line, area, bar, pie, scatter; `currency` like Table), Canvas (drawing and pointer input; animate it with `useFrame`).
 - **Icons:** any Lucide name, such as `droplet`, `calendar`, `trash-2` or `circle-check`. The checker suggests close names for a wrong one.
 - **Colours:** `text`, `muted`, `accent`, `danger`, `success`, `warning`, `surface`, `subtle`, `border`, or hex. Prefer the names: they follow light and dark mode.
 - **Hooks:**

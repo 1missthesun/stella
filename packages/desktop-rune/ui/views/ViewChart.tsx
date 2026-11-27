@@ -1,31 +1,13 @@
 // A view's `<Chart>`: line, area, bar, pie and scatter, drawn as vector paths sized to the space
 // it has, with axis labels as text and a legend for several series.
 import { useState } from "react";
+import { chartAxis } from "@stella/views/chart";
+import { formatAxis } from "@stella/views/format";
 import { fontSize, look, mix, useTokens } from "../theme";
 import type { Paint } from "./ViewRenderer";
 
 const LABEL = look(fontSize.xs, 400, { lh: 1.3 });
 const TITLE = look(fontSize.md, 600, { lh: 1.4 });
-
-const fmt = (v: number, format?: string) => {
-  if (format === "percent") return `${Math.round(v * 1000) / 10}%`;
-  const abs = Math.abs(v);
-  const short = abs >= 1e9 ? `${Math.round(v / 1e8) / 10}B` : abs >= 1e6 ? `${Math.round(v / 1e5) / 10}M` : abs >= 1e4 ? `${Math.round(v / 100) / 10}k` : `${Math.round(v * 100) / 100}`;
-  return format === "currency" ? `$${short}` : short;
-};
-
-function niceTicks(min: number, max: number, count = 4): number[] {
-  if (min === max) return [min];
-  const span = max - min;
-  const step0 = span / count;
-  const mag = 10 ** Math.floor(Math.log10(step0));
-  const step = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((s) => span / s <= count) ?? step0;
-  const start = Math.floor(min / step + 1e-9) * step;
-  const end = Math.ceil(max / step - 1e-9) * step;
-  const ticks: number[] = [];
-  for (let v = start; v <= end + step * 0.001; v += step) ticks.push(Math.round(v * 1e6) / 1e6);
-  return ticks;
-}
 
 export function ViewChart({ p, paint }: { p: Record<string, unknown>; paint: Paint }) {
   const t = useTokens();
@@ -37,6 +19,7 @@ export function ViewChart({ p, paint }: { p: Record<string, unknown>; paint: Pai
   const height = typeof p.height === "number" ? p.height : 200;
   const palette = (Array.isArray(p.colors) && p.colors.length ? (p.colors as string[]).map((c) => paint(c) ?? c) : [t.c.chart1, t.c.chart2, t.c.chart3, t.c.chart4, t.c.chart5, ...[t.c.chart1, t.c.chart2, t.c.chart3, t.c.chart4, t.c.chart5].map((c) => mix(c, 55, t.c.background))]) as string[];
   const format = typeof p.format === "string" ? p.format : undefined;
+  const fmt = (v: number, f?: string) => formatAxis(v, f, { currency: p.currency });
   const num = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : Number(v) || 0);
   const legend = (p.legend ?? series.length > 1) && type !== "pie";
   const title = typeof p.title === "string" ? p.title : null;
@@ -56,6 +39,19 @@ export function ViewChart({ p, paint }: { p: Record<string, unknown>; paint: Pai
       ) : null}
     </>
   );
+
+  // No data: the plot's floor alone, with no axis to read (ticks of nothing would be made up).
+  const empty = data.length === 0 || series.length === 0 || (type === "pie" && data.every((row) => !(num(row[series[0]!]) > 0)));
+  if (empty) {
+    return (
+      <col w="full" gap={8} onLayout={(l: { w: number }) => setWidth(Math.max(120, l.w))}>
+        {header}
+        <col w="full" h={height}>
+          <vector w={width} h={height} viewBox={[width, height]} paths={[{ d: `M0 ${height - 1}H${width}`, stroke: t.c.border, strokeWidth: 1 }]} />
+        </col>
+      </col>
+    );
+  }
 
   if (type === "pie") {
     const key = series[0] ?? "value";
@@ -100,33 +96,18 @@ export function ViewChart({ p, paint }: { p: Record<string, unknown>; paint: Pai
   const plotW = Math.max(40, width - left - 4);
   const plotH = Math.max(40, height - bottom - 6);
   const stacked = Boolean(p.stacked) && (type === "bar" || type === "area");
-  let lo = 0;
-  let hi = 0;
   const numericX = type === "scatter" || data.every((row) => typeof row[xKey] === "number");
-  data.forEach((row) => {
+  const values: number[] = [];
+  for (const row of data) {
     let acc = 0;
     for (const s of series) {
       const v = num(row[s]);
       acc += v;
-      const top = stacked ? acc : v;
-      lo = Math.min(lo, top, v);
-      hi = Math.max(hi, top);
-    }
-  });
-  if (type === "scatter" || type === "line") {
-    const values = data.flatMap((row) => series.map((s) => num(row[s])));
-    if (values.length) {
-      lo = Math.min(...values);
-      hi = Math.max(...values);
-      if (lo > 0 && lo < hi * 0.5) lo = 0;
-      const pad = (hi - lo) * 0.08 || 1;
-      hi += pad;
-      lo = lo === 0 ? 0 : lo - pad;
+      values.push(v);
+      if (stacked) values.push(acc);
     }
   }
-  const ticks = niceTicks(lo, hi === lo ? lo + 1 : hi);
-  const yMin = ticks[0] ?? lo;
-  const yMax = ticks[ticks.length - 1] ?? hi;
+  const { ticks, min: yMin, max: yMax } = chartAxis(values, { fromZero: type === "bar" || type === "area" });
   const yOf = (v: number) => 6 + plotH - ((v - yMin) / (yMax - yMin || 1)) * plotH;
   const xs = data.map((row) => num(row[xKey]));
   const xMin = Math.min(...xs);

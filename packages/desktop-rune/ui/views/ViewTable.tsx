@@ -2,33 +2,17 @@
 // header, sorting on sortable columns, striping, and rows that press.
 import { useMemo, useState, type ReactNode } from "react";
 import type { ViewChild, ViewNode } from "@stella/views/protocol";
+import { estimateTextWidth, formatValue } from "@stella/views/format";
 import { Icon, Icons } from "../kit";
 import { font, fontSize, look, mix, useTokens } from "../theme";
 import type { Paint } from "./ViewRenderer";
 
-type Column = { key: string; title: string; align?: "start" | "center" | "end"; width?: number | string; format?: string; sortable?: boolean };
+type Column = { key: string; title: string; align?: "start" | "center" | "end"; width?: number | string; format?: string; currency?: string; sortable?: boolean };
 
 const BODY = look(fontSize.base, 400, { lh: 1.45 });
 const HEAD = look(fontSize.sm, font.emphasisWeight, { lh: 1.4 });
-const CHAR = 7.1;
 
-const formatters: Record<string, (v: unknown) => string> = {
-  number: (v) => (typeof v === "number" ? v.toLocaleString("en-US", { maximumFractionDigits: 2 }) : String(v ?? "")),
-  currency: (v) => (typeof v === "number" ? v.toLocaleString("en-US", { style: "currency", currency: "USD" }) : String(v ?? "")),
-  percent: (v) => (typeof v === "number" ? `${(v * 100).toLocaleString("en-US", { maximumFractionDigits: 1 })}%` : String(v ?? "")),
-  date: (v) => {
-    const d = typeof v === "number" || typeof v === "string" ? new Date(v) : null;
-    return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : String(v ?? "");
-  },
-};
-
-const cellText = (row: Record<string, unknown>, column: Column) => {
-  const v = row[column.key];
-  if (column.format && formatters[column.format]) return formatters[column.format]!(v);
-  if (typeof v === "number") return formatters.number!(v);
-  if (v === null || v === undefined) return "";
-  return typeof v === "object" ? JSON.stringify(v) : String(v);
-};
+const cellText = (row: Record<string, unknown>, column: Column) => formatValue(row[column.key], column.format, { currency: column.currency });
 
 export function ViewTable({ id, node, paint, onRowPress, renderSlot }: { id: string; node: ViewNode; paint: Paint; onRowPress?: (v: unknown) => void; renderSlot: (nodes: ViewChild[], key: string) => ReactNode }) {
   const t = useTokens();
@@ -58,9 +42,9 @@ export function ViewTable({ id, node, paint, onRowPress, renderSlot }: { id: str
     return columns.map((column, index): { w?: number; basis?: number; grow?: number } => {
       if (typeof column.width === "number") return { w: column.width };
       if (typeof column.width === "string" && column.width.endsWith("fr")) return { basis: 0, grow: Number.parseFloat(column.width) || 1 };
-      let longest = column.title.length + (column.sortable ? 3 : 0);
-      for (const row of rows.slice(0, 200)) longest = Math.max(longest, cellText(row, column).length);
-      const fit = Math.min(320, Math.max(48, Math.ceil(longest * CHAR) + 24));
+      let widest = estimateTextWidth(column.title, fontSize.sm) + (column.sortable ? 18 : 0);
+      for (const row of rows.slice(0, 200)) widest = Math.max(widest, estimateTextWidth(cellText(row, column), fontSize.base));
+      const fit = Math.min(320, Math.max(48, Math.ceil(widest) + 28));
       return index === flexible ? { basis: fit, grow: 1 } : { w: fit };
     });
   }, [columns, rows]);

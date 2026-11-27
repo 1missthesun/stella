@@ -1,6 +1,7 @@
 import { useMemo, useState, type ReactNode } from "react";
 import { Pressable, ScrollView, StyleSheet, View, type ViewStyle } from "react-native";
 import type { ViewChild, ViewNode } from "@stella/views/protocol";
+import { estimateTextWidth, formatValue } from "@stella/views/format";
 import { SideScroller } from "../components/SideScroller";
 import { Text } from "../components/Text";
 import type { Colors } from "../theme/colors";
@@ -8,27 +9,10 @@ import { fonts } from "../theme/fonts";
 import { ViewIcon } from "./ViewIcon";
 import { mix, sizeOf, type Paint } from "./view-style";
 
-type Column = { key: string; title: string; align?: "start" | "center" | "end"; width?: number | string; format?: string; sortable?: boolean };
+type Column = { key: string; title: string; align?: "start" | "center" | "end"; width?: number | string; format?: string; currency?: string; sortable?: boolean };
 
-const CHAR = 7.6;
 
-const formatters: Record<string, (v: unknown) => string> = {
-  number: (v) => (typeof v === "number" ? v.toLocaleString("en-US", { maximumFractionDigits: 2 }) : String(v ?? "")),
-  currency: (v) => (typeof v === "number" ? v.toLocaleString("en-US", { style: "currency", currency: "USD" }) : String(v ?? "")),
-  percent: (v) => (typeof v === "number" ? `${(v * 100).toLocaleString("en-US", { maximumFractionDigits: 1 })}%` : String(v ?? "")),
-  date: (v) => {
-    const d = typeof v === "number" || typeof v === "string" ? new Date(v) : null;
-    return d && !Number.isNaN(d.getTime()) ? d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : String(v ?? "");
-  },
-};
-
-const cellText = (row: Record<string, unknown>, column: Column) => {
-  const v = row[column.key];
-  if (column.format && formatters[column.format]) return formatters[column.format]!(v);
-  if (typeof v === "number") return formatters.number!(v);
-  if (v === null || v === undefined) return "";
-  return typeof v === "object" ? JSON.stringify(v) : String(v);
-};
+const cellText = (row: Record<string, unknown>, column: Column) => formatValue(row[column.key], column.format, { currency: column.currency });
 
 export function ViewTable({ node, colors, paint, onRowPress, renderSlot }: { node: ViewNode; colors: Colors; paint: Paint; onRowPress?: (v: unknown) => void; renderSlot: (nodes: ViewChild[]) => ReactNode }) {
   const p = node.p ?? {};
@@ -55,9 +39,9 @@ export function ViewTable({ node, colors, paint, onRowPress, renderSlot }: { nod
   const widths = useMemo(() => {
     const fit = columns.map((column) => {
       if (typeof column.width === "number") return column.width;
-      let longest = column.title.length + (column.sortable ? 3 : 0);
-      for (const row of rows.slice(0, 200)) longest = Math.max(longest, cellText(row, column).length);
-      return Math.min(320, Math.max(48, Math.ceil(longest * CHAR) + 24));
+      let widest = estimateTextWidth(column.title, 13) + (column.sortable ? 18 : 0);
+      for (const row of rows.slice(0, 200)) widest = Math.max(widest, estimateTextWidth(cellText(row, column), 15));
+      return Math.min(320, Math.max(48, Math.ceil(widest) + 28));
     });
     const fr = columns.map((column) => (typeof column.width === "string" && column.width.endsWith("fr") ? Number.parseFloat(column.width) || 1 : 0));
     const anyFr = fr.some((share) => share > 0);

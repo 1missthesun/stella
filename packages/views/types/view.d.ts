@@ -178,6 +178,8 @@ declare module "@stella/view" {
     /** Points, or a share of the free width ("2fr"). */
     width?: number | `${number}fr`;
     format?: "number" | "currency" | "percent" | "date";
+    /** ISO 4217 code for `format: "currency"` ("EUR", "JPY"); the user's local currency when left out. */
+    currency?: string;
     sortable?: boolean;
   };
   /** A table that sizes its columns to their content, with a sticky header and sorting. */
@@ -207,7 +209,7 @@ declare module "@stella/view" {
     grow?: number;
   }): Element;
   export type ChartType = "line" | "area" | "bar" | "pie" | "scatter";
-  /** A chart of `data` rows: `x` names the category or x field, `y` one or more series fields. */
+  /** A chart of `data` rows: `x` names the category or x field, `y` one or more series fields. With no rows it draws an empty plot: say why yourself. */
   export function Chart<Row extends Record<string, unknown>>(props: {
     key?: Key;
     type: ChartType;
@@ -220,6 +222,8 @@ declare module "@stella/view" {
     legend?: boolean;
     /** Value format for the axis and labels. */
     format?: "number" | "currency" | "percent";
+    /** ISO 4217 code for `format: "currency"` ("EUR", "JPY"); the user's local currency when left out. */
+    currency?: string;
     title?: string;
   }): Element;
 

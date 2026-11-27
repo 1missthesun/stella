@@ -15,7 +15,9 @@
     "./paths": "./src/paths.ts",
     "./conversation": "./src/conversation.ts",
     "./icons": "./src/icons.ts",
-    "./storage-sync": "./src/storage-sync.ts"
+    "./storage-sync": "./src/storage-sync.ts",
+    "./chart": "./src/chart.ts",
+    "./format": "./src/format.ts"
   },
   "scripts": {
     "gen": "bun scripts/gen-runtime.ts && bun scripts/gen-icons.ts",

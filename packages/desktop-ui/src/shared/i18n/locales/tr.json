@@ -1831,43 +1831,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "İsteğe bağlı ekstralar",
-        "lead": "Hiçbiri zorunlu değil, ama her biri beni daha faydalı yapar.",
-        "start": "Sohbete başla"
-      },
-      "gmail": {
-        "body": "E-postaları bul, yazışmalara yetiş ve yanıt taslakları hazırla, sadece iste.",
-        "connect": "Gmail'i bağla",
-        "connected": "Bağlandı",
-        "connecting": "Google bekleniyor…",
-        "error": "Gmail bağlanamadı. Tekrar dene veya şimdilik atla.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Merhaba, ben Stella. Önce nasıl düşüneceğimi seç: mevcut Claude veya ChatGPT planın, kendi anahtarın ya da bir Stella hesabı."
-      },
-      "progress": "Kurulum ilerlemesi",
-      "replies": {
-        "signinDone": "Tamam."
-      },
-      "send": "Send",
       "signin": {
         "body": "Bunlardan biri yeterli. Diğerlerini sonra ekleyebilirsin.",
         "claudeCliMissing": "Önce Claude Code'u yükle, sonra tekrar dene.",
@@ -1903,8 +1866,7 @@
         "settledNone": "Henüz yapay zekâ seçilmedi",
         "settledNoneDesc": "Sohbete başlamak için istediğin zaman giriş yap ya da bir plan bağla.",
         "fineOwnPlan": "ChatGPT ve Claude Code, OpenAI veya Anthropic'teki kendi aboneliğini kullanır. Bunu istediğin zaman Ayarlar'dan değiştirebilirsin."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "Stella'yı kullanarak {terms} ve {privacy} koşullarımızı kabul etmiş olursunuz.",
     "privacyPolicy": "Gizlilik politikamızı",
@@ -2481,11 +2443,6 @@
         "twinkle": "Pırıltı"
       },
       "title": "Mesaj sesi"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "Başlangıç turunu yeniden çalıştır. Verilerin korunur.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3494,11 +3451,9 @@
     },
     "onboarding": {
       "link": "Kendi Stella sunucun mu var? Bağla",
-      "prose": "{name} sunucusuna sahibi olarak bağlısın. Şimdi neyle düşüneceğimi seç: Claude veya ChatGPT planın ya da kendi API anahtarın.",
       "title": "{name} sunucusuna bağlandı",
       "body": "Sahibi olarak oturum açtın. Stella'nın neyle düşüneceğini seç. Biri yeterli.",
-      "bodyOptional": "Sahibi olarak oturum açtın. Bu sunucunun kendi modelleri var, bu yüzden bu isteğe bağlı: Claude veya ChatGPT planını ya da bir API anahtarını da kullanabilirsin.",
-      "settled": "{name} sunucusuna bağlandı"
+      "bodyOptional": "Sahibi olarak oturum açtın. Bu sunucunun kendi modelleri var, bu yüzden bu isteğe bağlı: Claude veya ChatGPT planını ya da bir API anahtarını da kullanabilirsin."
     }
   },
   "contextMenu": {
@@ -3990,6 +3945,21 @@
     "phoneApp": {
       "title": "Stella telefonunda da var",
       "detail": "Bu bilgisayardan uzaktayken Stella'ya mesaj atmak ve görevlerini takip etmek için uygulamayı indir."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Stella for Chrome'u edin",
+      "connectGmail": "Gmail'i bağla",
+      "gmailWaiting": "Google bekleniyor…",
+      "gmailRetry": "Gmail'i yeniden dene",
+      "watchErrands": "Çalışırken izle",
+      "signIn": "Oturum aç",
+      "getPhoneApp": "Telefon uygulamasını edin",
+      "watchMemory": "Nasıl olduğunu gör",
+      "connectPlan": "Abonelik bağla",
+      "changeLook": "Görünümümü değiştir",
+      "watchCustomize": "Değişimi izle"
     }
   }
 }

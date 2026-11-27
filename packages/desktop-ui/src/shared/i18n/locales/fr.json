@@ -1841,43 +1841,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "Extras facultatifs",
-        "lead": "Rien de tout cela n’est obligatoire, mais chacun me rend plus utile.",
-        "start": "Commencer à discuter"
-      },
-      "gmail": {
-        "body": "Retrouve des e-mails, rattrape des conversations et rédige des réponses, simplement en demandant.",
-        "connect": "Connecter Gmail",
-        "connected": "Connecté",
-        "connecting": "En attente de Google…",
-        "error": "Impossible de connecter Gmail. Réessaie, ou passe pour l'instant.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Bonjour, je suis Stella. Commencez par choisir comment je réfléchis : votre abonnement Claude ou ChatGPT, votre propre clé ou un compte Stella."
-      },
-      "progress": "Progression de la configuration",
-      "replies": {
-        "signinDone": "C'est fait."
-      },
-      "send": "Send",
       "signin": {
         "body": "Un seul suffit. Vous pourrez ajouter les autres plus tard.",
         "claudeCliMissing": "Installez d'abord Claude Code, puis réessayez.",
@@ -1913,8 +1876,7 @@
         "settledNone": "Aucune IA choisie pour l'instant",
         "settledNoneDesc": "Connectez-vous ou reliez un abonnement à tout moment pour commencer.",
         "fineOwnPlan": "ChatGPT et Claude Code utilisent votre propre abonnement chez OpenAI ou Anthropic. Modifiable à tout moment dans les Réglages."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "En utilisant Stella, vous acceptez nos {terms} et notre {privacy}.",
     "privacyPolicy": "Politique de confidentialité",
@@ -2491,11 +2453,6 @@
         "twinkle": "Scintillement"
       },
       "title": "Son des messages"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "Relancez l'accueil. Vos données sont conservées.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3526,11 +3483,9 @@
     },
     "onboarding": {
       "link": "Vous avez votre propre serveur Stella ? Connectez-le",
-      "prose": "Tu es connecté à {name} en tant que propriétaire. Choisis maintenant ce qui me fait réfléchir : ton abonnement Claude ou ChatGPT, ou ta propre clé API.",
       "title": "Connecté à {name}",
       "body": "Tu es connecté en tant que propriétaire. Choisis ce qui fait réfléchir Stella. Un seul suffit.",
-      "bodyOptional": "Tu es connecté en tant que propriétaire. Ce serveur a ses propres modèles, c'est donc facultatif : tu peux aussi utiliser ton abonnement Claude ou ChatGPT, ou une clé API.",
-      "settled": "Connecté à {name}"
+      "bodyOptional": "Tu es connecté en tant que propriétaire. Ce serveur a ses propres modèles, c'est donc facultatif : tu peux aussi utiliser ton abonnement Claude ou ChatGPT, ou une clé API."
     }
   },
   "contextMenu": {
@@ -4047,6 +4002,21 @@
     "phoneApp": {
       "title": "Stella est aussi sur votre téléphone",
       "detail": "Téléchargez l’app pour écrire à Stella et suivre vos tâches quand vous n’êtes pas devant cet ordinateur."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Obtenir Stella for Chrome",
+      "connectGmail": "Connecter Gmail",
+      "gmailWaiting": "En attente de Google…",
+      "gmailRetry": "Réessayer Gmail",
+      "watchErrands": "Le voir à l'œuvre",
+      "signIn": "Se connecter",
+      "getPhoneApp": "Obtenir l'app mobile",
+      "watchMemory": "Voir comment",
+      "connectPlan": "Connecter un abonnement",
+      "changeLook": "Changer mon apparence",
+      "watchCustomize": "Le voir changer"
     }
   }
 }

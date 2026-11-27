@@ -1831,43 +1831,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "Valgfrie tillegg",
-        "lead": "Ingen av disse er påkrevd, men hver av dem gjør meg mer nyttig.",
-        "start": "Begynn å chatte"
-      },
-      "gmail": {
-        "body": "Finn e-poster, hold deg oppdatert på tråder og lag utkast til svar, bare ved å spørre.",
-        "connect": "Koble til Gmail",
-        "connected": "Tilkoblet",
-        "connecting": "Venter på Google…",
-        "error": "Kunne ikke koble til Gmail. Prøv igjen, eller hopp over inntil videre.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Hei, jeg er Stella. Velg først hvordan jeg tenker: Claude- eller ChatGPT-abonnementet du har, din egen nøkkel eller en Stella-konto."
-      },
-      "progress": "Oppsettsfremdrift",
-      "replies": {
-        "signinDone": "Ferdig."
-      },
-      "send": "Send",
       "signin": {
         "body": "Én av disse er nok. Du kan legge til de andre senere.",
         "claudeCliMissing": "Installer Claude Code først, og prøv igjen.",
@@ -1903,8 +1866,7 @@
         "settledNone": "Ingen AI valgt ennå",
         "settledNoneDesc": "Logg inn eller koble til et abonnement når som helst for å begynne å chatte.",
         "fineOwnPlan": "ChatGPT og Claude Code bruker ditt eget abonnement hos OpenAI eller Anthropic. Endre dette når som helst i Innstillinger."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "Ved å bruke Stella godtar du våre {terms} og {privacy}.",
     "privacyPolicy": "Personvernerklæring",
@@ -2481,11 +2443,6 @@
         "twinkle": "Glimt"
       },
       "title": "Meldingslyd"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "Kjør introduksjonen på nytt. Dataene dine beholdes.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3494,11 +3451,9 @@
     },
     "onboarding": {
       "link": "Har du din egen Stella-server? Koble den til",
-      "prose": "Du er koblet til {name} og logget inn som eier. Velg nå hva jeg tenker med: Claude- eller ChatGPT-abonnementet ditt, eller din egen API-nøkkel.",
       "title": "Koblet til {name}",
       "body": "Du er logget inn som eier. Velg hva Stella tenker med. Én er nok.",
-      "bodyOptional": "Du er logget inn som eier. Denne serveren har egne modeller, så dette er valgfritt: du kan også bruke Claude- eller ChatGPT-abonnementet ditt, eller en API-nøkkel.",
-      "settled": "Koblet til {name}"
+      "bodyOptional": "Du er logget inn som eier. Denne serveren har egne modeller, så dette er valgfritt: du kan også bruke Claude- eller ChatGPT-abonnementet ditt, eller en API-nøkkel."
     }
   },
   "contextMenu": {
@@ -3990,6 +3945,21 @@
     "phoneApp": {
       "title": "Stella er også på telefonen din",
       "detail": "Last ned appen for å sende meldinger til Stella og følge oppgavene dine når du er borte fra denne datamaskinen."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Hent Stella for Chrome",
+      "connectGmail": "Koble til Gmail",
+      "gmailWaiting": "Venter på Google…",
+      "gmailRetry": "Prøv Gmail igjen",
+      "watchErrands": "Se den i arbeid",
+      "signIn": "Logg på",
+      "getPhoneApp": "Hent mobilappen",
+      "watchMemory": "Se hvordan",
+      "connectPlan": "Koble til et abonnement",
+      "changeLook": "Endre utseendet mitt",
+      "watchCustomize": "Se den endre seg"
     }
   }
 }

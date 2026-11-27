@@ -1831,43 +1831,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "वैकल्पिक अतिरिक्त",
-        "lead": "इनमें से कुछ भी ज़रूरी नहीं है, पर हर एक मुझे और उपयोगी बनाता है।",
-        "start": "चैट शुरू करें"
-      },
-      "gmail": {
-        "body": "ईमेल खोजें, थ्रेड्स पर अपडेट रहें और जवाबों के ड्राफ़्ट लिखवाएँ, बस कहकर।",
-        "connect": "Gmail कनेक्ट करें",
-        "connected": "कनेक्ट हो गया",
-        "connecting": "Google का इंतज़ार…",
-        "error": "Gmail कनेक्ट नहीं हो सका। फिर से कोशिश करें, या अभी छोड़ दें।",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "नमस्ते, मैं Stella हूँ। पहले चुनें कि मैं कैसे सोचूँ: आपका मौजूदा Claude या ChatGPT प्लान, आपकी अपनी कुंजी या Stella खाता।"
-      },
-      "progress": "सेटअप की प्रगति",
-      "replies": {
-        "signinDone": "हो गया।"
-      },
-      "send": "Send",
       "signin": {
         "body": "इनमें से कोई एक काफ़ी है। बाकी बाद में जोड़ सकते हैं।",
         "claudeCliMissing": "पहले Claude Code इंस्टॉल करें, फिर से कोशिश करें।",
@@ -1903,8 +1866,7 @@
         "settledNone": "अभी तक कोई AI नहीं चुना गया",
         "settledNoneDesc": "चैट शुरू करने के लिए कभी भी साइन इन करें या प्लान जोड़ें।",
         "fineOwnPlan": "ChatGPT और Claude Code, OpenAI या Anthropic के साथ आपकी अपनी सदस्यता का उपयोग करते हैं। इसे सेटिंग्स में कभी भी बदलें।"
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "Stella का उपयोग करके, आप हमारी {terms} और {privacy} से सहमत होते हैं।",
     "privacyPolicy": "गोपनीयता नीति",
@@ -2481,11 +2443,6 @@
         "twinkle": "झिलमिल"
       },
       "title": "संदेश ध्वनि"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "ऑनबोर्डिंग फिर से चलाएँ। आपका डेटा बना रहेगा।",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3494,11 +3451,9 @@
     },
     "onboarding": {
       "link": "आपका अपना Stella सर्वर है? उसे कनेक्ट करें",
-      "prose": "आप {name} से उसके मालिक के रूप में जुड़े हैं। अब चुनें कि मैं किससे सोचूँ: आपका Claude या ChatGPT प्लान, या आपकी अपनी API कुंजी।",
       "title": "{name} से कनेक्ट है",
       "body": "आप मालिक के रूप में साइन इन हैं। चुनें कि Stella किससे सोचे। एक ही काफ़ी है।",
-      "bodyOptional": "आप मालिक के रूप में साइन इन हैं। इस सर्वर के अपने मॉडल हैं, इसलिए यह वैकल्पिक है: आप अपना Claude या ChatGPT प्लान, या API कुंजी भी इस्तेमाल कर सकते हैं।",
-      "settled": "{name} से कनेक्ट है"
+      "bodyOptional": "आप मालिक के रूप में साइन इन हैं। इस सर्वर के अपने मॉडल हैं, इसलिए यह वैकल्पिक है: आप अपना Claude या ChatGPT प्लान, या API कुंजी भी इस्तेमाल कर सकते हैं।"
     }
   },
   "contextMenu": {
@@ -3990,6 +3945,21 @@
     "phoneApp": {
       "title": "Stella आपके फ़ोन पर भी है",
       "detail": "ऐप पाएं ताकि इस कंप्यूटर से दूर होने पर भी Stella को संदेश भेज सकें और अपने काम देख सकें।"
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Stella for Chrome पाएँ",
+      "connectGmail": "Gmail कनेक्ट करें",
+      "gmailWaiting": "Google का इंतज़ार…",
+      "gmailRetry": "Gmail फिर से आज़माएँ",
+      "watchErrands": "काम करते हुए देखें",
+      "signIn": "साइन इन करें",
+      "getPhoneApp": "फ़ोन ऐप पाएँ",
+      "watchMemory": "देखें कैसे",
+      "connectPlan": "प्लान जोड़ें",
+      "changeLook": "मेरा रूप बदलें",
+      "watchCustomize": "बदलते हुए देखें"
     }
   }
 }

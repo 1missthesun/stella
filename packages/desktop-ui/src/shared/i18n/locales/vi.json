@@ -1821,43 +1821,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "Tiện ích tùy chọn",
-        "lead": "Không mục nào là bắt buộc, nhưng mỗi mục giúp tôi hữu ích hơn.",
-        "start": "Bắt đầu trò chuyện"
-      },
-      "gmail": {
-        "body": "Tìm email, theo kịp các chuỗi thư và soạn nháp trả lời, chỉ cần nhờ.",
-        "connect": "Kết nối Gmail",
-        "connected": "Đã kết nối",
-        "connecting": "Đang chờ Google…",
-        "error": "Không thể kết nối Gmail. Hãy thử lại hoặc bỏ qua lúc này.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Xin chào, tôi là Stella. Trước tiên, hãy chọn cách tôi suy nghĩ: gói Claude hoặc ChatGPT bạn đang có, khóa riêng của bạn hoặc tài khoản Stella."
-      },
-      "progress": "Tiến trình thiết lập",
-      "replies": {
-        "signinDone": "Xong."
-      },
-      "send": "Send",
       "signin": {
         "body": "Chỉ cần một trong số này là đủ. Bạn có thể thêm các cái khác sau.",
         "claudeCliMissing": "Hãy cài Claude Code trước rồi thử lại.",
@@ -1893,8 +1856,7 @@
         "settledNone": "Chưa chọn AI nào",
         "settledNoneDesc": "Đăng nhập hoặc kết nối một gói bất cứ lúc nào để bắt đầu trò chuyện.",
         "fineOwnPlan": "ChatGPT và Claude Code dùng gói đăng ký của chính bạn với OpenAI hoặc Anthropic. Đổi bất cứ lúc nào trong Cài đặt."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "Khi sử dụng Stella, bạn đồng ý với {terms} và {privacy} của chúng tôi.",
     "privacyPolicy": "Chính sách bảo mật",
@@ -2471,11 +2433,6 @@
         "twinkle": "Lấp lánh"
       },
       "title": "Âm báo tin nhắn"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "Chạy lại phần giới thiệu. Dữ liệu của bạn vẫn giữ nguyên.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3460,11 +3417,9 @@
     },
     "onboarding": {
       "link": "Bạn có máy chủ Stella riêng? Kết nối ngay",
-      "prose": "Bạn đã kết nối với {name} với tư cách chủ sở hữu. Giờ hãy chọn thứ tôi dùng để suy nghĩ: gói Claude hoặc ChatGPT bạn đang có, hoặc khóa API của riêng bạn.",
       "title": "Đã kết nối với {name}",
       "body": "Bạn đã đăng nhập với tư cách chủ sở hữu. Chọn thứ Stella dùng để suy nghĩ. Một là đủ.",
-      "bodyOptional": "Bạn đã đăng nhập với tư cách chủ sở hữu. Máy chủ này có mô hình riêng nên bước này là tùy chọn: bạn cũng có thể dùng gói Claude hoặc ChatGPT, hoặc một khóa API.",
-      "settled": "Đã kết nối với {name}"
+      "bodyOptional": "Bạn đã đăng nhập với tư cách chủ sở hữu. Máy chủ này có mô hình riêng nên bước này là tùy chọn: bạn cũng có thể dùng gói Claude hoặc ChatGPT, hoặc một khóa API."
     }
   },
   "contextMenu": {
@@ -3931,6 +3886,21 @@
     "phoneApp": {
       "title": "Stella cũng có trên điện thoại của bạn",
       "detail": "Tải ứng dụng để nhắn tin cho Stella và theo dõi công việc khi bạn không ở bên máy tính này."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Tải Stella for Chrome",
+      "connectGmail": "Kết nối Gmail",
+      "gmailWaiting": "Đang chờ Google…",
+      "gmailRetry": "Thử lại Gmail",
+      "watchErrands": "Xem cách hoạt động",
+      "signIn": "Đăng nhập",
+      "getPhoneApp": "Tải ứng dụng điện thoại",
+      "watchMemory": "Xem cách",
+      "connectPlan": "Kết nối gói",
+      "changeLook": "Đổi giao diện của tôi",
+      "watchCustomize": "Xem thay đổi"
     }
   }
 }

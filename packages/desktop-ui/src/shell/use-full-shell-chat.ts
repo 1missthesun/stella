@@ -17,7 +17,7 @@ import {
   useComposerMessageSelector,
   useComposerMessageStore,
 } from "@/features/chat/hooks/use-composer-message-state";
-import { takePendingComposerDraft } from "@/global/onboarding/chat/pending-handoff";
+import { useFirstRunWelcome } from "@/features/welcome/first-run";
 import { useStreamingChat } from "@/features/chat/hooks/use-streaming-chat";
 import { useThreadActivity } from "@/features/chat/hooks/use-thread-activity";
 import { buildActivityTasks } from "@/features/chat/lib/event-transforms";
@@ -124,7 +124,6 @@ export function useFullShellChat({
   const previousComposerConversationIdRef = useRef<string | null>(
     activeConversationId,
   );
-  const pendingAutoSendTextRef = useRef<string | null>(null);
   useLayoutEffect(() => {
     if (sessionIsLoading) return;
     const scope = `${accountScope}\0${storageMode}`;
@@ -169,15 +168,9 @@ export function useFullShellChat({
     }
     if (activeConversationId) {
       const remembered = composerTabMemory.take(activeConversationId);
-      const pendingDraft = remembered?.message
-        ? null
-        : takePendingComposerDraft();
-      pendingAutoSendTextRef.current = pendingDraft?.send
-        ? pendingDraft.text
-        : null;
       const cameFromAnother = previousConversationId !== null;
-      if (cameFromAnother || remembered || pendingDraft) {
-        setMessage(remembered?.message ?? pendingDraft?.text ?? "");
+      if (cameFromAnother || remembered) {
+        setMessage(remembered?.message ?? "");
         setChatContext(remembered?.chatContext ?? null);
         setSelectedText(remembered?.selectedText ?? null);
       }
@@ -229,6 +222,7 @@ export function useFullShellChat({
     [threadActivityRecords],
   );
   const piChat = usePiChat(activeConversationId);
+  useFirstRunWelcome(activeConversationId);
   const cloudChat = useCloudChatBridge({
     conversationId: activeConversationId,
     enabled: cloudChatShown,
@@ -657,25 +651,6 @@ export function useFullShellChat({
     conversationId: activeConversationId,
     requireConversationId: true,
   });
-  const autoSendDraftReady = useComposerMessageSelector(
-    composerMessageStore,
-    (text) =>
-      pendingAutoSendTextRef.current !== null &&
-      text === pendingAutoSendTextRef.current,
-  );
-  useEffect(() => {
-    const text = pendingAutoSendTextRef.current;
-    if (!text || !canSubmit || isStreaming) return;
-    if (composerMessageStore.getSnapshot() !== text) return;
-    pendingAutoSendTextRef.current = null;
-    void handleSend();
-  }, [
-    autoSendDraftReady,
-    canSubmit,
-    handleSend,
-    isStreaming,
-    composerMessageStore,
-  ]);
   const chatColumnConversation = useMemo(
     () => ({
       conversationId: activeConversationId,

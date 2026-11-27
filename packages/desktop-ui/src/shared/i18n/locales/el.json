@@ -1831,43 +1831,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "Προαιρετικά επιπλέον",
-        "lead": "Κανένα από αυτά δεν είναι υποχρεωτικό, αλλά το καθένα με κάνει πιο χρήσιμη.",
-        "start": "Ξεκινήστε τη συνομιλία"
-      },
-      "gmail": {
-        "body": "Βρες email, ενημερώσου για συζητήσεις και γράψε πρόχειρες απαντήσεις, απλώς ζητώντας το.",
-        "connect": "Σύνδεση Gmail",
-        "connected": "Συνδέθηκε",
-        "connecting": "Αναμονή για Google…",
-        "error": "Δεν ήταν δυνατή η σύνδεση του Gmail. Δοκίμασε ξανά ή παράλειψέ το προς το παρόν.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Γεια, είμαι η Stella. Πρώτα, επιλέξτε πώς σκέφτομαι: το πρόγραμμα Claude ή ChatGPT που ήδη έχετε, το δικό σας κλειδί ή έναν λογαριασμό Stella."
-      },
-      "progress": "Πρόοδος ρύθμισης",
-      "replies": {
-        "signinDone": "Έγινε."
-      },
-      "send": "Send",
       "signin": {
         "body": "Αρκεί οποιοδήποτε από αυτά. Μπορείς να προσθέσεις τα υπόλοιπα αργότερα.",
         "claudeCliMissing": "Εγκαταστήστε πρώτα το Claude Code και δοκιμάστε ξανά.",
@@ -1903,8 +1866,7 @@
         "settledNone": "Δεν έχει επιλεγεί AI ακόμα",
         "settledNoneDesc": "Συνδεθείτε ή συνδέστε μια συνδρομή οποιαδήποτε στιγμή για να ξεκινήσετε.",
         "fineOwnPlan": "Το ChatGPT και το Claude Code χρησιμοποιούν τη δική σας συνδρομή στην OpenAI ή στην Anthropic. Αλλάξτε το οποιαδήποτε στιγμή στις Ρυθμίσεις."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "Χρησιμοποιώντας τη Stella, αποδέχεστε τους {terms} και την {privacy}.",
     "privacyPolicy": "Πολιτική απορρήτου",
@@ -2481,11 +2443,6 @@
         "twinkle": "Λάμψη"
       },
       "title": "Ήχος μηνυμάτων"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "Επανάληψη της αρχικής ρύθμισης. Τα δεδομένα σας μένουν.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3494,11 +3451,9 @@
     },
     "onboarding": {
       "link": "Έχεις δικό σου διακομιστή Stella; Σύνδεσέ τον",
-      "prose": "Είσαι συνδεδεμένος στο {name} ως ιδιοκτήτης. Τώρα διάλεξε με τι σκέφτομαι: το πρόγραμμά σου στο Claude ή στο ChatGPT ή το δικό σου κλειδί API.",
       "title": "Συνδέθηκε στο {name}",
       "body": "Έχεις συνδεθεί ως ιδιοκτήτης. Διάλεξε με τι σκέφτεται η Stella. Ένα αρκεί.",
-      "bodyOptional": "Έχεις συνδεθεί ως ιδιοκτήτης. Αυτός ο διακομιστής έχει δικά του μοντέλα, οπότε είναι προαιρετικό: μπορείς επίσης να χρησιμοποιήσεις το πρόγραμμά σου στο Claude ή στο ChatGPT ή ένα κλειδί API.",
-      "settled": "Συνδέθηκε στο {name}"
+      "bodyOptional": "Έχεις συνδεθεί ως ιδιοκτήτης. Αυτός ο διακομιστής έχει δικά του μοντέλα, οπότε είναι προαιρετικό: μπορείς επίσης να χρησιμοποιήσεις το πρόγραμμά σου στο Claude ή στο ChatGPT ή ένα κλειδί API."
     }
   },
   "contextMenu": {
@@ -3990,6 +3945,21 @@
     "phoneApp": {
       "title": "Η Stella είναι και στο τηλέφωνό σας",
       "detail": "Αποκτήστε την εφαρμογή για να στέλνετε μηνύματα στη Stella και να βλέπετε τις εργασίες σας όταν είστε μακριά από αυτόν τον υπολογιστή."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Λήψη του Stella for Chrome",
+      "connectGmail": "Σύνδεση Gmail",
+      "gmailWaiting": "Αναμονή για Google…",
+      "gmailRetry": "Δοκιμάστε ξανά το Gmail",
+      "watchErrands": "Δείτε το να δουλεύει",
+      "signIn": "Σύνδεση",
+      "getPhoneApp": "Λήψη της εφαρμογής κινητού",
+      "watchMemory": "Δείτε πώς",
+      "connectPlan": "Σύνδεση συνδρομής",
+      "changeLook": "Αλλαγή εμφάνισης",
+      "watchCustomize": "Δείτε την αλλαγή"
     }
   }
 }

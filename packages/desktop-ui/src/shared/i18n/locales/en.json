@@ -1831,43 +1831,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "Optional extras",
-        "lead": "None of these are required, but each one makes me more useful.",
-        "start": "Start chatting"
-      },
-      "gmail": {
-        "body": "Find emails, catch up on threads, and draft replies, just by asking.",
-        "connect": "Connect Gmail",
-        "connected": "Connected",
-        "connecting": "Waiting for Google…",
-        "error": "Couldn't connect Gmail. Try again, or skip for now.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Hi, I'm Stella. First, choose how I think: the Claude or ChatGPT plan you already have, your own key, or a Stella account."
-      },
-      "progress": "Setup progress",
-      "replies": {
-        "signinDone": "Done."
-      },
-      "send": "Send",
       "signin": {
         "body": "Any one of these is enough. You can add the others later.",
         "claudeCliMissing": "Install Claude Code first, then try again.",
@@ -1903,8 +1866,7 @@
         "settledNone": "No AI chosen yet",
         "settledNoneDesc": "Sign in or connect a plan any time to start chatting.",
         "fineOwnPlan": "ChatGPT and Claude Code use your own subscription with OpenAI or Anthropic. Change this any time in Settings."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "By using Stella, you agree to our {terms} and {privacy}.",
     "privacyPolicy": "Privacy Policy",
@@ -2481,11 +2443,6 @@
         "twinkle": "Twinkle"
       },
       "title": "Message sound"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "Run onboarding again. Your data stays.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3494,11 +3451,9 @@
     },
     "onboarding": {
       "link": "Have your own Stella server? Connect it",
-      "prose": "You're connected to {name}, signed in as its owner. Next, choose what I think with: the Claude or ChatGPT plan you already have, or your own API key.",
       "title": "Connected to {name}",
       "body": "You're signed in as its owner. Pick what Stella thinks with. Any one is enough.",
-      "bodyOptional": "You're signed in as its owner. This server has its own models, so this is optional: you can also use your Claude or ChatGPT plan, or an API key.",
-      "settled": "Connected to {name}"
+      "bodyOptional": "You're signed in as its owner. This server has its own models, so this is optional: you can also use your Claude or ChatGPT plan, or an API key."
     }
   },
   "contextMenu": {
@@ -3990,6 +3945,21 @@
     "phoneApp": {
       "title": "Stella is on your phone too",
       "detail": "Get the app to message Stella and check on your tasks when you're away from this computer."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Get Stella for Chrome",
+      "connectGmail": "Connect Gmail",
+      "gmailWaiting": "Waiting for Google…",
+      "gmailRetry": "Try Gmail again",
+      "watchErrands": "Watch it work",
+      "signIn": "Sign in",
+      "getPhoneApp": "Get the phone app",
+      "watchMemory": "See how",
+      "connectPlan": "Connect a plan",
+      "changeLook": "Change how I look",
+      "watchCustomize": "Watch it change"
     }
   }
 }

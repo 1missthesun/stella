@@ -1831,43 +1831,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "Opcionális extrák",
-        "lead": "Egyik sem kötelező, de mindegyik hasznosabbá tesz.",
-        "start": "Csevegés indítása"
-      },
-      "gmail": {
-        "body": "Keress e-maileket, zárkózz fel a beszélgetésekre, és írass válaszvázlatokat, csak kérned kell.",
-        "connect": "Gmail csatlakoztatása",
-        "connected": "Csatlakoztatva",
-        "connecting": "Várakozás a Google-re…",
-        "error": "Nem sikerült csatlakoztatni a Gmailt. Próbáld újra, vagy most hagyd ki.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Szia, én Stella vagyok. Először válaszd ki, hogyan gondolkodjak: a meglévő Claude- vagy ChatGPT-előfizetésed, a saját kulcsod vagy egy Stella-fiók."
-      },
-      "progress": "Beállítás állapota",
-      "replies": {
-        "signinDone": "Kész."
-      },
-      "send": "Send",
       "signin": {
         "body": "Bármelyik elég. A többit később is hozzáadhatod.",
         "claudeCliMissing": "Előbb telepítsd a Claude Code-ot, majd próbáld újra.",
@@ -1903,8 +1866,7 @@
         "settledNone": "Még nincs kiválasztva AI",
         "settledNoneDesc": "Jelentkezz be vagy kapcsolj össze egy előfizetést bármikor, és kezdhetsz is.",
         "fineOwnPlan": "A ChatGPT és a Claude Code a saját OpenAI- vagy Anthropic-előfizetésedet használja. Ezt bármikor módosíthatod a Beállításokban."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "A Stella használatával elfogadod a {terms} és az {privacy} feltételeit.",
     "privacyPolicy": "Adatvédelmi szabályzat",
@@ -2481,11 +2443,6 @@
         "twinkle": "Csillogás"
       },
       "title": "Üzenethang"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "A bevezetés újrafuttatása. Az adataid megmaradnak.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3494,11 +3451,9 @@
     },
     "onboarding": {
       "link": "Van saját Stella-szervered? Csatlakoztasd",
-      "prose": "Tulajdonosként csatlakoztál ehhez: {name}. Most válaszd ki, mivel gondolkodjak: a Claude- vagy ChatGPT-előfizetésed, vagy a saját API-kulcsod.",
       "title": "Csatlakozva: {name}",
       "body": "Tulajdonosként vagy bejelentkezve. Válaszd ki, mivel gondolkodjon a Stella. Egy is elég.",
-      "bodyOptional": "Tulajdonosként vagy bejelentkezve. Ennek a szervernek saját modelljei vannak, így ez nem kötelező: használhatod a Claude- vagy ChatGPT-előfizetésedet, vagy egy API-kulcsot is.",
-      "settled": "Csatlakozva: {name}"
+      "bodyOptional": "Tulajdonosként vagy bejelentkezve. Ennek a szervernek saját modelljei vannak, így ez nem kötelező: használhatod a Claude- vagy ChatGPT-előfizetésedet, vagy egy API-kulcsot is."
     }
   },
   "contextMenu": {
@@ -3990,6 +3945,21 @@
     "phoneApp": {
       "title": "Stella a telefonodon is ott van",
       "detail": "Töltsd le az appot, hogy írhass Stellának és követhesd a feladataidat, amikor nem ennél a számítógépnél vagy."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Stella for Chrome letöltése",
+      "connectGmail": "Gmail csatlakoztatása",
+      "gmailWaiting": "Várakozás a Google-re…",
+      "gmailRetry": "Gmail újrapróbálása",
+      "watchErrands": "Nézd meg munka közben",
+      "signIn": "Bejelentkezés",
+      "getPhoneApp": "Telefonos app letöltése",
+      "watchMemory": "Mutasd, hogyan",
+      "connectPlan": "Előfizetés csatlakoztatása",
+      "changeLook": "Kinézetem módosítása",
+      "watchCustomize": "Nézd meg, ahogy változik"
     }
   }
 }

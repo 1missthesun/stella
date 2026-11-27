@@ -69,7 +69,6 @@ const evidenceRoot = () => {
 };
 const READY_SELECTOR = [
   ".shell-topbar-full",
-  '[data-window-mode="onboarding"] .full-body > *',
   '[data-testid="sign-in-screen"]',
   '[data-testid="self-host-pair-screen"]',
 ].join(", ");

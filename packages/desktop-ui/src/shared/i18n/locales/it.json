@@ -1841,43 +1841,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "Extra facoltativi",
-        "lead": "Nessuno è obbligatorio, ma ognuno mi rende più utile.",
-        "start": "Inizia a chattare"
-      },
-      "gmail": {
-        "body": "Trova email, recupera le conversazioni e fai bozze di risposta, basta chiedere.",
-        "connect": "Collega Gmail",
-        "connected": "Collegato",
-        "connecting": "In attesa di Google…",
-        "error": "Impossibile collegare Gmail. Riprova o salta per ora.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Ciao, sono Stella. Per prima cosa scegli come penso: il piano Claude o ChatGPT che hai già, la tua chiave o un account Stella."
-      },
-      "progress": "Avanzamento della configurazione",
-      "replies": {
-        "signinDone": "Fatto."
-      },
-      "send": "Send",
       "signin": {
         "body": "Ne basta uno. Puoi aggiungere gli altri più tardi.",
         "claudeCliMissing": "Installa prima Claude Code, poi riprova.",
@@ -1913,8 +1876,7 @@
         "settledNone": "Nessuna IA scelta per ora",
         "settledNoneDesc": "Accedi o collega un abbonamento quando vuoi per iniziare a chattare.",
         "fineOwnPlan": "ChatGPT e Claude Code usano il tuo abbonamento con OpenAI o Anthropic. Puoi cambiarlo quando vuoi nelle Impostazioni."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "Usando Stella accetti i nostri {terms} e la {privacy}.",
     "privacyPolicy": "Informativa sulla privacy",
@@ -2491,11 +2453,6 @@
         "twinkle": "Scintillio"
       },
       "title": "Suono dei messaggi"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "Ripeti l’onboarding. I tuoi dati restano.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3526,11 +3483,9 @@
     },
     "onboarding": {
       "link": "Hai un tuo server Stella? Connettilo",
-      "prose": "Sei connesso a {name} come proprietario. Ora scegli con cosa penso: il tuo piano Claude o ChatGPT, o la tua chiave API.",
       "title": "Connesso a {name}",
       "body": "Hai effettuato l'accesso come proprietario. Scegli con cosa pensa Stella. Ne basta uno.",
-      "bodyOptional": "Hai effettuato l'accesso come proprietario. Questo server ha modelli propri, quindi è facoltativo: puoi anche usare il tuo piano Claude o ChatGPT, o una chiave API.",
-      "settled": "Connesso a {name}"
+      "bodyOptional": "Hai effettuato l'accesso come proprietario. Questo server ha modelli propri, quindi è facoltativo: puoi anche usare il tuo piano Claude o ChatGPT, o una chiave API."
     }
   },
   "contextMenu": {
@@ -4047,6 +4002,21 @@
     "phoneApp": {
       "title": "Stella è anche sul tuo telefono",
       "detail": "Scarica l’app per scrivere a Stella e seguire le tue attività quando non sei a questo computer."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Scarica Stella for Chrome",
+      "connectGmail": "Collega Gmail",
+      "gmailWaiting": "In attesa di Google…",
+      "gmailRetry": "Riprova Gmail",
+      "watchErrands": "Guardalo all'opera",
+      "signIn": "Accedi",
+      "getPhoneApp": "Scarica l'app per telefono",
+      "watchMemory": "Scopri come",
+      "connectPlan": "Collega un abbonamento",
+      "changeLook": "Cambia il mio aspetto",
+      "watchCustomize": "Guardalo cambiare"
     }
   }
 }

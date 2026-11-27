@@ -1831,43 +1831,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "Optionele extra's",
-        "lead": "Niets hiervan is verplicht, maar elk ervan maakt me nuttiger.",
-        "start": "Begin met chatten"
-      },
-      "gmail": {
-        "body": "Vind e-mails, lees gesprekken bij en laat antwoorden opstellen, gewoon door het te vragen.",
-        "connect": "Gmail koppelen",
-        "connected": "Gekoppeld",
-        "connecting": "Wachten op Google…",
-        "error": "Gmail kon niet worden gekoppeld. Probeer het opnieuw of sla het nu over.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Hoi, ik ben Stella. Kies eerst hoe ik denk: je Claude- of ChatGPT-abonnement, je eigen sleutel of een Stella-account."
-      },
-      "progress": "Voortgang van de installatie",
-      "replies": {
-        "signinDone": "Klaar."
-      },
-      "send": "Send",
       "signin": {
         "body": "Eén van deze is genoeg. De rest kun je later toevoegen.",
         "claudeCliMissing": "Installeer eerst Claude Code en probeer het daarna opnieuw.",
@@ -1903,8 +1866,7 @@
         "settledNone": "Nog geen AI gekozen",
         "settledNoneDesc": "Log in of koppel op elk moment een abonnement om te beginnen.",
         "fineOwnPlan": "ChatGPT en Claude Code gebruiken je eigen abonnement bij OpenAI of Anthropic. Je kunt dit altijd wijzigen in Instellingen."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "Door Stella te gebruiken ga je akkoord met onze {terms} en {privacy}.",
     "privacyPolicy": "Privacybeleid",
@@ -2481,11 +2443,6 @@
         "twinkle": "Fonkeling"
       },
       "title": "Berichtgeluid"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "Doorloop de introductie opnieuw. Je gegevens blijven bewaard.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3494,11 +3451,9 @@
     },
     "onboarding": {
       "link": "Heb je je eigen Stella-server? Verbind hem",
-      "prose": "Je bent verbonden met {name} en aangemeld als eigenaar. Kies nu waarmee ik denk: je Claude- of ChatGPT-abonnement, of je eigen API-sleutel.",
       "title": "Verbonden met {name}",
       "body": "Je bent aangemeld als eigenaar. Kies waarmee Stella denkt. Eén is genoeg.",
-      "bodyOptional": "Je bent aangemeld als eigenaar. Deze server heeft eigen modellen, dus dit is optioneel: je kunt ook je Claude- of ChatGPT-abonnement of een API-sleutel gebruiken.",
-      "settled": "Verbonden met {name}"
+      "bodyOptional": "Je bent aangemeld als eigenaar. Deze server heeft eigen modellen, dus dit is optioneel: je kunt ook je Claude- of ChatGPT-abonnement of een API-sleutel gebruiken."
     }
   },
   "contextMenu": {
@@ -3990,6 +3945,21 @@
     "phoneApp": {
       "title": "Stella staat ook op je telefoon",
       "detail": "Download de app om Stella berichten te sturen en je taken te volgen als je niet achter deze computer zit."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Stella for Chrome downloaden",
+      "connectGmail": "Gmail koppelen",
+      "gmailWaiting": "Wachten op Google…",
+      "gmailRetry": "Gmail opnieuw proberen",
+      "watchErrands": "Zie het aan het werk",
+      "signIn": "Inloggen",
+      "getPhoneApp": "Telefoon-app downloaden",
+      "watchMemory": "Zie hoe",
+      "connectPlan": "Abonnement koppelen",
+      "changeLook": "Mijn uiterlijk aanpassen",
+      "watchCustomize": "Zie het veranderen"
     }
   }
 }

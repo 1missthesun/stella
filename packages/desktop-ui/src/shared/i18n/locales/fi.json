@@ -1831,43 +1831,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "Valinnaiset lisät",
-        "lead": "Mikään näistä ei ole pakollinen, mutta jokainen tekee minusta hyödyllisemmän.",
-        "start": "Aloita keskustelu"
-      },
-      "gmail": {
-        "body": "Etsi viestejä, pysy keskustelujen tasalla ja luonnostele vastauksia pelkällä pyynnöllä.",
-        "connect": "Yhdistä Gmail",
-        "connected": "Yhdistetty",
-        "connecting": "Odotetaan Googlea…",
-        "error": "Gmailin yhdistäminen epäonnistui. Yritä uudelleen tai ohita toistaiseksi.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Hei, olen Stella. Valitse ensin, miten ajattelen: Claude- tai ChatGPT-tilauksesi, oma avaimesi tai Stella-tili."
-      },
-      "progress": "Käyttöönoton eteneminen",
-      "replies": {
-        "signinDone": "Valmis."
-      },
-      "send": "Send",
       "signin": {
         "body": "Yksi näistä riittää. Voit lisätä muut myöhemmin.",
         "claudeCliMissing": "Asenna ensin Claude Code ja yritä sitten uudelleen.",
@@ -1903,8 +1866,7 @@
         "settledNone": "Tekoälyä ei ole vielä valittu",
         "settledNoneDesc": "Kirjaudu tai yhdistä tilaus milloin tahansa aloittaaksesi.",
         "fineOwnPlan": "ChatGPT ja Claude Code käyttävät omaa OpenAI- tai Anthropic-tilaustasi. Voit muuttaa tämän milloin tahansa asetuksista."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "Käyttämällä Stellaa hyväksyt {terms} ja {privacy}.",
     "privacyPolicy": "tietosuojakäytäntömme",
@@ -2481,11 +2443,6 @@
         "twinkle": "Tuike"
       },
       "title": "Viestin ääni"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "Käy käyttöönotto uudelleen läpi. Tietosi säilyvät.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3494,11 +3451,9 @@
     },
     "onboarding": {
       "link": "Onko sinulla oma Stella-palvelin? Yhdistä se",
-      "prose": "Olet yhteydessä palvelimeen {name} omistajana. Valitse seuraavaksi, millä ajattelen: Claude- tai ChatGPT-tilauksesi tai oma API-avaimesi.",
       "title": "Yhdistetty: {name}",
       "body": "Olet kirjautunut omistajana. Valitse, millä Stella ajattelee. Yksi riittää.",
-      "bodyOptional": "Olet kirjautunut omistajana. Tällä palvelimella on omat mallit, joten tämä on valinnaista: voit käyttää myös Claude- tai ChatGPT-tilaustasi tai API-avainta.",
-      "settled": "Yhdistetty: {name}"
+      "bodyOptional": "Olet kirjautunut omistajana. Tällä palvelimella on omat mallit, joten tämä on valinnaista: voit käyttää myös Claude- tai ChatGPT-tilaustasi tai API-avainta."
     }
   },
   "contextMenu": {
@@ -3990,6 +3945,21 @@
     "phoneApp": {
       "title": "Stella on myös puhelimessasi",
       "detail": "Hanki sovellus, niin voit viestiä Stellalle ja seurata tehtäviäsi, kun olet poissa tämän tietokoneen ääreltä."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Hanki Stella for Chrome",
+      "connectGmail": "Yhdistä Gmail",
+      "gmailWaiting": "Odotetaan Googlea…",
+      "gmailRetry": "Yritä Gmailia uudelleen",
+      "watchErrands": "Katso sen työskentelevän",
+      "signIn": "Kirjaudu",
+      "getPhoneApp": "Hanki puhelinsovellus",
+      "watchMemory": "Katso miten",
+      "connectPlan": "Yhdistä tilaus",
+      "changeLook": "Muuta ulkoasuani",
+      "watchCustomize": "Katso muutos"
     }
   }
 }

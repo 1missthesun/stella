@@ -1821,43 +1821,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "オプションの追加機能",
-        "lead": "どれも必須ではありませんが、それぞれが私をもっと役立つようにします。",
-        "start": "チャットを始める"
-      },
-      "gmail": {
-        "body": "メールを探したり、スレッドに追いついたり、返信の下書きを作ったり。頼むだけです。",
-        "connect": "Gmail を連携",
-        "connected": "連携済み",
-        "connecting": "Google を待っています…",
-        "error": "Gmail を連携できませんでした。もう一度試すか、今はスキップしてください。",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "こんにちは、Stella です。まず、私の考え方を選んでください。お持ちの Claude や ChatGPT のプラン、ご自身のキー、または Stella アカウントを使えます。"
-      },
-      "progress": "セットアップの進行状況",
-      "replies": {
-        "signinDone": "完了しました。"
-      },
-      "send": "Send",
       "signin": {
         "body": "どれかひとつで十分です。ほかはあとから追加できます。",
         "claudeCliMissing": "先に Claude Code をインストールしてから、もう一度お試しください。",
@@ -1893,8 +1856,7 @@
         "settledNone": "まだ AI が選ばれていません",
         "settledNoneDesc": "いつでもサインインするかプランを接続すると、チャットを始められます。",
         "fineOwnPlan": "ChatGPT と Claude Code は、OpenAI または Anthropic のご自身のサブスクリプションを使います。設定からいつでも変更できます。"
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "Stella を利用することで、{terms}および{privacy}に同意したことになります。",
     "privacyPolicy": "プライバシーポリシー",
@@ -2471,11 +2433,6 @@
         "twinkle": "きらめき"
       },
       "title": "メッセージ音"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "オンボーディングをやり直します。データはそのままです。",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3460,11 +3417,9 @@
     },
     "onboarding": {
       "link": "自分の Stella サーバーをお持ちですか？接続する",
-      "prose": "{name} にオーナーとして接続しています。次に、私が考えるために使うものを選んでください：お持ちの Claude または ChatGPT のプラン、またはご自身の API キーです。",
       "title": "{name} に接続済み",
       "body": "オーナーとしてサインインしています。Stella が使うものを選んでください。1つで十分です。",
-      "bodyOptional": "オーナーとしてサインインしています。このサーバーには独自のモデルがあるため、これは任意です。Claude や ChatGPT のプラン、または API キーも使えます。",
-      "settled": "{name} に接続済み"
+      "bodyOptional": "オーナーとしてサインインしています。このサーバーには独自のモデルがあるため、これは任意です。Claude や ChatGPT のプラン、または API キーも使えます。"
     }
   },
   "contextMenu": {
@@ -3931,6 +3886,21 @@
     "phoneApp": {
       "title": "Stella はスマートフォンでも使えます",
       "detail": "アプリを入手すると、このコンピュータから離れているときも Stella にメッセージを送ったり、タスクを確認したりできます。"
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Stella for Chrome を入手",
+      "connectGmail": "Gmail を連携",
+      "gmailWaiting": "Google を待っています…",
+      "gmailRetry": "Gmail をもう一度試す",
+      "watchErrands": "動いているところを見る",
+      "signIn": "サインイン",
+      "getPhoneApp": "スマホアプリを入手",
+      "watchMemory": "仕組みを見る",
+      "connectPlan": "プランを連携",
+      "changeLook": "見た目を変える",
+      "watchCustomize": "変わる様子を見る"
     }
   }
 }

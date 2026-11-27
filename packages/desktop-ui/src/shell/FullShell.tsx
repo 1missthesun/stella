@@ -1,20 +1,11 @@
-import {
-  lazy,
-  Suspense,
-  useCallback,
-  useEffect,
-  useState,
-  type ReactNode,
-} from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { RouterProvider } from "@tanstack/react-router";
 import { useTheme } from "@/context/theme-context";
 import {
   readLocalOnboardingCompleted,
   useOnboardingState,
 } from "@/global/onboarding/use-onboarding-state";
-import { setPendingComposerDraft } from "@/global/onboarding/chat/pending-handoff";
-import type { OnboardingChatHandoff } from "@/global/onboarding/chat/use-onboarding-chat";
-import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
+import { beginFirstRun } from "@/features/welcome/first-run";
 import { routerFor } from "@/router";
 import { routeTree } from "@/routeTree.gen";
 import { ShiftingGradient } from "./background/ShiftingGradient";
@@ -22,68 +13,14 @@ import { AskStellaSelectionChip } from "./selection/AskStellaSelectionChip";
 import "./full-shell.layout.css";
 import "./mobile.css";
 import { platformCapabilities } from "@/platform/capabilities";
-import {
-  dismissLaunchSplash,
-  holdLaunchSplashUntilLive,
-} from "./launch-splash";
+import { holdLaunchSplashUntilLive } from "./launch-splash";
 import { reportFirstAppPaint } from "./app-paint";
-
-const loadOnboardingChunk = () =>
-  import("@/global/onboarding/chat/OnboardingChat");
-
-const OnboardingChatView = lazy(() =>
-  import("@/global/onboarding/chat/OnboardingChat").then((module) => ({
-    default: module.OnboardingChat,
-  })),
-);
-
-type OnboardingExperienceProps = {
-  onEnteredApp: () => void;
-};
-
-function OnboardingExperience({ onEnteredApp }: OnboardingExperienceProps) {
-  const { completed: onboardingDone, complete: completeOnboarding } =
-    useOnboardingState();
-  const { hasConnectedAccount } = useAuthSessionState();
-
-  useEffect(() => {
-    let cancelled = false;
-    void loadOnboardingChunk().finally(() => {
-      if (!cancelled) dismissLaunchSplash();
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!onboardingDone) return;
-    onEnteredApp();
-  }, [onEnteredApp, onboardingDone]);
-
-  const handleComplete = useCallback(
-    (handoff: OnboardingChatHandoff) => {
-      if (handoff.composerDraft) setPendingComposerDraft(handoff.composerDraft);
-      completeOnboarding();
-    },
-    [completeOnboarding],
-  );
-
-  return (
-    <Suspense fallback={null}>
-      <OnboardingChatView
-        isAuthenticated={hasConnectedAccount}
-        onComplete={handleComplete}
-      />
-    </Suspense>
-  );
-}
 
 function ShellChrome({
   windowMode,
   children,
 }: {
-  windowMode: "app" | "onboarding";
+  windowMode: "app";
   children: ReactNode;
 }) {
   const { gradientMode, gradientColor } = useTheme();
@@ -115,15 +52,26 @@ const WebsiteShell = () => {
 };
 
 const DesktopFullShell = () => {
-  const { completed: onboardingDone, hydrated: onboardingHydrated } =
-    useOnboardingState();
+  const {
+    completed: onboardingDone,
+    hydrated: onboardingHydrated,
+    complete: completeOnboarding,
+  } = useOnboardingState();
   const [hasEnteredApp, setHasEnteredApp] = useState(() =>
     readLocalOnboardingCompleted(),
   );
 
   const onboardingResolved = onboardingHydrated || onboardingDone;
   const appReady = onboardingResolved && onboardingDone && hasEnteredApp;
-  const needsOnboarding = onboardingHydrated && !onboardingDone;
+  const firstRun = onboardingHydrated && !onboardingDone;
+
+  // There is no setup to go through: a new install opens on its chat, whose
+  // welcome message offers what setup used to.
+  useEffect(() => {
+    if (!firstRun) return;
+    beginFirstRun();
+    completeOnboarding();
+  }, [completeOnboarding, firstRun]);
 
   useEffect(() => {
     if (!onboardingResolved || !onboardingDone) return;
@@ -148,12 +96,8 @@ const DesktopFullShell = () => {
   }, [appReady]);
 
   return (
-    <ShellChrome windowMode={needsOnboarding ? "onboarding" : "app"}>
-      {appReady ? (
-        <HostedChatSurface />
-      ) : needsOnboarding ? (
-        <OnboardingExperience onEnteredApp={() => setHasEnteredApp(true)} />
-      ) : null}
+    <ShellChrome windowMode="app">
+      {appReady ? <HostedChatSurface /> : null}
     </ShellChrome>
   );
 };

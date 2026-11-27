@@ -1851,43 +1851,6 @@
   },
   "onboarding": {
     "chat": {
-      "composerPlaceholder": "Or just ask me something to get started",
-      "extras": {
-        "accessibilityDesc": "So I can act on selected text and what's under your cursor.",
-        "accessibilityTitle": "Accessibility",
-        "enable": "Enable",
-        "enabled": "Enabled",
-        "extensionDesc": "Optional. Lets me use your logins by working in a tab group of my own in your browser. Without it, just sign in once in Stella's browser. Works in Chrome, Arc, Brave, and Edge.",
-        "extensionOpened": "Opened",
-        "extensionTitle": "Stella for Chrome",
-        "getExtension": "Get extension",
-        "hint": "All of this lives in Settings too.",
-        "restart": "Restart Stella",
-        "restartHint": "Screen access needs a quick restart to take effect.",
-        "screenDesc": "So I can see the screen when you ask me to.",
-        "screenTitle": "Screen Recording",
-        "settledTitle": "Extras",
-        "heading": "Volitelné doplňky",
-        "lead": "Nic z toho není povinné, ale každá z nich mě udělá užitečnější.",
-        "start": "Začít chatovat"
-      },
-      "gmail": {
-        "body": "Najdi e-maily, dožeň konverzace a nech si napsat odpovědi, stačí říct.",
-        "connect": "Připojit Gmail",
-        "connected": "Připojeno",
-        "connecting": "Čekám na Google…",
-        "error": "Gmail se nepodařilo připojit. Zkus to znovu, nebo to zatím přeskoč.",
-        "title": "Gmail"
-      },
-      "messages": {
-        "extras": "Almost done. A little housekeeping, then we start.",
-        "signin": "Ahoj, jsem Stella. Nejdřív vyberte, jak budu přemýšlet: předplatné Claude nebo ChatGPT, které už máte, vlastní klíč nebo účet Stella."
-      },
-      "progress": "Průběh nastavení",
-      "replies": {
-        "signinDone": "Hotovo."
-      },
-      "send": "Send",
       "signin": {
         "body": "Stačí kterákoli z těchto možností. Ostatní můžeš přidat později.",
         "claudeCliMissing": "Nejdřív nainstalujte Claude Code a pak to zkuste znovu.",
@@ -1923,8 +1886,7 @@
         "settledNone": "Zatím není vybrána žádná AI",
         "settledNoneDesc": "Kdykoli se přihlaste nebo připojte předplatné a můžete začít chatovat.",
         "fineOwnPlan": "ChatGPT a Claude Code používají vaše vlastní předplatné u OpenAI nebo Anthropic. Změnit to můžete kdykoli v Nastavení."
-      },
-      "skipSetup": "Skip setup"
+      }
     },
     "legalFooter": "Používáním Stelly souhlasíte s našimi {terms} a {privacy}.",
     "privacyPolicy": "Zásadami ochrany osobních údajů",
@@ -2501,11 +2463,6 @@
         "twinkle": "Třpyt"
       },
       "title": "Zvuk zpráv"
-    },
-    "onboardingReplay": {
-      "action": "Replay",
-      "description": "Projděte úvodní nastavení znovu. Vaše data zůstanou.",
-      "title": "Onboarding"
     },
     "permissions": {
       "accessibility": {
@@ -3558,11 +3515,9 @@
     },
     "onboarding": {
       "link": "Máte vlastní server Stella? Připojte ho",
-      "prose": "Jsi připojen k {name} jako vlastník. Teď vyber, čím budu myslet: tvůj plán Claude nebo ChatGPT, nebo vlastní klíč API.",
       "title": "Připojeno k {name}",
       "body": "Jsi přihlášen jako vlastník. Vyber, čím Stella myslí. Stačí jedno.",
-      "bodyOptional": "Jsi přihlášen jako vlastník. Tento server má vlastní modely, takže je to volitelné: můžeš použít i svůj plán Claude nebo ChatGPT, nebo klíč API.",
-      "settled": "Připojeno k {name}"
+      "bodyOptional": "Jsi přihlášen jako vlastník. Tento server má vlastní modely, takže je to volitelné: můžeš použít i svůj plán Claude nebo ChatGPT, nebo klíč API."
     }
   },
   "contextMenu": {
@@ -4104,6 +4059,21 @@
     "phoneApp": {
       "title": "Stella je i ve vašem telefonu",
       "detail": "Stáhněte si aplikaci a pište Stelle a sledujte své úkoly, i když nejste u tohoto počítače."
+    }
+  },
+  "welcome": {
+    "actions": {
+      "getExtension": "Získat Stella for Chrome",
+      "connectGmail": "Připojit Gmail",
+      "gmailWaiting": "Čekám na Google…",
+      "gmailRetry": "Zkusit Gmail znovu",
+      "watchErrands": "Podívat se, jak pracuje",
+      "signIn": "Přihlásit se",
+      "getPhoneApp": "Získat aplikaci pro telefon",
+      "watchMemory": "Ukázat jak",
+      "connectPlan": "Připojit předplatné",
+      "changeLook": "Změnit můj vzhled",
+      "watchCustomize": "Podívat se na změnu"
     }
   }
 }

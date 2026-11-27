@@ -149,6 +149,8 @@ dumps. An element with an `id` is memoized: it rebuilds only when it or somethin
   opacity, rotate}]}`. `at` ≤ 1 is a fraction of the period. `scaleX` / `scaleY` are averaged,
   since Rune scales uniformly. `ease` (`linear ease easeIn easeOut easeInOut`, default `easeInOut`)
   times each segment like CSS `animation-timing-function`; frames sampled from a curve want `linear`.
+  A `sequence` repeats unless `times` is 1: then it plays once from when the loop first appears on
+  the element (already drawn or not) and holds its last frame, so it can play an entrance late.
 
 **Interaction.**
 - Pointer and focus: `cursor` (CSS names, also `crosshair`, `cell`, `copy`, `alias`, `zoomIn`/`zoomOut`,

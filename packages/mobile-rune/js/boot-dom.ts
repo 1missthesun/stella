@@ -12,6 +12,9 @@ const env = __native.env;
 
 /** localStorage over the app's own storage (UserDefaults on iOS), so values survive restarts. */
 function nativeUiState() {
+  // A phone follows the system's light and dark mode until the person picks one (the desktop
+  // defaults to dark once onboarding is done).
+  if (__native.storageGet("stella-color-mode") === null) __native.storageSet("stella-color-mode", "system");
   return {
     snapshot() {
       const out: Record<string, string> = {};

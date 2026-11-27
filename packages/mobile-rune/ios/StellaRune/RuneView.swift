@@ -22,6 +22,7 @@ final class RuneView: UIView {
 
   override init(frame: CGRect) {
     super.init(frame: frame)
+    watchAppearance()
     isMultipleTouchEnabled = true
     backgroundColor = .black
     let layer = self.layer as! CAMetalLayer
@@ -123,10 +124,11 @@ final class RuneView: UIView {
     sme_safe_area(host, Float(i.top), Float(i.right), Float(i.bottom), Float(i.left))
   }
 
-  override func traitCollectionDidChange(_ previous: UITraitCollection?) {
-    super.traitCollectionDidChange(previous)
-    if let host, traitCollection.userInterfaceStyle != previous?.userInterfaceStyle {
-      sme_set_dark(host, traitCollection.userInterfaceStyle == .dark)
+  /// Follows light and dark mode (the system's, or the window's override).
+  private func watchAppearance() {
+    registerForTraitChanges([UITraitUserInterfaceStyle.self]) { (view: RuneView, _: UITraitCollection) in
+      guard let host = view.host else { return }
+      sme_set_dark(host, view.traitCollection.userInterfaceStyle == .dark)
     }
   }
 

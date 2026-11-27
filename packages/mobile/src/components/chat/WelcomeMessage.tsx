@@ -10,7 +10,7 @@ import {
 } from "@stella/contracts/welcome-message";
 import { env } from "../../config/env";
 import { useBackendView } from "../../lib/backend";
-import { openDrawer } from "../../lib/drawer";
+import { openChatSettingsAt } from "../../lib/connect-plan";
 import { CONTENT_MAX_FONT_SCALE } from "../../lib/font-scale";
 import { tapLight } from "../../lib/haptics";
 import type { Colors } from "../../theme/colors";
@@ -27,65 +27,70 @@ const openSite = () => {
   void Linking.openURL(env.siteUrl).catch(() => undefined);
 };
 
-// One button per line, like the desktop: chat settings lists ChatGPT and
-// Claude side by side.
-function usePlansAction(): WelcomeAction | null {
+function usePlansActions(): WelcomeAction[] {
   const { value } = useBackendView("engines.get", NO_ARGS);
   return useMemo(() => {
-    if (!value || value.connections.some(isEngineConnectionUsable)) return null;
-    return { id: "plan", label: "Connect a plan", icon: "plug", onPress: () => openDrawer("end") };
+    if (!value || value.connections.some(isEngineConnectionUsable)) return [];
+    return [
+      { id: "chatgpt", label: "Connect ChatGPT", icon: "plug", onPress: () => openChatSettingsAt("chatgpt") },
+      { id: "claude", label: "Connect Claude", icon: "plug", onPress: () => openChatSettingsAt("anthropic") },
+    ];
   }, [value]);
 }
 
-function useAnywhereAction(): WelcomeAction | null {
+function useAnywhereActions(): WelcomeAction[] {
   const { value } = useBackendView("devices.list", NO_ARGS);
   return useMemo(
     () =>
       value && value.devices.length === 0
-        ? { id: "computer", label: "Get Stella for your computer", icon: "laptop" as const, onPress: openSite }
-        : null,
+        ? [{ id: "computer", label: "Get Stella for your computer", icon: "laptop" as const, onPress: openSite }]
+        : [],
     [value],
   );
 }
 
 // Stella's first message, drawn natively: points separated by space, each
-// with at most one neutral button under its text (a phone is too narrow for
-// the desktop's button on the right). A button disappears once that thing is
-// done.
+// with neutral buttons under its text for what it describes. A button
+// disappears once that thing is done.
 
-function ActionButton({ action, colors }: { action: WelcomeAction | null; colors: Colors }) {
+function ActionRow({ actions, colors }: { actions: readonly WelcomeAction[]; colors: Colors }) {
   const styles = useMemo(() => makeStyles(colors), [colors]);
-  if (!action) return null;
+  if (actions.length === 0) return null;
   return (
-    <Pressable
-      accessibilityRole="button"
-      testID={`welcome-action-${action.id}`}
-      hitSlop={4}
-      onPress={() => {
-        tapLight();
-        action.onPress();
-      }}
-      style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
-    >
-      <Icon name={action.icon} size={14} color={colors.textMuted} />
-      <Text style={styles.actionLabel} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
-        {action.label}
-      </Text>
-    </Pressable>
+    <View style={styles.actions}>
+      {actions.map((action) => (
+        <Pressable
+          key={action.id}
+          accessibilityRole="button"
+          testID={`welcome-action-${action.id}`}
+          hitSlop={4}
+          onPress={() => {
+            tapLight();
+            action.onPress();
+          }}
+          style={({ pressed }) => [styles.action, pressed && styles.actionPressed]}
+        >
+          <Icon name={action.icon} size={14} color={colors.textMuted} />
+          <Text style={styles.actionLabel} maxFontSizeMultiplier={CONTENT_MAX_FONT_SCALE}>
+            {action.label}
+          </Text>
+        </Pressable>
+      ))}
+    </View>
   );
 }
 
-function PlansAction({ colors }: { colors: Colors }) {
-  return <ActionButton action={usePlansAction()} colors={colors} />;
+function PlansActions({ colors }: { colors: Colors }) {
+  return <ActionRow actions={usePlansActions()} colors={colors} />;
 }
 
-function AnywhereAction({ colors }: { colors: Colors }) {
-  return <ActionButton action={useAnywhereAction()} colors={colors} />;
+function AnywhereActions({ colors }: { colors: Colors }) {
+  return <ActionRow actions={useAnywhereActions()} colors={colors} />;
 }
 
 const ITEM_ACTIONS: Partial<Record<WelcomeItemId, ComponentType<{ colors: Colors }>>> = {
-  anywhere: AnywhereAction,
-  plans: PlansAction,
+  anywhere: AnywhereActions,
+  plans: PlansActions,
 };
 
 export const WelcomeMessage = memo(function WelcomeMessage({ colors, fill }: { colors: Colors; fill: boolean }) {
@@ -127,8 +132,9 @@ const makeStyles = (colors: Colors) => {
     strong: { fontFamily: fonts.sans.semiBold, color: colors.textStrong },
     lead: { marginTop: 4 },
     points: { marginTop: 16, gap: 16 },
-    point: { gap: 8, alignItems: "flex-start" },
+    point: { gap: 8 },
     closing: { marginTop: 16 },
+    actions: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
     action: {
       flexDirection: "row",
       alignItems: "center",

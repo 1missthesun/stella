@@ -20,55 +20,35 @@ const ACTION_ICONS: Record<string, IconData> = {
   theme: Icons.stella.Palette,
 };
 
-// Under this width (the 480px window) each button drops under its text, as
-// desktop-ui's container query does.
-const NARROW_BELOW = 500;
-
-/** desktop-ui's `WelcomeMessage`: Stella's first message, points separated by space, each with at most one button on the right of its text (under it when narrow); all the text ends at one edge, with the buttons in a column as wide as the widest. */
+/** desktop-ui's `WelcomeMessage`: Stella's first message, points separated by space, each with buttons under its text for what it describes. */
 export function WelcomeMessage() {
   const t = useTokens();
   const [chooseAiOpen, setChooseAiOpen] = useState(false);
   // The demos are DOM films, which the Rune viewer can't play yet.
-  const actionFor = useWelcomeActions({ openChooseAi: () => setChooseAiOpen(true), demos: false });
+  const actionsFor = useWelcomeActions({ openChooseAi: () => setChooseAiOpen(true), demos: false });
   const hairline = mix(t.c.chatAssistantBubbleText, 11, "transparent");
-  const [width, setWidth] = useState(0);
-  const [buttonWidths, setButtonWidths] = useState<Record<string, number>>({});
-  const narrow = width > 0 && width < NARROW_BELOW;
-  const rows = WELCOME_ITEMS.map((item) => ({ item, action: actionFor(item.id) }));
-  const column = Math.max(0, ...rows.map(({ item, action }) => (action ? (buttonWidths[item.id] ?? 0) : 0)));
   return (
     <col w="full" gap={0} id="welcome-message">
       <ChooseAiDialog open={chooseAiOpen} onOpenChange={setChooseAiOpen} />
       <Markdown text={`**${WELCOME_GREETING}**\n\n${WELCOME_LEAD}`} cacheKey="welcome:lead" />
-      <col w="full" mt={14} gap={14} onLayout={(r) => setWidth(Math.round(r.w))}>
-        {rows.map(({ item, action }) => {
-          const button = action ? (
-            <WelcomeButton
-              itemId={item.id}
-              action={action}
-              hairline={hairline}
-              onWidth={(w) => setButtonWidths((prev) => (prev[item.id] === w ? prev : { ...prev, [item.id]: w }))}
-            />
-          ) : null;
-          const text = <Markdown text={`**${item.title}** ${item.body}`} cacheKey={`welcome:${item.id}`} />;
-          return narrow ? (
+      <col w="full" mt={14} gap={16}>
+        {WELCOME_ITEMS.map((item) => {
+          const actions = actionsFor(item.id);
+          return (
             <col key={item.id} w="full" gap={8} id={`welcome-item:${item.id}`}>
-              {text}
-              {button ? <row>{button}</row> : null}
+              <Markdown text={`**${item.title}** ${item.body}`} cacheKey={`welcome:${item.id}`} />
+              {actions.length > 0 ? (
+                <row wrap align="center" gap={6} rowGap={6}>
+                  {actions.map((action) => (
+                    <WelcomeButton key={action.id} itemId={item.id} action={action} hairline={hairline} />
+                  ))}
+                </row>
+              ) : null}
             </col>
-          ) : (
-            <row key={item.id} w="full" align="center" gap={column > 0 ? 24 : 0} id={`welcome-item:${item.id}`}>
-              <col grow={1} minW={0}>
-                {text}
-              </col>
-              <row w={column > 0 ? column : undefined} justify="end">
-                {button}
-              </row>
-            </row>
           );
         })}
       </col>
-      <col w="full" mt={14}>
+      <col w="full" mt={16}>
         <Markdown text={WELCOME_CLOSING} cacheKey="welcome:closing" />
       </col>
       <LegalLine />
@@ -78,16 +58,11 @@ export function WelcomeMessage() {
 
 // One button family: neutral for every setup step, the same box outlined for
 // demos, and the accent only on the primary one (Sign in while signed out).
-function WelcomeButton({ itemId, action, hairline, onWidth }: { itemId: string; action: WelcomeAction; hairline: string; onWidth: (w: number) => void }) {
+function WelcomeButton({ itemId, action, hairline }: { itemId: string; action: WelcomeAction; hairline: string }) {
   const t = useTokens();
   const anchor = `welcome-action:${itemId}:${action.id}:${useId()}`;
   const [themeOpen, setThemeOpen] = useState(false);
   const run = action.theme ? () => setThemeOpen((open) => !open) : action.run;
-  // The theme line's `run` marks the picker seen once it closes.
-  const onThemeOpenChange = (open: boolean) => {
-    setThemeOpen(open);
-    if (!open) action.run?.();
-  };
   const primary = Boolean(action.primary);
   const demo = Boolean(action.demo) && !primary;
   const icon = action.busy ? Icons.stella.LoaderCircle : demo ? Icons.stella.Play : ACTION_ICONS[action.id];
@@ -112,7 +87,6 @@ function WelcomeButton({ itemId, action, hairline, onWidth }: { itemId: string; 
         hoverFill={action.busy ? undefined : primary ? mix(t.c.foreground, 10, t.c.interactive) : demo ? mix(t.c.foreground, 5, "transparent") : mix(t.c.foreground, 4, t.c.card)}
         hoverBorder={action.busy || primary ? undefined : mix(t.c.foreground, 17, "transparent")}
         onPress={action.busy ? undefined : run}
-        onLayout={(r) => onWidth(Math.ceil(r.w))}
       >
         {icon ? (
           <Icon
@@ -126,7 +100,7 @@ function WelcomeButton({ itemId, action, hairline, onWidth }: { itemId: string; 
           {action.label}
         </text>
       </box>
-      {action.theme && themeOpen ? <ThemePicker hideTrigger open={themeOpen} onOpenChange={onThemeOpenChange} side="top" align="end" anchor={anchor} /> : null}
+      {action.theme && themeOpen ? <ThemePicker hideTrigger open={themeOpen} onOpenChange={setThemeOpen} side="top" align="start" anchor={anchor} /> : null}
     </>
   );
 }

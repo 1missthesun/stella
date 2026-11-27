@@ -34,6 +34,7 @@ mod surface;
 mod swap_view;
 mod text;
 mod text_services;
+mod trim;
 mod tree;
 mod view;
 #[cfg(feature = "webview")]
@@ -265,6 +266,7 @@ fn hidden_until_content(mut options: rune::WindowOptions, p: &props::Props) -> r
 }
 
 fn main() {
+    trim::init();
     #[cfg(unix)]
     block_quit_signals();
     metrics::mark_process_start();

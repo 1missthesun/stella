@@ -110,6 +110,7 @@ impl Metrics {
         }
         if !self.first_content && self.commits_seen > 0 {
             self.first_content = true;
+            crate::trim::after_startup();
             let t0 = std::env::var("STELLA_RUNE_T0").ok().and_then(|v| v.parse::<f64>().ok());
             self.say(serde_json::json!({
                 "metric": "first_content_frame", "at": at,

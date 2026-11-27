@@ -10,7 +10,7 @@ import { basename, dirname, isAbsolute, join } from "node:path";
 import { ViewSession, type ViewCapabilities, type ViewRun, type ViewSnapshot, type ViewStorage, type ViewVm } from "@stella/views/session";
 import type { ViewMessage, ViewPost, ViewTheme } from "@stella/views/protocol";
 import { latestConversationViews, type ConversationView, type ViewToolEvent } from "@stella/views/conversation";
-import { isViewPath, viewDataPath as dataPathFor, viewKey as hash, viewSourceHash, viewStatusPath, viewTitle as titleFor, type ViewStatusFile } from "@stella/views/files";
+import { isViewPath, viewDataPath as dataPathFor, viewHostMarkerPath, viewKey as hash, viewSourceHash, viewStatusPath, viewTitle as titleFor, type ViewHostMarker, type ViewStatusFile } from "@stella/views/files";
 import {
   MovableViewStorage,
   ViewStorageSync,
@@ -29,6 +29,8 @@ type Engine = typeof BridgeEngine;
 type On = typeof BridgeOn;
 
 const KEEP_ALIVE_MS = 60_000;
+/** The space a view has in its chat card (640 wide, less its padding), until the card says. */
+const CARD_VIEWPORT = { width: 606, height: 460 };
 /** A frame the engine doesn't answer in time (an engine without `views.frame`) comes from a timer. */
 const FRAME_FALLBACK_MS = 100;
 
@@ -405,7 +407,7 @@ const isLocalViewFile = (filePath: string): boolean => isAbsolute(filePath) && e
  * Keeps the view's status file current while it is open, so the agent tool that wrote the source
  * can tell whether it rendered (and how fast) or what broke, without a channel to this process.
  */
-function statusWriter(entry: { filePath: string; sourceHash: string }) {
+function statusWriter(entry: { filePath: string; sourceHash: string; refs: number }) {
   const file = viewStatusPath(entry.filePath);
   let last = "";
   let ready = false;
@@ -416,6 +418,7 @@ function statusWriter(entry: { filePath: string; sourceHash: string }) {
       status: snapshot.status,
       problem: snapshot.problem,
       renderMs: snapshot.swapMs ?? snapshot.firstRenderMs,
+      shown: entry.refs > 0,
     };
     const text = JSON.stringify(status);
     if (text === last || !entry.sourceHash) return;
@@ -510,7 +513,7 @@ export function createViewsHost(engine: Engine, on: On) {
     }
   };
 
-  const open = (filePath: string, theme: ViewTheme): Entry => {
+  const open = (filePath: string, theme: ViewTheme, viewport?: { width: number; height: number }): Entry => {
     const existing = entries.get(filePath);
     if (existing) {
       if (existing.closeTimer) clearTimeout(existing.closeTimer);
@@ -542,6 +545,7 @@ export function createViewsHost(engine: Engine, on: On) {
       capabilities: caps,
       theme,
       data,
+      ...(viewport ? { viewport } : {}),
       requestFrame,
       now,
       onLog: (log) => {
@@ -595,6 +599,34 @@ export function createViewsHost(engine: Engine, on: On) {
     rmSync(viewStatusPath(filePath), { force: true });
   };
 
+  // A view the agent's `view` tool writes runs here at once, before its chat card exists: the
+  // card mounts with the tool's result, and the tool waits for this run's first render to say
+  // whether the view works. The card then joins the run already going.
+  let lastTheme: ViewTheme = { dark: true, accent: "#3b82f6", platform: "desktop" };
+  const outputs = join(dataDir(), "outputs", "views");
+  const preOpen = (name: string) => {
+    if (!isViewPath(name)) return;
+    const filePath = join(outputs, name);
+    if (entries.has(filePath) || !existsSync(filePath)) return;
+    const entry = open(filePath, lastTheme, CARD_VIEWPORT);
+    if (entry.refs === 0 && !entry.closeTimer) {
+      entry.closeTimer = setTimeout(() => close(filePath), KEEP_ALIVE_MS);
+      entry.closeTimer.unref?.();
+    }
+  };
+  try {
+    mkdirSync(outputs, { recursive: true });
+    watch(outputs, (_event, name) => {
+      if (name) preOpen(String(name));
+    });
+    const marker = viewHostMarkerPath(dataDir());
+    mkdirSync(dirname(marker), { recursive: true, mode: 0o700 });
+    writeFileSync(marker, JSON.stringify({ pid: process.pid, dataDir: dataDir(), at: Date.now() } satisfies ViewHostMarker));
+    process.once("exit", () => rmSync(marker, { force: true }));
+  } catch (error) {
+    console.error(`[views] can't watch ${outputs}:`, error);
+  }
+
   const withEntry = (filePath: string, fn: (entry: Entry) => void) => {
     const entry = entries.get(filePath);
     if (entry) fn(entry);
@@ -604,7 +636,10 @@ export function createViewsHost(engine: Engine, on: On) {
     isViewPath,
     /** Opens (or shares) the view at `filePath` and calls `listener` with each snapshot; returns the release. */
     subscribe(filePath: string, theme: ViewTheme, listener: (snapshot: ViewSnapshot) => void): () => void {
+      lastTheme = theme;
       const entry = open(filePath, theme);
+      if (entry.closeTimer) clearTimeout(entry.closeTimer);
+      entry.closeTimer = null;
       entry.refs += 1;
       entry.session.setTheme(theme);
       const off = entry.session.subscribe(listener);

@@ -4,7 +4,7 @@ import { AGENT_IDS } from "@stella/contracts/agent-runtime";
 import { BackendClient } from "@stella/contracts/backend/client";
 import { compileView, lintView } from "@stella/views/compile";
 import { iconProblems } from "@stella/views/icons";
-import { awaitViewStatus } from "@stella/views/files";
+import { awaitViewStatus, liveViewHost, readViewStatus } from "@stella/views/files";
 import type { ToolContext, ToolDefinition } from "../types.js";
 import { htmlCanvasSlug } from "./html-def.js";
 import { VIEW_TOOL_DESCRIPTION, VIEW_TOOL_NAME, VIEW_TOOL_PARAMETERS } from "./view-def.js";
@@ -30,6 +30,16 @@ export type ViewToolOptions = {
   publish?: ViewPublisher;
   /** How long to wait for an open view to run the new source. */
   statusWaitMs?: number;
+};
+
+/** How long a new view may take to start and draw its first screen before the tool says it didn't. */
+const FIRST_RENDER_WAIT_MS = 3_000;
+
+/** A problem, with the source line it points at. */
+const withLine = (text: string, line: number | undefined, source: string): string => {
+  if (!line) return text;
+  const code = source.split("\n")[line - 1]?.trim();
+  return code ? `${text}\n    ${line} | ${code.length > 160 ? `${code.slice(0, 160)}…` : code}` : text;
 };
 
 export { hostRendersViews } from "../views-env.js";
@@ -82,12 +92,23 @@ export const createViewTool = (options: ViewToolOptions): ToolDefinition => {
       await fs.writeFile(`${filePath}.tmp`, source, "utf8");
       await fs.rename(`${filePath}.tmp`, filePath);
 
-      const problems = [...lintView(source), ...iconProblems(source)].map((p) => `line ${p.line ?? "?"}: ${p.message}`);
+      const problems = [...lintView(source), ...iconProblems(source)].map((p) => withLine(`line ${p.line ?? "?"}: ${p.message}`, p.line, source));
       const compiled = compileView(source, `${slug}.view.tsx`);
-      if (!compiled.ok) problems.unshift(`line ${compiled.error.line ?? "?"}${compiled.error.column ? `:${compiled.error.column}` : ""}: ${compiled.error.message}`);
+      if (!compiled.ok) problems.unshift(withLine(`line ${compiled.error.line ?? "?"}${compiled.error.column ? `:${compiled.error.column}` : ""}: ${compiled.error.message}`, compiled.error.line, source));
 
-      const run = options.rendersHere && problems.length === 0 ? await awaitViewStatus(filePath, source, options.statusWaitMs ?? 1500) : null;
-      if (run?.problem) problems.push(`${run.problem.phase}: ${run.problem.message}`);
+      // A views host runs each view written here as soon as it lands, so even the first write can
+      // say whether it rendered; with no host, only a view already open reports.
+      const host = options.rendersHere && problems.length === 0 && (await liveViewHost(stellaDataDir));
+      const run = options.rendersHere && problems.length === 0 ? await awaitViewStatus(filePath, source, host ? FIRST_RENDER_WAIT_MS : (options.statusWaitMs ?? 1500), { appear: host }) : null;
+      if (run?.problem) problems.push(withLine(`${run.problem.phase}: ${run.problem.message}`, run.problem.line, source));
+      let notRendered: string | null = null;
+      if (host && !run && problems.length === 0) {
+        const last = await readViewStatus(filePath);
+        notRendered =
+          last?.status === "loading"
+            ? `it was still starting after ${FIRST_RENDER_WAIT_MS / 1000} s (long work before its first render? move it into an effect)`
+            : `Stella didn't pick the file up within ${FIRST_RENDER_WAIT_MS / 1000} s`;
+      }
 
       const createdAt = Date.now();
       // Stella's own calls reach her other devices as they are; a task's calls stay in its thread,
@@ -109,14 +130,21 @@ export const createViewTool = (options: ViewToolOptions): ToolDefinition => {
               ? ` It couldn't reach the user's chat on their other devices (${published.error}).`
               : "";
       const link = task && problems.length === 0 ? ` Link it in your report as [${title}](<${filePath}>).` : "";
+      const ms = Math.round(run?.renderMs ?? 0);
       const result =
         problems.length > 0
           ? `View "${title}" saved at ${where}, but it has problems; fix them in the file (the open view keeps its last good version until then):\n${problems.join("\n")}`
-          : run
-            ? `View "${title}" is on screen (rendered in ${Math.round(run.renderMs ?? 0)} ms); saved at ${where}.${chat}${link}`
-            : options.rendersHere
-              ? `View "${title}" opened; saved at ${where}.${chat}${link}`
-              : `View "${title}" compiled cleanly; saved at ${where}. Nothing draws it here, so a runtime error shows only on the user's devices.${chat}${link}`;
+          : notRendered
+            ? `View "${title}" saved at ${where}, but it hasn't rendered: ${notRendered}.${chat}${link}`
+            : run
+              ? run.shown === false
+                ? task
+                  ? `View "${title}" rendered (first screen in ${ms} ms); saved at ${where}.${chat}${link}`
+                  : `View "${title}" rendered (first screen in ${ms} ms) and shows in the chat with this reply; saved at ${where}.`
+                : `View "${title}" is on screen (rendered in ${ms} ms); saved at ${where}.${chat}${link}`
+              : options.rendersHere
+                ? `View "${title}" saved at ${where}; it shows when the chat displays it.${chat}${link}`
+                : `View "${title}" compiled cleanly; saved at ${where}. Nothing draws it here, so a runtime error shows only on the user's devices.${chat}${link}`;
       // Other devices (the phone, the web chat) run the newest version of each slug from this
       // call's arguments, which sync as written; tool results are redacted on the way to the cloud.
       return {
@@ -129,6 +157,7 @@ export const createViewTool = (options: ViewToolOptions): ToolDefinition => {
           bytes: Buffer.byteLength(source, "utf8"),
           ...(problems.length > 0 ? { problems } : {}),
           ...(run?.renderMs != null ? { renderMs: run.renderMs } : {}),
+          ...(run ? { rendered: !run.problem } : {}),
         },
       };
     },

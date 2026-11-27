@@ -14,7 +14,8 @@
     "./files": "./src/files.ts",
     "./paths": "./src/paths.ts",
     "./conversation": "./src/conversation.ts",
-    "./icons": "./src/icons.ts"
+    "./icons": "./src/icons.ts",
+    "./storage-sync": "./src/storage-sync.ts"
   },
   "scripts": {
     "gen": "bun scripts/gen-runtime.ts && bun scripts/gen-icons.ts",
@@ -22,7 +23,8 @@
     "typecheck": "tsc -p tsconfig.json"
   },
   "dependencies": {
-    "sucrase": "^3.35.1"
+    "sucrase": "^3.35.1",
+    "@stella/contracts": "workspace:*"
   },
   "devDependencies": {
     "@types/bun": "^1.4.4",

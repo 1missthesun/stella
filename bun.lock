@@ -364,6 +364,7 @@
       "name": "@stella/views",
       "version": "0.0.0",
       "dependencies": {
+        "@stella/contracts": "workspace:*",
         "sucrase": "^3.35.1",
       },
       "devDependencies": {

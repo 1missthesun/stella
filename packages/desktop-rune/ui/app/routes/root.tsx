@@ -42,6 +42,7 @@ import { ShellTopBarFull } from "../../shell/ShellTopBarFull";
 import { WorkspaceStage } from "../../shell/workspace-stage/WorkspaceStage";
 import { CloudStartupFailure } from "../../shell/CloudStartupFailure";
 import { SHELL_TOPBAR_HEIGHT } from "../../shell/metrics";
+import { TopInsetContext } from "../../shell/top-inset";
 import { mounted, Nothing } from "../mount";
 
 const glob = <T,>(modules: Record<string, Record<string, unknown>>, name: string) => mounted<T>(modules, name, Nothing as never);
@@ -564,8 +565,8 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
             conversationId={conversationId}
           />
         </col>
-        <col id="route-outlet-surface" absolute={{ left: 0, top: SHELL_TOPBAR_HEIGHT, right: 0, bottom: 0 }} hidden={isOnChatRoute}>
-          {isOnChatRoute ? null : <Outlet />}
+        <col id="route-outlet-surface" absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} hidden={isOnChatRoute}>
+          <TopInsetContext.Provider value={SHELL_TOPBAR_HEIGHT}>{isOnChatRoute ? null : <Outlet />}</TopInsetContext.Provider>
         </col>
       </col>
 

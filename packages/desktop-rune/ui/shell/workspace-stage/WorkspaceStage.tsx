@@ -26,6 +26,7 @@ import { DropdownMenu, Icon, Icons, ManualCopyField, MenuItem, MenuSeparator, Re
 import { look, mixOklch, useTokens, derive, type Tokens } from "../../theme";
 import { useHostWindows, HostWindow } from "../../host/HostWindows";
 import { SHELL_TOPBAR_HEIGHT } from "../metrics";
+import { TopInsetContext } from "../top-inset";
 import { useWindowKeys } from "../window-keys";
 import { addContextMenu } from "../../replace/platform/context-menu/context-menu";
 import { SidebarSectionBody } from "../sidebar-sections/SidebarSectionBody";
@@ -44,7 +45,8 @@ export interface WorkspaceStageHandle {
 
 const STAGE_INSET = 20;
 const STAGE_RADIUS = 14;
-const STAGE_TOP = SHELL_TOPBAR_HEIGHT - 1;
+/** A stage-mode viewer is a card hanging below the glass top bar, as far under its capsules as the composer is below it. */
+const STAGE_TOP = SHELL_TOPBAR_HEIGHT + 9;
 /** `@container file-viewer (min-width: 760px)`: the strip moves to the left edge and stands up. */
 /** `@container file-viewer (min-width: 760px)`, against the viewer's content box (inside its 1px border). */
 const WIDE_VIEWER = 760;
@@ -91,7 +93,6 @@ const useDelayedHidden = (visible: boolean, ms: number) => {
 
 function TabStage({ visible }: { visible: boolean }) {
   const t = useTokens();
-  const l = stageLook(t);
   const geo = useGeometry();
   const hidden = useDelayedHidden(visible, 120);
   const { tabs } = useDisplayTabList();
@@ -100,28 +101,24 @@ function TabStage({ visible }: { visible: boolean }) {
   const [opened, setOpened] = useState(visible);
   if ((visible || tabs.length > 0) && !opened) setOpened(true);
   return (
-    <>
-      {hidden ? null : <StageBackdrop visible={visible} geo={geo} />}
-      <col
-        id="workspace-stage"
-        absolute={stageInsets(geo)}
-        fill={t.c.background}
-        border={l.edge}
-        radius={STAGE_RADIUS}
-        pad={1}
-        opacity={visible ? 1 : 0}
-        motion={{ dur: visible ? 0.16 : 0.12 }}
-        hidden={hidden}
-        inert={!visible}
-        label={visible ? undefined : ""}
-      >
-        <col id="workspace-stage-body" grow={1} minH={0} clip={STAGE_RADIUS - 1}>
+    <col
+      id="workspace-stage"
+      absolute={{ left: 0, top: 0, right: 0, bottom: stageBottom(geo) }}
+      fill={t.c.background}
+      opacity={visible ? 1 : 0}
+      motion={{ dur: visible ? 0.16 : 0.12 }}
+      hidden={hidden}
+      inert={!visible}
+      label={visible ? undefined : ""}
+    >
+      <col id="workspace-stage-body" grow={1} minH={0} px={STAGE_INSET} clip={0}>
+        <TopInsetContext.Provider value={SHELL_TOPBAR_HEIGHT}>
           <RetainedSurface active={visible} grow={1}>
             {opened ? <SidebarSectionBody /> : null}
           </RetainedSurface>
-        </col>
+        </TopInsetContext.Provider>
       </col>
-    </>
+    </col>
   );
 }
 

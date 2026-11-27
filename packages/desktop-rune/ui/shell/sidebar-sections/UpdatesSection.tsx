@@ -5,6 +5,7 @@ import { appSourceApi, useAppSourceState, useAutoUpdate } from "@/features/app-s
 import { whatsNewDialog } from "@/features/whats-new/whats-new-store";
 import { addOffer, ago, describeChange, deviceLabel, useAppSourceAction, useNow } from "@/features/app-source/AppSourceCards";
 import { EmptyState, Icon, Icons, Switch } from "../../kit";
+import { useTopInset } from "../top-inset";
 import { fontSize, look, mixOklch, useTokens } from "../../theme";
 
 const SMALL = look(fontSize.sm, 400);
@@ -184,11 +185,12 @@ export function UpdatesSection() {
   const state = useAppSourceState();
   const api = appSourceApi();
   const { pending, run } = useAppSourceAction();
+  const inset = useTopInset();
   if (!state || !api || (state.waiting.length === 0 && state.skipped.length === 0 && state.recent.length === 0)) {
     const empty = <EmptyState motif="updates" title={t("shell.appSource.updates.upToDateTitle")} body={t("shell.appSource.updates.upToDateBody")} />;
     if (!state || !api || state.developerCheckout) return empty;
     return (
-      <col id="updates-section" grow={1} minH={0} gap={4} pt={14} px={14} pb={20}>
+      <col id="updates-section" grow={1} minH={0} gap={4} pt={14 + inset} px={14} pb={20}>
         <col grow={1} minH={0}>
           {empty}
         </col>
@@ -198,7 +200,7 @@ export function UpdatesSection() {
   }
   const blocked = state.busy || pending !== null || state.merging !== undefined;
   return (
-    <col id="updates-section" grow={1} minH={0} scrollY gap={4} pt={8} px={10} pb={14}>
+    <col id="updates-section" grow={1} minH={0} scrollY gap={4} pt={8 + inset} px={10} pb={14}>
       {state.developerCheckout ? (
         <Note id="updates-developer-checkout">{t("shell.appSource.updates.developerCheckout")}</Note>
       ) : (

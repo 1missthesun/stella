@@ -101,6 +101,9 @@ struct Over {
     /// Whether it shows (Rune's `on_drawn_shows`): one that paints but doesn't (faded out, a
     /// hover-only control at rest) still takes the pointer, as CSS's does, but shows the page.
     shows: bool,
+    /// The page under it shows through it (a blur or a translucent fill): the view it is cut
+    /// into draws the page's snapshot under it (`backed`).
+    sees: bool,
 }
 
 /// Props a native view takes only when it is created.
@@ -173,6 +176,19 @@ const PARENT_SHIM: &str = r#"(() => {
   }
 })();"#;
 
+/// Tells the engine when the page scrolls, once a frame, for a snapshot under the elements
+/// over it (`reback`).
+const SCROLL_SHIM: &str = r#"(() => {
+  if (!window.ipc || window.__stellaScrolls) return;
+  window.__stellaScrolls = true;
+  let queued = false;
+  addEventListener("scroll", () => {
+    if (queued) return;
+    queued = true;
+    requestAnimationFrame(() => { queued = false; window.ipc.postMessage('{"stellaScroll":true}'); });
+  }, { capture: true, passive: true });
+})();"#;
+
 thread_local! {
     /// Drawn rects of the scroll viewports and clipping boxes webviews sit in, with the radius
     /// they round their clip to.
@@ -193,15 +209,16 @@ fn build_of(window: u32) -> u64 {
 
 /// An element over a webview: the native view leaves its drawn rect (rounded by its corners)
 /// to the engine, in what takes the pointer and, when the element `paints`, in what shows.
-pub fn over(e: El, window: u32, n: u32, corners: [f32; 4], paints: bool) -> El {
+pub fn over(e: El, window: u32, n: u32, corners: [f32; 4], paints: bool, sees: bool) -> El {
     let build = build_of(window);
     OVER.with(|o| {
         let mut o = o.borrow_mut();
-        let entry = o.entry(n).or_insert(Over { window, rect: None, corners, build, paints, shows: false });
+        let entry = o.entry(n).or_insert(Over { window, rect: None, corners, build, paints, shows: false, sees });
         entry.window = window;
         entry.corners = corners;
         entry.build = build;
         entry.paints = paints;
+        entry.sees = sees;
     });
     e.on_drawn_layout_tx(move |s: &mut Win, r: [f32; 4], tx: &mut rune::Tx| {
         tx.live_only();
@@ -211,18 +228,22 @@ pub fn over(e: El, window: u32, n: u32, corners: [f32; 4], paints: bool) -> El {
             }
         });
         refresh(s.node);
-        if BACKERS.with(|b| b.borrow().contains(&n)) {
+        if BACKERS.with(|b| b.borrow().contains(&n)) || OVER.with(|o| o.borrow().get(&n).is_some_and(|x| x.sees)) {
             reconcile(s.node);
         }
     })
     .on_drawn_shows(move |s: &mut Win, on: bool, tx: &mut rune::Tx| {
         tx.live_only();
-        OVER.with(|o| {
-            if let Some(entry) = o.borrow_mut().get_mut(&n) {
+        let sees = OVER.with(|o| {
+            o.borrow_mut().get_mut(&n).map(|entry| {
                 entry.shows = on;
-            }
+                entry.sees
+            })
         });
         refresh(s.node);
+        if sees == Some(true) {
+            reconcile(s.node);
+        }
     })
 }
 
@@ -409,9 +430,16 @@ fn overlaps(a: [f32; 4], b: [f32; 4]) -> bool {
 /// leaves pages live overlaps, and uncovers the rest.
 fn reconcile(window: u32) {
     let overlays: Vec<[f32; 4]> = OVERLAYS.with(|o| o.borrow().values().filter(|(w, _)| *w == window).map(|(_, r)| *r).collect());
+    let build = build_of(window);
     let backers: Vec<[f32; 4]> = BACKERS.with(|b| {
         let b = b.borrow();
-        OVER.with(|o| o.borrow().iter().filter(|(n, x)| b.contains(n) && x.window == window).filter_map(|(_, x)| x.rect).collect())
+        OVER.with(|o| {
+            o.borrow()
+                .iter()
+                .filter(|(n, x)| x.window == window && (b.contains(n) || (x.sees && x.shows && x.build == build)))
+                .filter_map(|(_, x)| x.rect)
+                .collect()
+        })
     });
     let changes: Vec<(u32, bool, bool)> = VIEWS.with(|v| {
         v.borrow()
@@ -434,7 +462,7 @@ fn reconcile(window: u32) {
         if covered {
             cover(n, window);
         } else if backed {
-            back(n, window);
+            back(n, window, || {});
         } else {
             COVERS.with(|c| c.borrow_mut().remove(&n));
             let rect = VIEWS.with(|v| v.borrow().get(&n).map(|x| x.rect));
@@ -473,8 +501,10 @@ fn cover(n: u32, window: u32) {
     }
 }
 
-fn back(n: u32, window: u32) {
-    let _ = with_view(n, |view| {
+fn back(n: u32, window: u32, done: impl FnOnce() + 'static) {
+    let done = std::cell::Cell::new(Some(done));
+    let sent = with_view(n, |view| {
+        let done = done.take();
         snap(&view.view, move |image| {
             let still = VIEWS.with(|v| v.borrow().get(&n).is_some_and(|x| x.backed));
             if let (true, Some(image)) = (still, image) {
@@ -483,8 +513,47 @@ fn back(n: u32, window: u32) {
                 COVERS.with(|c| c.borrow_mut().insert(n, pixels));
                 redraw(window);
             }
+            if let Some(done) = done {
+                done();
+            }
         })
     });
+    if sent.is_err()
+        && let Some(done) = done.take()
+    {
+        done();
+    }
+}
+
+thread_local! {
+    /// Backed views whose snapshot is being taken again, and whether the page scrolled since.
+    static REBACKING: RefCell<HashMap<u32, bool>> = RefCell::new(HashMap::new());
+}
+
+/// The page of a backed view loaded or scrolled: its snapshot is taken again, one at a time, so what
+/// shows through the elements over it follows the page.
+fn reback(n: u32) {
+    let Some(window) = VIEWS.with(|v| v.borrow().get(&n).filter(|x| x.backed).map(|x| x.window)) else { return };
+    let busy = REBACKING.with(|r| {
+        let mut r = r.borrow_mut();
+        match r.get_mut(&n) {
+            Some(again) => {
+                *again = true;
+                true
+            }
+            None => {
+                r.insert(n, false);
+                false
+            }
+        }
+    });
+    if !busy {
+        back(n, window, move || {
+            if REBACKING.with(|r| r.borrow_mut().remove(&n)) == Some(true) {
+                reback(n);
+            }
+        });
+    }
 }
 
 fn redraw(window: u32) {
@@ -797,8 +866,13 @@ fn build(n: u32, window: u32, p: &Props, r: [f32; 4], b: WebViewBuilder<'_>, sch
         .with_focused(false)
         .with_devtools(p.devtools || cfg!(debug_assertions))
         .with_initialization_script(PARENT_SHIM)
+        .with_initialization_script(SCROLL_SHIM)
         .with_ipc_handler(move |req: Request<String>| {
             let body: serde_json::Value = serde_json::from_str(req.body()).unwrap_or(serde_json::Value::Null);
+            if body.get("stellaScroll").is_some() {
+                reback(live(n));
+                return;
+            }
             element_event(live(n), "message", json!({ "data": body.get("data"), "targetOrigin": body.get("targetOrigin") }), None);
         })
         .with_document_title_changed_handler(move |title: String| page_event(n, "title", json!({ "title": title })))
@@ -807,7 +881,10 @@ fn build(n: u32, window: u32, p: &Props, r: [f32; 4], b: WebViewBuilder<'_>, sch
                 PageLoadEvent::Started => "started",
                 PageLoadEvent::Finished => "finished",
             };
-            page_event(n, "load", json!({ "phase": phase, "url": scheme_url::from_view(&load_protocols, &url) }))
+            page_event(n, "load", json!({ "phase": phase, "url": scheme_url::from_view(&load_protocols, &url) }));
+            if matches!(ev, PageLoadEvent::Finished) {
+                reback(live(n));
+            }
         });
     #[cfg(not(target_os = "linux"))]
     {

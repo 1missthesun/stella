@@ -84,13 +84,19 @@ fn paints(kind: Kind, p: &Props) -> bool {
         || p.backdrop_blur.is_some()
 }
 
+/// Whether the page under the element shows through it: it blurs what's behind it or its
+/// fill is translucent, as a CSS `backdrop-filter` or a translucent background over a page.
+fn sees_through(p: &Props) -> bool {
+    p.backdrop_blur.is_some_and(|b| b > 0.0) || p.fill.as_ref().is_some_and(|c| c.0.a < 1.0)
+}
+
 fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
     let p = &*n.props;
     if n.kind == Kind::Input {
         let e = crate::input::build(s, id, p);
         #[cfg(feature = "webview")]
         if OVER.get() && !p.hidden {
-            return crate::webview::over(e, s.node, id, p.corners.unwrap_or([p.radius.unwrap_or(0.0); 4]), true);
+            return crate::webview::over(e, s.node, id, p.corners.unwrap_or([p.radius.unwrap_or(0.0); 4]), true, sees_through(p));
         }
         return e;
     }
@@ -109,7 +115,7 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
     if eng.tree.clippers.contains(&id) {
         e = crate::webview::clipper(e, id, if p.scroll_x || p.scroll_y { 0.0 } else { p.clip.unwrap_or(0.0) });
     } else if marks || hits {
-        e = crate::webview::over(e, s.node, id, p.corners.unwrap_or([p.radius.unwrap_or(0.0); 4]), marks);
+        e = crate::webview::over(e, s.node, id, p.corners.unwrap_or([p.radius.unwrap_or(0.0); 4]), marks, marks && sees_through(p));
     }
     e.key(rune_key(id, p))
 }

@@ -63,9 +63,8 @@ pub fn route(v: Value) {
             m["t"] = json!("cmd");
             crate::native::send(m);
         }
-        // A context menu (a message's long press): Android shows its own pop-up menu and
-        // answers the rid with the picked id. iOS has no menu of its own here yet.
-        #[cfg(target_os = "android")]
+        // A context menu (a message's long press): the phone shows its own (Android's pop-up
+        // menu, iOS's edit menu) and answers the rid with the picked id.
         "menu.popup" => {
             let mut m = v.clone();
             m["t"] = json!("cmd");

@@ -97,7 +97,7 @@ final class App {
 
   /// Commands from TS (through the engine's `native` commands or `__native.post`).
   func command(_ m: [String: Any]) {
-    if Pickers.shared.handle(m) || Push.shared.handle(m) || Mic.shared.handle(m) || SignIn.shared.handle(m) || Store.shared.handle(m) { return }
+    if Pickers.shared.handle(m) || Menus.shared.handle(m) || Push.shared.handle(m) || Mic.shared.handle(m) || SignIn.shared.handle(m) || Store.shared.handle(m) { return }
     let cmd = (m["cmd"] as? String) ?? (m["t"] as? String) ?? ""
     switch cmd {
     case "clipboard.writeText", "clipboard.writeHTML":

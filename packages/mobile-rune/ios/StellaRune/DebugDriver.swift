@@ -75,6 +75,8 @@ enum DebugDriver {
       case "backspace": input.deleteBackward()
       default: input.insertText("\n")
       }
+    case "/menu":
+      Menus.shared.debugPick(Int(num("pick", 0)))
     case "/dark":
       App.shared.window?.overrideUserInterfaceStyle = q["on"] == "1" ? .dark : .light
     case "/perf":

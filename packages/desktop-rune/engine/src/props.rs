@@ -650,6 +650,8 @@ pub struct Props {
     pub dark: Option<bool>,
     /// The window's page zoom (Electron's `setZoomFactor`), 1 unzoomed.
     pub zoom: Option<f32>,
+    /// CSS `-webkit-font-smoothing` for the window's text on macOS, `antialiased` unset.
+    pub font_smoothing: Option<String>,
 }
 
 impl Props {

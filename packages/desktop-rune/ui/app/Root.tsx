@@ -2,6 +2,7 @@ import { HostWindows } from "../host/HostWindows";
 import type { WindowSnapshot } from "../../host/electron/browser-window";
 import { SHELL_TOPBAR_HEIGHT } from "../shell/metrics";
 import { useScopedWindowKeyProps, useWindowKeyProps } from "../shell/window-keys";
+import { useNativeFontSmoothingEnabled } from "@/shared/lib/native-font-smoothing";
 import { FullWindow } from "./FullWindow";
 import { AuxWindow } from "./AuxWindow";
 
@@ -15,12 +16,13 @@ const isViewerWindow = (w: WindowSnapshot) => w.frameName?.startsWith("stella-vi
 export function Root() {
   const windowKeys = useWindowKeyProps();
   const auxKeys = useScopedWindowKeyProps();
+  const fontSmoothing = useNativeFontSmoothingEnabled() ? "antialiased" : "subpixel-antialiased";
   if (!stella.host) {
     return (
-      <window id="main" {...windowKeys}>
+      <window id="main" fontSmoothing={fontSmoothing} {...windowKeys}>
         <FullWindow />
       </window>
     );
   }
-  return <HostWindows renderApp={renderApp} chrome={(w) => (w.mode === "full" ? { titlebar: SHELL_TOPBAR_HEIGHT, trafficLights: isMac ? [16, 13] : undefined, ...windowKeys } : auxKeys(w.id))} skip={isViewerWindow} />;
+  return <HostWindows renderApp={renderApp} chrome={(w) => (w.mode === "full" ? { titlebar: SHELL_TOPBAR_HEIGHT, trafficLights: isMac ? [16, 13] : undefined, fontSmoothing, ...windowKeys } : { fontSmoothing, ...auxKeys(w.id) })} skip={isViewerWindow} />;
 }

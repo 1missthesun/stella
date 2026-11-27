@@ -371,6 +371,7 @@ fn applied_at_open(p: &Props) -> Applied {
         titlebar: p.titlebar,
         click_through: Some(p.click_through || is_background(p)),
         content_protection: Some(p.content_protection || is_background(p)),
+        font_smoothing: None,
     }
 }
 
@@ -634,12 +635,27 @@ fn apply_window_props(node: u32, tx: &mut Tx) {
         });
         next.dark = Some(p.dark);
     }
+    #[cfg(target_os = "macos")]
+    if applied.font_smoothing.as_ref() != Some(&p.font_smoothing) {
+        tx.set_font_smoothing(font_smoothing(p.font_smoothing.as_deref()));
+        next.font_smoothing = Some(p.font_smoothing.clone());
+    }
     if next != applied {
         engine::with(|e| {
             if let Some(slot) = e.windows.get_mut(&node) {
                 slot.applied = next;
             }
         });
+    }
+}
+
+/// macOS text as Electron's page draws it: Stella's CSS asks for `antialiased` (CoreText with
+/// smoothing off) unless the Native font smoothing setting is off.
+#[cfg(target_os = "macos")]
+pub fn font_smoothing(css: Option<&str>) -> rune::FontSmoothing {
+    match css {
+        Some("subpixel-antialiased" | "auto") => rune::FontSmoothing::On,
+        _ => rune::FontSmoothing::Off,
     }
 }
 

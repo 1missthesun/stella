@@ -330,6 +330,8 @@ fn main() {
         eprintln!("stella-engine: text {mode:?} ({why}, system-ui {:?})", desktop.ui_family);
         app.font_smoothing(mode)
     };
+    #[cfg(target_os = "macos")]
+    let app = app.font_smoothing(windows::font_smoothing(None));
     let schemes = std::env::var("STELLA_RUNE_URL_SCHEMES").unwrap_or_else(|_| "stella".into());
     rune::url_schemes(schemes.split(',').map(str::trim).filter(|s| !s.is_empty()));
     let app = app.on_open_url(|_s: &mut Win, url: &str, _tx| engine::send(serde_json::json!({ "t": "open-url", "url": url })));

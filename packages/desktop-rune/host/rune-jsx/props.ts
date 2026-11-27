@@ -330,6 +330,8 @@ export type WindowProps = {
   /** Page zoom, as Electron's `setZoomFactor`: the content lays out `1 / zoom` as wide and draws `zoom` times larger. */
   zoom?: number;
   dir?: "ltr" | "rtl";
+  /** CSS `-webkit-font-smoothing` for the window's text on macOS; unset is `antialiased`. */
+  fontSmoothing?: "antialiased" | "subpixel-antialiased";
   /** Window-level chords (fire `onKey` when nothing focused takes them). */
   keys?: string[];
   onKey?: (e: KeyEvent) => void;

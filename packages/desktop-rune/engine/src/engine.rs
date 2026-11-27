@@ -54,6 +54,7 @@ pub struct Applied {
     pub titlebar: Option<f32>,
     pub click_through: Option<bool>,
     pub content_protection: Option<bool>,
+    pub font_smoothing: Option<Option<String>>,
 }
 
 pub struct Engine {

@@ -317,7 +317,7 @@ fn main() {
         p.title = Some("Stella".into());
     }
     let mut spec = windows::app_spec(&p);
-    spec.min_size = p.min_size.map(|[w, h]| (w, h)).or(Some((640.0, 480.0)));
+    spec.min_size = p.min_size.map(|[w, h]| (w, h)).or(Some((480.0, 600.0)));
     // Electron's globalShortcut takes a bare key (Show Stella's Escape discard).
     let app = App::new(spec).init(|| Win { node: 0, main: true, inputs: Default::default(), bg: None }).keep_running().allow_unmodified_shortcuts();
     let options = windows::options(&p);

@@ -55,6 +55,7 @@ pub struct Applied {
     pub click_through: Option<bool>,
     pub content_protection: Option<bool>,
     pub font_smoothing: Option<Option<String>>,
+    pub size_limits: Option<(Option<[f32; 2]>, Option<[f32; 2]>)>,
 }
 
 pub struct Engine {

@@ -1,4 +1,4 @@
-import { chromeGlass, useGlassBackdrop } from "../shell/glass";
+import { chromeGlass, COMPOSER_GLASS_ID, composerGroupGlass, useGlassBackdrop } from "../shell/glass";
 import { memo, useCallback, useEffect, useId, useRef, useState, type Dispatch, type SetStateAction } from "react";
 import type { ChatContext } from "@/shared/types/electron";
 import { useComposerModelPinned } from "@/features/chat/composer-model-pin-store";
@@ -309,13 +309,14 @@ function ComposerImpl({
     <col w="full" shrink={false} align="center" justify="end" {...column} onLayout={(r) => setComposerW(r.w)}>
       <ComposerLeadRow replyPeek={replyPeek} catchUpConversationId={catchUp && !sidebar ? conversationId : null} maxW={shellMaxW} />
       <col
+        id={sidebar ? undefined : COMPOSER_GLASS_ID}
         w="full"
         maxW={shellMaxW}
         minH={MIN_COMPOSER_SHELL_HEIGHT}
         pad={1}
         radius={radius}
         clip={radius}
-        fx={chromeGlass(tokens).composer.fx}
+        fx={sidebar ? chromeGlass(tokens).composer.fx : composerGroupGlass(tokens)}
         fill={chromeGlass(tokens).composer.fill}
         onBackdrop={glassBackdrop}
         border={isDragOver ? look.dragBorder : chromeGlass(tokens).composer.border}

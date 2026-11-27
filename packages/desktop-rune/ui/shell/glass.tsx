@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useState, type ReactNode } from "react";
-import type { Backdrop } from "../../host/rune-jsx/props";
+import type { Backdrop, FxLayer, Glass } from "../../host/rune-jsx/props";
 import { solidEdge, type Material } from "../kit/legible-glass";
 import { alpha, derive, mix, ModeScope, useTokens, type Gradient, type Tokens } from "../theme";
 
@@ -33,6 +33,21 @@ export function chromeGlass(t: Tokens) {
     const sheen: Gradient | undefined = t.dark ? { angle: 180, stops: [[0, "rgba(255,255,255,0)"], [1, "rgba(255,255,255,0.045)"]] } : undefined;
     return { controls, composer, hairline, sheen };
   });
+}
+
+/** The main chat composer's glass element: the scroll-to-bottom button grows out of it. */
+export const COMPOSER_GLASS_ID = "chat-composer-glass";
+const COMPOSER_GROUP = "chat-composer";
+
+/**
+ * The composer's glass, and with `grows` the scroll-to-bottom button's, as one glass group (Apple's
+ * GlassEffectContainer): the button rises out of the composer, pinching off it, and sinks back in.
+ * Nothing under Reduce Transparency, where both are solid.
+ */
+export function composerGroupGlass(t: Tokens, grows = false): FxLayer | undefined {
+  const fx = chromeGlass(t).composer.fx as { glass: Glass } | undefined;
+  if (!fx) return undefined;
+  return { glass: { ...fx.glass, group: COMPOSER_GROUP, ...(grows ? { morphFrom: COMPOSER_GLASS_ID } : {}) } };
 }
 
 /** The faint top-to-bottom lightening inside a dark glass control; nothing in light or solid. Put it first among the control's children. */

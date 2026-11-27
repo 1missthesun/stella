@@ -45,6 +45,9 @@ const TAB_TRAIL_TIGHT = 10;
 const SEGMENT_H = 26;
 const SEGMENT_R = SEGMENT_H / 2;
 const SETTLE_MS = 170;
+/** The shown tab's pill slides from tab to tab (`matched`) on this spring. */
+const PILL_ID = "topbar-tab-pill";
+const PILL_MOTION = { dur: 0.3, bounce: 0.12 };
 
 const LABEL = look(fontSize.sm, 500, { lh: 26 / fontSize.sm });
 
@@ -81,7 +84,7 @@ function tabLook(t: Tokens) {
 
 type Drag = { id: string; from: number; target: number; dx: number; slots: { x: number; w: number }[]; settling: boolean };
 
-/** desktop-ui's `ShellTopBarTabs` as segments of one glass capsule: pinned Chat, the open tabs (the shown one on a tinted pill), reorder by drag, and + to open more. */
+/** desktop-ui's `ShellTopBarTabs` as segments of one glass capsule: pinned Chat, the open tabs (the shown one on a tinted pill that slides from tab to tab), reorder by drag, and + to open more. */
 export function ShellTopBarTabs({ room }: { room: number }) {
   const tk = useTokens();
   const l = tabLook(tk);
@@ -250,7 +253,11 @@ export function ShellTopBarTabs({ room }: { room: number }) {
       </col>
       <row id="topbar-tablist" role="tablist" label="Tabs" h="full" align="center" gap={2} minW={0} shrink>
         <row id="topbar-tab-chat" h={SEGMENT_H} align="center" mr={CHAT_FULL_GAP} shrink={false} hoverGroup noWindowDrag>
-          <box absolute={{ left: 0, right: 0, top: 0, bottom: 0 }} radius={SEGMENT_R} fill={chatActive ? l.selected : l.hoverFill} hoverOpacity={chatActive ? undefined : [0, 1]} motion={{ dur: 0.16 }} inert />
+          {chatActive ? (
+            <box key="pill" absolute={{ left: 0, right: 0, top: 0, bottom: 0 }} radius={SEGMENT_R} fill={l.selected} matched={PILL_ID} matchedInPlace motion={PILL_MOTION} inert />
+          ) : (
+            <box key="fill" absolute={{ left: 0, right: 0, top: 0, bottom: 0 }} radius={SEGMENT_R} fill={l.hoverFill} hoverOpacity={[0, 1]} motion={{ dur: 0.16 }} inert />
+          )}
           <row
             id="topbar-tab-chat-target"
             role="tab"
@@ -305,14 +312,19 @@ export function ShellTopBarTabs({ room }: { room: number }) {
                   setSizes((s) => (Math.abs((s[tab.id] ?? -1) - r.w) < 0.5 ? s : { ...s, [tab.id]: r.w }));
                 }}
               >
-                <box
-                  absolute={{ left: 0, right: 0, top: 0, bottom: 0 }}
-                  radius={SEGMENT_R}
-                  fill={active ? l.selected : dragging ? l.draggingFill : viewing ? l.viewingFill : l.hoverFill}
-                  hoverOpacity={active || dragging || viewing ? undefined : drag ? [0, 0] : [0, 1]}
-                  motion={{ dur: 0.16 }}
-                  inert
-                />
+                {active ? (
+                  <box key="pill" absolute={{ left: 0, right: 0, top: 0, bottom: 0 }} radius={SEGMENT_R} fill={l.selected} matched={PILL_ID} matchedInPlace motion={PILL_MOTION} inert />
+                ) : (
+                  <box
+                    key="fill"
+                    absolute={{ left: 0, right: 0, top: 0, bottom: 0 }}
+                    radius={SEGMENT_R}
+                    fill={dragging ? l.draggingFill : viewing ? l.viewingFill : l.hoverFill}
+                    hoverOpacity={dragging || viewing ? undefined : drag ? [0, 0] : [0, 1]}
+                    motion={{ dur: 0.16 }}
+                    inert
+                  />
+                )}
                 <row
                   id={`topbar-tab-${tab.id}-target`}
                   role="tab"

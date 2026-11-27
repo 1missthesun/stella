@@ -654,6 +654,18 @@ after the app-source publish; stella.sh after the website deploy.
    through the backend's release channel (`/api/app-source/releases`, added
    2026-10-13); desktop code published ahead of a backend without it can't
    connect and sees new versions only at launch.
+   **Dependency seeds** (opt-in, `--deps-seed`): builds a per-platform seed
+   of bun's cache for the tree's lockfile (`scripts/build-deps-seeds.mjs`,
+   about 4 minutes for the six platforms, 67–93 MB each), uploads it to R2 at
+   `deps-seed/<lock sha256>/` (skipped when that lock's manifest is already
+   there), and writes `packages/desktop/deps-seed.json` into the tree. A new
+   launcher's first install (`packages/desktop/scripts/install-deps.mjs`) then
+   unpacks it instead of fetching ~630 packages from npm. Run it with the bun
+   version in `packages/desktop/launcher.json`, since a seed from another bun
+   is ignored. Without the flag, or if seeding fails, first installs run a
+   plain `bun install`. With `--out`, the seeds stay beside the tree in
+   `<out>.deps-seed/`; add `--deps-seed-base-url <url>` to point the tree
+   at a local server.
 2. **Launchers** (only when `launcher/` changed): a push only builds and
    self-tests them. Publish with `gh workflow run build-launchers.yml --ref master -f publish=true`.
    It signs and notarizes macOS (DMG + zip), signs `Stella.exe`, builds the Linux

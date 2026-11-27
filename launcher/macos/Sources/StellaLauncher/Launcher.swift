@@ -279,15 +279,21 @@ final class Launcher {
     private func prepareForLaunch() throws -> ElectronIdentity.Resolved {
         let fm = FileManager.default
         followServerFile()
+        let firstInstall = !fm.fileExists(atPath: paths.app.appendingPathComponent(".git").path)
+        if firstInstall {
+            try fm.createDirectory(at: paths.runtimes, withIntermediateDirectories: true)
+            Install.prefetchBun(paths: paths, baseEnv: baseEnvironment(), localBun: options.localBun)
+        }
         let (git, signer) = try tools()
         let env = baseEnvironment()
 
-        if !fm.fileExists(atPath: paths.app.appendingPathComponent(".git").path) {
+        if firstInstall {
             try Install.cloneSource(paths: paths, git: git, source: source, progress: status)
             try signer.signHead(git: git, app: paths.app, expected: nil)
             state = LauncherState()
             state.installedAt = ISO8601DateFormatter().string(from: Date())
             state.save(paths)
+            ElectronIdentity.prefetch(paths: paths, env: env)
         }
 
         if let changes = try signer.outsideChanges(git: git, app: paths.app) {

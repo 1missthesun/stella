@@ -401,8 +401,8 @@ const bunInstall = (env) =>
     child.once("close", (status) => resolve(status ?? 1));
   });
 
-// The launcher's logs folder (<root>/logs), else the app's .git folder.
-const agentClisLog = () => {
+// The launcher's logs folder (<root>/logs), or null outside a launcher install.
+const launcherLogs = () => {
   let dir = appRoot;
   for (let up = 0; up < 3; up += 1) {
     dir = path.dirname(dir);
@@ -410,10 +410,10 @@ const agentClisLog = () => {
       fs.existsSync(path.join(dir, "launcher.lock")) &&
       fs.existsSync(path.join(dir, "logs"))
     ) {
-      return path.join(dir, "logs", "agent-clis.log");
+      return path.join(dir, "logs");
     }
   }
-  return path.join(appRoot, ".git", "stella-agent-clis.log");
+  return null;
 };
 
 const startAgentClis = () => {
@@ -421,8 +421,15 @@ const startAgentClis = () => {
   if (!fs.existsSync(script) || process.env.STELLA_SKIP_AGENT_CLIS === "1")
     return;
   try {
-    const logFile = agentClisLog();
-    const child = spawn(process.execPath, [script, "--log", logFile], {
+    const logs = launcherLogs();
+    const logFile = logs
+      ? path.join(logs, "agent-clis.log")
+      : path.join(appRoot, ".git", "stella-agent-clis.log");
+    // Their downloads and first runs slow Stella's own first start, so
+    // they wait for the launcher to log that Stella is up.
+    const args = [script, "--log", logFile];
+    if (logs) args.push("--after-ready", path.join(logs, "launcher.log"));
+    const child = spawn(process.execPath, args, {
       cwd: appRoot,
       env: process.env,
       detached: true,
@@ -454,7 +461,7 @@ const main = async () => {
     ? fetchElectron(plan, seeded).catch((error) => ({ error }))
     : null;
   // Claude Code and Antigravity are ~500 MB together, so they start once the
-  // downloads this install waits on are in, and finish while Stella opens.
+  // downloads this install waits on are in, and install once Stella is up.
   Promise.all([seeded, electron]).then(startAgentClis);
 
   await seeded;

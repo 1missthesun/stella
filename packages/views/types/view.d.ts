@@ -272,7 +272,7 @@ declare module "@stella/view" {
   export type Context<T> = { Provider: HostComponent<{ value: T; children?: Child }> };
   export function createContext<T>(defaultValue: T): Context<T>;
   export function useContext<T>(context: Context<T>): T;
-  export function memo<P>(component: Component<P>, equal?: (a: P, b: P) => boolean): Component<P>;
+  export function memo<P>(component: Component<P>, equal?: (a: P, b: P) => boolean): (props: P & { key?: Key }) => Element;
 
   // ---------------------------------------------------------------- Stella hooks
   /** A value saved with the view: it survives restarts and edits, and syncs to the user's devices. */

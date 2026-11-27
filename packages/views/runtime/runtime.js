@@ -554,6 +554,8 @@ const __sv_main = (() => {
   const clearTimeout = (id) => {
     timers.delete(id);
   };
+  // Intervals share the timer ids, so clearing one is the same call.
+  const clearInterval = clearTimeout;
 
   let frameCallbacks = [];
   let frameRequested = false;
@@ -795,7 +797,7 @@ const __sv_main = (() => {
     restore = input.restore || {};
     const module = { exports: {} };
     try {
-      factory(requireModule, module.exports, module, consoleShim, stella, setTimeout, clearTimeout, setInterval, clearTimeout, requestAnimationFrame, cancelAnimationFrame, h, FRAGMENT, hookKey);
+      factory(requireModule, module.exports, module, consoleShim, stella, setTimeout, clearTimeout, setInterval, clearInterval, requestAnimationFrame, cancelAnimationFrame, h, FRAGMENT, hookKey);
       const exported = module.exports;
       root = typeof exported === "function" ? exported : exported.default || exported.App || null;
       if (typeof root !== "function") throw new Error("A view must `export default` its root component.");

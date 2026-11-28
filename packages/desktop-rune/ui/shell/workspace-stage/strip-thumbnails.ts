@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { useEffect, useRef, useState } from "react";
 import { useDriveFileVersion } from "@/features/cloud/drive-file-versions";
 import { driveFileLink } from "@/features/cloud/CloudFileSource";
+import { onPhone, phoneDrivePicture } from "../phone";
 
 const EDGE_PX = 120;
 const MAX_KEPT = 600;
@@ -55,9 +56,13 @@ const pdfThumb = async (filePath: string): Promise<string | null> => {
   }
 };
 
-const driveThumb = async (drivePath: string): Promise<string | null> => {
+const driveThumb = async (kind: StripThumbKind, drivePath: string): Promise<string | null> => {
   const host = window.electronAPI?.chatEvidence;
-  if (!host?.driveCards) return null;
+  if (!host?.driveCards) {
+    // The phone has no evidence host: a picture shows from its Files tab's cache, or the file itself.
+    if (!onPhone() || kind !== "image") return null;
+    return phoneDrivePicture(drivePath) ?? (await driveFileLink(drivePath)).url;
+  }
   const link = await driveFileLink(drivePath);
   const [card] = await host.driveCards([{ drivePath: link.path, url: link.url, sizeBytes: link.sizeBytes, contentType: link.contentType, version: link.version }]);
   return card?.thumbnail ?? null;
@@ -160,7 +165,7 @@ export const useStripThumbnail = (kind: StripThumbKind, filePath: string, wanted
 
 export const useDriveStripThumbnail = (kind: StripThumbKind, drivePath: string, wanted: boolean): string | null => {
   const version = useDriveFileVersion(wanted ? drivePath : null);
-  return useThumb(wanted && version !== null ? driveKeyOf(kind, drivePath, version ?? "") : null, () => driveThumb(drivePath));
+  return useThumb(wanted && version !== null ? driveKeyOf(kind, drivePath, version ?? "") : null, () => driveThumb(kind, drivePath));
 };
 
 /** Height over width of a `data:image/png` thumbnail, from its IHDR. */

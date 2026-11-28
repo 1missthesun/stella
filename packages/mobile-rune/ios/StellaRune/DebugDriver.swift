@@ -63,6 +63,19 @@ enum DebugDriver {
           app.inject(id: 9002, phase: i == steps ? 2 : 1, at: CGPoint(x: x + dx * f, y: y + dy * f))
         }
       }
+    case "/pinch":
+      // Two fingers about (x, y) moving from `from` to `to` points apart, horizontally.
+      let x = num("x", 214), y = num("y", 400), a = num("from", 60), b = num("to", 200), ms = max(16, num("ms", 400))
+      let steps = max(2, Int(ms / 8))
+      app.inject(id: 9003, phase: 0, at: CGPoint(x: x - a / 2, y: y))
+      app.inject(id: 9004, phase: 0, at: CGPoint(x: x + a / 2, y: y))
+      for i in 1...steps {
+        let f = Double(i) / Double(steps), d = a + (b - a) * f
+        DispatchQueue.main.asyncAfter(deadline: .now() + ms / 1000 * f) {
+          app.inject(id: 9003, phase: i == steps ? 2 : 1, at: CGPoint(x: x - d / 2, y: y))
+          app.inject(id: 9004, phase: i == steps ? 2 : 1, at: CGPoint(x: x + d / 2, y: y))
+        }
+      }
     case "/type":
       (firstResponder(in: app) as? UIKeyInput)?.insertText(q["text"] ?? "")
     case "/paste":
@@ -79,6 +92,11 @@ enum DebugDriver {
       Menus.shared.debugPick(Int(num("pick", 0)))
     case "/dark":
       App.shared.window?.overrideUserInterfaceStyle = q["on"] == "1" ? .dark : .light
+    case "/a11y":
+      // Reduce Transparency (glass solid) as the system setting would, for measurements.
+      if let h = app.host { sme_accessibility(h, q["rt"] == "1", false, false); app.wake() }
+    case "/blur":
+      app.endEditing(true)
     case "/perf":
       if let label = q["start"] { App.shared.command(["cmd": "perf.start", "label": label]) }
       if let label = q["stop"] { App.shared.command(["cmd": "perf.stop", "label": label]) }

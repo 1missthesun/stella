@@ -39,6 +39,9 @@ export type ScrollPos = { x: number; y: number; maxX: number; maxY: number; view
 /** `onBackdrop`: perceptual (sRGB) luminance behind a glass element and its standard deviation, 0..1. */
 export type Backdrop = { lum: number; contrast: number };
 export type Drag = { phase: "start" | "move" | "end"; dx: number; dy: number; x: number; y: number };
+export type EdgeDrag = Drag & { edge: "left" | "right"; cancelled: boolean };
+/** A two-finger pinch (or a trackpad pinch, or Ctrl + wheel when `wheel`): scale by `1 + delta` about `x`, `y`, the fingers' midpoint in the element's own points. */
+export type Magnify = { phase: "start" | "move" | "end"; delta: number; x: number; y: number; wheel: boolean };
 
 /** A Liquid Glass lens: refracts and lenses what is painted behind the element, with a bevelled rim catching the light. */
 export type Glass = {
@@ -158,6 +161,19 @@ export type BoxProps = {
   motion?: { dur?: number; bounce?: number };
   /** Animate layout changes on a spring of this duration (s). */
   layout?: number;
+  /**
+   * Rides the phone's keyboard, applied by the engine on every display frame (no TS round trip).
+   * With `kb` the keyboard's overlap with the window: `lift` moves it up by `max(0, kb - lift)`,
+   * `pad` = `[min, add]` sets its bottom padding to `max(kb, min) + add`, `fade` fades it out over
+   * the keyboard's first `fade` points. No effect on desktops.
+   */
+  keyboard?: { lift?: number; slack?: number; pad?: [number, number]; fade?: number };
+  /**
+   * Zones (points in from the window's left and right edges) where a finger that first moves
+   * away from that edge drives `onEdgeDrag`, ahead of the scroll view under it (a phone's swipe
+   * to open a drawer). A row that scrolls sideways keeps its own pan.
+   */
+  edgeDrag?: { left?: number; right?: number };
   enter?: Presence; exit?: Presence;
   loop?: Loop;
   /** Changes inside land at once (search results). */
@@ -225,6 +241,10 @@ export type BoxProps = {
   onDropFiles?: (paths: string[]) => void;
   onDropHover?: (over: boolean) => void;
   onDrag?: (d: Drag) => void;
+  /** A swipe from an `edgeDrag` zone: `edge` is the edge it moves away from. */
+  onEdgeDrag?: (d: EdgeDrag) => void;
+  /** A pinch over this element; while one runs it stays with this element. */
+  onMagnify?: (m: Magnify) => void;
   /** A ref gives the host instance (`HostElement`): `nodeId(ref)` is its engine node, and `ref.current.set({...})` changes props without a React render. */
   ref?: React.Ref<unknown>;
 };

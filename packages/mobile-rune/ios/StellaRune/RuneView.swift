@@ -18,6 +18,8 @@ final class RuneView: UIView {
   private(set) var frames = 0
   private(set) var frameCpuUs: [UInt64] = []
   private(set) var frameTimes: [CFTimeInterval] = []
+  /// Per recorded frame: the keyboard overlap drawn, the focused field's bottom, the real keyboard's top.
+  private(set) var frameKb: [[Double]] = []
   var recording = false
 
   override init(frame: CGRect) {
@@ -71,19 +73,24 @@ final class RuneView: UIView {
 
   @objc private func tick(_ l: CADisplayLink) {
     guard let host else { return }
+    KeyboardWatch.shared.frameDuration = l.targetTimestamp - l.timestamp
+    KeyboardWatch.shared.frame(host)
     let f = sme_frame(host)
     if f.drew {
       frames += 1
       if recording {
         frameCpuUs.append(f.cpu_us)
         frameTimes.append(l.timestamp)
+        #if STELLA_DEV
+        frameKb.append([Double(KeyboardWatch.shared.liveValue), Double(NativeFields.shared.focusedBottom ?? -1), Double(KeyboardWatch.shared.realKeyboardTop())])
+        #endif
       }
       if !drewFirst {
         drewFirst = true
         onFirstFrame?()
       }
     }
-    if !f.animating && !recording {
+    if !f.animating && !recording && !KeyboardWatch.shared.moving {
       l.isPaused = true
       if f.wake_after >= 0 {
         wakeTimer?.invalidate()
@@ -95,6 +102,7 @@ final class RuneView: UIView {
   func resetRecording() {
     frameCpuUs.removeAll()
     frameTimes.removeAll()
+    frameKb.removeAll()
   }
 
   override func layoutSubviews() {

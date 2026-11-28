@@ -142,7 +142,8 @@ function Panel({ open, width, insets }: { open: boolean; width: number; insets: 
         scrollY
         px={GUTTER}
         pt={insets.top + BRAND_TOP}
-        pb={Math.max(insets.bottom, insets.keyboard) + 24}
+        pb={insets.bottom + 24}
+        keyboard={{ pad: [insets.bottom, 24] }}
         enter={slide}
         exit={{ opacity: 0, dur: 0.12 }}
       >

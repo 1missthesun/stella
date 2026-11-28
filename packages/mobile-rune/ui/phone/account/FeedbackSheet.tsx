@@ -90,7 +90,7 @@ function FeedbackForm({ insets, onClose }: { insets: PhoneInsets; onClose: () =>
   const off = sending || !trimmed;
 
   return (
-    <col grow={1} minH={0} pb={Math.max(insets.bottom, insets.keyboard)}>
+    <col grow={1} minH={0} pb={insets.bottom} keyboard={{ pad: [insets.bottom, 0] }}>
       <row align="center" justify="between" px={20} py={14} borderSides={[0, 0, 1, 0]} border={c.border} shrink={false}>
         <text role="heading" {...F.title} color={c.text}>
           {t("shell.sidebar.feedback.title")}

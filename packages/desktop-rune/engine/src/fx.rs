@@ -389,8 +389,13 @@ fn layer_slot(id: u32, i: usize, s: &FxSpec, p: &Props) -> El {
     if s.backdrop() {
         e = e.effect_backdrop(true);
     }
-    if matches!(s.effect, Effect::Glass { .. }) {
+    if let Effect::Glass { lens, morph, .. } = &s.effect {
         e = e.effect_bleed(GLASS_BLEED);
+        // A lens reads the page only around itself (its rim bend and frost); a morphing one is
+        // drawn between two rects, so it keeps the whole copy.
+        if morph.is_none() && lens.magnification >= 1.0 {
+            e = crate::windows::backdrop_reach(e, GLASS_BLEED + 4.0 * lens.frost_blur_pt() + 16.0);
+        }
     }
     // A fade would draw the lens in a layer of its own, with no backdrop to bend; the morph is
     // its entrance.

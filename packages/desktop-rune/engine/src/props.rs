@@ -197,6 +197,62 @@ pub struct ModalP {
     pub live_pages: bool,
 }
 
+/// Follows the phone's keyboard as it moves, applied by the engine on each display frame (no TS
+/// round trip), so what rides it stays locked to the keyboard. `kb` = the keyboard's overlap with
+/// the window (points, 0 on desktops):
+/// - `lift`: moves the element up by `max(0, kb - lift)` (added to `y`), less what `slack` takes;
+/// - `slack`: with `lift`, up to this much of that move becomes bottom padding instead (the empty
+///   space under a short chat, so its messages stay put while the composer rises);
+/// - `pad`: `[min, add]` makes its bottom padding `max(kb, min) + add`;
+/// - `fade`: fades it out over the keyboard's first `fade` points.
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct KeyboardP {
+    pub lift: Option<f32>,
+    /// With `lift`: empty space at the bottom of the content the keyboard takes first, by
+    /// padding (the element shrinks from below), before what is left lifts it.
+    pub slack: Option<f32>,
+    pub pad: Option<[f32; 2]>,
+    pub fade: Option<f32>,
+}
+
+/// `edgeDrag`: zones (points in from the window's left and right edges) where a finger that
+/// first moves away from that edge drives the element's `onEdgeDrag`, ahead of the scroll view
+/// under it (a phone's swipe to open a drawer). A row that scrolls sideways keeps its own pan.
+#[derive(Clone, Copy, Debug, Default, Deserialize, PartialEq)]
+#[serde(default)]
+pub struct EdgeDragP {
+    pub left: Option<f32>,
+    pub right: Option<f32>,
+}
+
+impl KeyboardP {
+    /// The props with the keyboard's current overlap applied.
+    pub fn apply(&self, p: &Props, kb: f32) -> Props {
+        let mut out = p.clone();
+        out.keyboard = None;
+        if let Some(base) = self.lift {
+            let over = (kb - base).max(0.0);
+            let take = over.min(self.slack.unwrap_or(0.0).max(0.0));
+            if take > 0.0 {
+                out.pb = Some(p.pb.unwrap_or(0.0) + take);
+            }
+            out.y = Some(p.y.unwrap_or(0.0) - (over - take));
+        }
+        if let Some([min, add]) = self.pad {
+            out.pb = Some(kb.max(min) + add);
+        }
+        if let Some(range) = self.fade.filter(|r| *r > 0.0) {
+            let k = (1.0 - kb / range).clamp(0.0, 1.0);
+            out.opacity = Some(p.opacity.unwrap_or(1.0) * k);
+            if k <= 0.0 {
+                out.inert = true;
+            }
+        }
+        out
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize)]
 pub struct MotionP {
     #[serde(default = "dur_default")]
@@ -511,6 +567,10 @@ pub struct Props {
     pub origin: Option<[f32; 2]>,
     pub motion: Option<MotionP>,
     pub layout: Option<f32>,
+    /// Rides the phone's keyboard frame by frame (`KeyboardP`).
+    pub keyboard: Option<KeyboardP>,
+    /// Edge swipe zones for `onEdgeDrag` (`EdgeDragP`).
+    pub edge_drag: Option<EdgeDragP>,
     pub enter: Option<PresenceP>,
     pub exit: Option<PresenceP>,
     #[serde(rename = "loop")]

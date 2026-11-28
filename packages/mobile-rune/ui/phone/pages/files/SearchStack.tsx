@@ -4,7 +4,6 @@ import { Icon, type IconData } from "../../../../../desktop-rune/ui/kit";
 import { menuSurface } from "../../../../../desktop-rune/ui/kit/Menu";
 import { alpha, layer, useTokens } from "../../../../../desktop-rune/ui/theme";
 import { AdaptiveGlass, chromeGlass, GlassSheen, useGlassBackdrop } from "../../../../../desktop-rune/ui/shell/glass";
-import { usePhoneInsets } from "../../insets";
 import { glyph } from "../../icons";
 import { rt, useRn } from "../../rn";
 import type { SortOrder, SourceFilter } from "./model";
@@ -107,11 +106,9 @@ export function SearchStack({
   const t = useTokens();
   const c = useRn();
   const tr = useT();
-  const keyboard = usePhoneInsets().keyboard;
   const [menuOpen, setMenuOpen] = useState(false);
   const glass = chromeGlass(t);
   const narrowed = source !== "all" || sort !== "newest";
-  const lift = Math.max(0, keyboard - bottom);
   const groups: Choice[][] = [
     [
       { id: "all", label: sourceLabel("all"), selected: source === "all", onPress: () => onSource("all") },
@@ -124,7 +121,7 @@ export function SearchStack({
     ],
   ];
   return (
-    <row id="phone-files-search-stack" absolute={{ left: 24, right: 24, bottom: bottom + 4 }} h={SEARCH_HEIGHT} gap={10} align="center" y={-lift} motion={{ dur: 0.25, bounce: 0 }}>
+    <row id="phone-files-search-stack" absolute={{ left: 24, right: 24, bottom: bottom + 4 }} h={SEARCH_HEIGHT} gap={10} align="center" keyboard={{ lift: bottom }}>
       <row id="phone-files-search" grow={1} minW={0} h={SEARCH_HEIGHT} px={16} gap={10} align="center" radius={SEARCH_HEIGHT / 2} fx={glass.composer.fx} fill={glass.composer.fill} border={glass.composer.border}>
         <Icon icon={glyph("search")} size={16} color={c.textMuted} />
         {/* The phone's fields are native views laid over the page; one on a tab in the background would show through, so it is there only while Files is. */}

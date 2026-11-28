@@ -161,6 +161,10 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
     let p = if closing {
         held = closing_props(id, &n.props);
         &held
+    } else if let Some(k) = n.props.keyboard {
+        crate::windows::note_keyboard_rider(id);
+        held = k.apply(&n.props, crate::windows::keyboard_live());
+        &held
     } else {
         &*n.props
     };
@@ -314,6 +318,31 @@ pub fn handlers(mut e: El, n: u32, p: &Props, is_input: bool) -> El {
             }),
             "dropHover" => e.on_drop_hover(move |_s: &mut Win, over: bool, tx: &mut Tx| element_event(n, "dropHover", json!({ "over": over }), Some(tx))),
             "link" => e.on_link(move |_s: &mut Win, href: &str, tx: &mut Tx| element_event(n, "link", json!({ "href": href }), Some(tx))),
+            "edgeDrag" => {
+                let zones = p.edge_drag.unwrap_or_default();
+                let mut e = e;
+                for (edge, width, side) in [(rune::SwipeEdge::Left, zones.left, "left"), (rune::SwipeEdge::Right, zones.right, "right")] {
+                    let Some(width) = width else { continue };
+                    e = e.on_edge_drag(edge, width, move |_s: &mut Win, d: &mut rune::Drag, tx: &mut Tx| {
+                        let phase = match d.phase {
+                            rune::Phase::Down => "start",
+                            rune::Phase::Move => "move",
+                            rune::Phase::Up => "end",
+                        };
+                        element_event(n, "edgeDrag", json!({ "phase": phase, "dx": d.dx, "dy": d.dy, "x": d.x, "y": d.y, "edge": side, "cancelled": d.cancelled() }), Some(tx))
+                    });
+                }
+                e
+            }
+            "magnify" => e.on_magnify(move |_s: &mut Win, m: rune::MagnifyEvent, tx: &mut Tx| {
+                let phase = match m.phase {
+                    rune::GesturePhase::Began => "start",
+                    rune::GesturePhase::Moved => "move",
+                    rune::GesturePhase::Ended => "end",
+                };
+                element_event(n, "magnify", json!({ "phase": phase, "delta": m.delta, "x": m.x, "y": m.y, "wheel": m.wheel }), Some(tx));
+                true
+            }),
             "drag" => e.on_drag(move |_s: &mut Win, d: &mut rune::Drag, tx: &mut Tx| {
                 let phase = match d.phase {
                     rune::Phase::Down => "start",

@@ -249,10 +249,18 @@ pub extern "C" fn sme_set_dark(h: *mut Host, dark: bool) {
     }
 }
 
-/// The keyboard's height over the window, in points (0 when hidden).
+/// Where the keyboard is headed (its overlap with the window once it settles, in points; 0
+/// hidden). Call as a keyboard move starts; TS hears it.
 #[unsafe(no_mangle)]
 pub extern "C" fn sme_keyboard(_h: *mut Host, height: f32) {
     windows::set_keyboard(height);
+}
+
+/// Where the keyboard is on the frame about to be drawn (points), from the display link right
+/// before `sme_frame`; elements with a `keyboard` prop follow it within that frame.
+#[unsafe(no_mangle)]
+pub extern "C" fn sme_keyboard_frame(_h: *mut Host, height: f32) {
+    windows::set_keyboard_live(height);
 }
 
 /// A touch: phase 0 began, 1 moved, 2 ended, 3 cancelled; `x`,`y` in points; `time` seconds.

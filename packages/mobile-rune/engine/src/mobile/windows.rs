@@ -108,6 +108,10 @@ thread_local! {
     static SYSTEM_DARK: std::cell::Cell<Option<bool>> = const { std::cell::Cell::new(None) };
     static SAFE: std::cell::Cell<[f32; 4]> = const { std::cell::Cell::new([0.0; 4]) };
     static KEYBOARD: std::cell::Cell<f32> = const { std::cell::Cell::new(0.0) };
+    /// Where the keyboard is on the frame being built (KEYBOARD is where it is headed, for TS).
+    static KEYBOARD_LIVE: std::cell::Cell<f32> = const { std::cell::Cell::new(0.0) };
+    /// Elements with a `keyboard` prop, rebuilt whenever the live keyboard moves.
+    static RIDERS: std::cell::RefCell<std::collections::HashSet<u32>> = std::cell::RefCell::new(std::collections::HashSet::new());
     static A11Y: std::cell::Cell<[bool; 3]> = const { std::cell::Cell::new([false; 3]) };
 }
 
@@ -140,13 +144,57 @@ fn note_state(_node: u32, dark: bool, safe: [f32; 4], a11y: [bool; 3]) {
     }
 }
 
-/// The keyboard's height over the window (points), from the app's keyboard notifications.
+/// Where the keyboard is headed: its overlap with the window (points) once its animation ends,
+/// from the app's keyboard notifications. TS hears it once per move, as it starts.
 pub fn set_keyboard(h: f32) {
     if KEYBOARD.with(|k| k.replace(h)) != h {
         let mut ev = appearance();
         ev["t"] = json!("appearance");
         engine::send(ev);
     }
+}
+
+/// Where the keyboard is on the frame about to be drawn, set by the app's display link just
+/// before `sme_frame`: elements with a `keyboard` prop follow it in that same frame.
+pub fn set_keyboard_live(h: f32) {
+    if KEYBOARD_LIVE.with(|k| k.replace(h)) == h {
+        return;
+    }
+    let riders: Vec<u32> = RIDERS.with(|r| r.borrow().iter().copied().collect());
+    if riders.is_empty() {
+        return;
+    }
+    let gone: Vec<u32> = engine::with(|e| {
+        let mut gone = Vec::new();
+        for id in riders {
+            if e.tree.get(id).is_some_and(|n| n.props.keyboard.is_some()) {
+                e.tree.touch(id);
+            } else {
+                gone.push(id);
+            }
+        }
+        gone
+    });
+    RIDERS.with(|r| gone.iter().for_each(|id| {
+        r.borrow_mut().remove(id);
+    }));
+    mark_dirty();
+}
+
+pub fn keyboard_live() -> f32 {
+    KEYBOARD_LIVE.with(|k| k.get())
+}
+
+/// Limits an effect slot's backdrop copy to its rect grown by `pt` points: a lens reads only
+/// its neighbourhood, and a full 3× copy per glass element is most of a frame's GPU time.
+pub fn backdrop_reach(e: rune::El, pt: f32) -> rune::El {
+    e.effect_backdrop_reach(pt)
+}
+
+pub fn note_keyboard_rider(id: u32) {
+    RIDERS.with(|r| {
+        r.borrow_mut().insert(id);
+    });
 }
 
 pub fn on_key(s: &mut Win, ev: &rune::KeyEvent, tx: &mut Tx) -> bool {

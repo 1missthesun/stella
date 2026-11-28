@@ -1,4 +1,5 @@
-import { memo, useEffect, useState, type ReactNode } from "react";
+import { memo, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
+import { setChatCovered, setPhoneSafeTop } from "../../../desktop-rune/ui/shell/phone";
 import { useT } from "@/shared/i18n";
 import { Icon, RetainedSurface } from "../../../desktop-rune/ui/kit";
 import { alpha, useTokens } from "../../../desktop-rune/ui/theme";
@@ -10,7 +11,7 @@ import { glyph, tabIcon } from "./icons";
 import { PhoneViewScreen } from "./ViewScreen";
 import { GlassCircle, BRAND_TOP, BRAND_ROW, TEXT, useRn } from "./rn";
 import { StatusPill } from "./StatusPill";
-import { CLOSE_SPRING, DRAWER_SCALE, drawerProgress, drawerTravel, OPEN_SPRING, panelLook, sideOf, signOf, drawerVeil, setStageBackground, stageFollow, useDrawerHost, useStage, useWindowSize, type Stage } from "./stage";
+import { CLOSE_SPRING, DRAWER_SCALE, drawerProgress, drawerTravel, OPEN_SPRING, panelLook, sideOf, signOf, drawerBlur, drawerVeil, setStageBackground, stageFollow, useDrawerHost, useStage, useWindowSize, type Stage } from "./stage";
 import { AccountPanel } from "./AccountPanel";
 import { ChatSettingsPanel } from "./ChatSettingsPanel";
 import { SchedulePage } from "./pages/SchedulePage";
@@ -44,8 +45,6 @@ const CHEVRON_RAISE = 64;
 export const barPad = (safeBottom: number) => Math.max(safeBottom - 6, 4);
 /** What a page keeps free at its bottom for the bar. */
 export const barBase = (i: PhoneInsets) => BAR_ROW + barPad(i.bottom);
-/** What a page keeps free at its bottom: the bar, or the keyboard once it rises past the bar. */
-export const barSpace = (i: PhoneInsets) => Math.max(i.keyboard, barBase(i));
 /** useTabBottomInset: a tab page's free space at its bottom (the bar and 10 pt over it). */
 export const tabBottomInset = (i: PhoneInsets) => barBase(i) + 10;
 
@@ -111,7 +110,7 @@ function BottomBar({ insets, tab, st }: { insets: PhoneInsets; tab: PhoneTab; st
   // The React Native app's bar: flush with the bottom edge over the app's own background,
   // which fades in over its top 10 points; no glass.
   return (
-    <col id="phone-bottom-bar-dock" fixed absolute={{ left: 0, right: 0, bottom: 0 }} h={BAR_ROW + pad} pb={pad} {...stageFollow(st, st.size.h - (BAR_ROW + pad), BAR_ROW + pad)} raise={SHEET_RAISE + 1} opacity={Math.max(0, 1 - insets.keyboard / (BAR_ROW + pad))} inert={insets.keyboard > 0}>
+    <col id="phone-bottom-bar-dock" fixed absolute={{ left: 0, right: 0, bottom: 0 }} h={BAR_ROW + pad} pb={pad} {...stageFollow(st, st.size.h - (BAR_ROW + pad), BAR_ROW + pad)} raise={SHEET_RAISE + 1} keyboard={{ fade: BAR_ROW + pad }} inert={insets.keyboard > 0}>
       <box absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} gradient={{ angle: 180, stops: [[0, alpha(bg, 0)], [BAR_FADE / (BAR_ROW + pad), bg], [1, bg]] }} />
       <row id="phone-bottom-bar" role="tablist" w="full" maxW={BAR_MAX_W} selfAlign="center" h={BAR_ROW} px={34} align="center" justify="center">
         {PHONE_TABS.map((id) => {
@@ -271,12 +270,30 @@ function Drawers({ insets }: { insets: PhoneInsets }) {
 /** Paints over the page and its chrome (the bars, the tab pages) while a drawer is out (DrawerStage's veil). */
 const VEIL_RAISE = 60;
 const STRIP_VEIL = 0.9;
+/** The page's blur with a drawer open, in points (packages/mobile's PAGE_BLUR intensity 30). */
+const PAGE_BLUR = 8;
 
 /** The page's veil: the app's background over the page as it moves aside, which a tap or a drag on closes the drawer from. Fixed, so it carries the page's transform itself. */
 function StageVeil({ st }: { st: Stage }) {
   const bg = useTokens().c.background;
   if (!st.live) return null;
   return (
+    <>
+    {/* packages/mobile's page blur (DrawerStage's AnimatedBlur under the veil): the page and its
+        bars blurred as they move aside, deepening on drawerBlur's curve. */}
+    <box
+      id="phone-stage-blur"
+      fixed
+      inset={0}
+      raise={VEIL_RAISE}
+      x={st.x}
+      scale={st.scale}
+      radius={st.radius}
+      backdropBlur={PAGE_BLUR}
+      opacity={drawerBlur(st.v)}
+      motion={st.motion}
+      inert
+    />
     <box
       id="phone-stage-veil"
       fixed
@@ -299,6 +316,7 @@ function StageVeil({ st }: { st: Stage }) {
           : undefined
       }
     />
+    </>
   );
 }
 
@@ -311,6 +329,9 @@ export const ShellTopBarFull = memo(function PhoneChrome(_props: { onSignIn?: ()
   const st = useStage();
   const bg = useTokens().c.background;
   useEffect(() => setStageBackground(bg), [bg]);
+  // A tab page is opaque over the chat: the chat isn't drawn under it.
+  useLayoutEffect(() => setChatCovered(tab !== "chat"), [tab]);
+  useLayoutEffect(() => setPhoneSafeTop(insets.top), [insets.top]);
   // The chat-settings drawer belongs to the chat; leaving it closes the drawer (RN's MainLayout).
   useEffect(() => {
     if (tab !== "chat" && phoneNav.get().drawer === "chat-settings") phoneNav.closeDrawer();

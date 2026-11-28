@@ -5,7 +5,7 @@ import { glyph } from "../../icons";
 import { rt, useRn } from "../../rn";
 import type { ThumbnailKind } from "./model";
 import { TextThumbnail } from "./TextThumbnail";
-import { useFileThumbnail } from "./thumbnails";
+import { useFileThumbnail, useThumbnailFade } from "./thumbnails";
 
 // packages/mobile's files/FileThumbnail: a picture fills its frame; a document is a white sheet
 // rising from the frame's bottom (a slide deck's sheet sits whole in the middle), showing its
@@ -37,6 +37,7 @@ export const FileThumbnail = memo(function FileThumbnail({ kind, drivePath, vers
   const row = size === "row";
   const state = useFileThumbnail(kind, drivePath ?? "", version, extension, wanted);
   const thumbnail = state.status === "ready" ? state.thumbnail : null;
+  const fade = useThumbnailFade(state.status === "ready");
   const radius = row ? 10 : 18;
   const fill = frameFill(c.text, c.dark);
 
@@ -44,7 +45,7 @@ export const FileThumbnail = memo(function FileThumbnail({ kind, drivePath, vers
     const still = thumbnail?.kind === "image" ? thumbnail : null;
     return (
       <box w={width} h={height} radius={radius} clip={radius} fill={fill} shrink={false}>
-        {still ? <image src={still.path} w={width} h={height} fit="cover" enter={{ opacity: 0, dur: 0.14 }} /> : state.status === "none" ? <Extension extension={extension} row={row} /> : null}
+        {still ? <image src={still.path} w={width} h={height} fit="cover" enter={fade} /> : state.status === "none" ? <Extension extension={extension} row={row} /> : null}
         {kind === "video" && still ? (
           <box absolute={{ left: row ? 4 : 10, bottom: row ? 4 : 10 }} w={row ? 18 : 28} h={row ? 18 : 28} radius={row ? 9 : 14} center fill="rgba(0,0,0,0.5)">
             <Icon icon={glyph("play")} size={row ? 9 : 13} color="#ffffff" />
@@ -71,7 +72,7 @@ export const FileThumbnail = memo(function FileThumbnail({ kind, drivePath, vers
           {text !== null ? (
             <TextThumbnail text={text} extension={extension} width={pageWidth} />
           ) : still ? (
-            <image src={still.path} w={sheetWidth} h={sheetHeight} fit="cover" enter={{ opacity: 0, dur: 0.14 }} />
+            <image src={still.path} w={sheetWidth} h={sheetHeight} fit="cover" enter={fade} />
           ) : blank ? (
             <Extension extension={extension} row={row} onPage />
           ) : null}

@@ -32,6 +32,10 @@ final class NativeFields: NSObject, UITextViewDelegate, UITextFieldDelegate {
   }
 
   private var fields: [UInt32: Field] = [:]
+  /// Whether one of the fields is being edited (has the keyboard).
+  var editing: Bool { fields.values.contains { $0.view.isFirstResponder } }
+  /// The focused field's bottom edge (points), as placed for the frame being drawn.
+  var focusedBottom: CGFloat? { fields.values.first { $0.view.isFirstResponder }?.view.frame.maxY }
   private var byView: [ObjectIdentifier: UInt32] = [:]
 
   func handle(_ m: [String: Any]) {

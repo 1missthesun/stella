@@ -1,6 +1,7 @@
 import { useChatStorageMode, selectPrivateConversation } from "@/features/chat/services/chat-storage-preference";
 import { Outlet, useMatchRoute, useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, useSyncExternalStore, type RefObject } from "react";
+import { isChatCovered, subscribeChatCovered } from "../../shell/phone";
 import { ChatRuntimeProvider } from "@/context/chat-runtime";
 import { ChatMessageAlerts } from "@/features/chat-alerts/ChatMessageAlerts";
 import { FirstReplyCounter } from "@/features/anonymous-counts/FirstReplyCounter";
@@ -549,6 +550,7 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
 
   const onShellLayout = useCallback((r: { w: number }) => shellBreakpointStore.setWidth(r.w), []);
 
+  const chatCovered = useSyncExternalStore(subscribeChatCovered, isChatCovered, isChatCovered);
   return (
     <>
       <CompanionBridge conversationId={conversationId} />
@@ -561,7 +563,7 @@ function RootChrome({ conversationId }: { conversationId: string | null }) {
 
       <col id="content-area" grow={1} minW={0} h="full" onLayout={onShellLayout}>
         <box absolute={{ left: 0, top: 0, right: 0 }} h={SHELL_TOPBAR_HEIGHT} windowDrag />
-        <col id="persistent-chat-surface" absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} hidden={!isOnChatRoute}>
+        <col id="persistent-chat-surface" absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} hidden={!isOnChatRoute || chatCovered}>
           <ChatColumn
             conversation={chat.conversation}
             composer={chat.composer}

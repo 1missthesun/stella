@@ -1,6 +1,7 @@
-import { useEffect, useSyncExternalStore } from "react";
+import { useEffect, useRef, useSyncExternalStore } from "react";
 import { backendClient } from "@/platform/backend/backend-client";
 import type { ThumbnailKind } from "./model";
+import { setPhoneDrivePictures } from "../../../../../desktop-rune/ui/shell/phone";
 
 // packages/mobile's file-thumbnails in Rune: a Drive file's picture, page preview or opening text,
 // fetched once per version into the app's caches and kept across launches. Pictures are files on
@@ -55,6 +56,12 @@ const stored = (thumbnail: Thumbnail): Stored =>
   thumbnail.kind === "image" ? { kind: "image", file: thumbnail.path.slice(thumbnail.path.lastIndexOf("/") + 1) } : thumbnail;
 
 const restored = (thumbnail: Stored): Thumbnail => (thumbnail.kind === "image" ? { kind: "image", path: `${folder()}/${thumbnail.file}` } : thumbnail);
+
+/** The picture this cache keeps for a Drive image, if any (the file viewer's strip shows it). */
+export const keptDrivePicture = (drivePath: string): string | null => {
+  const known = keptEntries().get(`image|${drivePath}`)?.thumbnail;
+  return known?.kind === "image" ? `${folder()}/${known.file}` : null;
+};
 
 const keep = (id: string, version: number, thumbnail: Thumbnail) => {
   const entries = keptEntries();
@@ -185,6 +192,14 @@ const stateOf = (id: string, version: number): ThumbnailState => {
  * A Drive file's thumbnail. It loads once `wanted` (the file's row is near the screen), and what
  * loaded before shows at once, so a tile scrolled back to never flashes empty.
  */
+const FADE_IN = { opacity: 0, dur: 0.14 } as const;
+
+/** The fade for a thumbnail's picture: only when it arrives while its row is on screen. A row the
+ * list mounts again as it scrolls (its overscan) shows its picture at once, without a flash. */
+export function useThumbnailFade(ready: boolean): typeof FADE_IN | undefined {
+  return useRef(!ready).current ? FADE_IN : undefined;
+}
+
 export function useFileThumbnail(kind: ThumbnailKind, drivePath: string, version: number, extension: string, wanted: boolean): ThumbnailState {
   const id = `${kind}|${drivePath}`;
   const loadable = kind === "image" || kind === "html" || kind === "text";
@@ -195,3 +210,5 @@ export function useFileThumbnail(kind: ThumbnailKind, drivePath: string, version
   }, [drivePath, extension, kind, loadable, version, wanted]);
   return state;
 }
+
+setPhoneDrivePictures(keptDrivePicture);

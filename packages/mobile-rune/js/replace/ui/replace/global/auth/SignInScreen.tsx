@@ -72,10 +72,11 @@ export function SignInScreen() {
   const google = nativeSignIn?.google ?? null;
   const busy = pending !== null;
   const muted = tokens.c.mutedForeground;
-  const bottom = Math.max(insets.bottom, insets.keyboard) + 16;
+  // Above the keyboard, moving with it frame by frame (the engine applies `keyboard`).
+  const bottom = insets.bottom + 16;
 
   return (
-    <col id="phone-sign-in" fixed inset={0} fill={tokens.c.background} pt={insets.top} pb={bottom} px={SIDE}>
+    <col id="phone-sign-in" fixed inset={0} fill={tokens.c.background} pt={insets.top} pb={bottom} keyboard={{ pad: [insets.bottom, 16] }} px={SIDE}>
       <col w="full" grow={1} minH={180} justify="center" gap={14} py={24}>
         <text role="heading" {...look(36, 600, { lh: 42 / 36, em: -2 / 36, family: font.display })} color={tokens.c.textStrong}>
           {t("mobile.login.heroTitle")}

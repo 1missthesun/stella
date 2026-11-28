@@ -28,6 +28,8 @@ void sme_resize(SmeHost *h, float w, float ht, float scale);
 void sme_safe_area(SmeHost *h, float top, float right, float bottom, float left);
 void sme_set_dark(SmeHost *h, bool dark);
 void sme_keyboard(SmeHost *h, float height);
+/// Where the keyboard is on the frame about to be drawn (points); call right before sme_frame.
+void sme_keyboard_frame(SmeHost *h, float height);
 /** Reduce Transparency (glass turns solid), Increase Contrast, Reduce Motion. */
 void sme_accessibility(SmeHost *h, bool reduce_transparency, bool increase_contrast, bool reduce_motion);
 void sme_touch(SmeHost *h, uint64_t id, uint32_t phase, float x, float y, double time);

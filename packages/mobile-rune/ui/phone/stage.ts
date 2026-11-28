@@ -40,6 +40,20 @@ export function drawerVeil(v: number): number {
   return t * t * (3 - 2 * t) * 0.92 + t * 0.08;
 }
 
+/** packages/mobile's drawerBlur: the page's blur over its progress, a third of the way in by 0.15 and full at 0.9. */
+export function drawerBlur(v: number): number {
+  const knee = 0.15;
+  const kneeAmount = 0.38;
+  const end = 0.9;
+  if (v <= 0) return 0;
+  if (v >= end) return 1;
+  if (v <= knee) {
+    const t = 1 - v / knee;
+    return kneeAmount * (1 - t * t * t);
+  }
+  return kneeAmount + (1 - kneeAmount) * Math.pow((v - knee) / (end - knee), 1.5);
+}
+
 export const clamp01 = (v: number) => Math.max(0, Math.min(1, v));
 
 /** Where the page sits at progress `v`. */

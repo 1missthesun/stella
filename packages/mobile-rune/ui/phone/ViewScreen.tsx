@@ -109,7 +109,8 @@ export function PhoneViewScreen({ width, insets, raise, BackButton }: { width: n
       inert={!isOpen}
       hidden={!current}
       pt={insets.top}
-      pb={Math.max(insets.bottom, insets.keyboard)}
+      pb={insets.bottom}
+      keyboard={{ pad: [insets.bottom, 0] }}
       pl={insets.left}
       pr={insets.right}
     >

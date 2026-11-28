@@ -1,5 +1,6 @@
 import { createContext, memo, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type ReactNode } from "react";
 import { ChatVariantContext, type ChatVariant } from "./chat-text";
+import { chatFit } from "./chat-at-end";
 import type { ChatListBinding } from "./use-chat-scroll-management";
 import { buildChatTimelineItems, type ChatTimelineItem } from "@/features/chat/lib/chat-timeline-items";
 import { timestampHeaders } from "@/features/chat/lib/message-time-labels";
@@ -321,6 +322,7 @@ export const ChatTimeline = memo(function ChatTimeline({
   const underGlass = useContext(UnderGlassContext);
   const contextVariant = useContext(ChatVariantContext);
   const surfaceVariant = variant ?? contextVariant;
+  const mainChat = surfaceVariant !== "sidebar";
   const maxW = contentMaxWidth(contentContainerStyle);
   const scrollId = list?.scrollId;
 
@@ -358,6 +360,7 @@ export const ChatTimeline = memo(function ChatTimeline({
       justify="center"
       align="center"
       {...status}
+      onSize={mainChat ? (r) => { chatFit.view = r.h; chatFit.content = 0; } : undefined}
       onLayout={() => {
         laidOutRef.current = true;
         markReady();
@@ -377,12 +380,13 @@ export const ChatTimeline = memo(function ChatTimeline({
       selectionGroup
       scrollFade={underGlass ? undefined : { top: { size: SESSION_TOP_FADE, linear: true }, ...(padding.pb > 0 ? { bottom: { size: padding.pb, stops: SESSION_END_FADE_STOPS } } : {}) }}
       onScroll={list?.onScroll}
+      onSize={mainChat ? (r) => { chatFit.view = r.h; } : undefined}
       onLayout={() => {
         laidOutRef.current = true;
         markReady();
       }}
     >
-      <col w="full" maxW={maxW} selfAlign="center" {...(alignItemsAtEnd ? { minH: "full", justify: "end" } : {})} {...padding}>
+      <col w="full" maxW={maxW} selfAlign="center" {...(alignItemsAtEnd ? { minH: "full", justify: "end" } : {})} {...padding} onSize={mainChat ? (r) => { chatFit.content = r.h; } : undefined}>
         {children}
       </col>
     </col>

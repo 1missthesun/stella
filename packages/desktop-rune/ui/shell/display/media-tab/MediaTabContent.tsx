@@ -1,4 +1,5 @@
-import { useCallback, useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import type { Drag, Magnify } from "../../../../host/rune-jsx/props";
 import type { MediaAsset } from "@stella/contracts/desktop/display-payload";
 import { displayTabs } from "@/features/workspace-display/tab-store";
 import { fileViewer } from "@/features/workspace-display/file-viewer-store";
@@ -97,7 +98,8 @@ function ImageView({ filePaths, viewer, prompt, onSwipe }: { filePaths: string[]
   const tk = useTokens();
   const { files, error, missing, missingMessages } = useDisplayFileBlobs(filePaths, "Media preview requires the Electron host runtime.");
   const [activeIndex, setActiveIndex] = useState(0);
-  const [zoomed, setZoomed] = useState(false);
+  const zoom = useImageZoom(activeIndex);
+  const zoomed = zoom.view.scale > 1;
   const safeIndex = Math.max(0, Math.min(activeIndex, files.length - 1));
   const active = files[safeIndex];
   const path = filePaths[safeIndex] ?? "";
@@ -116,13 +118,28 @@ function ImageView({ filePaths, viewer, prompt, onSwipe }: { filePaths: string[]
           clip={6}
           center
           cursor={zoomed ? "grab" : "default"}
-          onDoublePress={() => setZoomed((z) => !z)}
+          onSize={zoom.onFrame}
+          onDoublePress={zoom.toggle}
+          onMagnify={zoom.onMagnify}
           onDrag={(d) => {
-            if (zoomed || d.phase !== "end" || Math.abs(d.dx) < 80 || Math.abs(d.dx) < Math.abs(d.dy)) return;
+            if (zoom.onDrag(d) || d.phase !== "end" || Math.abs(d.dx) < 80 || Math.abs(d.dx) < Math.abs(d.dy)) return;
             onSwipe(d.dx < 0 ? "next" : "previous");
           }}
         >
-          <image src={active.url} fit="contain" maxW="full" maxH="full" selfAlign="center" radius={6} scale={zoomed ? 2 : 1} motion={{ dur: 0.22 }} />
+          <image
+            src={active.url}
+            fit="contain"
+            maxW="full"
+            maxH="full"
+            selfAlign="center"
+            radius={6}
+            onSize={zoom.onImage}
+            scale={zoom.view.scale}
+            x={zoom.view.x}
+            y={zoom.view.y}
+            motion={ZOOM_GLIDE}
+            instant={zoom.live}
+          />
         </box>
       ) : missing[safeIndex] ? (
         <EmptyState motif="unavailable" title={t("shell.display.media.imageUnavailable")} body={missingMessages[safeIndex] ?? `${filenameOf(path)} was moved or deleted.`} />
@@ -155,6 +172,97 @@ function ImageView({ filePaths, viewer, prompt, onSwipe }: { filePaths: string[]
       ) : null}
     </col>
   );
+}
+
+const ZOOM_MAX = 5;
+const ZOOM_DOUBLE = 2.5;
+const ZOOM_GLIDE = { dur: 0.3, bounce: 0 };
+type ZoomView = { scale: number; x: number; y: number };
+type Size = { w: number; h: number };
+const FIT: ZoomView = { scale: 1, x: 0, y: 0 };
+
+/** Keeps a zoomed image covering its middle: it can't be panned past its own edges. */
+const clampPan = (v: ZoomView, image: Size | null): ZoomView => {
+  if (!image || v.scale <= 1) return { ...v, x: 0, y: 0 };
+  const mx = ((v.scale - 1) * image.w) / 2;
+  const my = ((v.scale - 1) * image.h) / 2;
+  return { scale: v.scale, x: Math.max(-mx, Math.min(mx, v.x)), y: Math.max(-my, Math.min(my, v.y)) };
+};
+
+/** Pinch to zoom about the fingers, pan a zoomed image with one finger, double-tap to zoom in and back (packages/mobile's image viewer). */
+function useImageZoom(resetKey: unknown) {
+  const [view, setView] = useState<ZoomView>(FIT);
+  const [live, setLive] = useState(false);
+  const frame = useRef<Size>({ w: 0, h: 0 });
+  const image = useRef<Size | null>(null);
+  const current = useRef(view);
+  current.current = view;
+  const pinching = useRef(false);
+  const panFrom = useRef<ZoomView | null>(null);
+
+  useEffect(() => {
+    setView(FIT);
+    setLive(false);
+  }, [resetKey]);
+
+  const settle = (v: ZoomView) => {
+    setLive(false);
+    setView(v.scale <= 1.02 ? FIT : clampPan({ ...v, scale: Math.min(ZOOM_MAX, v.scale) }, image.current));
+  };
+
+  const onMagnify = (m: Magnify) => {
+    const v = current.current;
+    if (m.phase === "start") {
+      pinching.current = true;
+      panFrom.current = null;
+      setLive(true);
+    }
+    if (m.delta) {
+      // The image sits in the frame's middle and scales about its own middle: keep the point under the fingers there.
+      const scale = Math.max(0.6, Math.min(ZOOM_MAX * 1.25, v.scale * (1 + m.delta)));
+      const fx = m.x - frame.current.w / 2;
+      const fy = m.y - frame.current.h / 2;
+      const k = scale / v.scale;
+      const next = { scale, x: fx - (fx - v.x) * k, y: fy - (fy - v.y) * k };
+      current.current = next;
+      if (m.wheel) settle(next);
+      else setView(next);
+    }
+    if (m.phase === "end") {
+      pinching.current = false;
+      settle(current.current);
+    }
+  };
+
+  /** Pans a zoomed image; returns whether it took the drag (an image at its fit leaves it for swiping between files). */
+  const onDrag = (d: Drag): boolean => {
+    if (pinching.current) return true;
+    if (d.phase === "start") {
+      panFrom.current = current.current.scale > 1 ? current.current : null;
+      if (panFrom.current) setLive(true);
+      return Boolean(panFrom.current);
+    }
+    const from = panFrom.current;
+    if (!from) return false;
+    const next = clampPan({ scale: from.scale, x: from.x + d.dx, y: from.y + d.dy }, image.current);
+    if (d.phase === "end") {
+      panFrom.current = null;
+      settle(next);
+    } else {
+      current.current = next;
+      setView(next);
+    }
+    return true;
+  };
+
+  const toggle = () => setView((v) => (v.scale > 1 ? FIT : { scale: ZOOM_DOUBLE, x: 0, y: 0 }));
+  const onFrame = (s: Size) => {
+    frame.current = s;
+  };
+  const onImage = (s: Size) => {
+    image.current = s;
+  };
+  return { view, live, onMagnify, onDrag, toggle, onFrame, onImage };
 }
 
 /** A video or audio whose surface is hidden stops playing, as the viewer pauses its media when it isn't shown. */
@@ -320,7 +428,9 @@ export const MediaTabContent = ({ item }: { item: MediaTabItem }) => {
     displayTabs.closeTab(item.id);
     fileViewer.closeItem(item.id);
   }, [item.id]);
-  const inViewer = useContext(ViewerItemContext) === item.id;
+  // A Drive file's tab is its local item's id behind `drive:` (payload-to-tab-spec's cloud spec).
+  const viewerItem = useContext(ViewerItemContext);
+  const inViewer = viewerItem === item.id || viewerItem === `drive:${item.id}`;
   useViewerMediaActions(item, remove);
 
   if (inViewer) {

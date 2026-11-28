@@ -249,7 +249,9 @@ pub extern "system" fn Java_com_stella_rune_Engine_nativeSetDark(_env: JNIEnv, _
 
 #[unsafe(no_mangle)]
 pub extern "system" fn Java_com_stella_rune_Engine_nativeKeyboard(_env: JNIEnv, _class: JClass, h: jlong, height: jfloat) {
+    // Android's shell reports the keyboard as it moves: both where it is and (for TS) where it goes.
     ffi::sme_keyboard(host(h), height);
+    ffi::sme_keyboard_frame(host(h), height);
 }
 
 #[unsafe(no_mangle)]

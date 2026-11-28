@@ -45,6 +45,11 @@ final class App {
     rune.onFirstFrame = { [weak self] in
       self?.firstFrameMs = (CACurrentMediaTime() - processStart) * 1000
       AppLog.shared.write("info", String(format: "first frame %.1f ms after process start", self?.firstFrameMs ?? 0))
+      // Once launch has settled, and only if nothing has taken focus by then.
+      DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+        guard let w = self?.window, !NativeFields.shared.editing else { return }
+        KeyboardWatch.shared.prewarm(in: w)
+      }
     }
     rune.start(dark: dark)
     js.onAppCommand = { [weak self] m in self?.command(m) }
@@ -148,7 +153,7 @@ final class App {
     var gaps: [Double] = []
     for i in 1..<max(1, times.count) { gaps.append((times[i] - times[i - 1]) * 1000) }
     let cpu = r.frameCpuUs.map { Double($0) / 1000 }
-    let obj: [String: Any] = ["label": label, "frames": times.count, "gapsMs": gaps, "cpuMs": cpu, "rssMB": Memory.residentMB()]
+    let obj: [String: Any] = ["label": label, "frames": times.count, "gapsMs": gaps, "cpuMs": cpu, "kb": r.frameKb, "rssMB": Memory.residentMB()]
     if let d = try? JSONSerialization.data(withJSONObject: obj) {
       let url = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("perf-\(label).json")
       try? d.write(to: url)
@@ -206,79 +211,151 @@ enum Haptics {
   }
 }
 
-/// The keyboard's overlap with the window, for the composer to sit on it. It moves with the
-/// keyboard rather than jumping: a hidden probe view runs UIKit's own keyboard animation (its
-/// duration and curve), and each display frame hands the probe's in-flight value to Rune.
+/// The keyboard's overlap with the window, for the composer to sit on it, moving in lockstep with
+/// the keyboard. A hidden probe view runs UIKit's own keyboard animation (its duration and curve);
+/// Rune's display link reads the probe on every tick, right before it draws, and hands the engine
+/// where the keyboard will be when that frame reaches the screen (`sme_keyboard_frame`). Elements
+/// riding the keyboard (`keyboard` props) move within that same frame, with no TS round trip,
+/// so nothing trails the keyboard by a frame or two. TS hears where the keyboard is headed once
+/// per move (`sme_keyboard`), as it starts.
 final class KeyboardWatch {
   static let shared = KeyboardWatch()
   private let probe = UIView(frame: .zero)
-  private var link: CADisplayLink?
-  private var sent: CGFloat = 0
+  private var target: CGFloat = 0
+  private var live: CGFloat = 0
   private var until: CFTimeInterval = 0
+  /// Seconds between Rune's frames, for how far ahead of now the probe runs.
+  var frameDuration: CFTimeInterval = 1.0 / 120
+
+  /// Whether a keyboard move is in flight (Rune's display link keeps ticking until it lands).
+  var moving: Bool { CACurrentMediaTime() < until }
 
   func start() {
     probe.isHidden = true
     probe.isUserInteractionEnabled = false
     NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillChangeFrameNotification, object: nil, queue: .main) { [weak self] n in
-      guard let end = (n.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue, let w = App.shared.window else { return }
-      self?.move(to: max(0, w.bounds.maxY - end.minY), n.userInfo, in: w)
+      guard let self, !self.warming, let end = (n.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? NSValue)?.cgRectValue, let w = App.shared.window else { return }
+      self.move(to: max(0, w.bounds.maxY - end.minY), n.userInfo, in: w)
     }
     NotificationCenter.default.addObserver(forName: UIResponder.keyboardWillHideNotification, object: nil, queue: .main) { [weak self] n in
-      guard let w = App.shared.window else { return }
-      self?.move(to: 0, n.userInfo, in: w)
+      guard let self, !self.warming, let w = App.shared.window else { return }
+      self.move(to: 0, n.userInfo, in: w)
     }
+  }
+
+  private var warming = false
+
+  /// UIKit builds the keyboard (its window, layouts and key views, ~100 ms on the main thread)
+  /// the first time anything takes focus, which held the first tap on the composer back that
+  /// long. Built once while the app sits idle after launch, by focusing a field that is never
+  /// seen and letting go in the same turn, before anything is drawn.
+  func prewarm(in window: UIWindow) {
+    let field = UITextField(frame: CGRect(x: -100, y: -100, width: 10, height: 10))
+    field.autocorrectionType = .no
+    window.addSubview(field)
+    warming = true
+    UIView.performWithoutAnimation {
+      field.becomeFirstResponder()
+      field.resignFirstResponder()
+    }
+    field.removeFromSuperview()
+    DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) { self.warming = false }
   }
 
   private func move(to overlap: CGFloat, _ info: [AnyHashable: Any]?, in window: UIWindow) {
     if probe.superview !== window { window.addSubview(probe) }
+    let end = max(0, overlap.rounded())
+    if end != target, let h = App.shared.rune?.host {
+      target = end
+      sme_keyboard(h, Float(end))
+    }
     let dur = (info?[UIResponder.keyboardAnimationDurationUserInfoKey] as? Double) ?? 0
     let curve = (info?[UIResponder.keyboardAnimationCurveUserInfoKey] as? UInt) ?? 7
     guard dur > 0 else {
       probe.layer.removeAllAnimations()
-      probe.frame = CGRect(x: 0, y: overlap, width: 1, height: 1)
-      send(overlap)
+      probe.frame = CGRect(x: 0, y: end, width: 1, height: 1)
+      until = CACurrentMediaTime() + 0.05
+      App.shared.rune?.wake()
       return
     }
     UIView.animate(withDuration: dur, delay: 0, options: [UIView.AnimationOptions(rawValue: curve << 16), .beginFromCurrentState]) {
-      self.probe.frame = CGRect(x: 0, y: overlap, width: 1, height: 1)
+      self.probe.frame = CGRect(x: 0, y: end, width: 1, height: 1)
     }
-    // What the probe reads reaches the screen a couple of frames later (Rune lays out on the next
-    // frame after JS hears it), so the probe runs the keyboard's own animation that far ahead.
-    let frame = link.map { $0.targetTimestamp - $0.timestamp } ?? (1.0 / Double(max(60, window.screen.maximumFramesPerSecond)))
-    let lead = 2 * max(frame, 1.0 / 120)
-    let now = probe.layer.convertTime(CACurrentMediaTime(), from: nil)
+    // A frame drawn on a tick is committed then, composited by the render server on the next
+    // refresh and shown on the one after: two frames on, which is when the keyboard's own
+    // animation (evaluated by the render server for the frame it shows) will be where we draw. So
+    // the probe runs the keyboard's animation two frames ahead. It starts in the keyboard's own
+    // transaction (begin time left to the commit, which can land tens of milliseconds after this
+    // notification while UIKit sets the keyboard up) and only its local clock is ahead.
+    let lead = 2 * max(frameDuration, 1.0 / 120)
     for key in probe.layer.animationKeys() ?? [] {
       guard let a = probe.layer.animation(forKey: key)?.mutableCopy() as? CAAnimation else { continue }
-      a.beginTime = now - lead
+      a.timeOffset = lead
       probe.layer.add(a, forKey: key)
     }
     until = CACurrentMediaTime() + dur + 0.05
-    if link == nil {
-      let l = CADisplayLink(target: self, selector: #selector(tick))
-      l.preferredFrameRateRange = CAFrameRateRange(minimum: 80, maximum: 120, preferred: 120)
-      l.add(to: .main, forMode: .common)
-      link = l
-    }
-  }
-
-  @objc private func tick() {
-    // Until the animation is committed there is no presentation layer; the model value then is
-    // where the keyboard ends up, not where it is.
-    if let y = probe.layer.presentation()?.frame.minY { send(y) }
-    if CACurrentMediaTime() >= until {
-      send(probe.frame.minY)
-      link?.invalidate()
-      link = nil
-    }
-  }
-
-  private func send(_ overlap: CGFloat) {
-    let v = max(0, overlap.rounded())
-    guard v != sent, let h = App.shared.rune?.host else { return }
-    sent = v
-    sme_keyboard(h, Float(v))
     App.shared.rune?.wake()
   }
+
+  /// Rune's display link, right before `sme_frame`: where the keyboard will be when this frame shows.
+  func frame(_ host: OpaquePointer) {
+    let y: CGFloat
+    if moving {
+      // Until the animation is committed there is no presentation layer; the model value then is
+      // where the keyboard ends up, not where it is: keep the last value for that tick.
+      guard let p = probe.layer.presentation()?.frame.minY else { return }
+      // An animation run ahead by `timeOffset` wraps back to its start for its last `timeOffset`
+      // (Core Animation plays offset → end, then start → offset): past its end, it has landed.
+      if landed() { y = probe.frame.minY } else { y = p }
+    } else {
+      y = probe.frame.minY
+    }
+    let v = max(0, y.rounded())
+    guard v != live else { return }
+    live = v
+    sme_keyboard_frame(host, Float(v))
+  }
+
+  private func landed() -> Bool {
+    let now = probe.layer.convertTime(CACurrentMediaTime(), from: nil)
+    for key in probe.layer.animationKeys() ?? [] {
+      // Not yet given its start by the commit: still to run.
+      guard let a = probe.layer.animation(forKey: key), a.beginTime > 0 else { return false }
+      if now - a.beginTime + a.timeOffset < a.duration { return false }
+    }
+    return true
+  }
+  var liveValue: CGFloat { live }
+
+  #if STELLA_DEV
+  private weak var keyboardHost: UIView?
+  /// The system keyboard's top edge on screen right now (its in-process host view's presentation), for sync measurements.
+  func realKeyboardTop() -> CGFloat {
+    if keyboardHost?.window == nil {
+      keyboardHost = nil
+      var all: [UIWindow] = []
+      for scene in UIApplication.shared.connectedScenes {
+        guard let ws = scene as? UIWindowScene else { continue }
+        all += ws.windows
+      }
+      all += UIApplication.shared.windows
+      for w in all where w !== App.shared.window {
+        if let v = Self.find(in: w) { keyboardHost = v; break }
+      }
+    }
+    guard let v = keyboardHost, let w = v.window else { return -1 }
+    let f = v.layer.presentation()?.frame ?? v.frame
+    let r = (v.superview ?? w).convert(f, to: nil)
+    return r.minY
+  }
+
+  private static func find(in v: UIView) -> UIView? {
+    let name = NSStringFromClass(type(of: v))
+    if name.contains("UIKeyboardItemContainerView") { return v }
+    for s in v.subviews { if let f = find(in: s) { return f } }
+    return nil
+  }
+  #endif
 }
 
 enum AppFonts {

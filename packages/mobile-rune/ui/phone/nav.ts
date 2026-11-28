@@ -49,6 +49,19 @@ export const phoneNav = {
     if (!nav.drawer) return;
     set({ drag: Math.max(0, toward) });
   },
+  /** A finger swiping a drawer open from the page (packages/mobile's open pan): it starts shut, `travel` from open, and follows the finger with `dragDrawer`. */
+  swipeDrawer: (drawer: Exclude<PhoneDrawer, null>, travel: number) => {
+    if (settleTimer) clearTimeout(settleTimer);
+    settleTimer = null;
+    set({ drawer, shown: drawer, drag: travel });
+  },
+  /** The swiping finger lifted, moving at `velocity` points a second toward open: open past half the travel (a flick carries a fifth of a second ahead), else shut. */
+  releaseSwipe: (travel: number, velocity: number) => {
+    if (!nav.drawer) return;
+    const progress = 1 - (nav.drag ?? 0) / travel;
+    if (progress + (velocity / travel) * 0.2 > 0.5) set({ drag: null });
+    else close();
+  },
   /** The finger lifted: shut past a third of the travel, else spring back open. */
   releaseDrawer: (travel: number) => {
     if (!nav.drawer) return;

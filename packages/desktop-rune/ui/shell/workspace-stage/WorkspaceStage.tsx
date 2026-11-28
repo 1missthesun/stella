@@ -26,6 +26,7 @@ import { DropdownMenu, Icon, Icons, ManualCopyField, MenuItem, MenuSeparator, Re
 import { look, mixOklch, useTokens, derive, type Tokens } from "../../theme";
 import { useHostWindows, HostWindow } from "../../host/HostWindows";
 import { SHELL_TOPBAR_HEIGHT } from "../metrics";
+import { onPhone, usePhoneSafeTop } from "../phone";
 import { TopInsetContext } from "../top-inset";
 import { useWindowKeys } from "../window-keys";
 import { addContextMenu } from "../../replace/platform/context-menu/context-menu";
@@ -213,6 +214,8 @@ function ViewerHeader({ item, placement, width, onDrag, onDetach, onClose, onDoc
   const [armed, setArmed] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const idBase = `file-viewer-${placement === "window" ? "window" : "docked"}`;
+  // The phone's top sheet closes by a tap outside it or a swipe up, and is never a floating or full-stage viewer.
+  const phone = onPhone();
 
   useEffect(() => {
     setStatus(null);
@@ -299,7 +302,7 @@ function ViewerHeader({ item, placement, width, onDrag, onDetach, onClose, onDoc
       ...(detached
         ? [{ label: t("contextMenu.dockViewer"), run: () => onDock?.() }]
         : [
-            { label: stage ? t("contextMenu.shrinkViewer") : t("contextMenu.expandViewer"), run: () => fileViewer.toggleMode() },
+            ...(phone ? [] : [{ label: stage ? t("contextMenu.shrinkViewer") : t("contextMenu.expandViewer"), run: () => fileViewer.toggleMode() }]),
             ...(onDetach ? [{ label: t("contextMenu.detachViewer"), run: onDetach }] : []),
           ]),
       { label: t("contextMenu.closeViewer"), run: onClose },
@@ -320,10 +323,10 @@ function ViewerHeader({ item, placement, width, onDrag, onDetach, onClose, onDoc
       gap={8}
       pl={detached && window.electronAPI?.platform === "darwin" ? 78 : 14}
       pr={6}
-      cursor={stage || detached ? undefined : "grab"}
+      cursor={stage || detached || phone ? undefined : "grab"}
       windowDrag={detached || undefined}
       onDrag={onDrag}
-      onDoublePress={detached ? undefined : () => fileViewer.toggleMode()}
+      onDoublePress={detached || phone ? undefined : () => fileViewer.toggleMode()}
     >
       <DisplayTabIcon kind={item.kind} size={15} color={tk.c.textWeak} />
       <text {...look(12, 600)} color={tk.c.textStrong} nowrap truncate shrink minW={0} maxW={34 * 7} title={title}>
@@ -419,8 +422,8 @@ function ViewerHeader({ item, placement, width, onDrag, onDetach, onClose, onDoc
             ) : null}
           </DropdownMenu>
         ) : null}
-        <box w={1} h={16} mx={4} fill={l.divider} />
-        {detached ? (
+        {phone ? null : <box w={1} h={16} mx={4} fill={l.divider} />}
+        {phone ? null : detached ? (
           <HeaderButton id={`${idBase}-dock`} label={t("contextMenu.dockViewer")} onPress={() => onDock?.()} icon={DockIcon} />
         ) : (
           <>
@@ -433,7 +436,7 @@ function ViewerHeader({ item, placement, width, onDrag, onDetach, onClose, onDoc
             />
           </>
         )}
-        {detached && window.electronAPI?.platform === "darwin" ? null : (
+        {phone || (detached && window.electronAPI?.platform === "darwin") ? null : (
           <HeaderButton id={`${idBase}-close`} label="Close" {...(detached ? {} : { shortcut: "Esc" })} onPress={onClose} icon={withStroke(Icons.stella.X, 1.75)} size={16} />
         )}
       </row>
@@ -680,6 +683,94 @@ function DockedViewer({ item: docked, carried, bodies, hiddenForExclusiveTab }: 
   );
 }
 
+// The phone's viewer is a top sheet (packages/mobile TopSheet): it slides down from the top of the
+// screen over the top bar to 80% of the screen's height, over a 40% black scrim. Its top edge sits a
+// corner's radius above the screen, so only the bottom corners show round. A tap on the scrim
+// or a swipe up on its header closes it; a downward pull gives a little.
+const SHEET_HEIGHT = 0.8;
+const SHEET_RADIUS = 26;
+const SHEET_SCRIM = 0.4;
+// Over the phone's tab pages (40), bars (41), view screen (42), drawer veil (60) and chevron (64).
+const SHEET_RAISE = 70;
+const SHEET_OPEN = { dur: 0.3, bounce: 0 };
+const SHEET_CLOSE = { dur: 0.22, bounce: 0 };
+const SHEET_DISMISS = 56;
+const SHEET_SHADOW_CLEARANCE = 40;
+
+function PhoneSheetViewer({ item, bodies }: { item: DisplayTab | null; bodies: PlacedBody[] }) {
+  const t = useTokens();
+  const l = stageLook(t);
+  const geo = useGeometry();
+  const safeTop = usePhoneSafeTop();
+  const open = Boolean(item);
+  // The sheet keeps showing what it closed on while it slides away.
+  const last = useRef<DisplayTab | null>(item);
+  if (item) last.current = item;
+  const gone = useDelayedHidden(open, 260);
+  const shown = item ?? (gone ? null : last.current);
+  const [pull, setPull] = useState<number | null>(null);
+  const height = Math.round(geo.viewportHeight * SHEET_HEIGHT);
+  const away = -(height + SHEET_RADIUS + SHEET_SHADOW_CLEARANCE);
+  const placed = shown && !item ? bodies.map((body) => (body.item.id === shown.id ? { ...body, active: true } : body)) : bodies;
+
+  const onPull = (d: DragEvent) => {
+    if (d.phase === "start") {
+      setPull(0);
+      return;
+    }
+    if (d.phase === "end" || d.phase === "cancel") {
+      setPull(null);
+      if (d.dy < -SHEET_DISMISS) fileViewer.close();
+      return;
+    }
+    setPull(d.dy < 0 ? d.dy : d.dy * 0.15);
+  };
+
+  return (
+    <>
+      <box
+        id="file-viewer-scrim"
+        fixed
+        inset={0}
+        fill="#000000"
+        opacity={open ? SHEET_SCRIM : 0}
+        motion={open ? SHEET_OPEN : SHEET_CLOSE}
+        raise={SHEET_RAISE}
+        hidden={gone}
+        inert={!open}
+        role="button"
+        label="Close"
+        onPress={() => fileViewer.close()}
+      />
+      <col
+        id="file-viewer-docked"
+        role="dialog"
+        label={shown?.title}
+        fixed
+        absolute={{ left: 0, right: 0, top: -SHEET_RADIUS }}
+        h={height + SHEET_RADIUS}
+        pt={SHEET_RADIUS + safeTop}
+        y={open ? (pull ?? 0) : away}
+        enter={{ y: away }}
+        motion={pull !== null ? undefined : open ? SHEET_OPEN : SHEET_CLOSE}
+        instant={pull !== null}
+        raise={SHEET_RAISE + 1}
+        fill={t.c.background}
+        border={l.edge}
+        radius={SHEET_RADIUS}
+        clip={SHEET_RADIUS}
+        shadows={[{ y: 10, blur: 24, color: "rgba(0,0,0,0.18)" }]}
+        hidden={gone}
+        inert={!open}
+        onContextMenu={shown ? (at) => itemMenu(shown.id, at) : undefined}
+      >
+        {shown ? <ViewerHeader item={shown} placement="float" width={geo.viewportWidth} onDrag={onPull} onDetach={null} onClose={() => fileViewer.close()} /> : null}
+        <ViewerMain item={shown} bodies={placed} surface={DOCKED} wide={false} idBase="file-viewer-docked" />
+      </col>
+    </>
+  );
+}
+
 function DetachedViewerFrame({ name, item, bodies }: { name: string; item: DisplayTab; bodies: PlacedBody[] }) {
   const t = useTokens();
   const windows = useHostWindows();
@@ -829,7 +920,7 @@ function Viewers({ hiddenForExclusiveTab }: { hiddenForExclusiveTab: boolean }) 
 
   return (
     <>
-        {hasDocked ? <DockedViewer item={item} carried={carried} bodies={bodies} hiddenForExclusiveTab={hiddenForExclusiveTab} /> : null}
+        {hasDocked ? onPhone() ? <PhoneSheetViewer item={item} bodies={bodies} /> : <DockedViewer item={item} carried={carried} bodies={bodies} hiddenForExclusiveTab={hiddenForExclusiveTab} /> : null}
         {detached.map(({ name, fileId: id }) => {
           const shown = itemOf(id);
           return shown && detachedWindows.has(name) ? (

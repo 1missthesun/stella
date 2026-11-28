@@ -252,7 +252,7 @@ function serialize(inst: Instance, reactProps: Record<string, any>): string {
  *  pointer motion and scrolling batch per task, and everything the engine reports by itself
  *  (layout, scroll position, page state) waits for the next default render. */
 const DISCRETE = new Set(["press", "doublePress", "dismiss", "input", "submit", "key", "keyRaw", "paste", "link", "linkContextMenu", "contextMenu", "dropFiles", "focus", "focusWithin", "selection"]);
-const CONTINUOUS = new Set(["hover", "scroll", "wheel", "pointer", "dropHover", "drag"]);
+const CONTINUOUS = new Set(["hover", "scroll", "wheel", "pointer", "dropHover", "drag", "edgeDrag", "magnify"]);
 
 let pressKeys = false;
 

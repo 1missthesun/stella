@@ -190,6 +190,8 @@ pub fn run(st: &mut Win, tx: &mut Tx, rid: Option<u64>, v: Value) {
                 if v.get("y").and_then(|y| y.as_str()) == Some("end") {
                     if v.get("animate").and_then(|a| a.as_bool()) == Some(false) {
                         tx.scroll_to_bottom_instant(key);
+                    } else if let Some(d) = f(&v, "spring").filter(|d| *d > 0.0) {
+                        tx.scroll_to_bottom_with(key, rune::Spring::new(d, 0.0));
                     } else {
                         tx.scroll_to_bottom(key);
                     }

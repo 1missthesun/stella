@@ -13,6 +13,9 @@ import { rune as engine } from "./engine";
 import { chatAtEnd } from "./chat-at-end";
 import { onPhone } from "../shell/phone";
 
+/** The response (seconds) of the spring a phone glides to the latest message on. */
+const PHONE_JUMP_SPRING = 0.2;
+
 
 const SCROLL_BUTTON_THRESHOLD = 180;
 const THUMB_MIN_HEIGHT = 24;
@@ -307,7 +310,8 @@ export function useChatScrollManagement({
       },
       scrollToEnd: async ({ animated = true } = {}) => {
         markProgrammatic();
-        await engine().scroll.to(scrollId, "end", { animate: animated });
+        // A phone's jump to latest lands as quickly as UIKit's animated scroll does.
+        await engine().scroll.to(scrollId, "end", { animate: animated, ...(onPhone() ? { spring: PHONE_JUMP_SPRING } : {}) });
       },
       scrollToOffset: async ({ offset, animated = false }: { offset: number; animated?: boolean }) => {
         markProgrammatic();

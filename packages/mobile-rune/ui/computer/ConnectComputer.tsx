@@ -159,9 +159,10 @@ function ConnectComputerSheet({ initialCode }: { initialCode: string | null }) {
   };
 
   const ink = tokens.dark ? "#000000" : "#ffffff";
-  const bottom = Math.max(insets.bottom, insets.keyboard) + 16;
+  // Above the keyboard, moving with it frame by frame (the engine applies `keyboard`).
+  const bottom = insets.bottom + 16;
   return (
-    <col id="phone-p2p-connect" role="dialog" fixed inset={0} raise={200} fill={tokens.c.background} pt={insets.top} pb={bottom} px={SIDE}>
+    <col id="phone-p2p-connect" role="dialog" fixed inset={0} raise={200} fill={tokens.c.background} pt={insets.top} pb={bottom} keyboard={{ pad: [insets.bottom, 16] }} px={SIDE}>
       <row w="full" h={52} align="center" ml={-10}>
         <box id="phone-p2p-back" role="button" label={t("mobile.selfHost.back")} w={BUTTON} h={BUTTON} radius={BUTTON / 2} center pressFill={alpha(tokens.c.foreground, 0.08)} onPress={busy ? undefined : connectComputer.close}>
           <Icon icon={Icons.stella.ChevronLeft} size={22} color={tokens.c.foreground} />

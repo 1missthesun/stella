@@ -1084,3 +1084,17 @@ pub fn first_window() -> Option<u32> {
     engine::read(|e| e.main_node.or_else(|| e.windows.keys().min().copied()))
 }
 
+
+/// The phone keyboard's live overlap (props `keyboard`): desktops have none.
+pub fn keyboard_live() -> f32 {
+    0.0
+}
+
+/// Limits an effect slot's backdrop copy to its neighbourhood on the phone (whose Rune has
+/// `El::effect_backdrop_reach`); desktops copy the whole target.
+pub fn backdrop_reach(e: rune::El, _pt: f32) -> rune::El {
+    e
+}
+
+/// An element riding the phone's keyboard: nothing to follow on desktops.
+pub fn note_keyboard_rider(_id: u32) {}

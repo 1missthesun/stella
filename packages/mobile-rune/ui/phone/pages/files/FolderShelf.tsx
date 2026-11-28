@@ -4,7 +4,7 @@ import { GUTTER, PRESS, rt, useRn } from "../../rn";
 import { frameFill } from "./FileThumbnail";
 import type { FolderEntry, FolderPeek } from "./model";
 import { TextThumbnail } from "./TextThumbnail";
-import { useFileThumbnail } from "./thumbnails";
+import { useFileThumbnail, useThumbnailFade } from "./thumbnails";
 
 // packages/mobile's files/FolderShelf: the open folder's subfolders in a sideways row, each a soft
 // well with up to three of its files fanned out as small pages, its name and its file count.
@@ -30,7 +30,8 @@ const EXTENSION = rt(11, 700, -0.2);
 function Peek({ peek, front }: { peek: FolderPeek; front: boolean }) {
   const state = useFileThumbnail(peek.kind, peek.drivePath, peek.version, peek.extension, true);
   const thumbnail = state.status === "ready" ? state.thumbnail : null;
-  if (thumbnail?.kind === "image") return <image src={thumbnail.path} w={SHEET_WIDTH} h={SHEET_HEIGHT} fit="cover" enter={{ opacity: 0, dur: 0.14 }} />;
+  const fade = useThumbnailFade(state.status === "ready");
+  if (thumbnail?.kind === "image") return <image src={thumbnail.path} w={SHEET_WIDTH} h={SHEET_HEIGHT} fit="cover" enter={fade} />;
   if (thumbnail?.kind === "text") return <TextThumbnail text={thumbnail.text} extension={peek.extension} width={SHEET_WIDTH} />;
   if (!front) return null;
   return (

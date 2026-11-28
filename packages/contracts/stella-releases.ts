@@ -56,6 +56,26 @@ export const releaseDateLabel = (
 
 export const stellaReleases: readonly StellaRelease[] = [
   {
+    date: "2026-11-28",
+    title: "Stella opens straight away and installs faster",
+    summary: "Opening Stella starts it at once, a new install is ready in about half the time, and Stella can now switch a task to another model mid-way.",
+    tags: ["Polish", "Fixes"],
+    highlights: [
+      { text: "Opening Stella starts it straight away, with no Start button. Quitting Stella closes it fully, and opening it again while it runs brings its window forward.", product: "Launcher" },
+      { text: "A new install is ready in about half the time, and Claude Code and Antigravity come installed with it.", product: "Launcher" },
+      { text: "If Stella ever fails to start after a change, Repair fixes it with the Claude account you chose in Stella and keeps only a fix that works.", product: "Launcher" },
+      "Stella can move a task to another model or engine part-way through and keep its conversation, and the model pickers follow the switch.",
+    ],
+    more: [
+      "A new computer asks for your saved logins only when a task first needs one, and Settings lists synced logins as they arrive.",
+      "Saved logins keep their key when the system keychain is briefly locked or unreadable, and on a Mac Claude Code stays signed in even when the keychain settings were changed.",
+      "On Windows, Stella keeps its own name and icon on the taskbar and in Start after its first notification.",
+      "PDFs in a detached viewer window show crisp text, and the viewer keeps your place when it moves between the window and the chat.",
+      "Signing in to Google for Antigravity no longer shows a warning about account limits.",
+      { text: "Downloads of Stella and its tools come from a faster, cached server.", product: "Launcher" },
+    ],
+  },
+  {
     date: "2026-11-27",
     title: "A much bigger Drive, and a guide to meet Stella",
     summary: "Drive holds up to 2 TB with no file limit, a full Drive no longer stops you sending a photo, and Stella's first message comes with a Meet Stella guide.",

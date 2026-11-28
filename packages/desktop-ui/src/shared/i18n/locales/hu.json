@@ -2248,8 +2248,7 @@
       "antigravityHint": "Gemini a Google-előfizetéseddel",
       "antigravityOpened": "Megnyílt a Google bejelentkezési oldala a böngésződben. Jelentkezz be ott, majd illeszd be a megjelenő kódot.",
       "antigravityCode": "Illeszd be a Google által mutatott kódot",
-      "antigravityPreparing": "A Google Antigravity előkészítése…",
-      "antigravityRisk": "A Google korlátozhatja a felügyelet nélküli munkára használt fiókokat."
+      "antigravityPreparing": "A Google Antigravity előkészítése…"
     },
     "engineModels": {
       "ariaLabel": "{engine} modellek",

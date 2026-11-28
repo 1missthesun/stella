@@ -55,7 +55,6 @@ export function AntigravitySignInPrompt({
           )}
         </T>
       )}
-      {signIn.state === "running" ? <T w="full" {...s.engineConnectPromptHint}>{t(`${K}.antigravityRisk`)}</T> : null}
       {page ? (
         <Input {...s.engineConnectPromptInput} type="text" value={code} onChange={(event) => setCode(event.target.value)} onKeyDown={(event) => {
             if (event.key === "Enter") submit();

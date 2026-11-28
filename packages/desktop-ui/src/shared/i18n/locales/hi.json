@@ -2248,8 +2248,7 @@
       "antigravityHint": "आपके Google प्लान पर Gemini",
       "antigravityOpened": "Google का साइन-इन पेज आपके ब्राउज़र में खुल गया है। वहाँ साइन इन करें, फिर दिखाया गया कोड यहाँ पेस्ट करें।",
       "antigravityCode": "Google का दिखाया कोड पेस्ट करें",
-      "antigravityPreparing": "Google Antigravity तैयार हो रहा है…",
-      "antigravityRisk": "बिना निगरानी के काम में इस्तेमाल होने वाले खातों को Google सीमित कर सकता है।"
+      "antigravityPreparing": "Google Antigravity तैयार हो रहा है…"
     },
     "engineModels": {
       "ariaLabel": "{engine} मॉडल",

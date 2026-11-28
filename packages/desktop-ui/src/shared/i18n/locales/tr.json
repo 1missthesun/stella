@@ -2248,8 +2248,7 @@
       "antigravityHint": "Google planındaki Gemini",
       "antigravityOpened": "Google'ın oturum açma sayfası tarayıcınızda açıldı. Orada oturum açın, sonra gösterdiği kodu yapıştırın.",
       "antigravityCode": "Google'ın gösterdiği kodu yapıştırın",
-      "antigravityPreparing": "Google Antigravity hazırlanıyor…",
-      "antigravityRisk": "Google, gözetimsiz işlerde kullanılan hesapları sınırlayabilir."
+      "antigravityPreparing": "Google Antigravity hazırlanıyor…"
     },
     "engineModels": {
       "ariaLabel": "{engine} modelleri",

@@ -2248,8 +2248,7 @@
       "antigravityHint": "Gemini über dein Google-Abo",
       "antigravityOpened": "Die Anmeldeseite von Google wurde in deinem Browser geöffnet. Melde dich dort an und füge dann den angezeigten Code ein.",
       "antigravityCode": "Den von Google angezeigten Code einfügen",
-      "antigravityPreparing": "Google Antigravity wird vorbereitet…",
-      "antigravityRisk": "Google kann Konten einschränken, die für unbeaufsichtigte Arbeit genutzt werden."
+      "antigravityPreparing": "Google Antigravity wird vorbereitet…"
     },
     "engineModels": {
       "ariaLabel": "{engine}-Modelle",

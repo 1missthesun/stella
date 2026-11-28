@@ -2248,8 +2248,7 @@
       "antigravityHint": "Gemini on your Google plan",
       "antigravityOpened": "Google's sign-in page opened in your browser. Sign in there, then paste the code it shows you.",
       "antigravityCode": "Paste the code Google shows",
-      "antigravityPreparing": "Getting Google Antigravity ready…",
-      "antigravityRisk": "Google may limit accounts used for unattended work."
+      "antigravityPreparing": "Getting Google Antigravity ready…"
     },
     "engineModels": {
       "ariaLabel": "{engine} models",

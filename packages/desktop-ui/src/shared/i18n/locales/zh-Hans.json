@@ -2238,8 +2238,7 @@
       "antigravityHint": "使用你的 Google 方案运行 Gemini",
       "antigravityOpened": "Google 登录页面已在浏览器中打开。请在那里登录，然后粘贴显示的代码。",
       "antigravityCode": "粘贴 Google 显示的代码",
-      "antigravityPreparing": "正在准备 Google Antigravity…",
-      "antigravityRisk": "Google 可能会限制用于无人值守工作的账号。"
+      "antigravityPreparing": "正在准备 Google Antigravity…"
     },
     "engineModels": {
       "ariaLabel": "{engine} 模型",

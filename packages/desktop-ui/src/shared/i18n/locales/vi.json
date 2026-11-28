@@ -2238,8 +2238,7 @@
       "antigravityHint": "Gemini theo gói Google của bạn",
       "antigravityOpened": "Trang đăng nhập của Google đã mở trong trình duyệt. Hãy đăng nhập ở đó rồi dán mã hiển thị.",
       "antigravityCode": "Dán mã Google hiển thị",
-      "antigravityPreparing": "Đang chuẩn bị Google Antigravity…",
-      "antigravityRisk": "Google có thể giới hạn các tài khoản dùng cho công việc không có người giám sát."
+      "antigravityPreparing": "Đang chuẩn bị Google Antigravity…"
     },
     "engineModels": {
       "ariaLabel": "Mô hình {engine}",

@@ -2238,8 +2238,7 @@
       "antigravityHint": "Gemini dengan paket Google Anda",
       "antigravityOpened": "Halaman masuk Google terbuka di browser Anda. Masuk di sana, lalu tempelkan kode yang ditampilkan.",
       "antigravityCode": "Tempelkan kode yang ditampilkan Google",
-      "antigravityPreparing": "Menyiapkan Google Antigravity…",
-      "antigravityRisk": "Google dapat membatasi akun yang dipakai untuk pekerjaan tanpa pengawasan."
+      "antigravityPreparing": "Menyiapkan Google Antigravity…"
     },
     "engineModels": {
       "ariaLabel": "Model {engine}",

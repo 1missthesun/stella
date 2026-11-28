@@ -2258,8 +2258,7 @@
       "antigravityHint": "Gemini con tu plan de Google",
       "antigravityOpened": "La página de inicio de sesión de Google se abrió en tu navegador. Inicia sesión ahí y luego pega el código que te muestra.",
       "antigravityCode": "Pega el código que muestra Google",
-      "antigravityPreparing": "Preparando Google Antigravity…",
-      "antigravityRisk": "Google puede limitar las cuentas usadas para trabajo sin supervisión."
+      "antigravityPreparing": "Preparando Google Antigravity…"
     },
     "engineModels": {
       "ariaLabel": "Modelos de {engine}",

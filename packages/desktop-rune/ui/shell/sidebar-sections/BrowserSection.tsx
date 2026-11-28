@@ -208,7 +208,7 @@ function BrowserTabShell({ tab, active, frozenWidth, others, onLayout, onClose }
       hover={active ? undefined : mixOklch(tk.c.foreground, 5, "transparent")}
       hoverGroup
       enter={{ opacity: 0, y: 3, scale: 0.98, dur: 0.16 }}
-      onLayout={(r) => onLayout(tab.id, r.w)}
+      onSize={(r) => onLayout(tab.id, r.w)}
       onContextMenu={contextMenu(() => {
         const url = normalizedHttpUrl(tab.url ?? "");
         return [
@@ -454,7 +454,7 @@ export function BrowserSection() {
     <col id="browser-section" role="region" label="Browser" grow={1} minW={0} minH={0} clip={0} onLayout={setSurfaceRect}>
       {activeTab ? (
         <>
-          <col id="browser-section-chrome" shrink={false} raise={2} fill={chromeFill} border={tk.c.borderWeak} borderSides={[0, 0, 1, 0]} onLayout={(r) => setChromeWidth(r.w)}>
+          <col id="browser-section-chrome" shrink={false} raise={2} fill={chromeFill} border={tk.c.borderWeak} borderSides={[0, 0, 1, 0]} onSize={(r) => setChromeWidth(r.w)}>
             <row id="browser-section-tabs" role="tablist" label="Browser tabs" align="end" gap={2} minW={0} h={32} pt={4} px={6} scrollX onHover={(inside) => (!inside ? setFrozenWidths(null) : undefined)}>
               {state.tabs.map((tab) => (
                 <BrowserTabShell key={tab.id} tab={tab} active={tab.id === activeTab.id} frozenWidth={frozenWidths?.get(tab.id) ?? null} others={state.tabs.filter((entry) => entry.id !== tab.id)} onLayout={(id, w) => tabWidths.current.set(id, w)} onClose={closeTab} />

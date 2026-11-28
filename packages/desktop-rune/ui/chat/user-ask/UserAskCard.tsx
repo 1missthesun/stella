@@ -40,7 +40,7 @@ export function UserAskFrame({ label, gap = 12, onLayoutNarrow, keys, onKey, chi
       justify="center"
       px={narrow ? 8 : 48}
       mb={10}
-      onLayout={(r) => {
+      onSize={(r) => {
         const next = r.w < NARROW_W;
         if (next !== narrow) {
           setNarrow(next);

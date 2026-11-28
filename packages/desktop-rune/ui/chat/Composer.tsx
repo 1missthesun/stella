@@ -107,7 +107,7 @@ function usePillExpansion(message: string) {
   const expanded = message.length > 0 && pillFieldW > 0 && pillTextH > LINE + 0.5;
   const measure =
     pillFieldW > 0 && message.length > 0 ? (
-      <text absolute={{ left: 0, top: 0 }} w={pillFieldW - PILL_INPUT_PAD_X * 2} size={fontSize.md} lineHeight={LINE} tracking={APP_TRACKING} hidden inert onLayout={(r) => setPillTextH(r.h)}>
+      <text absolute={{ left: 0, top: 0 }} w={pillFieldW - PILL_INPUT_PAD_X * 2} size={fontSize.md} lineHeight={LINE} tracking={APP_TRACKING} hidden inert onSize={(r) => setPillTextH(r.h)}>
         {message.endsWith("\n") ? `${message} ` : message}
       </text>
     ) : null;
@@ -308,7 +308,7 @@ function ComposerImpl({
 
   const phone = onPhone();
   return (
-    <col w="full" shrink={false} align="center" justify="end" {...column} onLayout={(r) => setComposerW(r.w)}>
+    <col w="full" shrink={false} align="center" justify="end" {...column} onSize={(r) => setComposerW(r.w)}>
       <ComposerLeadRow replyPeek={replyPeek} catchUpConversationId={catchUp && !sidebar ? conversationId : null} maxW={shellMaxW} />
       <col
         id={sidebar ? undefined : COMPOSER_GLASS_ID}

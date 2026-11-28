@@ -1,4 +1,4 @@
-import { memo, useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from "react";
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ComponentProps } from "react";
 import { ConnectorConnectCard } from "@/app/chat/ConnectorConnectCard";
 import { UsageLimitChatCard } from "@/features/chat/UsageLimitChatCard";
 import { SafeguardChatCard } from "@/features/chat/SafeguardChatCard";
@@ -34,6 +34,7 @@ import { COMPOSER_GAP, COMPOSER_NARROW_W, COMPOSER_PAD_TOP, composerShellMaxW } 
 import { reportComposerArea } from "../replace/shell/workspace-stage/viewer-geometry";
 import { reportChatColumnEdges } from "../shell/chat-column-edges";
 import type { Layout } from "../../host/rune-jsx/props";
+import type { HostElement } from "../../host/reconciler";
 import type { ChatScrollThumb, ChatScrollThumbHandle } from "./use-chat-scroll-management";
 import { useStaticHomeLook } from "./static-home";
 
@@ -154,28 +155,53 @@ function ScrollToBottomButton({ shown, onPress, bottom }: { shown: boolean; onPr
   );
 }
 
-/** `.chat-scrollbar`: the overlay thumb the scroll hook drives, draggable, at the layer's right edge. */
+/** `.chat-scrollbar`: the overlay thumb the scroll hook drives, draggable, at the layer's right edge.
+ *  The thumb follows the scroll through direct updates (`ref.set`), so scrolling costs no commits;
+ *  React renders only when it first appears and when hover or drag changes its look. */
 function ChatScrollbar({ bind, onDrag }: { bind: (handle: ChatScrollThumbHandle | null) => void; onDrag: (dy: number, phase: "start" | "move" | "end") => void }) {
   const tokens = useTokens();
-  const [thumb, setThumb] = useState<ChatScrollThumb>({ top: 0, height: 0, visible: false });
+  const [shown, setShown] = useState(false);
   const [hovered, setHovered] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const thumbEl = useRef<HostElement | null>(null);
+  const thumb = useRef<ChatScrollThumb>({ top: 0, height: 0, visible: false });
+  const shownRef = useRef(false);
+  const wideRef = useRef(false);
+  const place = useCallback(() => {
+    const t = thumb.current;
+    const wide = wideRef.current;
+    thumbEl.current?.set({ absolute: { top: t.top, right: wide ? 1 : 2 }, h: t.height, opacity: t.visible || wide ? 1 : 0 });
+  }, []);
   useEffect(() => {
-    bind((next) => setThumb((prev) => (prev.top === next.top && prev.height === next.height && prev.visible === next.visible ? prev : next)));
+    bind((next) => {
+      const prev = thumb.current;
+      if (prev.top === next.top && prev.height === next.height && prev.visible === next.visible) return;
+      thumb.current = next;
+      if (next.height > 0 && !shownRef.current) {
+        shownRef.current = true;
+        setShown(true);
+        return;
+      }
+      place();
+    });
     return () => bind(null);
-  }, [bind]);
+  }, [bind, place]);
   const look = derive(tokens, "chat-scrollbar", (k) => ({ rest: mix(k.c.foreground, 28, "transparent"), active: mix(k.c.foreground, 35, "transparent") }));
   const wide = hovered || dragging;
+  wideRef.current = wide;
+  useLayoutEffect(place, [place, wide, shown]);
+  const t = thumb.current;
   return (
     <box absolute={{ top: 0, right: 0, bottom: 0 }} w={SCROLLBAR_W} raise={15} onHover={setHovered}>
-      {thumb.height > 0 ? (
+      {shown ? (
         <box
-          absolute={{ top: thumb.top, right: wide ? 1 : 2 }}
+          ref={thumbEl}
+          absolute={{ top: t.top, right: wide ? 1 : 2 }}
           w={wide ? 8 : 6}
-          h={thumb.height}
+          h={t.height}
           radius={999}
           fill={dragging ? look.active : look.rest}
-          opacity={thumb.visible || wide ? 1 : 0}
+          opacity={t.visible || wide ? 1 : 0}
           motion={{ dur: 0.2, bounce: 0 }}
           cursor={dragging ? "grabbing" : "grab"}
           onDrag={(d) => {

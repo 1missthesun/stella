@@ -10,7 +10,8 @@ RUN="${RUN:-$ROOT/.run/xvfb}"
 DISP="${DISP:-:93}"
 XVFB="${XVFB:-$HOME/.cache/stella-verify/xvfb/usr/bin/Xvfb}"
 BIN="${BIN:-$ROOT/engine/target/release/stella-engine}"
-BUN="$(PATH=$(echo "$PATH" | tr ':' '\n' | grep -v shell-shims | paste -sd:) command -v bun)"
+# Stella's pinned Bun (host/services/stella-bun.ts), found by whichever bun is on PATH.
+BUN="$("$(PATH=$(echo "$PATH" | tr ':' '\n' | grep -v shell-shims | paste -sd:) command -v bun)" "$ROOT/host/services/stella-bun.ts")"
 W="${W:-1280}"; H="${H:-820}"
 mkdir -p "$RUN"
 

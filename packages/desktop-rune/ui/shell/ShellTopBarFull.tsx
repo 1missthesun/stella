@@ -96,8 +96,8 @@ export const ShellTopBarFull = memo(function ShellTopBarFull({ onSignIn }: { onS
       </row>
       <ShellTopBarActivity width={middle} />
       <row id="shell-topbar-full-right" w={right} h="full" align="center" justify="end" pr={padRight} windowDrag>
-        <row gap={8} align="center" h="full" onLayout={(r) => setRightRow((v) => (Math.abs(v.w - (r.w - insetRight)) < 0.5 ? v : { ...v, w: r.w - insetRight }))}>
-          <Capsule px={CAPSULE_PAD + 2} gap={4} mr={insetRight} onLayout={(r) => setRightRow((v) => (Math.abs(v.capsule - r.w) < 0.5 ? v : { ...v, capsule: r.w }))}>
+        <row gap={8} align="center" h="full" onSize={(r) => setRightRow((v) => (Math.abs(v.w - (r.w - insetRight)) < 0.5 ? v : { ...v, w: r.w - insetRight }))}>
+          <Capsule px={CAPSULE_PAD + 2} gap={4} mr={insetRight} onSize={(r) => setRightRow((v) => (Math.abs(v.capsule - r.w) < 0.5 ? v : { ...v, capsule: r.w }))}>
             <ShellTopBarUpdatePill />
             <GlobalExecutionTargetControl />
             <NotificationBell />

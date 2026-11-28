@@ -313,6 +313,23 @@ export const ignoreLinkedModules = (appRoot: string) => {
   } catch {}
 };
 
+/**
+ * The app's own install, when it can serve a draft as is: a real folder (not
+ * itself linked) whose packages are all in place.
+ */
+const appPackagesUsable = (appRoot: string) => {
+  const modules = lstat(path.join(appRoot, "node_modules"));
+  return modules?.isDirectory() === true && !modules.isSymbolicLink() && intact(appRoot);
+};
+
+/**
+ * A draft with the app's dependencies links the app's installed packages: no
+ * install, so a fresh draft is ready in a moment on every platform. A draft
+ * whose dependencies differ links a package set built for them. Installs in a
+ * draft never reach the app's packages: Stella's bun shim unlinks shared
+ * packages before any install (shell/shims.ts), and removing a draft unlinks
+ * them before anything deletes the folder (dir-links.ts).
+ */
 export const prepareDraftDependencies = async (options: {
   draftRoot: string;
   appRoot: string;
@@ -321,6 +338,12 @@ export const prepareDraftDependencies = async (options: {
 }): Promise<DraftDependencies> => {
   const startedAt = Date.now();
   const { draftRoot, appRoot } = options;
+  if (dependencyFingerprint(draftRoot) === dependencyFingerprint(appRoot) && appPackagesUsable(appRoot)) {
+    const already = linkedTo(draftRoot, appRoot);
+    await linkPackageSet(draftRoot, appRoot);
+    ignoreLinkedModules(appRoot);
+    return { mode: already ? "ready" : "linked", ms: Date.now() - startedAt };
+  }
   const { store, built } = await ensurePackageSet({
     source: draftRoot,
     appRoot,

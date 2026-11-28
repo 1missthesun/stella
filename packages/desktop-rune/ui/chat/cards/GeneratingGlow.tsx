@@ -29,7 +29,7 @@ export function GeneratingGlow({ drift = true }: { drift?: boolean }) {
   const tilesX = Math.ceil(w / NOISE_TILE);
   const tilesY = Math.ceil(h / NOISE_TILE);
   return (
-    <box absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} clip={0} inert onLayout={(r) => setSize([r.w, r.h])}>
+    <box absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} clip={0} inert onSize={(r) => setSize([r.w, r.h])}>
       {w > 0 ? (
         <box
           absolute={{ left: -ox, top: -oy }}

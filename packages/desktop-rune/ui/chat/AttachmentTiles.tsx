@@ -96,7 +96,7 @@ export function AttachmentTileRow({ items, align, maxW }: AttachmentTileRowProps
   const shownCount = rowW > 0 ? fitCount(measured, rowW) : items.length;
   const hidden = items.slice(shownCount);
   return (
-    <row w="full" maxW={maxW} selfAlign={align === "end" ? "end" : "start"} justify={align} align="end" gap={TILE_GAP} pt={4} minW={0} onLayout={(r) => setRowW(Math.round(r.w))}>
+    <row w="full" maxW={maxW} selfAlign={align === "end" ? "end" : "start"} justify={align} align="end" gap={TILE_GAP} pt={4} minW={0} onSize={(r) => setRowW(Math.round(r.w))}>
       {items.map((item, index) => {
         const offFlow = index >= shownCount;
         return (
@@ -106,7 +106,7 @@ export function AttachmentTileRow({ items, align, maxW }: AttachmentTileRowProps
             absolute={offFlow ? { left: 0, top: 0 } : undefined}
             hidden={offFlow}
             inert={offFlow}
-            onLayout={(r) => setWidths((prev) => (prev[item.key] === Math.round(r.w) ? prev : { ...prev, [item.key]: Math.round(r.w) }))}
+            onSize={(r) => setWidths((prev) => (prev[item.key] === Math.round(r.w) ? prev : { ...prev, [item.key]: Math.round(r.w) }))}
           >
             {item.node}
           </box>

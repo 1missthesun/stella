@@ -149,7 +149,7 @@ export const UsageTimelineChart = memo(function UsageTimelineChart({ timeline, h
 
   return (
     <UsagePanel title={t("app.usage.timeline.title")} afterSummary>
-      <col w="full" {...s.usageChart} role="img" label={t("app.usage.timeline.chartLabel")} onLayout={(r) => setWidth(r.w)}>
+      <col w="full" {...s.usageChart} role="img" label={t("app.usage.timeline.chartLabel")} onSize={(r) => setWidth(r.w)}>
         {svg ? (
           <col w={plot.innerW} h={plot.innerH}>
             <image absolute={{ left: 0, top: 0 }} src={`data:image/svg+xml;utf8,${encodeURIComponent(svg)}`} w={plot.innerW} h={plot.innerH} inert />

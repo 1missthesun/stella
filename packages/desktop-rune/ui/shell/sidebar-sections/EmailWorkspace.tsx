@@ -998,7 +998,7 @@ export function EmailWorkspace({ state }: { state: EmailPageState }) {
       minW={0}
       keys={typing ? undefined : ["ArrowDown", "ArrowUp"]}
       onKey={(event) => handleKeyNav(event.key)}
-      onLayout={(rect) => setWidth(rect.w)}
+      onSize={(rect) => setWidth(rect.w)}
     >
       <row id="email-bar" align="center" justify="between" gap={12} shrink={false} minH={46} px={compact ? 16 : 20} pt={compact ? 8 : 0} pb={compact ? 9 : 1} borderSides={[0, 0, 1, 0]} border={line(tk)}>
         {stacked ? (

@@ -225,7 +225,7 @@ export function UsagePanel() {
   return (
     <TextScope base={{ ...base, family: s.usageScreenText.family, em: s.usageScreenText.em as number }}>
       <Ink.Provider value={s.usageScreenText.color}>
-        <col {...s.usageScreen} aria-busy={phase === "loading" || undefined} onLayout={(r) => setWidth(r.w)}>
+        <col {...s.usageScreen} aria-busy={phase === "loading" || undefined} onSize={(r) => setWidth(r.w)}>
           {usage.narrow ? (
             <col {...s.usageHeader} {...s.usageHeaderNarrow}>
               <T {...s.usageHeaderText}>{t("app.usage.intro")}</T>

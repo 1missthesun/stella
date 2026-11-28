@@ -1,6 +1,13 @@
 name: Build Electron Identity
 
 # macOS ties the Keychain item and privacy grants to the Developer ID signature; an ad-hoc copy gets a new identity per version.
+#
+# Layout under electron-identity/<version>/ (dl.stella.sh edge-caches this prefix by each upload's Cache-Control):
+#   <sha256>/Stella-darwin-<arch>.zip      the build, addressed by its checksum (immutable)
+#   Stella-darwin-<arch>.current.sha256    which build is current (5 minutes)
+#   Stella-darwin-<arch>.zip(.sha256)      the first build, for launchers from before; never overwritten (immutable)
+# A forced rebuild of the same version publishes a new <sha256>/ and moves the pointer, so a zip and
+# its checksum can never come from different builds, whatever an edge still holds.
 
 on:
   push:
@@ -42,8 +49,8 @@ jobs:
           version="$(node -p "const p = require('./package.json'); (p.devDependencies || {}).electron || (p.dependencies || {}).electron")"
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Electron must be pinned exactly, got $version" >&2; exit 1; }
           echo "version=$version" >> "$GITHUB_OUTPUT"
-          if [[ "${{ inputs.force }}" != "true" ]] && curl -sfI "$PUBLIC_BASE/$version/Stella-darwin-arm64.zip.sha256" > /dev/null \
-            && curl -sfI "$PUBLIC_BASE/$version/Stella-darwin-x64.zip.sha256" > /dev/null; then
+          published() { curl -sfI "$PUBLIC_BASE/$version/Stella-darwin-arm64$1" > /dev/null && curl -sfI "$PUBLIC_BASE/$version/Stella-darwin-x64$1" > /dev/null; }
+          if [[ "${{ inputs.force }}" != "true" ]] && { published .current.sha256 || published .zip.sha256; }; then
             echo "published=true" >> "$GITHUB_OUTPUT"
             echo "Electron $version is already published."
           fi
@@ -107,8 +114,28 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: |
           set -euo pipefail
-          for file in Stella-darwin-arm64.zip Stella-darwin-x64.zip Stella-darwin-arm64.zip.sha256 Stella-darwin-x64.zip.sha256; do
-            aws s3 cp "out/$file" "s3://${R2_BUCKET}/electron-identity/$VERSION/$file" \
-              --cache-control "public, max-age=31536000, immutable" --endpoint-url "$R2_ENDPOINT"
+          prefix="s3://${R2_BUCKET}/electron-identity/$VERSION"
+          immutable="public, max-age=31536000, immutable"
+          put() { aws s3 cp "$1" "$2" --cache-control "$3" --endpoint-url "$R2_ENDPOINT"; }
+          # `aws s3 ls` exits 1 when nothing matches; anything else means it couldn't tell.
+          absent() {
+            local rc=0
+            aws s3 ls "$1" --endpoint-url "$R2_ENDPOINT" > /dev/null 2>&1 || rc=$?
+            [[ $rc == 0 ]] && return 1
+            [[ $rc == 1 ]] && return 0
+            echo "Couldn't check $1 (exit $rc)" >&2
+            exit 1
+          }
+          for arch in arm64 x64; do
+            sha="$(cat "out/Stella-darwin-$arch.zip.sha256")"
+            [[ "$sha" =~ ^[0-9a-f]{64}$ ]] || { echo "bad checksum for $arch: $sha" >&2; exit 1; }
+            # The build first, then the pointer to it, so a launcher that sees the pointer finds the build.
+            put "out/Stella-darwin-$arch.zip" "$prefix/$sha/Stella-darwin-$arch.zip" "$immutable"
+            put "out/Stella-darwin-$arch.zip.sha256" "$prefix/Stella-darwin-$arch.current.sha256" "public, max-age=300"
+            # Launchers from before the pointer read these year-long immutable URLs: written once, as a pair.
+            if absent "$prefix/Stella-darwin-$arch.zip.sha256"; then
+              put "out/Stella-darwin-$arch.zip" "$prefix/Stella-darwin-$arch.zip" "$immutable"
+              put "out/Stella-darwin-$arch.zip.sha256" "$prefix/Stella-darwin-$arch.zip.sha256" "$immutable"
+            fi
           done
           echo "Published signed Stella.app for Electron $VERSION"

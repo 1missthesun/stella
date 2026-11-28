@@ -704,12 +704,18 @@ after the app-source publish; stella.sh after the website deploy.
    `deps-seed/`) whatever their extension. So versioned uploads must be
    `public, max-age=31536000, immutable` and moving ones `no-cache`
    (`launcher/stable/*`, `*/current.json`) or a short max-age
-   (`deps-seed/<lock>/deps-seed.json`, 300 s), which the edge then keeps.
+   (`deps-seed/<lock>/deps-seed.json`,
+   `electron-identity/<version>/Stella-darwin-<arch>.current.sha256`, 300 s),
+   which the edge then keeps.
 3. **Electron version bump**: the push of `package.json` runs
    `build-electron-identity.yml`, which publishes the Developer ID-signed
    `Stella.app` for that Electron version. Let it finish before publishing app
    source, or macOS launchers fall back to an ad-hoc copy and prompt for the
-   Keychain.
+   Keychain. Each build goes under its own checksum
+   (`electron-identity/<version>/<sha256>/`) with a 5-minute pointer to it, so
+   a forced rebuild (`force`, e.g. for a new icon) never rewrites a cached URL;
+   the first build's `Stella-darwin-<arch>.zip(.sha256)` pair stays for
+   launchers from before and is never overwritten.
 4. **Native helpers** (`packages/native/`): the push runs
    `build-native-helpers.yml`, which uploads to R2 and moves `current.json`
    only when the commit is still master's head. **stella-browser**

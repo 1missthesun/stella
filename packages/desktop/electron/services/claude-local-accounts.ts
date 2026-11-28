@@ -860,10 +860,12 @@ export class ClaudeLocalAccounts {
       ? state.chosenEmail
       : text(previous.chosenEmail);
     const active = this.configs.find((config) => config.configId === state.activeConfigId);
+    // Logins Anthropic refused, by the expiry they had then, so Repair passes over them too.
     const record = {
       configId: state.activeConfigId,
       ...(active?.email ? { email: active.email } : {}),
       ...(chosenEmail ? { chosenEmail } : {}),
+      ...(this.rejected.size ? { rejected: Object.fromEntries(this.rejected) } : {}),
     };
     try {
       if (JSON.stringify(previous) === JSON.stringify(record)) return;

@@ -13,7 +13,12 @@
 // - anything else (Stella's models, ChatGPT, API keys): Stella's headless runtime
 //   (packages/runtime/headless/cli.ts) from an export of the last version that started, with
 //   the desktop's own sign-in and saved keys (--desktop-user-data).
-// The runner commits what the model changed; the launcher signs it and starts Stella.
+// The prompt goes to the model in a file or on stdin, never as one command-line argument (Windows
+// caps a whole command line at 32K characters, Linux one argument at 128K).
+// Only a run that finished in time, exited cleanly and left code that still parses is kept: the
+// runner then commits the files the model changed (never other edits already in the checkout) and
+// the launcher signs it and starts Stella. Anything else puts back what the model changed, with
+// its version of each file kept in <work>/unfinished-<time>/.
 //
 // usage: bun launcher-repair.mjs --app <checkout> --data-dir <dir> --user-data <dir> --work <dir>
 //          --failure <file> [--log <file>]... [--known-good <sha>] [--backend <url>]
@@ -21,6 +26,7 @@
 // The result file gets {"ok":bool,"route":string,"message":string}; message is one short line.
 
 import { spawn, spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
@@ -94,7 +100,80 @@ const knownGood = commitExists(option("known-good")) ? option("known-good") : ""
 const upstream = commitExists("refs/remotes/stella-upstream/main") ? "refs/remotes/stella-upstream/main" : "";
 const base = knownGood || (upstream && git(["merge-base", upstream, "HEAD"]).out) || "";
 const headBefore = git(["rev-parse", "HEAD"]).out;
-const statusBefore = git(["status", "--porcelain=v1", "--untracked-files=all"]).out;
+
+// Paths `git status` lists (both sides of a rename), from its NUL-separated form.
+const dirtyPaths = () => {
+  const r = spawnSync(gitBin, ["status", "--porcelain=v1", "-z", "--untracked-files=all"], {
+    cwd: app,
+    encoding: "utf8",
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0" },
+    maxBuffer: 64 * 1024 * 1024,
+    windowsHide: true,
+  });
+  const entries = String(r.stdout ?? "").split("\0");
+  const paths = new Set();
+  for (let i = 0; i < entries.length; i++) {
+    const entry = entries[i];
+    if (entry.length < 4) continue;
+    paths.add(entry.slice(3));
+    if (/[RC]/.test(entry.slice(0, 2)) && i + 1 < entries.length) paths.add(entries[++i]);
+  }
+  return paths;
+};
+
+// What a path holds right now, to tell the model's edits from edits that were already there.
+const fingerprint = (relative) => {
+  const file = path.join(app, relative);
+  let stat;
+  try {
+    stat = fs.lstatSync(file);
+  } catch {
+    return "absent";
+  }
+  if (stat.isSymbolicLink()) {
+    try {
+      return `link:${fs.readlinkSync(file)}`;
+    } catch {
+      return "link";
+    }
+  }
+  if (!stat.isFile()) return `other:${stat.mtimeMs}`;
+  if (stat.size > 64 * 1024 * 1024) return `big:${stat.size}:${stat.mtimeMs}`;
+  try {
+    return `file:${stat.mode}:${createHash("sha1").update(fs.readFileSync(file)).digest("hex")}`;
+  } catch {
+    return `unreadable:${stat.mtimeMs}`;
+  }
+};
+
+const unfinishedDir = path.join(work, `unfinished-${Date.now().toString(36)}`);
+const beforeDir = path.join(work, "before");
+fs.rmSync(beforeDir, { recursive: true, force: true });
+// Files already changed before the repair, with a copy of each to put back if the model's run
+// isn't kept. Very large ones are only fingerprinted.
+const before = new Map();
+{
+  let copied = 0;
+  for (const relative of dirtyPaths()) {
+    const print = fingerprint(relative);
+    let backup = null;
+    if (print.startsWith("file:")) {
+      const file = path.join(app, relative);
+      const size = fs.statSync(file).size;
+      if (size <= 8 * 1024 * 1024 && copied + size <= 128 * 1024 * 1024) {
+        try {
+          backup = path.join(beforeDir, String(before.size));
+          fs.mkdirSync(beforeDir, { recursive: true });
+          fs.copyFileSync(file, backup);
+          copied += size;
+        } catch {
+          backup = null;
+        }
+      }
+    }
+    before.set(relative, { print, backup });
+  }
+}
 
 const failure = readText(option("failure"), 12_000);
 const logs = options("log")
@@ -125,6 +204,12 @@ ${committed}
 
 ${capped(committedDiff, 60_000) || "(no committed changes)"}
 ${uncommittedDiff ? `\n## Not committed yet\n${capped(uncommittedDiff, 20_000)}\n` : ""}`;
+
+fs.mkdirSync(work, { recursive: true });
+const promptFile = path.join(work, "repair-brief.md");
+fs.writeFileSync(promptFile, prompt);
+// For a CLI that only takes its prompt as an argument: a short one that points at the brief.
+const pointerPrompt = `Read the file ${promptFile} in full: it explains why Stella, the app checked out at ${app}, fails to start, and what to do. Then do what it asks, working in ${app}.`;
 
 // ---- Running a route, bounded ----
 
@@ -241,55 +326,106 @@ const claudeRoute = async () => {
   ]);
   if (!cli) finish(false, "claude-code", "Claude Code isn't installed on this computer.");
   if (!(await online("https://api.anthropic.com"))) finish(false, "claude-code", "Repair needs the internet, and this computer is offline.");
-  // The login Stella's turns use, which Stella records in claude-accounts/active.json: the
-  // account chosen in Stella's settings, else the one Stella last used, else Claude Code's own
-  // login, else one Stella added (the order of claude-local-accounts.ts activeConfig).
+  // The login Stella's turns use, by the rules of claude-local-accounts.ts (activeConfig and
+  // readStatus): the account chosen in Stella's settings, else Claude Code's own login, else the
+  // first one Stella added; a claude.ai login only, past its time limit or refused by Anthropic
+  // (Stella records refusals in claude-accounts/active.json) counting as signed out.
   const accountsDir = path.join(dataDir, "claude-accounts");
   const active = readJson(path.join(accountsDir, "active.json")) ?? {};
+  const rejected = active.rejected && typeof active.rejected === "object" ? active.rejected : {};
   const lower = (value) => (typeof value === "string" && value.trim() ? value.trim().toLowerCase() : undefined);
-  const configs = [{ configId: "default", dir: null }];
+  const epochMs = (value) => {
+    if (typeof value === "number" && Number.isFinite(value)) return value;
+    if (typeof value !== "string" || !value.trim()) return undefined;
+    const parsed = Date.parse(value);
+    return Number.isFinite(parsed) ? parsed : undefined;
+  };
+  const defaultDir = process.env.CLAUDE_CONFIG_DIR?.trim() || null;
+  // readStoredClaudeLogin (packages/contracts/claude-login.ts), on Claude Code's own file.
+  const storedLogin = (dir) => {
+    let oauth;
+    try {
+      const parsed = JSON.parse(fs.readFileSync(path.join(dir ?? defaultDir ?? path.join(home, ".claude"), ".credentials.json"), "utf8"));
+      oauth = parsed?.claudeAiOauth && typeof parsed.claudeAiOauth === "object" ? parsed.claudeAiOauth : undefined;
+    } catch {}
+    if (!oauth) return { alive: false };
+    const now = Date.now();
+    const expiresAt =
+      typeof oauth.refreshTokenExpiresAt === "number" && Number.isFinite(oauth.refreshTokenExpiresAt) ? oauth.refreshTokenExpiresAt : undefined;
+    const refreshes = typeof oauth.refreshToken === "string" && oauth.refreshToken.length > 0;
+    const longLived =
+      !refreshes && expiresAt === undefined && typeof oauth.accessToken === "string" && oauth.accessToken.length > 0 &&
+      typeof oauth.expiresAt === "number" && oauth.expiresAt > now;
+    const alive = oauth.loginEnded === undefined && (longLived || (refreshes && (expiresAt === undefined || expiresAt > now)));
+    return { alive, expiresAt };
+  };
+  const storedEmail = (dir) => lower(readJson(path.join(dir ?? defaultDir ?? home, ".claude.json"))?.oauthAccount?.emailAddress);
+  const configs = [{ configId: "default", dir: null, createdAt: 0 }];
   try {
-    for (const entry of fs.readdirSync(accountsDir).sort()) {
+    for (const entry of fs.readdirSync(accountsDir)) {
       if (!/^[a-f0-9]{6,64}$/.test(entry)) continue;
       try {
         // Real paths: Claude Code keys its Keychain login by the config dir's path.
         const dir = fs.realpathSync(path.join(accountsDir, entry));
-        if (fs.statSync(dir).isDirectory()) configs.push({ configId: entry, dir });
+        const stat = fs.statSync(dir);
+        if (stat.isDirectory()) configs.push({ configId: entry, dir, createdAt: stat.birthtimeMs || stat.ctimeMs });
       } catch {}
     }
   } catch {}
+  configs.sort((a, b) => a.createdAt - b.createdAt);
+  // Only the login on disk: a key or token in the environment would answer for every account.
+  const cliEnv = (dir) => {
+    const env = { ...process.env };
+    for (const key of ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"]) delete env[key];
+    if (dir) env.CLAUDE_CONFIG_DIR = dir;
+    return env;
+  };
   const statusOf = ({ configId, dir }) =>
     new Promise((resolve) => {
-      const env = { ...process.env };
-      if (dir) env.CLAUDE_CONFIG_DIR = dir;
-      const child = spawn(cli, ["auth", "status", "--json"], { env, stdio: ["ignore", "pipe", "ignore"], windowsHide: true });
+      const child = spawn(cli, ["auth", "status", "--json"], { env: cliEnv(dir), stdio: ["ignore", "pipe", "ignore"], windowsHide: true });
       let out = "";
       const timer = setTimeout(() => child.kill(), 20_000);
       child.stdout.on("data", (chunk) => (out += chunk));
       child.on("error", () => {});
       child.on("close", () => {
         clearTimeout(timer);
-        let status = {};
+        let status = null;
         try {
           status = JSON.parse(out);
         } catch {}
-        const stored = readJson(path.join(dir ?? process.env.CLAUDE_CONFIG_DIR?.trim() ?? home, ".claude.json"));
-        resolve({ configId, dir, loggedIn: status.loggedIn === true, email: lower(status.email) ?? lower(stored?.oauthAccount?.emailAddress) });
+        if (!status || typeof status !== "object") {
+          resolve({ configId, dir, loggedIn: false });
+          return;
+        }
+        // `claude auth status` describes a token from Claude Code's settings when there is one;
+        // the claude.ai login stored here is what Stella's turns run on.
+        let loggedIn;
+        let email;
+        let expiresAt;
+        if (status.authMethod === "claude.ai") {
+          loggedIn = status.loggedIn === true;
+          email = lower(status.email);
+          expiresAt = epochMs(status.loginExpiresAt);
+        } else {
+          const stored = storedLogin(dir);
+          loggedIn = stored.alive;
+          expiresAt = stored.expiresAt;
+        }
+        email ??= storedEmail(dir);
+        if (loggedIn && expiresAt !== undefined && expiresAt <= Date.now()) loggedIn = false;
+        if (loggedIn && Object.hasOwn(rejected, configId) && rejected[configId] === (expiresAt ?? null)) loggedIn = false;
+        resolve({ configId, dir, loggedIn, email });
       });
     });
   const signedIn = (await Promise.all(configs.map(statusOf))).filter((config) => config.loggedIn);
   const wanted = lower(active.chosenEmail);
   const chosen =
     (wanted && signedIn.find((config) => config.email === wanted)) ||
-    signedIn.find((config) => config.configId === active.configId) ||
     signedIn.find((config) => config.dir === null) ||
     signedIn[0];
   if (!chosen) finish(false, "claude-code", "Claude Code isn't signed in.");
   if (wanted && chosen.email !== wanted) say(`the Claude account chosen in Stella (${wanted}) isn't signed in here`);
-  const configDir = chosen.dir;
-  const env = { ...process.env };
-  for (const key of ["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "CLAUDE_CODE_OAUTH_TOKEN"]) delete env[key];
-  if (configDir) env.CLAUDE_CONFIG_DIR = configDir;
+  const env = cliEnv(chosen.dir);
   const model = (prefs.claudeCodeModel || "opus").trim();
   say(`claude-code (${model}) as ${chosen.email ?? chosen.configId} in ${app}`);
   return await runBounded(cli, ["-p", "--permission-mode", "bypassPermissions", "--model", model, "--output-format", "text"], {
@@ -306,7 +442,8 @@ const antigravityRoute = async (model) => {
   if (!cli) finish(false, "antigravity", "Antigravity isn't installed on this computer.");
   if (!(await online("https://generativelanguage.googleapis.com"))) finish(false, "antigravity", "Repair needs the internet, and this computer is offline.");
   say(`antigravity (${model}) in ${app}`);
-  const cliArgs = ["-p", prompt, "--dangerously-skip-permissions", "--print-timeout", `${Math.round(remainingMs() / 1000)}s`];
+  // agy's text mode takes its prompt only as an argument, so it gets the brief as a file.
+  const cliArgs = ["-p", pointerPrompt, "--add-dir", work, "--dangerously-skip-permissions", "--print-timeout", `${Math.round(remainingMs() / 1000)}s`];
   if (model) cliArgs.push("--model", model);
   return await runBounded(cli, cliArgs);
 };
@@ -454,7 +591,8 @@ const runtimeRoute = async () => {
     "--desktop-user-data", userData,
     "--conversation", `launcher-repair-${Date.now().toString(36)}`,
     "--timeout", String(Math.round(remainingMs() / 1000)),
-    "--prompt", prompt,
+    // A runtime from before --prompt-file gets a short prompt that points at the brief.
+    ...(readText(cli, 1_000_000).includes('"--prompt-file"') ? ["--prompt-file", promptFile] : ["--prompt", pointerPrompt]),
   ];
   if (backend) cliArgs.push("--backend-url", backend);
   say(`stella runtime from ${commit.slice(0, 12)} (${chosenModel || "default model"})`);
@@ -468,7 +606,9 @@ const runtimeRoute = async () => {
       if (parsed.kind === "cli.result") last = parsed;
     } catch {}
   }
-  if (last && !last.ok) {
+  if (!last) {
+    result.code = result.code || 1;
+  } else if (!last.ok) {
     const reason = String(last.error ?? last.status ?? "");
     if (/sign|auth|401|403/i.test(reason)) finish(false, "stella", "Repair needs you to be signed in to Stella.");
     if (/timeout/i.test(reason)) result.timedOut = true;
@@ -500,9 +640,126 @@ const result =
 
 if (result.timedOut) say(`the model ran out of time after ${timeoutSeconds}s`);
 const headAfter = git(["rev-parse", "HEAD"]).out;
-const statusAfter = git(["status", "--porcelain=v1", "--untracked-files=all"]).out;
-const changed = headAfter !== headBefore || statusAfter !== statusBefore;
-if (!changed) {
+const headMoved = headAfter !== headBefore;
+// The model's changes: paths it changed that were clean, and changed paths it changed again.
+const owned = [];
+for (const relative of new Set([...before.keys(), ...dirtyPaths()])) {
+  const was = before.get(relative);
+  if (!was || fingerprint(relative) !== was.print) owned.push(relative);
+}
+owned.sort();
+
+const nulInput = (paths) => paths.join("\0");
+const literal = { GIT_LITERAL_PATHSPECS: "1" };
+const gitWithPaths = (gitArgs, paths, extra = {}) => {
+  const r = spawnSync(gitBin, [...gitArgs, "--pathspec-from-file=-", "--pathspec-file-nul"], {
+    cwd: app,
+    encoding: "utf8",
+    input: nulInput(paths),
+    env: { ...process.env, GIT_TERMINAL_PROMPT: "0", ...literal, ...extra },
+    maxBuffer: 64 * 1024 * 1024,
+    windowsHide: true,
+  });
+  return { ok: r.status === 0, out: (r.stdout ?? "").trim(), err: (r.stderr ?? "").trim() };
+};
+
+// What the model left has to parse: each script it touched builds, each JSON file still reads.
+const SCRIPT = /\.(?:[cm]?[jt]s|[jt]sx)$/i;
+const validate = () => {
+  for (const relative of owned) {
+    const file = path.join(app, relative);
+    if (!fs.existsSync(file) || !fs.statSync(file).isFile()) continue;
+    if (SCRIPT.test(relative) && !relative.endsWith(".d.ts") && process.versions.bun) {
+      const built = spawnSync(process.execPath, ["build", "--no-bundle", file], {
+        cwd: app,
+        encoding: "utf8",
+        stdio: ["ignore", "ignore", "pipe"],
+        timeout: 30_000,
+        windowsHide: true,
+      });
+      if (built.status !== 0) {
+        const error = String(built.stderr ?? "").split("\n").find((line) => /^\s*error:/.test(line));
+        return `${relative} doesn't build: ${error?.replace(/^\s*error:\s*/, "") || summaryOf(built.stderr) || `exit ${built.status ?? "timeout"}`}`;
+      }
+    } else if (/\.json$/i.test(relative)) {
+      const parses = (text) => {
+        try {
+          JSON.parse(text);
+          return true;
+        } catch {
+          return false;
+        }
+      };
+      // A file that didn't parse before either is JSON with comments (tsconfig and the like).
+      const was = before.get(relative)?.backup;
+      const previous = was ? readText(was, 64 * 1024 * 1024) : git(["show", `${headBefore}:${relative}`], literal).out;
+      if (!parses(fs.readFileSync(file, "utf8")) && (!previous || parses(previous))) return `${relative} isn't valid JSON`;
+    }
+  }
+  return "";
+};
+
+// Puts back what the model changed, keeping its version of each file in unfinishedDir.
+const putBack = () => {
+  if (!owned.length) return;
+  const headFiles = new Set(
+    git(["ls-tree", "-r", "-z", "--name-only", headBefore]).out.split("\0").filter(Boolean),
+  );
+  const fromHead = [];
+  const kept = [];
+  for (const relative of owned) {
+    const file = path.join(app, relative);
+    try {
+      if (fs.lstatSync(file).isFile()) {
+        const copy = path.join(unfinishedDir, relative);
+        fs.mkdirSync(path.dirname(copy), { recursive: true });
+        fs.copyFileSync(file, copy);
+        kept.push(relative);
+      }
+    } catch {}
+    const was = before.get(relative);
+    try {
+      if (was) {
+        // Already changed before the repair: back to that version.
+        if (was.print === "absent") fs.rmSync(file, { force: true });
+        else if (was.backup) {
+          fs.mkdirSync(path.dirname(file), { recursive: true });
+          fs.rmSync(file, { force: true });
+          fs.copyFileSync(was.backup, file);
+          const mode = Number(was.print.split(":")[1]);
+          if (Number.isFinite(mode)) fs.chmodSync(file, mode & 0o7777);
+        } else say(`can't put back ${relative}: it was too large to copy`);
+      } else if (headFiles.has(relative)) fromHead.push(relative);
+      else fs.rmSync(file, { recursive: true, force: true });
+    } catch (error) {
+      say(`can't put back ${relative}: ${error.message}`);
+    }
+  }
+  // Clean before the repair: the index and the file go back to the last commit.
+  const cleanBefore = owned.filter((relative) => !before.has(relative));
+  if (cleanBefore.length) gitWithPaths(["reset", "-q", headBefore], cleanBefore);
+  if (fromHead.length) {
+    const restored = spawnSync(gitBin, ["checkout-index", "-f", "-z", "--stdin"], {
+      cwd: app,
+      input: nulInput(fromHead),
+      encoding: "utf8",
+      windowsHide: true,
+    });
+    if (restored.status !== 0) say(`couldn't put back ${fromHead.length} files: ${summaryOf(restored.stderr)}`);
+  }
+  if (kept.length) {
+    fs.writeFileSync(path.join(unfinishedDir, "FILES.txt"), `${kept.join("\n")}\n`);
+    say(`put back ${owned.length} changed paths; the model's versions are in ${unfinishedDir}`);
+  }
+  if (headMoved) say(`the model committed on its own (${headAfter.slice(0, 12)}); that commit stays, unsigned`);
+};
+
+const fail = (message) => {
+  putBack();
+  finish(false, route, message);
+};
+
+if (!headMoved && !owned.length) {
   finish(
     false,
     route,
@@ -513,10 +770,23 @@ if (!changed) {
         : "Repair didn't find anything to change.",
   );
 }
+if (result.timedOut) fail("Repair ran out of time before it finished, so it changed nothing.");
+if (result.code !== 0) fail(`Repair stopped before it finished (${summaryOf(result.err) || `exit ${result.code}`}), so it changed nothing.`);
+const invalid = validate();
+if (invalid) fail(`Repair's fix didn't hold up (${invalid}), so it changed nothing.`);
+
 const summary = summaryOf(result.out) || "Repaired Stella's start";
-if (statusAfter) {
-  git(["add", "-A"]);
-  const commit = git(["commit", "-q", "--no-verify", "-m", `Repair: ${summary.slice(0, 72)}`, "-m", summary], identity);
-  if (!commit.ok) finish(false, route, `Repair couldn't save its fix: ${summaryOf(commit.err)}`);
+if (owned.length) {
+  const added = gitWithPaths(["add", "-A"], owned);
+  if (!added.ok) fail(`Repair couldn't save its fix: ${summaryOf(added.err)}`);
+  const ownedSet = new Set(owned);
+  const staged = git(["diff", "--cached", "--name-only", "-z", "--no-renames", "HEAD"]).out.split("\0").filter((p) => ownedSet.has(p));
+  if (staged.length) {
+    const commit = gitWithPaths(["commit", "-q", "--no-verify", "--only", "-m", `Repair: ${summary.slice(0, 72)}`, "-m", summary], staged, identity);
+    if (!commit.ok) fail(`Repair couldn't save its fix: ${summaryOf(commit.err)}`);
+  } else if (!headMoved) {
+    finish(false, route, "Repair didn't find anything to change.");
+  }
 }
+fs.rmSync(beforeDir, { recursive: true, force: true });
 finish(true, route, summary);

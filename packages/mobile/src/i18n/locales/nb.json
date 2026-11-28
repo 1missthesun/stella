@@ -952,7 +952,9 @@
         "reasonCloudLogin": "Skyens pålogging",
         "reasonOtherLogin": "Lagt til i Stella",
         "reasonOwnLogin": "Denne datamaskinens egen Claude Code-pålogging",
-        "reasonSelected": "Valgt i Stella"
+        "reasonSelected": "Valgt i Stella",
+        "noteKeychain": "{place}: påloggingen er fortsatt lagret, men Mac-ens Nøkkelring finner den ikke.",
+        "rowKeychain": "Ikke funnet i Nøkkelring"
       },
       "claudeLogin": {
         "whereCloud": "Logger på Claude Code i skyen din.",

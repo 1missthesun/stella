@@ -951,7 +951,9 @@
         "reasonCloudLogin": "Login cloud",
         "reasonOtherLogin": "Ditambahkan di Stella",
         "reasonOwnLogin": "Login Claude Code milik komputer ini",
-        "reasonSelected": "Dipilih di Stella"
+        "reasonSelected": "Dipilih di Stella",
+        "noteKeychain": "{place}: proses masuk masih tersimpan, tetapi Rantai Kunci Mac tidak menemukannya.",
+        "rowKeychain": "Tidak ditemukan di Rantai Kunci"
       },
       "claudeLogin": {
         "whereCloud": "Masuk ke Claude Code di cloud Anda.",

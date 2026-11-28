@@ -2172,7 +2172,9 @@
         "reasonCloudLogin": "A felhő bejelentkezése",
         "reasonOtherLogin": "Stellában hozzáadva",
         "reasonOwnLogin": "Ennek a számítógépnek a saját Claude Code-bejelentkezése",
-        "reasonSelected": "Kiválasztva a Stellában"
+        "reasonSelected": "Kiválasztva a Stellában",
+        "noteKeychain": "{place}: a bejelentkezés még el van mentve, de a Mac Kulcskarikája nem találja.",
+        "rowKeychain": "Nem található a Kulcskarikában"
       },
       "claudeLogin": {
         "approve": "Hagyd jóvá a megnyílt Anthropic-oldalon, és a bejelentkezés magától befejeződik.",
@@ -3568,7 +3570,10 @@
     "signIn": "Bejelentkezés",
     "signedInContinuing": "Bejelentkeztél a Claude-ba. Stella most válaszol.",
     "signedInAsResend": "Bejelentkeztél a Claude-ba ezzel: {email}. A folytatáshoz küldd el újra az üzeneted.",
-    "signedInResend": "Bejelentkeztél a Claude-ba. A folytatáshoz küldd el újra az üzeneted."
+    "signedInResend": "Bejelentkeztél a Claude-ba. A folytatáshoz küldd el újra az üzeneted.",
+    "keychainTitle": "A Claude nem találja a bejelentkezésedet ezen a Macen",
+    "keychainDescription": "A Claude-bejelentkezésed továbbra is el van mentve ennek a Macnek a bejelentkezési kulcskarikájában, de a Kulcskarika-keresések nem találják, általában mert a bejelentkezési kulcskarikát eltávolították a keresési listáról. Semmi sem lett kijelentkeztetve.",
+    "keychainHeldDescription": "A Claude-bejelentkezésed továbbra is el van mentve ennek a Macnek a bejelentkezési kulcskarikájában, de a Kulcskarika-keresések nem találják. Semmi sem lett kijelentkeztetve. Az üzeneted megmarad, és elmegy, amint újra megtalálható."
   },
   "email": {
     "title": "E-mail",

@@ -30,6 +30,8 @@ export type ClaudeCodeConfigAccess = {
   configDir: string | null;
   email?: string;
   signedIn: boolean;
+  /** Claude Code can't find a login this Mac's login keychain still holds. */
+  unreachable?: "keychain";
 };
 
 let broker: LocalLlmCredentialAccessBroker | null = null;

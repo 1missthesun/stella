@@ -953,7 +953,9 @@
         "reasonCloudLogin": "Conectarea din cloud",
         "reasonOtherLogin": "Adăugat în Stella",
         "reasonOwnLogin": "Conectarea proprie a acestui computer la Claude Code",
-        "reasonSelected": "Ales în Stella"
+        "reasonSelected": "Ales în Stella",
+        "noteKeychain": "{place}: autentificarea este încă salvată, dar Acces Portchei de pe Mac nu o găsește.",
+        "rowKeychain": "Negăsit în Acces Portchei"
       },
       "claudeLogin": {
         "whereCloud": "Conectare la Claude Code în cloudul tău.",

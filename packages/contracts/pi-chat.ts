@@ -143,7 +143,7 @@ export type PiChatEvent =
       paused?: import("./claude-usage-limit.js").UsageLimitSummary;
     }
   | { type: "engine_status"; state: "usage-limit-end"; text: string; resumed: boolean }
-  | { type: "engine_status"; state: "login-required"; text: string; email?: string }
+  | { type: "engine_status"; state: "login-required"; text: string; email?: string; cause?: "keychain" }
   | { type: "engine_status"; state: "login-required-end"; text: string; resumed: boolean }
   | { type: "safeguard"; notice: SafeguardNotice | null }
   | { type: "remote_turns"; turns: PiRemoteTurn[] }
@@ -477,8 +477,8 @@ export const piTerminalNotice = (message: {
           (message.errorMessage?.trimStart().startsWith("[claude-code/not-installed]")
             ? "Stella couldn't answer: Claude Code isn't installed on this computer."
             : null) ??
-          (message.errorMessage?.trimStart().startsWith("[claude-code/login-required]")
-            ? message.errorMessage.replace(ENGINE_ERROR_MARK, "").trim()
+          (/^\s*\[claude-code\/(?:login-required|keychain-unreachable)\]/.test(message.errorMessage ?? "")
+            ? (message.errorMessage ?? "").replace(ENGINE_ERROR_MARK, "").trim()
             : null) ??
           `Stella couldn't answer: ${message.errorMessage?.replace(ENGINE_ERROR_MARK, "").trim() || "the model request failed."}`,
       }

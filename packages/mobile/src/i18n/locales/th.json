@@ -951,7 +951,9 @@
         "reasonCloudLogin": "การเข้าสู่ระบบของคลาวด์",
         "reasonOtherLogin": "เพิ่มใน Stella",
         "reasonOwnLogin": "การเข้าสู่ระบบ Claude Code ของคอมพิวเตอร์เครื่องนี้",
-        "reasonSelected": "เลือกใน Stella"
+        "reasonSelected": "เลือกใน Stella",
+        "noteKeychain": "{place}: การลงชื่อเข้าใช้ยังบันทึกอยู่ แต่พวงกุญแจของ Mac หาไม่พบ",
+        "rowKeychain": "ไม่พบในพวงกุญแจ"
       },
       "claudeLogin": {
         "whereCloud": "กำลังลงชื่อเข้าใช้ Claude Code ในคลาวด์ของคุณ",

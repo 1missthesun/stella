@@ -2172,7 +2172,9 @@
         "reasonCloudLogin": "Skyens login",
         "reasonOtherLogin": "Tilføjet i Stella",
         "reasonOwnLogin": "Denne computers eget Claude Code-login",
-        "reasonSelected": "Valgt i Stella"
+        "reasonSelected": "Valgt i Stella",
+        "noteKeychain": "{place}: loginet er stadig gemt, men Macens Nøglering kan ikke finde det.",
+        "rowKeychain": "Ikke fundet i Nøglering"
       },
       "claudeLogin": {
         "approve": "Godkend på Anthropics side, der blev åbnet, så afsluttes det af sig selv.",
@@ -3568,7 +3570,10 @@
     "signIn": "Log ind",
     "signedInContinuing": "Logget ind på Claude. Stella svarer nu.",
     "signedInAsResend": "Logget ind på Claude som {email}. Send din besked igen for at fortsætte.",
-    "signedInResend": "Logget ind på Claude. Send din besked igen for at fortsætte."
+    "signedInResend": "Logget ind på Claude. Send din besked igen for at fortsætte.",
+    "keychainTitle": "Claude kan ikke finde dit login på denne Mac",
+    "keychainDescription": "Dit Claude-login er stadig gemt i denne Macs login-nøglering, men opslag i Nøglering kan ikke finde det, som regel fordi login-nøgleringen er fjernet fra søgelisten. Intet er logget ud.",
+    "keychainHeldDescription": "Dit Claude-login er stadig gemt i denne Macs login-nøglering, men opslag i Nøglering kan ikke finde det. Intet er logget ud. Din besked er gemt og sendes, så snart det findes igen."
   },
   "email": {
     "title": "E-mail",

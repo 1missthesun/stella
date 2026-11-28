@@ -7,12 +7,14 @@ export type ClaudeLocalConfig = {
   /** A Claude login lasts a fixed time from signing in, however often it is used. */
   loginExpiresAt?: number;
   ended?: boolean;
+  /** Still saved in this Mac's login keychain, but Keychain lookups don't find it. */
+  unreachable?: "keychain";
 };
 
 export const CLAUDE_LOGIN_WARN_BEFORE_MS = 3 * 24 * 60 * 60 * 1000;
 
 export type ClaudeLoginAttention = {
-  state: "ending" | "ended";
+  state: "ending" | "ended" | "unreachable";
   configId: string;
   email?: string;
   expiresAt?: number;

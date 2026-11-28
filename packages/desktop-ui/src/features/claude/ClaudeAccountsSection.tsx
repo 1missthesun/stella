@@ -67,7 +67,7 @@ type PlaceView = {
   ownLoginEmail?: string;
   missingChosen: boolean;
   reported: boolean;
-  loginEnd?: { state: "ending" | "ended"; endsAt?: number; email?: string };
+  loginEnd?: { state: "ending" | "ended" | "unreachable"; endsAt?: number; email?: string };
 };
 
 export function ClaudeAccountsSection({
@@ -509,6 +509,9 @@ export function ClaudeAccountsSection({
       place,
       place.missingChosen ? chosen?.email : place.loginEnd?.email,
     );
+    if (place.loginEnd?.state === "unreachable") {
+      return { text: t(`${C}.noteKeychain`, { place: placeShort(place) }), target: null };
+    }
     if (place.loginEnd?.state === "ended") {
       return { text: t(`${C}.noteEnded`, { place: placeShort(place) }), target };
     }
@@ -565,6 +568,7 @@ export function ClaudeAccountsSection({
 
   const inUseRow = (account: (typeof accounts)[number]) => account.accountId === chosenId;
   const placeMeta = (place: PlaceView, status: string) => {
+    if (place.loginEnd?.state === "unreachable") return `${status} · ${t(`${C}.rowKeychain`)}`;
     if (place.loginEnd?.state === "ended") return `${status} · ${t(`${C}.rowEnded`)}`;
     if (place.loginEnd?.state === "ending") {
       return `${status} · ${t(`${C}.rowEnding`, { date: formatEnd(place.loginEnd.endsAt) })}`;

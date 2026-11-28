@@ -2172,7 +2172,9 @@
         "reasonCloudLogin": "Bulutun oturumu",
         "reasonOtherLogin": "Stella'da eklendi",
         "reasonOwnLogin": "Bu bilgisayarın kendi Claude Code oturumu",
-        "reasonSelected": "Stella'da seçildi"
+        "reasonSelected": "Stella'da seçildi",
+        "noteKeychain": "{place}: oturum açma bilgisi hâlâ kayıtlı, ancak Mac'in Anahtar Zinciri onu bulamıyor.",
+        "rowKeychain": "Anahtar Zinciri'nde bulunamadı"
       },
       "claudeLogin": {
         "approve": "Açılan Anthropic sayfasında onaylayın, oturum açma kendiliğinden tamamlanır.",
@@ -3568,7 +3570,10 @@
     "signIn": "Oturum aç",
     "signedInContinuing": "Claude'da oturum açıldı. Stella şimdi yanıtlıyor.",
     "signedInAsResend": "Claude'da {email} olarak oturum açıldı. Devam etmek için mesajınızı yeniden gönderin.",
-    "signedInResend": "Claude'da oturum açıldı. Devam etmek için mesajınızı yeniden gönderin."
+    "signedInResend": "Claude'da oturum açıldı. Devam etmek için mesajınızı yeniden gönderin.",
+    "keychainTitle": "Claude bu Mac'te oturum açma bilginizi bulamıyor",
+    "keychainDescription": "Claude oturum açma bilginiz bu Mac'in giriş anahtar zincirinde hâlâ kayıtlı, ancak Anahtar Zinciri aramaları onu bulamıyor; genellikle giriş anahtar zinciri arama listesinden çıkarıldığı için. Hiçbir oturum kapatılmadı.",
+    "keychainHeldDescription": "Claude oturum açma bilginiz bu Mac'in giriş anahtar zincirinde hâlâ kayıtlı, ancak Anahtar Zinciri aramaları onu bulamıyor. Hiçbir oturum kapatılmadı. Mesajınız saklanıyor ve yeniden bulunduğu anda gönderilecek."
   },
   "email": {
     "title": "E-posta",

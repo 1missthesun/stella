@@ -952,7 +952,9 @@
         "reasonCloudLogin": "क्लाउड का लॉगिन",
         "reasonOtherLogin": "Stella में जोड़ा गया",
         "reasonOwnLogin": "इस कंप्यूटर का अपना Claude Code लॉगिन",
-        "reasonSelected": "Stella में चुना गया"
+        "reasonSelected": "Stella में चुना गया",
+        "noteKeychain": "{place}: साइन-इन अब भी सहेजा है, लेकिन Mac का कीचेन उसे नहीं ढूँढ पाता।",
+        "rowKeychain": "कीचेन में नहीं मिला"
       },
       "claudeLogin": {
         "whereCloud": "आपके क्लाउड में Claude Code में साइन इन किया जा रहा है।",

@@ -954,7 +954,9 @@
         "reasonCloudLogin": "Вход облака",
         "reasonOtherLogin": "Добавлено в Stella",
         "reasonOwnLogin": "Собственный вход этого компьютера в Claude Code",
-        "reasonSelected": "Выбран в Stella"
+        "reasonSelected": "Выбран в Stella",
+        "noteKeychain": "{place}: вход по-прежнему сохранён, но Связка ключей Mac его не находит.",
+        "rowKeychain": "Не найдено в Связке ключей"
       },
       "claudeLogin": {
         "whereCloud": "Вход в Claude Code в вашем облаке.",

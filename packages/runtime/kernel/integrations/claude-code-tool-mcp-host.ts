@@ -39,7 +39,10 @@ import {
   forkCancelableInterval,
   forkCancelableTimeout,
 } from "./effect-runtime.js";
-import { claudeCodePostToolUseHookResponse } from "./claude-code-output-redaction.js";
+import {
+  claudeCodePostToolUseHookResponse,
+  claudeCodePreToolUseHookResponse,
+} from "./claude-code-output-redaction.js";
 import { waitsForUser } from "@stella/contracts/long-tool-call";
 import {
   CLAUDE_CODE_STELLA_SERVER_NAME,
@@ -874,9 +877,12 @@ export const createClaudeCodeToolMcpHost = async (
     } catch {
       body = null;
     }
-    const answer = await claudeCodePostToolUseHookResponse(body, (name) =>
-      resolveStellaName(name) !== undefined || name.startsWith("mcp__"),
-    );
+    const answer =
+      (body as { hook_event_name?: unknown } | null)?.hook_event_name === "PreToolUse"
+        ? claudeCodePreToolUseHookResponse(body)
+        : await claudeCodePostToolUseHookResponse(body, (name) =>
+            resolveStellaName(name) !== undefined || name.startsWith("mcp__"),
+          );
     response.writeHead(200, { "content-type": "application/json" });
     response.end(JSON.stringify(answer));
   };

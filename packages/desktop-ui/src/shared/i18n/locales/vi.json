@@ -2162,7 +2162,9 @@
         "reasonCloudLogin": "Đăng nhập của đám mây",
         "reasonOtherLogin": "Đã thêm trong Stella",
         "reasonOwnLogin": "Đăng nhập Claude Code riêng của máy tính này",
-        "reasonSelected": "Đã chọn trong Stella"
+        "reasonSelected": "Đã chọn trong Stella",
+        "noteKeychain": "{place}: thông tin đăng nhập vẫn được lưu, nhưng Chuỗi khóa của máy Mac không tìm thấy.",
+        "rowKeychain": "Không có trong Chuỗi khóa"
       },
       "claudeLogin": {
         "approve": "Phê duyệt trên trang Anthropic vừa mở, việc đăng nhập sẽ tự hoàn tất.",
@@ -3534,7 +3536,10 @@
     "signIn": "Đăng nhập",
     "signedInContinuing": "Đã đăng nhập Claude. Stella đang trả lời.",
     "signedInAsResend": "Đã đăng nhập Claude bằng {email}. Gửi lại tin nhắn để tiếp tục.",
-    "signedInResend": "Đã đăng nhập Claude. Gửi lại tin nhắn để tiếp tục."
+    "signedInResend": "Đã đăng nhập Claude. Gửi lại tin nhắn để tiếp tục.",
+    "keychainTitle": "Claude không tìm thấy thông tin đăng nhập của bạn trên máy Mac này",
+    "keychainDescription": "Thông tin đăng nhập Claude của bạn vẫn được lưu trong chuỗi khóa đăng nhập của máy Mac này, nhưng tìm kiếm Chuỗi khóa không thấy, thường là do chuỗi khóa đăng nhập đã bị gỡ khỏi danh sách tìm kiếm. Không có gì bị đăng xuất.",
+    "keychainHeldDescription": "Thông tin đăng nhập Claude của bạn vẫn được lưu trong chuỗi khóa đăng nhập của máy Mac này, nhưng tìm kiếm Chuỗi khóa không thấy. Không có gì bị đăng xuất. Tin nhắn của bạn được giữ lại và sẽ gửi ngay khi tìm thấy lại."
   },
   "email": {
     "title": "Email",

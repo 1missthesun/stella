@@ -2162,7 +2162,9 @@
         "reasonCloudLogin": "Login cloud",
         "reasonOtherLogin": "Ditambahkan di Stella",
         "reasonOwnLogin": "Login Claude Code milik komputer ini",
-        "reasonSelected": "Dipilih di Stella"
+        "reasonSelected": "Dipilih di Stella",
+        "noteKeychain": "{place}: proses masuk masih tersimpan, tetapi Rantai Kunci Mac tidak menemukannya.",
+        "rowKeychain": "Tidak ditemukan di Rantai Kunci"
       },
       "claudeLogin": {
         "approve": "Setujui di halaman Anthropic yang terbuka, lalu proses masuk selesai dengan sendirinya.",
@@ -3534,7 +3536,10 @@
     "signIn": "Masuk",
     "signedInContinuing": "Sudah masuk ke Claude. Stella sedang menjawab.",
     "signedInAsResend": "Sudah masuk ke Claude sebagai {email}. Kirim ulang pesan Anda untuk melanjutkan.",
-    "signedInResend": "Sudah masuk ke Claude. Kirim ulang pesan Anda untuk melanjutkan."
+    "signedInResend": "Sudah masuk ke Claude. Kirim ulang pesan Anda untuk melanjutkan.",
+    "keychainTitle": "Claude tidak dapat menemukan proses masuk Anda di Mac ini",
+    "keychainDescription": "Proses masuk Claude Anda masih tersimpan di rantai kunci login Mac ini, tetapi pencarian Rantai Kunci tidak menemukannya, biasanya karena rantai kunci login dihapus dari daftar pencarian. Tidak ada yang dikeluarkan.",
+    "keychainHeldDescription": "Proses masuk Claude Anda masih tersimpan di rantai kunci login Mac ini, tetapi pencarian Rantai Kunci tidak menemukannya. Tidak ada yang dikeluarkan. Pesan Anda disimpan dan dikirim begitu ditemukan lagi."
   },
   "email": {
     "title": "Email",

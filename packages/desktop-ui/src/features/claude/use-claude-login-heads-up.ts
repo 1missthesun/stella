@@ -23,7 +23,7 @@ const withdrawHeadsUp = () => {
 const DISMISSED_KEY = "stella.claudeLogin.headsUpDismissed";
 
 type Attention = {
-  state: "ending" | "ended";
+  state: "ending" | "ended" | "unreachable";
   place: "local" | "cloud";
   id: string;
   email?: string;
@@ -93,6 +93,22 @@ export function useClaudeLoginHeadsUp(): void {
           }).format(new Date(attention.expiresAt))
         : "";
     const cloudPlace = attention.place === "cloud";
+    const bellId = `${NOTICE_ID}:${key}`;
+    if (shownInBell !== bellId) withdrawHeadsUp();
+    if (attention.state === "unreachable") {
+      const title = t("claudeLogin.keychainTitle");
+      const description = t("claudeLogin.keychainDescription");
+      dismissComposerNotice(NOTICE_ID);
+      shownInBell = bellId;
+      notify({
+        id: bellId,
+        kind: "problem",
+        title,
+        detail: description,
+        onDismiss: () => rememberClaudeHeadsUpDismissed(key),
+      });
+      return;
+    }
     const notice = {
       id: NOTICE_ID,
       conversationId: null,
@@ -116,8 +132,6 @@ export function useClaudeLoginHeadsUp(): void {
         dismissKey: key,
       },
     } satisfies ComposerNoticeInput;
-    const bellId = `${NOTICE_ID}:${key}`;
-    if (shownInBell !== bellId) withdrawHeadsUp();
     shownInBell = bellId;
     notify({
       id: bellId,

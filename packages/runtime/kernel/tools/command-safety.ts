@@ -52,6 +52,7 @@ const BLOCKED_HOME_DIRECTORIES = [
   ".azure",
   path.join(".config", "gh"),
   path.join(".config", "gcloud"),
+  path.join("Library", "Keychains"),
 ];
 
 const BLOCKED_DEVICE_PATHS = new Set([
@@ -84,6 +85,7 @@ const SENSITIVE_HOME_FILES = [
   ".npmrc",
   ".pypirc",
   ".git-credentials",
+  "Library/Preferences/com.apple.security.plist",
 ];
 
 const STELLA_CREDENTIAL_FILES = [

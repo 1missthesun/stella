@@ -951,7 +951,9 @@
         "reasonCloudLogin": "雲端的登入",
         "reasonOtherLogin": "在 Stella 中新增",
         "reasonOwnLogin": "這台電腦自己的 Claude Code 登入",
-        "reasonSelected": "在 Stella 中選擇"
+        "reasonSelected": "在 Stella 中選擇",
+        "noteKeychain": "{place}：登入仍已儲存，但 Mac 的鑰匙圈找不到它。",
+        "rowKeychain": "鑰匙圈中找不到"
       },
       "claudeLogin": {
         "whereCloud": "正在你的雲端登入 Claude Code。",

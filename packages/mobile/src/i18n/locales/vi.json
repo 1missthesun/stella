@@ -951,7 +951,9 @@
         "reasonCloudLogin": "Đăng nhập của đám mây",
         "reasonOtherLogin": "Đã thêm trong Stella",
         "reasonOwnLogin": "Đăng nhập Claude Code riêng của máy tính này",
-        "reasonSelected": "Đã chọn trong Stella"
+        "reasonSelected": "Đã chọn trong Stella",
+        "noteKeychain": "{place}: thông tin đăng nhập vẫn được lưu, nhưng Chuỗi khóa của máy Mac không tìm thấy.",
+        "rowKeychain": "Không có trong Chuỗi khóa"
       },
       "claudeLogin": {
         "whereCloud": "Đang đăng nhập Claude Code trên đám mây của bạn.",

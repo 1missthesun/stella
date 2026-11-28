@@ -952,7 +952,9 @@
         "reasonCloudLogin": "Molnets inloggning",
         "reasonOtherLogin": "Tillagd i Stella",
         "reasonOwnLogin": "Den här datorns egen Claude Code-inloggning",
-        "reasonSelected": "Vald i Stella"
+        "reasonSelected": "Vald i Stella",
+        "noteKeychain": "{place}: inloggningen finns kvar, men Macens Nyckelring hittar den inte.",
+        "rowKeychain": "Hittades inte i Nyckelring"
       },
       "claudeLogin": {
         "whereCloud": "Loggar in på Claude Code i ditt moln.",

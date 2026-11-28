@@ -35,6 +35,7 @@ import {
   openEngineConnectFallback,
 } from '@/features/chat/connect-plan/connect-plan'
 import {
+  claudeCodeKeychainUnreachableMatcher,
   classifyStellaProviderError,
   isStellaLimitOrAuthClassification,
   type StellaProviderErrorKind,
@@ -203,6 +204,14 @@ export const resolveStellaProviderErrorToast = (
         duration: 10000,
       }
     case 'claude-code-unusable':
+      if (message.toLowerCase().includes(claudeCodeKeychainUnreachableMatcher)) {
+        return {
+          title: translateNow('claudeLogin.keychainTitle'),
+          description: translateNow('claudeLogin.keychainDescription'),
+          variant: 'error',
+          duration: 15000,
+        }
+      }
       return {
         title: "Claude Code can't start",
         description: stripClaudeCodeMark(message),

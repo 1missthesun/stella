@@ -952,7 +952,9 @@
         "reasonCloudLogin": "Pilven kirjautuminen",
         "reasonOtherLogin": "Lisätty Stellassa",
         "reasonOwnLogin": "Tämän tietokoneen oma Claude Code -kirjautuminen",
-        "reasonSelected": "Valittu Stellassa"
+        "reasonSelected": "Valittu Stellassa",
+        "noteKeychain": "{place}: kirjautuminen on yhä tallessa, mutta Macin Avainnippu ei löydä sitä.",
+        "rowKeychain": "Ei löydy Avainnipusta"
       },
       "claudeLogin": {
         "whereCloud": "Kirjaudutaan Claude Codeen pilvessäsi.",

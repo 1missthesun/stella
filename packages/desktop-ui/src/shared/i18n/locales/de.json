@@ -2172,7 +2172,9 @@
         "reasonCloudLogin": "Anmeldung der Cloud",
         "reasonOtherLogin": "In Stella hinzugefügt",
         "reasonOwnLogin": "Eigene Claude Code-Anmeldung dieses Computers",
-        "reasonSelected": "In Stella ausgewählt"
+        "reasonSelected": "In Stella ausgewählt",
+        "noteKeychain": "{place}: Die Anmeldung ist noch gespeichert, aber der Schlüsselbund des Mac findet sie nicht.",
+        "rowKeychain": "Nicht im Schlüsselbund gefunden"
       },
       "claudeLogin": {
         "approve": "Bestätige auf der geöffneten Seite von Anthropic, dann wird die Anmeldung automatisch abgeschlossen.",
@@ -3568,7 +3570,10 @@
     "signIn": "Anmelden",
     "signedInContinuing": "Bei Claude angemeldet. Stella antwortet jetzt.",
     "signedInAsResend": "Bei Claude als {email} angemeldet. Sende deine Nachricht erneut, um fortzufahren.",
-    "signedInResend": "Bei Claude angemeldet. Sende deine Nachricht erneut, um fortzufahren."
+    "signedInResend": "Bei Claude angemeldet. Sende deine Nachricht erneut, um fortzufahren.",
+    "keychainTitle": "Claude findet deine Anmeldung auf diesem Mac nicht",
+    "keychainDescription": "Deine Claude-Anmeldung ist noch im Anmeldeschlüsselbund dieses Mac gespeichert, aber Schlüsselbund-Abfragen finden sie nicht, meist weil der Anmeldeschlüsselbund aus der Suchliste entfernt wurde. Nichts wurde abgemeldet.",
+    "keychainHeldDescription": "Deine Claude-Anmeldung ist noch im Anmeldeschlüsselbund dieses Mac gespeichert, aber Schlüsselbund-Abfragen finden sie nicht. Nichts wurde abgemeldet. Deine Nachricht bleibt erhalten und wird gesendet, sobald sie wieder gefunden wird."
   },
   "email": {
     "title": "E-Mail",

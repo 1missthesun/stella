@@ -2172,7 +2172,9 @@
         "reasonCloudLogin": "De login van de cloud",
         "reasonOtherLogin": "Toegevoegd in Stella",
         "reasonOwnLogin": "De eigen Claude Code-login van deze computer",
-        "reasonSelected": "Gekozen in Stella"
+        "reasonSelected": "Gekozen in Stella",
+        "noteKeychain": "{place}: de aanmelding staat er nog, maar de Sleutelhanger van de Mac vindt haar niet.",
+        "rowKeychain": "Niet gevonden in Sleutelhanger"
       },
       "claudeLogin": {
         "approve": "Keur goed op de geopende pagina van Anthropic, dan wordt het vanzelf afgerond.",
@@ -3568,7 +3570,10 @@
     "signIn": "Inloggen",
     "signedInContinuing": "Ingelogd bij Claude. Stella antwoordt nu.",
     "signedInAsResend": "Ingelogd bij Claude als {email}. Stuur je bericht opnieuw om verder te gaan.",
-    "signedInResend": "Ingelogd bij Claude. Stuur je bericht opnieuw om verder te gaan."
+    "signedInResend": "Ingelogd bij Claude. Stuur je bericht opnieuw om verder te gaan.",
+    "keychainTitle": "Claude kan je aanmelding op deze Mac niet vinden",
+    "keychainDescription": "Je Claude-aanmelding staat nog in de inlogsleutelhanger van deze Mac, maar zoekopdrachten in Sleutelhanger vinden haar niet, meestal omdat de inlogsleutelhanger van de zoeklijst is gehaald. Er is niets afgemeld.",
+    "keychainHeldDescription": "Je Claude-aanmelding staat nog in de inlogsleutelhanger van deze Mac, maar zoekopdrachten in Sleutelhanger vinden haar niet. Er is niets afgemeld. Je bericht blijft bewaard en gaat weg zodra ze weer gevonden wordt."
   },
   "email": {
     "title": "E-mail",

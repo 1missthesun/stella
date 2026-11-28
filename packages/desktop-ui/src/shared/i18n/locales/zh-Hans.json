@@ -2162,7 +2162,9 @@
         "reasonCloudLogin": "云端的登录",
         "reasonOtherLogin": "在 Stella 中添加",
         "reasonOwnLogin": "这台电脑自己的 Claude Code 登录",
-        "reasonSelected": "在 Stella 中选择"
+        "reasonSelected": "在 Stella 中选择",
+        "noteKeychain": "{place}：登录仍已保存，但 Mac 的钥匙串找不到它。",
+        "rowKeychain": "钥匙串中找不到"
       },
       "claudeLogin": {
         "approve": "在打开的 Anthropic 页面上批准，登录会自动完成。",
@@ -3534,7 +3536,10 @@
     "signIn": "登录",
     "signedInContinuing": "已登录 Claude。Stella 正在回复。",
     "signedInAsResend": "已以 {email} 登录 Claude。请重新发送消息以继续。",
-    "signedInResend": "已登录 Claude。请重新发送消息以继续。"
+    "signedInResend": "已登录 Claude。请重新发送消息以继续。",
+    "keychainTitle": "Claude 在这台 Mac 上找不到你的登录",
+    "keychainDescription": "你的 Claude 登录仍保存在这台 Mac 的登录钥匙串中，但钥匙串查找不到它，通常是因为登录钥匙串被移出了钥匙串搜索列表。没有任何账户被退出登录。",
+    "keychainHeldDescription": "你的 Claude 登录仍保存在这台 Mac 的登录钥匙串中，但钥匙串查找不到它。没有任何账户被退出登录。你的消息已保留，一旦再次找到就会发送。"
   },
   "email": {
     "title": "邮件",

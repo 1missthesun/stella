@@ -2182,7 +2182,9 @@
         "reasonCloudLogin": "La connexion du cloud",
         "reasonOtherLogin": "Ajouté dans Stella",
         "reasonOwnLogin": "La connexion à Claude Code propre à cet ordinateur",
-        "reasonSelected": "Choisi dans Stella"
+        "reasonSelected": "Choisi dans Stella",
+        "noteKeychain": "{place} : la connexion est toujours enregistrée, mais le Trousseau du Mac ne la trouve pas.",
+        "rowKeychain": "Introuvable dans le Trousseau"
       },
       "claudeLogin": {
         "approve": "Approuvez sur la page d'Anthropic qui s'est ouverte, et la connexion se termine toute seule.",
@@ -3600,7 +3602,10 @@
     "signIn": "Se connecter",
     "signedInContinuing": "Connecté à Claude. Stella répond maintenant.",
     "signedInAsResend": "Connecté à Claude en tant que {email}. Renvoyez votre message pour continuer.",
-    "signedInResend": "Connecté à Claude. Renvoyez votre message pour continuer."
+    "signedInResend": "Connecté à Claude. Renvoyez votre message pour continuer.",
+    "keychainTitle": "Claude ne trouve pas votre connexion sur ce Mac",
+    "keychainDescription": "Votre connexion Claude est toujours enregistrée dans le trousseau de session de ce Mac, mais les recherches du Trousseau ne la trouvent pas, généralement parce que le trousseau de session a été retiré de la liste de recherche. Aucune session n’a été fermée.",
+    "keychainHeldDescription": "Votre connexion Claude est toujours enregistrée dans le trousseau de session de ce Mac, mais les recherches du Trousseau ne la trouvent pas. Aucune session n’a été fermée. Votre message est conservé et partira dès qu’elle sera de nouveau trouvée."
   },
   "email": {
     "title": "E-mail",

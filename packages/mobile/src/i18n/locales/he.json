@@ -953,7 +953,9 @@
         "reasonCloudLogin": "החיבור של הענן",
         "reasonOtherLogin": "נוסף ב‑Stella",
         "reasonOwnLogin": "החיבור של המחשב הזה ל-Claude Code",
-        "reasonSelected": "נבחר ב-Stella"
+        "reasonSelected": "נבחר ב-Stella",
+        "noteKeychain": "{place}: ההתחברות עדיין שמורה, אבל מחזיק המפתחות של ה-Mac לא מוצא אותה.",
+        "rowKeychain": "לא נמצא במחזיק המפתחות"
       },
       "claudeLogin": {
         "whereCloud": "מתחברים ל-Claude Code בענן שלכם.",

@@ -2192,7 +2192,9 @@
         "reasonCloudLogin": "Logowanie chmury",
         "reasonOtherLogin": "Dodane w Stella",
         "reasonOwnLogin": "Własne logowanie tego komputera do Claude Code",
-        "reasonSelected": "Wybrane w Stella"
+        "reasonSelected": "Wybrane w Stella",
+        "noteKeychain": "{place}: logowanie jest nadal zapisane, ale Pęk kluczy Maca go nie znajduje.",
+        "rowKeychain": "Nie znaleziono w Pęku kluczy"
       },
       "claudeLogin": {
         "approve": "Zatwierdź na otwartej stronie Anthropic, a logowanie zakończy się samo.",
@@ -3632,7 +3634,10 @@
     "signIn": "Zaloguj się",
     "signedInContinuing": "Zalogowano do Claude. Stella właśnie odpowiada.",
     "signedInAsResend": "Zalogowano do Claude jako {email}. Wyślij wiadomość ponownie, aby kontynuować.",
-    "signedInResend": "Zalogowano do Claude. Wyślij wiadomość ponownie, aby kontynuować."
+    "signedInResend": "Zalogowano do Claude. Wyślij wiadomość ponownie, aby kontynuować.",
+    "keychainTitle": "Claude nie może znaleźć Twojego logowania na tym Macu",
+    "keychainDescription": "Twoje logowanie do Claude jest nadal zapisane w pęku kluczy logowania tego Maca, ale wyszukiwanie w Pęku kluczy go nie znajduje, zwykle dlatego, że pęk kluczy logowania usunięto z listy wyszukiwania. Nic nie zostało wylogowane.",
+    "keychainHeldDescription": "Twoje logowanie do Claude jest nadal zapisane w pęku kluczy logowania tego Maca, ale wyszukiwanie w Pęku kluczy go nie znajduje. Nic nie zostało wylogowane. Twoja wiadomość jest zachowana i zostanie wysłana, gdy logowanie znów się znajdzie."
   },
   "email": {
     "title": "E-mail",

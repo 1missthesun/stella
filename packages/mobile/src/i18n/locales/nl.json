@@ -952,7 +952,9 @@
         "reasonCloudLogin": "De login van de cloud",
         "reasonOtherLogin": "Toegevoegd in Stella",
         "reasonOwnLogin": "De eigen Claude Code-login van deze computer",
-        "reasonSelected": "Gekozen in Stella"
+        "reasonSelected": "Gekozen in Stella",
+        "noteKeychain": "{place}: de aanmelding staat er nog, maar de Sleutelhanger van de Mac vindt haar niet.",
+        "rowKeychain": "Niet gevonden in Sleutelhanger"
       },
       "claudeLogin": {
         "whereCloud": "Inloggen bij Claude Code in je cloud.",

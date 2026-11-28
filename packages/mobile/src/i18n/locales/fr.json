@@ -953,7 +953,9 @@
         "reasonCloudLogin": "La connexion du cloud",
         "reasonOtherLogin": "Ajouté dans Stella",
         "reasonOwnLogin": "La connexion à Claude Code propre à cet ordinateur",
-        "reasonSelected": "Choisi dans Stella"
+        "reasonSelected": "Choisi dans Stella",
+        "noteKeychain": "{place} : la connexion est toujours enregistrée, mais le Trousseau du Mac ne la trouve pas.",
+        "rowKeychain": "Introuvable dans le Trousseau"
       },
       "claudeLogin": {
         "whereCloud": "Connexion à Claude Code dans votre cloud.",

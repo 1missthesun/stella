@@ -956,7 +956,9 @@
         "reasonCloudLogin": "تسجيل دخول السحابة",
         "reasonOtherLogin": "أُضيف في Stella",
         "reasonOwnLogin": "تسجيل الدخول الخاص بهذا الكمبيوتر إلى Claude Code",
-        "reasonSelected": "مُختار في Stella"
+        "reasonSelected": "مُختار في Stella",
+        "noteKeychain": "{place}: لا يزال تسجيل الدخول محفوظًا، لكن سلسلة مفاتيح Mac لا تجده.",
+        "rowKeychain": "غير موجود في سلسلة المفاتيح"
       },
       "claudeLogin": {
         "whereCloud": "جارٍ تسجيل الدخول إلى Claude Code في سحابتك.",

@@ -40,6 +40,8 @@ struct LauncherPaths {
     var lockFile: URL { root.appendingPathComponent("launcher.lock") }
     var isolatedUserData: URL { root.appendingPathComponent("user-data") }
     var isolatedHome: URL { root.appendingPathComponent("stella-home") }
+    /// A first install's hydration progress (app-hydration.ts reads it).
+    var hydrationFile: URL { root.appendingPathComponent("hydration.json") }
 }
 
 struct ServerConfig: Equatable {
@@ -184,6 +186,9 @@ enum Shell {
         process.arguments = args
         if let cwd { process.currentDirectoryURL = cwd }
         process.environment = env
+        // Work run behind the open window (hydration) keeps its children behind it too.
+        let qos = Thread.current.qualityOfService
+        if qos == .utility || qos == .background { process.qualityOfService = qos }
         process.standardInput = FileHandle.nullDevice
 
         if let outputFile {
@@ -374,6 +379,9 @@ struct LauncherState: Codable {
     var bunLockHash: String?
     var preparedHead: String?
     var installedAt: String?
+    /// Set while the app folder is a first install's app bundle (no git, no packages): the commit
+    /// it was built from, which hydration checks out.
+    var bundleCommit: String?
 
     static func load(_ paths: LauncherPaths) -> LauncherState {
         guard let data = try? Data(contentsOf: paths.stateFile),
@@ -387,5 +395,33 @@ struct LauncherState: Codable {
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         guard let data = try? encoder.encode(self) else { return }
         try? data.write(to: paths.stateFile, options: .atomic)
+    }
+}
+
+/// The launcher's state, which hydration (on its own thread) records while the supervisor may too.
+final class StateStore {
+    private let lock = NSLock()
+    private var state: LauncherState
+
+    init(_ state: LauncherState) { self.state = state }
+
+    var current: LauncherState {
+        lock.lock()
+        defer { lock.unlock() }
+        return state
+    }
+
+    func replace(_ next: LauncherState) {
+        lock.lock()
+        state = next
+        lock.unlock()
+    }
+
+    /// Changes the state and saves it.
+    func update(_ paths: LauncherPaths, _ change: (inout LauncherState) -> Void) {
+        lock.lock()
+        defer { lock.unlock() }
+        change(&state)
+        state.save(paths)
     }
 }

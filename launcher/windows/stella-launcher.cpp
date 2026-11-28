@@ -13,6 +13,7 @@
 #include <dwmapi.h>
 #include <objbase.h>
 #include <sddl.h>
+#include <tlhelp32.h>
 #include <shellapi.h>
 #include <shlobj.h>
 #include <shlwapi.h>
@@ -323,6 +324,7 @@ struct Paths {
     wstring lockFile() const { return root + L"\\launcher.lock"; }
     wstring isolatedUserData() const { return root + L"\\user-data"; }
     wstring isolatedHome() const { return root + L"\\stella-home"; }
+    wstring hydrationFile() const { return root + L"\\hydration.json"; }
 
     static Paths resolve() {
         Paths p;
@@ -397,8 +399,14 @@ static bool loadServer(Server &out) {
     return ok;
 }
 
+// The hydration thread changes and saves the state while the supervisor may too.
+static std::recursive_mutex gStateLock;
+
 struct State {
     string bunLockHash, preparedHead, installedAt, caughtUpTo;
+    // Set while the app folder is a first install's app bundle (no git, no
+    // packages): the commit it was built from, which hydration checks out.
+    string bundleCommit;
 
     static State load() {
         State s;
@@ -409,11 +417,13 @@ struct State {
         if (const char *v = mj_get_string(json, "preparedHead")) s.preparedHead = v;
         if (const char *v = mj_get_string(json, "installedAt")) s.installedAt = v;
         if (const char *v = mj_get_string(json, "caughtUpTo")) s.caughtUpTo = v;
+        if (const char *v = mj_get_string(json, "bundleCommit")) s.bundleCommit = v;
         mj_free(json);
         return s;
     }
 
     void save() const {
+        std::lock_guard<std::recursive_mutex> lock(gStateLock);
         string out = "{";
         bool first = true;
         auto add = [&](const char *name, const string &value) {
@@ -424,6 +434,7 @@ struct State {
             first = false;
         };
         add("bunLockHash", bunLockHash);
+        add("bundleCommit", bundleCommit);
         add("caughtUpTo", caughtUpTo);
         add("installedAt", installedAt);
         add("preparedHead", preparedHead);
@@ -434,7 +445,7 @@ struct State {
 
 static State S;
 
-enum class Choice { None, Return, Reinstall, Retry, Accept, Quit };
+enum class Choice { None, Return, Reinstall, Retry, Accept, Repair, Quit };
 
 static const char *choiceName(Choice c) {
     switch (c) {
@@ -442,6 +453,7 @@ static const char *choiceName(Choice c) {
     case Choice::Reinstall: return "reinstall";
     case Choice::Retry: return "retry";
     case Choice::Accept: return "accept";
+    case Choice::Repair: return "repair";
     case Choice::Quit: return "quit";
     default: return "none";
     }
@@ -457,6 +469,7 @@ struct Options {
     bool selfTest = false;
     bool start = false;
     bool show = false;
+    bool recovery = false;
     DWORD after = 0;
     bool backendArg = false;
     bool backendOverride = false;
@@ -464,6 +477,8 @@ struct Options {
     string sourceRef;
     wstring backend;
     wstring localBun;
+    wstring engine = envVar(L"STELLA_LAUNCHER_ENGINE");
+    wstring engineBin = envVar(L"STELLA_LAUNCHER_ENGINE_BIN");
     double hold = 0;
     Choice recoveryChoice = Choice::None;
     wstring captureDir;
@@ -493,9 +508,14 @@ static void followServerFile() {
 static const char *kUsage =
     "usage: Stella.exe [--self-test] [--source <path|git url>] [--source-ref <ref>]\n"
     "                  [--backend <url>] [--bun <path>] [--hold <seconds>]\n"
-    "                  [--recovery-choice return|retry|quit] [--capture-dir <dir>]\n"
-    "                  [--start [--show]] [--after <pid>]\n"
+    "                  [--recovery-choice return|repair|retry|quit] [--capture-dir <dir>]\n"
+    "                  [--start [--show]] [--recovery] [--after <pid>]\n"
+    "                  [--engine electron|rune] [--engine-bin <path>]\n"
     "       Stella.exe --version\n"
+    "\n"
+    "Opening Stella starts it; the window shows only for an install or update step, or when\n"
+    "Stella can't start. --recovery (or holding Shift while opening Stella) shows the window\n"
+    "with Start, rollback and reinstall instead.\n"
     "\n"
     "Environment: STELLA_LAUNCHER_ROOT (install root, for testing),\n"
     "STELLA_LAUNCHER_KEY_FILE (PKCS#8 PEM instead of the DPAPI key),\n"
@@ -503,7 +523,12 @@ static const char *kUsage =
     "STELLA_LAUNCHER_READY_TIMEOUT_SECONDS, STELLA_LAUNCHER_PREPARE_TIMEOUT_SECONDS,\n"
     "STELLA_LAUNCHER_INSTALL_DIR (instead of %LOCALAPPDATA%\\Programs\\Stella),\n"
     "STELLA_LAUNCHER_UPDATE_URL, STELLA_LAUNCHER_UPDATE_DELAY_SECONDS and\n"
-    "STELLA_LAUNCHER_UPDATE_SKIP_SIGNATURE=1 (with an update URL; for testing).\n";
+    "STELLA_LAUNCHER_UPDATE_SKIP_SIGNATURE=1 (with an update URL; for testing),\n"
+    "STELLA_LAUNCHER_MIRROR_URL (where GitHub runtime downloads are tried first; \"off\" for none),\n"
+    "STELLA_LAUNCHER_REPAIR_SECONDS (how long Repair may run; 180 by default),\n"
+    "STELLA_LAUNCHER_ENGINE=rune|electron or the file <root>\\rune-engine or <root>\\electron-engine\n"
+    "(the engine; Electron unless Rune is chosen),\n"
+    "STELLA_LAUNCHER_ENGINE_BIN (a local stella-engine.exe; implies rune).\n";
 
 static void parseOptions() {
     int argc = 0;
@@ -526,14 +551,18 @@ static void parseOptions() {
         else if (a == L"--backend") { O.backend = value(); O.backendArg = true; O.backendOverride = true; }
         else if (a == L"--start") O.start = true;
         else if (a == L"--show") O.show = true;
+        else if (a == L"--recovery") O.recovery = true;
         else if (a == L"--after") O.after = wcstoul(value().c_str(), nullptr, 10);
         else if (a == L"--bun") O.localBun = value();
+        else if (a == L"--engine") O.engine = value();
+        else if (a == L"--engine-bin") O.engineBin = value();
         else if (a == L"--hold") O.hold = _wtof(value().c_str());
         else if (a == L"--capture-dir") O.captureDir = value();
         else if (a == L"--recovery-choice") {
             wstring v = value();
             if (v == L"return") O.recoveryChoice = Choice::Return;
             else if (v == L"retry") O.recoveryChoice = Choice::Retry;
+            else if (v == L"repair") O.recoveryChoice = Choice::Repair;
             else if (v == L"quit") O.recoveryChoice = Choice::Quit;
             else { LOG("unknown recovery choice"); ExitProcess(64); }
         } else if (a == L"-h" || a == L"--help" || a == L"/?") {
@@ -652,6 +681,10 @@ static HANDLE openNul() {
     return CreateFileW(L"NUL", GENERIC_READ, FILE_SHARE_READ | FILE_SHARE_WRITE, &sa, OPEN_EXISTING, 0, nullptr);
 }
 
+// Hydration's thread starts its commands below normal priority, behind the
+// open window (their children inherit it).
+static thread_local DWORD tChildPriority = 0;
+
 static CmdResult runCmd(const vector<wstring> &argv, const wstring &cwd, const Env &env, const wstring &outputFile = L"",
                         double timeoutSeconds = 0, const wstring &rawCmdline = L"", bool keepBackground = false) {
     CmdResult r;
@@ -684,7 +717,8 @@ static CmdResult runCmd(const vector<wstring> &argv, const wstring &cwd, const E
     PROCESS_INFORMATION pi;
     ZeroMemory(&pi, sizeof(pi));
     wstring cmdline = rawCmdline.empty() ? commandLine(argv) : rawCmdline;
-    bool started = createProcess(argv[0], cmdline, cwd, env, nul, outWrite, errWrite, CREATE_NO_WINDOW | CREATE_SUSPENDED, &pi);
+    bool started = createProcess(argv[0], cmdline, cwd, env, nul, outWrite, errWrite,
+                                 CREATE_NO_WINDOW | CREATE_SUSPENDED | tChildPriority, &pi);
     DWORD startError = GetLastError();
     if (outputFile.empty()) {
         CloseHandle(outWrite);
@@ -1120,8 +1154,12 @@ static void downloadOnce(const string &url, const wstring &dest, const string &s
 static void download(const string &url, const wstring &dest, const string &sha256) {
     static const string kGitHub = "https://github.com/";
     vector<string> sources;
-    if (url.compare(0, kGitHub.size(), kGitHub) == 0)
-        sources.push_back(string(STELLA_RELEASES_URL) + "/runtimes/github/" + url.substr(kGitHub.size()));
+    // STELLA_LAUNCHER_MIRROR_URL points the mirror elsewhere (a test server), or "off".
+    string base = trim(utf8(envVar(L"STELLA_LAUNCHER_MIRROR_URL")));
+    if (base.empty()) base = STELLA_RELEASES_URL;
+    while (!base.empty() && base.back() == '/') base.pop_back();
+    if (base != "off" && url.compare(0, kGitHub.size(), kGitHub) == 0)
+        sources.push_back(base + "/runtimes/github/" + url.substr(kGitHub.size()));
     sources.push_back(url);
     static const DWORD kPauseSeconds[] = {0, 5, 15, 30};
     string lastError;
@@ -1132,7 +1170,19 @@ static void download(const string &url, const wstring &dest, const string &sha25
         }
         for (const string &source : sources) {
             try {
+                ULONGLONG started = GetTickCount64();
                 downloadOnce(source, dest, sha256);
+                WIN32_FILE_ATTRIBUTE_DATA info = {};
+                unsigned long long size = GetFileAttributesExW(dest.c_str(), GetFileExInfoStandard, &info)
+                                              ? ((unsigned long long)info.nFileSizeHigh << 32) | info.nFileSizeLow
+                                              : 0;
+                size_t hostStart = source.find("://");
+                hostStart = hostStart == string::npos ? 0 : hostStart + 3;
+                string host = source.substr(hostStart, source.find('/', hostStart) - hostStart);
+                size_t slash = dest.find_last_of(L"\\/");
+                logLine(format("install: %s from %s (%llu MB, sha256 checked) in %.1fs",
+                               utf8(slash == wstring::npos ? dest : dest.substr(slash + 1)).c_str(), host.c_str(),
+                               size / 1000000, (GetTickCount64() - started) / 1000.0));
                 return;
             } catch (const LauncherError &e) {
                 lastError = e.message;
@@ -1175,6 +1225,9 @@ struct GitTool {
             if (kv.first != L"STELLA_GIT_BIN" && kv.first != L"LOCAL_GIT_DIRECTORY" && kv.first != L"STELLA_GIT_BASH")
                 env[kv.first] = kv.second;
         env[L"GIT_TERMINAL_PROMPT"] = L"0";
+        // An app folder without .git (a first install's app bundle, before
+        // hydration) must not find a repository above it.
+        env[L"GIT_CEILING_DIRECTORIES"] = P.root;
         for (auto &kv : extra) env[kv.first] = kv.second;
         vector<wstring> argv = {bin()};
         for (auto &a : args) argv.push_back(wide(a));
@@ -1204,7 +1257,8 @@ static Env baseEnvironment() {
          {L"STELLA_LAUNCHER_KEY_FILE", L"STELLA_LAUNCHER_ROOT", L"ELECTRON_RUN_AS_NODE", L"STELLA_V2_DEV_DATA_DIR",
           L"STELLA_APP_DIR", L"STELLA_RUNTIME_STATE_DIR", L"STELLA_DEV_RESTART_REQUEST_FILE",
           L"STELLA_DEV_USER_QUIT_REQUEST_FILE", L"STELLA_ELECTRON_DEV_RUNNER_PID", L"STELLA_ELECTRON_READY_FILE",
-          L"NODE_OPTIONS", L"STELLA_LAUNCHER_PIPE"})
+          L"NODE_OPTIONS", L"STELLA_LAUNCHER_PIPE", L"STELLA_LAUNCHER_ENGINE", L"STELLA_LAUNCHER_ENGINE_BIN",
+          L"STELLA_RUNE_ROOT", L"STELLA_RUNE_BUN", L"STELLA_RUNE_SERVICES"})
         env.erase(key);
     if (!(P.isolated && usesTestKey))
         for (const wchar_t *key : {L"STELLA_DEV_HARNESS", L"STELLA_DEV_HARNESS_STORAGE_KEY", L"STELLA_V2_DEV_USER_DATA_DIR",
@@ -1226,9 +1280,19 @@ static Env baseEnvironment() {
     return env;
 }
 
+// Stella runs from a first install's app bundle this session: git and the
+// packages come in behind it (hydrateMain).
+static std::atomic<bool> gBundleStage{false};
+
 static Env electronEnvironment(const wstring &pipeName) {
     Env env = baseEnvironment();
     env[L"STELLA_LAUNCHER"] = L"1";
+    env.erase(L"STELLA_APP_HYDRATION");
+    if (gBundleStage) {
+        // What needs git or the packages waits on this file (app-hydration.ts).
+        env[L"STELLA_APP_HYDRATION"] = P.hydrationFile();
+        env[L"GIT_CEILING_DIRECTORIES"] = P.root;
+    }
     env[L"VITE_STELLA_BACKEND_URL"] = backendURL();
     env[L"STELLA_LAUNCHER_DATA_DIR"] = P.root;
     env[L"STELLA_LAUNCHER_VERSION"] = std::to_wstring(kLauncherVersion);
@@ -1254,7 +1318,10 @@ static Env electronEnvironment(const wstring &pipeName) {
 struct Recovery {
     string reason;
     vector<string> output;
+    string title;
     bool hasKnownGood = false;
+    // Repair is offered once per launcher run; after it, Undo is the button.
+    bool canRepair = false;
     Choice automation = Choice::None;
     double automationDelay = 0;
     wstring capturePath;
@@ -1277,6 +1344,8 @@ public:
     virtual Choice failed(const Recovery &recovery) = 0;
     virtual Choice changed(const OutsideChanges &changes, bool hasKnownGood) = 0;
     virtual void installInfo(const string &version, bool hasKnownGood) {}
+    // The launcher's own window (a reopen Stella didn't answer).
+    virtual void reveal() {}
 };
 
 static Ui *gUi = nullptr;
@@ -1287,6 +1356,7 @@ static void progress(const string &status, double from, double to) {
 }
 
 static void requestShutdown();
+static bool requestFocus();
 
 class ProgressWindow {
 public:
@@ -1377,7 +1447,7 @@ struct RecoveryDialog {
     const Recovery &recovery;
     bool clicked = false;
 
-    enum { kReturn = 101, kReinstall = 102, kRetry = 103, kQuit = 104 };
+    enum { kReturn = 101, kReinstall = 102, kRetry = 103, kQuit = 104, kRepair = 105 };
 
     static HRESULT CALLBACK callback(HWND hwnd, UINT msg, WPARAM wParam, LPARAM, LONG_PTR ref) {
         auto self = (RecoveryDialog *)ref;
@@ -1388,6 +1458,7 @@ struct RecoveryDialog {
             self->clicked = true;
             int id = r.automation == Choice::Return ? (r.hasKnownGood ? kReturn : kReinstall)
                      : r.automation == Choice::Retry ? kRetry
+                     : r.automation == Choice::Repair && r.canRepair ? kRepair
                                                      : kQuit;
             LOG("recovery: self-test clicks %s", choiceName(r.automation));
             PostMessageW(hwnd, TDM_CLICK_BUTTON, id, 0);
@@ -1401,11 +1472,12 @@ struct RecoveryDialog {
         for (size_t i = 0; i < r.output.size(); i++) joined += (i ? "\n" : "") + r.output[i];
         wstring content = wide(r.reason);
         wstring details = wide(r.output.empty() ? string("(Stella wrote no output.)") : joined);
-        TASKDIALOG_BUTTON buttons[] = {
-            {r.hasKnownGood ? kReturn : kReinstall, r.hasKnownGood ? L"Return to last working version" : L"Reinstall"},
-            {kRetry, L"Try again"},
-            {kQuit, L"Quit"},
-        };
+        vector<TASKDIALOG_BUTTON> buttons;
+        if (r.canRepair) buttons.push_back({kRepair, L"Repair"});
+        buttons.push_back({r.hasKnownGood ? kReturn : kReinstall, r.hasKnownGood ? L"Undo last change" : L"Reinstall"});
+        buttons.push_back({kRetry, L"Try again"});
+        buttons.push_back({kQuit, L"Quit"});
+        wstring title = wide(r.title.empty() ? string("Stella couldn't start") : r.title);
         TASKDIALOGCONFIG config;
         ZeroMemory(&config, sizeof(config));
         config.cbSize = sizeof(config);
@@ -1413,13 +1485,13 @@ struct RecoveryDialog {
         config.dwFlags = TDF_EXPANDED_BY_DEFAULT | TDF_CALLBACK_TIMER | TDF_ALLOW_DIALOG_CANCELLATION;
         config.pszWindowTitle = L"Stella";
         config.pszMainIcon = TD_WARNING_ICON;
-        config.pszMainInstruction = L"Stella couldn't start";
+        config.pszMainInstruction = title.c_str();
         config.pszContent = content.c_str();
         config.pszExpandedInformation = details.c_str();
         config.pszExpandedControlText = L"Hide output";
         config.pszCollapsedControlText = L"Show output";
-        config.pButtons = buttons;
-        config.cButtons = 3;
+        config.pButtons = buttons.data();
+        config.cButtons = (UINT)buttons.size();
         config.nDefaultButton = buttons[0].nButtonID;
         config.cxWidth = 320;
         config.pfCallback = callback;
@@ -1433,6 +1505,7 @@ struct RecoveryDialog {
         Choice choice = pressed == kReturn ? Choice::Return
                         : pressed == kReinstall ? Choice::Reinstall
                         : pressed == kRetry ? Choice::Retry
+                        : pressed == kRepair ? Choice::Repair
                                             : Choice::Quit;
         if (choice == Choice::Return && !r.hasKnownGood) choice = Choice::Reinstall;
         LOG("recovery: chose %s", choiceName(choice));
@@ -1772,6 +1845,8 @@ public:
             phase_ = "failed";
             reason_ = r.reason;
             output_ = r.output;
+            title_ = r.title;
+            canRepair_ = r.canRepair;
             hasKnownGood_ = r.hasKnownGood;
             command_ = Choice::None;
         });
@@ -1801,6 +1876,8 @@ public:
         update([&]() {
             phase_ = "changed";
             reason_.clear();
+            title_.clear();
+            canRepair_ = false;
             changes_ = changes.files;
             hasKnownGood_ = hasKnownGood;
             command_ = Choice::None;
@@ -1821,6 +1898,8 @@ public:
         });
     }
 
+    void reveal() override { PostMessageW(hwnd_, WM_UI_ACTIVATE, 0, 0); }
+
 private:
     enum { kCreateTimer = 1, kLoadTimer = 2 };
 
@@ -1834,7 +1913,8 @@ private:
 
     std::mutex mutex_;
     std::condition_variable cond_;
-    string phase_ = "idle", status_, reason_, version_;
+    string phase_ = "idle", status_, reason_, version_, title_;
+    bool canRepair_ = false;
     double progress_ = 0, progressTo_ = 0;
     vector<string> output_;
     vector<OutsideChanges::File> changes_;
@@ -1889,9 +1969,10 @@ private:
                 phase_ = "starting";
                 status_ = choice == Choice::Return      ? "Restoring the last working version…"
                           : choice == Choice::Reinstall ? "Reinstalling Stella…"
+                          : choice == Choice::Repair    ? "Repairing Stella…"
                                                         : "Starting Stella…";
-                progress_ = 0;
-                progressTo_ = 0.05;
+                progress_ = choice == Choice::Repair ? 0.02 : 0;
+                progressTo_ = choice == Choice::Repair ? 0.9 : 0.05;
             }
         }
         PostMessageW(hwnd_, WM_UI_RENDER, 0, 0);
@@ -1959,7 +2040,17 @@ private:
             capturePreview((int)wParam, *path);
             return 0;
         }
-        case WM_UI_ACTIVATE:
+        case WM_UI_ACTIVATE: {
+            // wParam 1: Stella was opened again; it comes forward itself while it runs.
+            bool running;
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                running = phase_ == "running";
+            }
+            if (wParam == 1 && running && requestFocus()) {
+                LOG("ui: Stella was opened again; bringing it forward");
+                return 0;
+            }
             LOG("ui: asked to show the window");
             {
                 std::lock_guard<std::mutex> lock(mutex_);
@@ -1967,6 +2058,7 @@ private:
             }
             applyVisibility();
             return 0;
+        }
         case WM_UI_DONE:
             if (controller_) controller_->Close();
             DestroyWindow(hwnd);
@@ -2100,6 +2192,13 @@ private:
             pageLoaded();
         } else if (action == "start") {
             command(Choice::Retry, action);
+        } else if (action == "repair") {
+            bool can;
+            {
+                std::lock_guard<std::mutex> lock(mutex_);
+                can = phase_ == "failed" && canRepair_;
+            }
+            if (can) command(Choice::Repair, action);
         } else if (action == "return") {
             command(Choice::Return, action);
         } else if (action == "accept") {
@@ -2210,7 +2309,9 @@ private:
                                                                    starting ? progress_ : 0, starting ? progressTo_ : 0) +
                    ",\"output\":[";
             for (size_t i = 0; i < output_.size(); i++) json += (i ? "," : "") + jsonString(output_[i]);
-            json += string("],\"hasKnownGood\":") + (hasKnownGood_ ? "true" : "false") + ",\"version\":" + jsonString(version_) +
+            json += string("],\"hasKnownGood\":") + (hasKnownGood_ ? "true" : "false") +
+                    ",\"canRepair\":" + (canRepair_ && phase_ == "failed" ? "true" : "false") +
+                    ",\"title\":" + jsonString(phase_ == "failed" ? title_ : string()) + ",\"version\":" + jsonString(version_) +
                     ",\"changes\":[";
             const size_t shown = 200;
             for (size_t i = 0; i < changes_.size() && i < shown; i++)
@@ -2278,7 +2379,8 @@ private:
     }
 };
 
-static bool showRunningLauncher() {
+// focus: Stella itself comes forward (a plain reopen); else the launcher's window.
+static bool showRunningLauncher(bool focus) {
     struct Search {
         ULONG_PTR tag;
         HWND found;
@@ -2295,24 +2397,34 @@ static bool showRunningLauncher() {
         },
         (LPARAM)&search);
     if (!search.found) return false;
-    DWORD pid = 0;
-    GetWindowThreadProcessId(search.found, &pid);
-    AllowSetForegroundWindow(pid);
-    return PostMessageW(search.found, WM_UI_ACTIVATE, 0, 0) != 0;
+    // This process was just opened by the user, so it may hand the foreground on:
+    // to the launcher, or to the Stella it asks to come forward.
+    AllowSetForegroundWindow(ASFW_ANY);
+    return PostMessageW(search.found, WM_UI_ACTIVATE, focus ? 1 : 0, 0) != 0;
+}
+
+static wstring gitRoot() { return P.runtimes() + L"\\git-" + wide(kGitVersion); }
+
+// gGit names where PortableGit is (or, for a first install from the app
+// bundle, will be: hydration downloads it behind the open window), so set it
+// only once: the supervisor thread reads it while hydration runs.
+static void useGitAt(const wstring &root) {
+    if (!gGit || gGit->root != root) gGit.reset(new GitTool{root});
 }
 
 static bool adoptGit() {
-    GitTool git{P.runtimes() + L"\\git-" + wide(kGitVersion)};
-    if (!exists(git.bin())) return false;
-    gGit.reset(new GitTool(git));
+    wstring root = gitRoot();
+    if (!exists(root + L"\\cmd\\git.exe")) return false;
+    useGitAt(root);
     return true;
 }
 
-static void ensureGit() {
+// showProgress is false on hydration's thread (Stella already open).
+static void ensureGit(bool showProgress = true) {
     if (adoptGit()) return;
-    wstring root = P.runtimes() + L"\\git-" + wide(kGitVersion);
+    wstring root = gitRoot();
     const Asset &asset = kGitAssets[nativeArm64() ? 1 : 0];
-    progress("Getting things ready…", 0.02, 0.10);
+    if (showProgress) progress("Getting things ready…", 0.02, 0.10);
     LOG("install: downloading PortableGit %s from %s", kGitVersion, asset.url);
     mkdirs(P.runtimes());
     wstring archive = P.runtimes() + L"\\PortableGit-" + wide(kGitVersion) + L".7z.exe";
@@ -2446,6 +2558,138 @@ static void joinBunPrefetch() {
     if (gBunPrefetch.valid()) gBunPrefetch.wait();
 }
 
+static wstring gEngineBin;
+static string gEngineVersion;
+
+static string enginePlatformKey() {
+    string key = bunPlatformKey();
+    return key == "win-x64-baseline" ? "win-x64" : key;
+}
+
+// Electron is the engine unless Rune is chosen by hand: --engine, the environment or the file
+// <root>\rune-engine (<root>\electron-engine wins).
+static bool engineRequested() {
+    if (!O.engine.empty()) return O.engine == L"rune";
+    if (!O.engineBin.empty()) return true;
+    if (exists(P.root + L"\\electron-engine")) return false;
+    return exists(P.root + L"\\rune-engine");
+}
+
+static bool isEngine(const wstring &exe) { return !gEngineBin.empty() && exe == gEngineBin; }
+
+static void installEngineAsset(const string &version, const string &url, const string &sha, const string &member,
+                               bool showProgress);
+
+// launcher.json "stellaEngine": {"version", "assets": {<platform>: {"url", "sha256", "member"?}}};
+// an asset without "member" is the bare binary, one with it is a zip holding it.
+// Also runs on a thread while dependencies install (startEnginePrefetch), with
+// showProgress false, so nothing here may touch the UI then.
+static void installEngine(bool showProgress) {
+    string key = enginePlatformKey();
+    wstring host = P.app() + L"\\packages\\desktop-rune\\host\\main.tsx";
+    if (!exists(host)) fail("This version of Stella has no Rune app (" + utf8(host) + " is missing).");
+    if (!O.engineBin.empty()) {
+        if (!showProgress) return;
+        if (!exists(O.engineBin)) fail(utf8(O.engineBin) + " is not a stella-engine.");
+        gEngineBin = O.engineBin;
+        gEngineVersion = "local";
+        return;
+    }
+    string version, url, sha, member;
+    string manifest;
+    if (readFile(P.app() + L"\\packages\\desktop\\launcher.json", manifest)) {
+        mj_value *json = mj_parse(manifest.data(), manifest.size());
+        const mj_value *engine = mj_get(json, "stellaEngine");
+        const mj_value *asset = mj_get(mj_get(engine, "assets"), key.c_str());
+        auto field = [](const mj_value *v, const char *name) { const char *s = mj_get_string(v, name); return string(s ? s : ""); };
+        version = field(engine, "version");
+        url = field(asset, "url");
+        sha = field(asset, "sha256");
+        member = field(asset, "member");
+        mj_free(json);
+    }
+    if (version.empty() || url.empty() || sha.empty()) fail("This version of Stella has no Rune engine for " + key + ".");
+    installEngineAsset(version, url, sha, member, showProgress);
+}
+
+// Downloads (unless it is already there) and, with showProgress, selects one stella-engine build.
+static void installEngineAsset(const string &version, const string &url, const string &sha, const string &member,
+                               bool showProgress) {
+    wstring dir = P.runtimes() + L"\\stella-engine-" + wide(version);
+    wstring bin = dir + L"\\stella-engine.exe";
+    if (!exists(bin)) {
+        if (showProgress) progress("Getting things ready…", 0.30, 0.40);
+        LOG("install: downloading stella-engine %s from %s", version.c_str(), url.c_str());
+        mkdirs(dir);
+        wstring downloaded = P.runtimes() + L"\\.stella-engine-" + wide(version) + L".download";
+        download(url, downloaded, sha);
+        if (!member.empty()) {
+            wstring staging = P.runtimes() + L"\\.stella-engine-" + wide(version) + L".partial";
+            removeTree(staging);
+            extractZip(downloaded, staging);
+            wstring memberPath = staging + L"\\" + wide(member);
+            std::replace(memberPath.begin(), memberPath.end(), L'/', L'\\');
+            if (!MoveFileExW(memberPath.c_str(), bin.c_str(), MOVEFILE_REPLACE_EXISTING))
+                fail("stella-engine's archive has no " + member + ".");
+            removeTree(staging);
+            DeleteFileW(downloaded.c_str());
+        } else if (!MoveFileExW(downloaded.c_str(), bin.c_str(), MOVEFILE_REPLACE_EXISTING)) {
+            fail(format("could not install stella-engine (error %lu)", GetLastError()));
+        }
+        LOG("install: stella-engine %s ready", version.c_str());
+    }
+    if (!showProgress) return;
+    gEngineBin = bin;
+    gEngineVersion = version;
+}
+
+// A first install fetches the engine while dependencies install. It starts
+// once the source is verified, since the engine's URL and checksum come from
+// that source's launcher.json, and is joined before the launch. Detached, so a
+// launcher that quits mid-download never waits on it.
+static std::shared_future<void> gEnginePrefetch;
+
+static void startEnginePrefetch() {
+    if (!O.engineBin.empty() || gEnginePrefetch.valid() || !engineRequested()) return;
+    auto done = std::make_shared<std::promise<void>>();
+    gEnginePrefetch = done->get_future().share();
+    std::thread([done]() {
+        try {
+            installEngine(false);
+        } catch (const LauncherError &e) {
+            LOG("install: early stella-engine download failed (%s); trying again", e.message.c_str());
+        } catch (...) {
+            LOG("install: early stella-engine download failed; trying again");
+        }
+        done->set_value();
+    }).detach();
+}
+
+static void joinEnginePrefetch() {
+    if (!gEnginePrefetch.valid()) return;
+    gEnginePrefetch.wait();
+    gEnginePrefetch = {};
+}
+
+static void ensureEngine() {
+    joinEnginePrefetch();
+    installEngine(true);
+}
+
+static DWORD parentProcessId(DWORD pid) {
+    HANDLE snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0);
+    if (snapshot == INVALID_HANDLE_VALUE) return 0;
+    PROCESSENTRY32W entry = {sizeof(entry)};
+    DWORD parent = 0;
+    for (BOOL more = Process32FirstW(snapshot, &entry); more; more = Process32NextW(snapshot, &entry))
+        if (entry.th32ProcessID == pid) { parent = entry.th32ParentProcessID; break; }
+    CloseHandle(snapshot);
+    return parent;
+}
+
+// The app bundle the backend offers a first install (bootstrap's "bundle").
+static string gBundleManifest;
+
 static void bootstrapAccess(string &remote, string &token) {
     wstring base = backendURL();
     while (!base.empty() && base.back() == L'/') base.pop_back();
@@ -2455,6 +2699,10 @@ static void bootstrapAccess(string &remote, string &token) {
     if (r.status != 200) fail(format("The app source bootstrap returned HTTP %lu.", r.status));
     mj_value *json = mj_parse(r.body.data(), r.body.size());
     if (!json) fail("The app source bootstrap returned an unexpected body.");
+    {
+        const char *manifest = mj_get_string(mj_get(json, "bundle"), "manifest");
+        gBundleManifest = manifest ? manifest : "";
+    }
     const mj_value *body = mj_get(json, "upstream");
     if (!body) body = json;
     const char *rm = mj_get_string(body, "remote"), *tk = mj_get_string(body, "token");
@@ -2769,6 +3017,11 @@ static bool hasStagedUpdate() {
     return gStagedVersion > kLauncherVersion;
 }
 
+static bool firstCheckPending() {
+    std::lock_guard<std::mutex> lock(gCheckLock);
+    return gFirstCheck == CheckResult::Pending;
+}
+
 static CheckResult waitForFirstCheck(double timeout) {
     ULONGLONG deadline = GetTickCount64() + (ULONGLONG)(timeout * 1000);
     unsigned seen = 0;
@@ -2800,7 +3053,22 @@ static void fallBack(const string &message) {
     Sleep(2500);
 }
 
-static bool updateBeforeStart() {
+// quiet: the start opening Stella makes by itself. A launcher update already
+// downloaded takes over; a check still running is left for the next start
+// rather than shown or waited on.
+static bool updateBeforeStart(bool quiet = false) {
+    if (quiet) {
+        ULONGLONG deadline = GetTickCount64() + 1500;
+        while (!hasStagedUpdate() && GetTickCount64() < deadline && firstCheckPending()) Sleep(100);
+        if (hasStagedUpdate()) {
+            progress("Starting the updated Stella…", 0.95, 1);
+            if (handOverToUpdate(true)) return true;
+            LOG("launcher: handing over failed; starting the current version");
+        } else if (firstCheckPending()) {
+            LOG("launcher: the update check is still running; starting the current version");
+        }
+        return false;
+    }
     CheckResult result = waitForFirstCheck(0.5);
     if (result == CheckResult::Pending) {
         progress("Checking for updates…", 0, 0.05);
@@ -2951,11 +3219,21 @@ static string signHead(const string &expected) {
 
 // Electron keeps its own name: it decides app.isPackaged from the executable's
 // name, and launcher runs are source runs.
-static wstring prepare() {
+// With rune (the Rune engine starts instead) Electron is neither fetched nor
+// needed, and this returns "".
+// quiet is hydration's run (a thread, Stella already open from its app bundle
+// under Rune): no progress, and nothing to return but "".
+static wstring prepare(bool rune, bool quiet = false) {
     wstring app = P.app();
     string lockHash = sha256File(app + L"\\bun.lock");
-    if (S.bunLockHash != lockHash || !exists(app + L"\\node_modules\\electron\\package.json")) {
-        progress("Installing Stella…", 0.40, 0.82);
+    string knownLock, knownHead;
+    {
+        std::lock_guard<std::recursive_mutex> lock(gStateLock);
+        knownLock = S.bunLockHash;
+        knownHead = S.preparedHead;
+    }
+    if (knownLock != lockHash || !exists(app + L"\\node_modules\\electron\\package.json")) {
+        if (!quiet) progress("Installing Stella…", 0.40, 0.82);
         // install-deps.mjs (newer app sources) starts bun's cache from a
         // per-platform seed and fetches Electron and the prepare-install
         // helpers alongside; older sources get a plain bun install.
@@ -2967,25 +3245,33 @@ static wstring prepare() {
         Env env = baseEnvironment();
         env[L"STELLA_SKIP_BROWSER_HYDRATE"] = L"1";
         env[L"STELLA_SKIP_OFFICE_HYDRATE"] = L"1";
+        // baseEnvironment() strips the engine choice; install-deps.mjs skips
+        // Electron and its bundle for Rune.
+        if (rune) env[L"STELLA_LAUNCHER_ENGINE"] = L"rune";
+        // Stella is already up: what install-deps holds back for its start
+        // (Claude Code and Antigravity) can go now.
+        if (quiet) env[L"STELLA_APP_HYDRATION"] = P.hydrationFile();
         vector<wstring> argv = seeded ? vector<wstring>{gBunBin, installDeps}
                                       : vector<wstring>{gBunBin, L"install", L"--frozen-lockfile"};
         CmdResult r = runCmd(argv, app, env, P.installLog(), 30 * 60, L"", seeded);
         if (r.timedOut) fail("bun install timed out after 30 minutes:\n" + lastLines(r.err, 20));
         if (r.code != 0) fail(format("bun install failed (exit %lu):\n", r.code) + lastLines(r.err, 20));
         LOG("prepare: bun install finished in %ds", (int)((GetTickCount64() - started) / 1000));
+        std::lock_guard<std::recursive_mutex> lock(gStateLock);
         S.bunLockHash = lockHash;
         S.save();
     }
 
     string head = gGit->run({"rev-parse", "HEAD"}, app);
     wstring script = app + L"\\packages\\desktop\\scripts\\prepare-install.mjs";
-    if (S.preparedHead != head && exists(script)) {
-        progress("Finishing setup…", 0.82, 0.94);
+    if (knownHead != head && exists(script)) {
+        if (!quiet) progress("Finishing setup…", 0.82, 0.94);
         LOG("prepare: prepare-install.mjs for %s", short12(head).c_str());
         double timeout = envSeconds(L"STELLA_LAUNCHER_PREPARE_TIMEOUT_SECONDS", 10 * 60);
         try {
             CmdResult r = runCmd({gBunBin, script}, app, baseEnvironment(), P.installLog(), timeout);
             if (!r.timedOut && r.code == 0) {
+                std::lock_guard<std::recursive_mutex> lock(gStateLock);
                 S.preparedHead = head;
                 S.save();
             } else if (r.timedOut) {
@@ -2998,7 +3284,20 @@ static wstring prepare() {
         }
     }
 
+    if (rune || quiet) return L"";
     wstring electron = app + L"\\node_modules\\electron\\dist\\electron.exe";
+    wstring ensure = app + L"\\packages\\desktop\\scripts\\ensure-electron-binary.mjs";
+    if (!exists(electron) && exists(ensure)) {
+        // Dependencies installed for Rune have no Electron binary; fetch it
+        // now that Electron starts instead.
+        progress("Getting things ready…", 0.90, 0.96);
+        LOG("prepare: Electron is missing; running ensure-electron-binary.mjs");
+        try {
+            runCmd({gBunBin, ensure}, app, baseEnvironment(), P.installLog(), 10 * 60);
+        } catch (const LauncherError &e) {
+            LOG("prepare: ensure-electron-binary.mjs could not run: %s", e.message.c_str());
+        }
+    }
     if (!exists(electron)) fail("Electron is not installed (missing " + utf8(electron) + ").");
     return electron;
 }
@@ -3145,8 +3444,18 @@ public:
         HANDLE nul = openNul();
         PROCESS_INFORMATION pi;
         ZeroMemory(&pi, sizeof(pi));
-        bool ok = createProcess(exe, commandLine({exe, app}), app, electronEnvironment(pipeName_), nul, outWrite, outWrite, 0,
-                                &pi);
+        engine_ = isEngine(exe);
+        Env env = electronEnvironment(pipeName_);
+        if (engine_) {
+            env[L"STELLA_LAUNCHER_ENGINE"] = L"rune";
+            env[L"STELLA_RUNE_SERVICES"] = L"1";
+            env[L"STELLA_RUNE_ROOT"] = app + L"\\packages\\desktop-rune";
+            env.erase(L"BUN_RUNTIME_TRANSPILER_CACHE_PATH");
+            env[L"MIMALLOC_PURGE_DELAY"] = L"0";
+            if (!gBunBin.empty()) env[L"STELLA_RUNE_BUN"] = gBunBin;
+        }
+        bool ok = createProcess(exe, engine_ ? commandLine({exe}) : commandLine({exe, app}), app, env, nul, outWrite, outWrite,
+                                0, &pi);
         DWORD error = GetLastError();
         CloseHandle(outWrite);
         CloseHandle(nul);
@@ -3158,7 +3467,7 @@ public:
         CloseHandle(pi.hThread);
         process_ = pi.hProcess;
         pid_ = pi.dwProcessId;
-        LOG("supervisor: spawned Electron pid %lu", pid_);
+        LOG("supervisor: spawned %s pid %lu", engine_ ? "stella-engine" : "Electron", pid_);
 
         std::thread([capture = output, outRead]() {
             char buf[16384];
@@ -3230,6 +3539,7 @@ private:
     wstring pipeName_;
     HANDLE pipe_ = INVALID_HANDLE_VALUE, process_ = nullptr, writeEvent_ = nullptr, stopEvent_ = nullptr;
     DWORD pid_ = 0;
+    bool engine_ = false;
     std::mutex writeLock_, exitLock_;
     bool connected_ = false, exited_ = false;
     vector<std::thread> threads_;
@@ -3268,7 +3578,9 @@ private:
             else if (error == ERROR_IO_PENDING) connected = waitIo(&ov, &n);
         }
         ULONG client = 0;
-        if (connected && GetNamedPipeClientProcessId(pipe_, &client) && client != pid_) {
+        // Under stella-engine the client is the engine's TS host, a direct child.
+        if (connected && GetNamedPipeClientProcessId(pipe_, &client) && client != pid_ &&
+            !(engine_ && parentProcessId(client) == pid_)) {
             LOG("channel: refused a client that isn't Electron (pid %lu)", client);
             connected = false;
         }
@@ -3320,6 +3632,7 @@ static void handlePrepared(const mj_value *message) {
     const char *lockHash = mj_get_string(message, "lockHash");
     const char *head = mj_get_string(message, "head");
     bool noted = false;
+    std::lock_guard<std::recursive_mutex> lock(gStateLock);
     try {
         if (lockHash) {
             string actual = sha256File(P.app() + L"\\bun.lock");
@@ -3386,11 +3699,22 @@ static void requestShutdown() {
     if (gSupervised) gSupervised->post({Event::Timer, "shutdown"});
 }
 
+static bool requestFocus() {
+    std::lock_guard<std::mutex> lock(gSupervisedLock);
+    if (!gSupervised) return false;
+    gSupervised->post({Event::Timer, "focus"});
+    return true;
+}
+
 static void refreshInstallInfo();
+static void hydrateStart();
+static bool hydrationRunning();
 
 static Outcome supervise(const wstring &electron) {
+    const char *child = isEngine(electron) ? "stella-engine" : "Electron";
     string spawnedHead;
-    try { spawnedHead = gGit->run({"rev-parse", "HEAD"}, P.app()); } catch (const LauncherError &) {}
+    if (!gBundleStage)
+        try { spawnedHead = gGit->run({"rev-parse", "HEAD"}, P.app()); } catch (const LauncherError &) {}
     std::unique_ptr<ElectronProcess> process;
     try {
         process.reset(new ElectronProcess(electron, P.app(), P.electronLog()));
@@ -3403,7 +3727,7 @@ static Outcome supervise(const wstring &electron) {
     bool ready = false;
     ULONGLONG readyAt = 0;
     string pendingReason;
-    bool pending = false, quitRequested = false, announced = false, teardownForced = false;
+    bool pending = false, quitRequested = false, announced = false, teardownForced = false, focusPending = false;
     DWORD announcedCode = 0;
     for (;;) {
         Event event = process->events.next();
@@ -3417,10 +3741,13 @@ static Outcome supervise(const wstring &electron) {
                     ready = true;
                     readyAt = GetTickCount64();
                     LOG("supervisor: ready");
+                    if (gBundleStage) hydrateStart();
                     process->events.after(O.stableSeconds, "stable");
                     gUi->running();
                     if (O.selfTest) process->events.after(O.hold, "self-test-quit");
                 }
+            } else if (op && !strcmp(op, "focused")) {
+                focusPending = false;
             } else if (op && !strcmp(op, "sign")) {
                 handleSign(message, *process);
             } else if (op && !strcmp(op, "prepared")) {
@@ -3430,11 +3757,11 @@ static Outcome supervise(const wstring &electron) {
                 mj_get_number(message, "code", &code);
                 announced = true;
                 announcedCode = (DWORD)code;
-                LOG("supervisor: Electron is exiting with %lu", announcedCode);
+                LOG("supervisor: %s is exiting with %lu", child, announcedCode);
                 process->events.after(10, "exit-grace");
             } else if (op && !strcmp(op, "failed")) {
                 const char *reason = mj_get_string(message, "reason");
-                LOG("supervisor: Electron reported failure: %s", reason ? reason : "unknown");
+                LOG("supervisor: %s reported failure: %s", child, reason ? reason : "unknown");
                 if (!pending) {
                     pending = true;
                     pendingReason = string("Stella reported a problem: ") + (reason ? reason : "unknown");
@@ -3459,16 +3786,28 @@ static Outcome supervise(const wstring &electron) {
                 } catch (const LauncherError &e) {
                     LOG("supervisor: could not mark known-good: %s", e.message.c_str());
                 }
+            } else if (name == "self-test-quit" && !quitRequested && hydrationRunning()) {
+                // A self-test proves the whole install, hydration included.
+                process->events.after(0.5, "self-test-quit");
             } else if ((name == "self-test-quit" || name == "shutdown") && !quitRequested) {
-                LOG("supervisor: %s asks Electron to quit", name == "shutdown" ? "Shut down" : "self-test");
+                LOG("supervisor: %s asks %s to quit", name == "shutdown" ? "Shut down" : "self-test", child);
                 quitRequested = true;
                 process->send("{\"op\":\"quit\"}");
                 process->events.after(30, "quit-timeout");
+            } else if (name == "focus") {
+                focusPending = true;
+                process->send("{\"op\":\"focus\"}");
+                process->events.after(1.5, "focus-timeout");
+            } else if (name == "focus-timeout" && focusPending) {
+                // A Stella from before "focus" doesn't answer: the window shows instead.
+                focusPending = false;
+                LOG("supervisor: %s didn't come forward; showing the launcher window", child);
+                gUi->reveal();
             } else if (name == "quit-timeout" && !announced) {
-                LOG("supervisor: Electron did not quit in time; terminating");
+                LOG("supervisor: %s did not quit in time; terminating", child);
                 process->terminate();
             } else if (name == "exit-grace") {
-                LOG("supervisor: Electron's teardown is still running 10s after it announced its exit; terminating");
+                LOG("supervisor: %s's teardown is still running 10s after it announced its exit; terminating", child);
                 teardownForced = true;
                 process->forceKill();
             }
@@ -3476,11 +3815,11 @@ static Outcome supervise(const wstring &electron) {
             Sleep(300);
             vector<string> output = process->output->lastLines();
             string detail = format("exit %lu", event.code);
-            LOG("supervisor: Electron exited (%s)", detail.c_str());
+            LOG("supervisor: %s exited (%s)", child, detail.c_str());
             if (pending) return {OutcomeKind::Failed, 0, detail, pendingReason, output};
             if (announced && teardownForced)
-                LOG("supervisor: Electron's teardown did not finish; its announced exit %lu stands but cleanup is incomplete",
-                    announcedCode);
+                LOG("supervisor: %s's teardown did not finish; its announced exit %lu stands but cleanup is incomplete",
+                    child, announcedCode);
             DWORD code = announced ? announcedCode : event.code;
             if (code == kRelaunchExitCode) return {OutcomeKind::Relaunch, 0, detail, string(), output};
             if (quitRequested && code != 0)
@@ -3629,14 +3968,21 @@ static void refreshInstallInfo() {
     gUi->installInfo(version, hasKnownGood());
 }
 
-static Choice recover(const string &reason, const vector<string> &output) {
+static bool gRepairUsed = false, gRepaired = false;
+
+static Choice recover(const string &reason, const vector<string> &output, const string &title = string()) {
     gRecoveryCount++;
     Recovery recovery;
     recovery.reason = reason;
     recovery.output = output;
+    recovery.title = title;
+    if (!gRepairUsed && gGit && exists(P.app() + L"\\.git")) {
+        CmdResult head = gGit->raw({"rev-parse", "--verify", "--quiet", "HEAD"}, P.app());
+        recovery.canRepair = head.code == 0;
+    }
     bool forcedExit = false;
     if (O.selfTest) {
-        if (O.recoveryChoice != Choice::None && gRecoveryCount == 1) {
+        if (O.recoveryChoice != Choice::None && gRecoveryCount == 1 && (O.recoveryChoice != Choice::Repair || recovery.canRepair)) {
             recovery.automation = O.recoveryChoice;
             recovery.automationDelay = 2;
         } else {
@@ -3655,20 +4001,355 @@ static Choice recover(const string &reason, const vector<string> &output) {
 
 static void ensureTools() {
     for (auto &dir : {P.root, P.logs(), P.runtimes()}) mkdirs(dir);
-    if (!gGit) ensureGit();
+    ensureGit();
     if (!gSigner) gSigner.reset(new TreeSigner());
 }
 
 struct OutsideChangesFound {};
 static OutsideChanges gOutside;
 
-static wstring prepareForLaunch() {
-    if (!exists(P.app() + L"\\.git")) {
-        mkdirs(P.runtimes());
-        startBunPrefetch();
+// ---- First install from an app bundle (Rune) ----
+//
+// Stage 1 (before the window): download the app bundle (scripts/
+// build-app-bundle.mjs: the published tree plus the Rune host and UI boot
+// bundles, the runtime bytecode and React, without node_modules or .git)
+// while Bun and the engine download, unpack it and start Stella. Stage 2
+// (hydrateMain, once Stella is ready): fetch PortableGit, check the same
+// commit out in place, sign it, install the packages and prepare the install,
+// then mark hydration.json done; what in Stella needs git or the packages
+// waits on that file meanwhile. Without a bundle (none offered, Electron
+// forced, any step failing) a first install fetches git, clones and installs
+// before the window, as before.
+
+static bool isURL(const string &s) { return s.rfind("https://", 0) == 0 || s.rfind("http://", 0) == 0; }
+
+// A manifest entry's file is relative to the manifest unless it is a URL or an absolute path.
+static string bundleResolve(const string &manifest, const string &ref) {
+    if (isURL(ref) || ref[0] == '/' || ref[0] == '\\' || (ref.size() > 1 && ref[1] == ':')) return ref;
+    size_t slash = manifest.find_last_of(isURL(manifest) ? "/" : "/\\");
+    if (slash == string::npos) return ref;
+    return manifest.substr(0, slash) + (isURL(manifest) ? "/" : "\\") + ref;
+}
+
+// Windows' own bsdtar reads .tar.gz.
+static void extractTarGz(const wstring &archive, const wstring &dir) {
+    wstring tar = envVar(L"SystemRoot") + L"\\System32\\tar.exe";
+    mkdirs(dir);
+    CmdResult r = runCmd({tar, L"-xzf", archive, L"-C", dir}, L"", baseEnvironment(), L"", 600);
+    if (r.code != 0) fail(format("Could not unpack %s: %s", utf8(archive).c_str(), trim(r.err).c_str()));
+}
+
+// Defender and the indexer briefly hold files just written; a rename right
+// after waits them out.
+static bool moveWithRetry(const wstring &from, const wstring &to) {
+    for (int attempt = 0; attempt < 40; attempt++) {
+        if (MoveFileExW(from.c_str(), to.c_str(), 0)) return true;
+        DWORD error = GetLastError();
+        if (error != ERROR_ACCESS_DENIED && error != ERROR_SHARING_VIOLATION) return false;
+        Sleep(250);
     }
-    ensureTools();
+    return false;
+}
+
+// The engine named in the app bundle's manifest (the bundle's own launcher.json pin), fetched
+// beside the bundle rather than after it; ensureEngine joins it.
+static void startBundleEnginePrefetch(const mj_value *engine) {
+    const char *version = mj_get_string(engine, "version"), *url = mj_get_string(engine, "url");
+    const char *sha = mj_get_string(engine, "sha256"), *member = mj_get_string(engine, "member");
+    if (!O.engineBin.empty() || gEnginePrefetch.valid() || !version || !url || !sha) return;
+    string v = version, u = url, s = sha, m = member ? member : "";
+    auto done = std::make_shared<std::promise<void>>();
+    gEnginePrefetch = done->get_future().share();
+    std::thread([v, u, s, m, done]() {
+        try {
+            installEngineAsset(v, u, s, m, false);
+        } catch (const LauncherError &e) {
+            LOG("install: early stella-engine download failed (%s); trying again", e.message.c_str());
+        } catch (...) {
+            LOG("install: early stella-engine download failed; trying again");
+        }
+        done->set_value();
+    }).detach();
+}
+
+// Stage 1's download: leaves P.app() holding the bundle and S.bundleCommit set.
+static void bundleInstall(const string &manifest) {
+    string text;
+    if (isURL(manifest)) {
+        HttpResponse r = http(wide(manifest), L"GET", string(), L"");
+        if (r.status != 200) fail(format("could not fetch the app bundle manifest %s (HTTP %lu)", manifest.c_str(), r.status));
+        text = r.body;
+    } else if (!readFile(wide(manifest), text)) {
+        fail("could not read the app bundle manifest " + manifest);
+    }
+    mj_value *json = mj_parse(text.data(), text.size());
+    if (!json) fail("could not read the app bundle manifest " + manifest);
+    string key = enginePlatformKey();
+    const mj_value *platform = mj_get(mj_get(json, "platforms"), key.c_str());
+    const char *commitV = mj_get_string(json, "commit");
+    const char *fileV = mj_get_string(platform, "url");
+    if (!fileV) fileV = mj_get_string(platform, "file");
+    const char *shaV = mj_get_string(platform, "sha256");
+    if (!commitV || !fileV || !shaV) {
+        mj_free(json);
+        fail("the app bundle manifest has no " + key + " bundle");
+    }
+    string commit = commitV, url = bundleResolve(manifest, fileV), sha = shaV;
+    startBundleEnginePrefetch(mj_get(platform, "engine"));
+    mj_free(json);
+
+    ULONGLONG started = GetTickCount64();
+    progress("Downloading Stella…", 0.05, 0.60);
+    LOG("install: app bundle %s from %s", short12(commit).c_str(), url.c_str());
+    wstring archive = P.runtimes() + L"\\app-bundle.tar.gz";
+    wstring staging = P.appStaging();
+    try {
+        if (isURL(url)) {
+            download(url, archive, sha);
+        } else {
+            if (!CopyFileW(wide(url).c_str(), archive.c_str(), FALSE)) fail("could not copy the app bundle " + url);
+            if (_stricmp(sha256File(archive).c_str(), sha.c_str()) != 0) fail("Checksum mismatch for " + url + ".");
+        }
+        ULONGLONG unpacking = GetTickCount64();
+        removeTree(staging);
+        mkdirs(P.installRoot());
+        extractTarGz(archive, staging);
+        LOG("install: unpacked the app bundle in %.1fs", (GetTickCount64() - unpacking) / 1000.0);
+        if (!moveWithRetry(staging, P.app()))
+            fail(format("could not move the app into place (error %lu)", GetLastError()));
+    } catch (...) {
+        removeTree(staging);
+        DeleteFileW(archive.c_str());
+        throw;
+    }
+    DeleteFileW(archive.c_str());
+    {
+        std::lock_guard<std::recursive_mutex> lock(gStateLock);
+        S = State();
+        S.installedAt = isoNow();
+        S.bundleCommit = commit;
+        S.save();
+    }
+    LOG("install: app bundle in place in %.1fs", (GetTickCount64() - started) / 1000.0);
+}
+
+static std::atomic<bool> gHydrating{false}, gHydrateFinished{false};
+static std::mutex gHydrationLock;
+static string gHydrateStep = "pending";
+
+static void hydrationWrite(const string &status, const string *error = nullptr) {
+    std::lock_guard<std::mutex> lock(gHydrationLock);
+    char *qStatus = mj_quote(status.c_str()), *qStep = mj_quote(gHydrateStep.c_str());
+    string body = format("{\"status\":%s,\"pid\":%lu,\"step\":%s", qStatus, GetCurrentProcessId(), qStep);
+    if (error) {
+        char *qError = mj_quote(error->c_str());
+        body += string(",\"error\":") + qError;
+        free(qError);
+    }
+    body += "}\n";
+    free(qStatus);
+    free(qStep);
+    writeFileAtomic(P.hydrationFile(), body);
+}
+
+static void hydrationStep(const char *step) {
+    {
+        std::lock_guard<std::mutex> lock(gHydrationLock);
+        gHydrateStep = step;
+    }
+    hydrationWrite("running");
+    LOG("hydrate: %s", step);
+}
+
+// Stage 2: PortableGit, the git checkout of the bundle's commit, its signature, the packages.
+static void hydrate(bool rune) {
+    wstring app = P.app(), gitDir = app + L"\\.git-hydrate", finalDir = app + L"\\.git";
+    string branch = O.sourceRef.empty() ? kUpstreamBranch : O.sourceRef;
+    string commit;
+    {
+        std::lock_guard<std::recursive_mutex> lock(gStateLock);
+        commit = S.bundleCommit;
+    }
+    if (commit.empty()) fail("no app bundle to hydrate");
+    bool placed = false;
+    try {
+        hydrationStep("git");
+        ensureGit(false);
+        string remote;
+        vector<std::pair<wstring, wstring>> auth;
+        if (!O.source.empty()) {
+            remote = O.source;
+        } else {
+            string token;
+            bootstrapAccess(remote, token);
+            auth = {{L"GIT_CONFIG_COUNT", L"2"},
+                    {L"GIT_CONFIG_KEY_0", L"http.extraHeader"},
+                    {L"GIT_CONFIG_VALUE_0", wide("Authorization: Bearer " + token)},
+                    {L"GIT_CONFIG_KEY_1", L"protocol.version"},
+                    {L"GIT_CONFIG_VALUE_1", L"1"}};
+        }
+        string gd = utf8(gitDir), wt = utf8(app);
+        auto hgit = [&](vector<string> args) {
+            vector<string> full = {"--git-dir", gd, "--work-tree", wt};
+            full.insert(full.end(), args.begin(), args.end());
+            return gGit->run(full, app);
+        };
+        removeTree(gitDir);
+        hgit({"init", "-q"});
+        // As cloneSource: an LF working tree whatever PortableGit's system
+        // autocrlf says, or every file reads as changed.
+        hgit({"config", "core.autocrlf", "false"});
+        hgit({"config", "core.longpaths", "true"});
+        hgit({"symbolic-ref", "HEAD", string("refs/heads/") + kUpstreamBranch});
+        hgit({"remote", "add", kUpstreamRemoteName, remote});
+        {
+            ULONGLONG started = GetTickCount64();
+            gGit->run({"--git-dir", gd, "fetch", "-q", "--no-tags", kUpstreamRemoteName,
+                       "+refs/heads/" + branch + ":refs/remotes/" + kUpstreamRemoteName + "/" + branch},
+                      app, auth);
+            LOG("hydrate: fetched %s in %.1fs", branch.c_str(), (GetTickCount64() - started) / 1000.0);
+        }
+        if (gGit->raw({"--git-dir", gd, "cat-file", "-e", commit + "^{commit}"}, app).code != 0) {
+            // The branch moved past the bundle's commit without keeping it: ask for it by name.
+            gGit->run({"--git-dir", gd, "fetch", "-q", "--no-tags", kUpstreamRemoteName, commit}, app, auth);
+        }
+        hgit({"update-ref", string("refs/heads/") + kUpstreamBranch, commit});
+        hgit({"config", string("branch.") + kUpstreamBranch + ".remote", kUpstreamRemoteName});
+        hgit({"config", string("branch.") + kUpstreamBranch + ".merge", string("refs/heads/") + kUpstreamBranch});
+        // The index from the commit, against the files already there.
+        hgit({"reset", "-q"});
+        string status = hgit({"status", "--porcelain=v1", "--untracked-files=no"});
+        if (!status.empty()) fail("the app bundle differs from " + short12(commit) + ": " + status.substr(0, 300));
+        if (!moveWithRetry(gitDir, finalDir)) fail(format("could not move .git into place (error %lu)", GetLastError()));
+        placed = true;
+        // init with --work-tree records it; a clone does not.
+        gGit->raw({"config", "--unset", "core.worktree"}, app);
+
+        hydrationStep("sign");
+        if (!gSigner) gSigner.reset(new TreeSigner());
+        signHead(commit);
+        // A signed checkout: from here on the launcher treats it as installed,
+        // and installs what is missing before the window if this run stops.
+        {
+            std::lock_guard<std::recursive_mutex> lock(gStateLock);
+            S.bundleCommit.clear();
+            S.save();
+        }
+        placed = false;
+
+        hydrationStep("packages");
+        prepare(rune, true);
+    } catch (...) {
+        removeTree(gitDir);
+        // An unsigned checkout would read as changed outside Stella.
+        if (placed) removeTree(finalDir);
+        throw;
+    }
+}
+
+static void hydrateMain() {
+    ULONGLONG started = GetTickCount64();
+    // Behind the open window: never ahead of it for the CPU.
+    SetThreadPriority(GetCurrentThread(), THREAD_PRIORITY_BELOW_NORMAL);
+    tChildPriority = BELOW_NORMAL_PRIORITY_CLASS;
+    try {
+        hydrate(true);
+        {
+            std::lock_guard<std::mutex> lock(gHydrationLock);
+            gHydrateStep = "done";
+        }
+        hydrationWrite("done");
+        LOG("hydrate: done in %.1fs", (GetTickCount64() - started) / 1000.0);
+    } catch (const LauncherError &e) {
+        string step;
+        {
+            std::lock_guard<std::mutex> lock(gHydrationLock);
+            step = gHydrateStep;
+        }
+        LOG("hydrate: failed at %s: %s", step.c_str(), e.message.c_str());
+        hydrationWrite("failed", &e.message);
+    } catch (...) {
+        string error = "unexpected error";
+        LOG("hydrate: failed: %s", error.c_str());
+        hydrationWrite("failed", &error);
+    }
+    gHydrateFinished = true;
+}
+
+static bool hydrationRunning() { return gHydrating && !gHydrateFinished; }
+
+static void hydrateStart() {
+    if (gHydrating.exchange(true)) return;
+    std::thread(hydrateMain).detach();
+}
+
+// Electron chosen by hand (engineRequested's flag, environment or <root>\electron-engine):
+// a first install then clones, since the app bundle is for Rune.
+static bool electronForced() {
+    if (!O.engine.empty()) return O.engine != L"rune";
+    if (!O.engineBin.empty()) return false;
+    return exists(P.root + L"\\electron-engine");
+}
+
+static wstring prepareForLaunch() {
+    for (auto &dir : {P.root, P.logs(), P.runtimes()}) mkdirs(dir);
+    if (!exists(P.app() + L"\\.git")) startBunPrefetch();
     followServerFile();
+    if (!exists(P.app() + L"\\.git") && !exists(P.app()) && !electronForced()) {
+        // A first install: from the app bundle when there is one.
+        string manifest = trim(utf8(envVar(L"STELLA_LAUNCHER_BUNDLE_MANIFEST")));
+        if (manifest.empty() && O.source.empty()) {
+            try {
+                string remote, token;
+                bootstrapAccess(remote, token);
+                manifest = gBundleManifest;
+            } catch (const LauncherError &e) {
+                LOG("install: bootstrap failed (%s)", e.message.c_str());
+            }
+        }
+        if (!manifest.empty()) {
+            try {
+                bundleInstall(manifest);
+            } catch (const LauncherError &e) {
+                LOG("install: the app bundle failed (%s); cloning instead", e.message.c_str());
+            }
+        }
+    }
+    string bundleCommit;
+    {
+        std::lock_guard<std::recursive_mutex> lock(gStateLock);
+        bundleCommit = S.bundleCommit;
+    }
+    if (!exists(P.app() + L"\\.git") && !bundleCommit.empty() && exists(P.app())) {
+        if (!gSigner) gSigner.reset(new TreeSigner());
+        startEnginePrefetch();
+        if (engineRequested()) {
+            // Rune opens from the bundle; hydration (PortableGit included)
+            // follows once it is up. gGit already names where PortableGit
+            // goes, so Stella's environment points there from the start.
+            ensureBun();
+            ensureEngine();
+            useGitAt(gitRoot());
+            gBundleStage = true;
+            if (!gHydrating) {
+                {
+                    std::lock_guard<std::mutex> lock(gHydrationLock);
+                    gHydrateStep = "pending";
+                }
+                hydrationWrite("pending");
+            }
+            LOG("install: starting stella-engine %s from the app bundle %s; hydrating once Stella is up",
+                gEngineVersion.c_str(), short12(bundleCommit).c_str());
+            return gEngineBin;
+        }
+        // Electron needs the packages: hydrate before the window.
+        LOG("install: Electron starts here; hydrating the app bundle first");
+        progress("Installing Stella…", 0.40, 0.90);
+        ensureBun();
+        hydrate(false);
+    }
+    gBundleStage = false;
+    ensureTools();
     if (!exists(P.app() + L"\\.git")) {
         cloneSource();
         signHead("");
@@ -3686,8 +4367,96 @@ static wstring prepareForLaunch() {
         LOG("catch-up: %s", e.message.c_str());
     }
     refreshInstallInfo();
+    startEnginePrefetch();
     ensureBun();
-    return prepare();
+    bool rune = engineRequested();
+    wstring electron = prepare(rune);
+    if (!rune) return electron;
+    ensureEngine();
+    LOG("launcher: starting stella-engine %s (%s) instead of Electron", gEngineVersion.c_str(), utf8(gEngineBin).c_str());
+    return gEngineBin;
+}
+
+// Repair: one bounded pass of the user's own model at the checkout
+// (packages/desktop/scripts/launcher-repair.mjs, taken from the last version
+// that started so a broken checkout can't break its own repair). It commits
+// its fix; the launcher signs it. Returns "" or why it didn't work.
+static string repair(const string &failure, const vector<string> &output) {
+    gRepairUsed = true;
+    auto fail = [](const string &why) {
+        LOG("repair: %s", why.c_str());
+        return why;
+    };
+    wstring work = P.root + L"\\repair", script = work + L"\\launcher-repair.mjs";
+    wstring failureFile = work + L"\\failure.txt", resultFile = work + L"\\result.json";
+    try {
+        ensureTools();
+        if (gBunBin.empty()) ensureBun();
+    } catch (const LauncherError &e) {
+        return fail("Repair couldn't set itself up: " + e.message);
+    }
+    mkdirs(work);
+    string knownGood;
+    if (hasKnownGood()) try { knownGood = gGit->run({"rev-parse", kKnownGoodRef}, P.app()); } catch (const LauncherError &) {}
+    string text, source;
+    for (const string &ref : {knownGood, string("HEAD")}) {
+        if (ref.empty()) continue;
+        CmdResult r = gGit->raw({"show", ref + ":packages/desktop/scripts/launcher-repair.mjs"}, P.app());
+        if (r.code == 0 && !r.out.empty()) {
+            text = r.out;
+            source = ref == "HEAD" ? ref : short12(ref);
+            break;
+        }
+    }
+    if (text.empty()) return fail("This version of Stella can't repair itself.");
+    writeFileAtomic(script, text);
+    string details = failure + "\n\nOutput:\n";
+    for (auto &line : output) details += line + "\n";
+    writeFileAtomic(failureFile, details);
+    DeleteFileW(resultFile.c_str());
+    wstring userData, dataDir;
+    if (P.isolated) {
+        userData = P.isolatedUserData();
+        dataDir = P.isolatedHome();
+    } else {
+        userData = envVar(L"APPDATA") + L"\\Stella";
+        dataDir = envVar(L"STELLA_DATA_DIR");
+        if (dataDir.empty()) dataDir = envVar(L"USERPROFILE") + L"\\.stella";
+    }
+    Env env = baseEnvironment();
+    for (auto &kv : gGit->runtimeEnv()) env[kv.first] = kv.second;
+    if (!O.backendOverride && gHasServer) env[L"STELLA_LAUNCHER_SERVER_ID"] = wide(gServer.serverId);
+    double timeout = envSeconds(L"STELLA_LAUNCHER_REPAIR_SECONDS", 180);
+    vector<wstring> argv = {gBunBin, script, L"--app", P.app(), L"--data-dir", dataDir, L"--user-data", userData,
+                            L"--work", work, L"--failure", failureFile, L"--log", P.electronLog(),
+                            L"--known-good", wide(knownGood), L"--backend", backendURL(),
+                            L"--timeout", std::to_wstring((int)timeout), L"--result", resultFile};
+    LOG("repair: running the repair from %s (%ds)", source.c_str(), (int)timeout);
+    ULONGLONG started = GetTickCount64();
+    CmdResult r;
+    try {
+        r = runCmd(argv, P.app(), env, P.logs() + L"\\repair.log", timeout + 60);
+    } catch (const LauncherError &e) {
+        return fail("Repair couldn't start: " + e.message);
+    }
+    if (r.timedOut) return fail("Repair ran out of time.");
+    string data;
+    mj_value *json = readFile(resultFile, data) ? mj_parse(data.data(), data.size()) : nullptr;
+    if (!json) return fail("Repair stopped without an answer.");
+    const mj_value *ok = mj_get(json, "ok");
+    const char *message = mj_get_string(json, "message"), *route = mj_get_string(json, "route");
+    bool fixed = ok && ok->type == MJ_BOOL && ok->boolean;
+    string said = message ? message : "";
+    LOG("repair: %s finished in %ds: %s", route ? route : "?", (int)((GetTickCount64() - started) / 1000), said.c_str());
+    mj_free(json);
+    if (!fixed) return fail(said.empty() ? "Repair couldn't fix it." : said);
+    try {
+        signHead("");
+    } catch (const LauncherError &e) {
+        return fail("Repair couldn't save its fix: " + e.message);
+    }
+    gRepaired = true;
+    return string();
 }
 
 static int run() {
@@ -3696,16 +4465,29 @@ static int run() {
     adoptGit();
     refreshInstallInfo();
     if (O.start && O.show) gUi->starting("Starting Stella…", 0, 0.05, true);
-    Choice next = O.start ? Choice::Retry : gUi->idle();
+    // Opening Stella starts it; the window shows only for real work (an install or
+    // update step), a failure, or --recovery. A self-test still shows (and captures) it.
+    Choice next = O.start || (!O.recovery && !O.selfTest) ? Choice::Retry : gUi->idle();
     if (next == Choice::Quit || next == Choice::None) return 0;
-    bool checkUpdate = !O.start;
+    bool checkUpdate = !O.start, quietCheck = !O.start && !O.recovery && !O.selfTest;
+    LOG("launcher: %s", O.recovery ? "recovery window" : "starting Stella");
     vector<ULONGLONG> crashTimes;
+    string lastReason;
+    vector<string> lastOutput;
     for (;;) {
         bool failed = false;
         string reason;
         vector<string> output;
         try {
-            if (next == Choice::Accept) {
+            if (next == Choice::Repair) {
+                string why = repair(lastReason, lastOutput);
+                if (!why.empty()) {
+                    next = recover(why, lastOutput, "Repair didn't work");
+                    if (next == Choice::Quit || next == Choice::None) return 1;
+                    checkUpdate = false;
+                    continue;
+                }
+            } else if (next == Choice::Accept) {
                 gUi->starting("Starting Stella…", 0, 0.05, false);
                 ensureTools();
                 try {
@@ -3728,7 +4510,9 @@ static int run() {
             gUi->starting("Starting Stella…", 0, 0.05, false);
             if (checkUpdate) {
                 checkUpdate = false;
-                if (updateBeforeStart()) {
+                bool quiet = quietCheck;
+                quietCheck = false;
+                if (updateBeforeStart(quiet)) {
                     LOG("launcher: handed over to the update at Start");
                     return 0;
                 }
@@ -3787,7 +4571,10 @@ static int run() {
         }
         if (!failed) continue;
         LOG("launcher: failure: %s", reason.c_str());
-        next = recover(reason, output);
+        lastReason = reason;
+        lastOutput = output;
+        quietCheck = false;
+        next = recover(reason, output, gRepaired ? "Stella still couldn't start" : "");
         if (next == Choice::Quit || next == Choice::None) return 1;
         checkUpdate = next == Choice::Retry;
     }
@@ -3806,6 +4593,8 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
     gLogFile = CreateFileW(P.launcherLog().c_str(), FILE_APPEND_DATA, FILE_SHARE_READ | FILE_SHARE_WRITE, nullptr, OPEN_ALWAYS,
                            FILE_ATTRIBUTE_NORMAL, nullptr);
     parseOptions();
+    // Holding Shift while opening Stella opens the launcher's own window instead of starting it.
+    if (!O.selfTest && !O.start && (GetAsyncKeyState(VK_SHIFT) & 0x8000)) O.recovery = true;
     if (O.after) waitForPreviousLauncher(O.after);
     removeOldLauncher();
 
@@ -3817,7 +4606,7 @@ int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int) {
         Sleep(250);
     }
     if (lock == INVALID_HANDLE_VALUE) {
-        if (showRunningLauncher()) {
+        if (showRunningLauncher(!O.recovery)) {
             LOG("launcher: another launcher owns %s; showed its window", utf8(P.root).c_str());
             return 0;
         }

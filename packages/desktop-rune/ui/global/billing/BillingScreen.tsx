@@ -19,9 +19,8 @@ import { useLocale, useT } from "@/shared/i18n";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { openExternalUrl } from "@/platform/electron/open-external";
 import { planUsageDialog } from "@/global/billing/plan-usage-dialog-store";
-import { CONNECT_PLAN_COPY } from "@stella/contracts/connect-plan-offer";
 import {
-  connectPlanChatGptOnly,
+  connectPlanActionLabel,
   connectPlanCopy,
   connectPlanOfferEnabled,
   openConnectPlan,
@@ -423,10 +422,10 @@ function UsageSection({
                 primary
                 onPress={() => {
                   planUsageDialog.close();
-                  openConnectPlan({ conversationId: null, reason: "allowance", choose: true });
+                  openConnectPlan({ conversationId: null, reason: "allowance" });
                 }}
               >
-                {connectPlanChatGptOnly() ? CONNECT_PLAN_COPY.connectChatGpt : CONNECT_PLAN_COPY.connect}
+                {connectPlanActionLabel()}
               </BillingButton>
             ) : null}
             {next ? (

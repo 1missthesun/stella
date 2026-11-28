@@ -2646,6 +2646,8 @@
       "onOtherDevices": "A mentett belépéseid itt vannak: {names}",
       "useHereHint": "Ha itt használod őket, ez a számítógép mindet megkapja.",
       "useHere": "Használat itt",
+      "notSyncingWith": "Nincs szinkronizálva ezzel: {names}",
+      "syncHere": "Szinkronizálás itt",
       "asked": "Kérés elküldve: {time}. Engedélyezd itt: {names}.",
       "askFailed": "Nem sikerült elküldeni a kérést. A Stella tovább próbálkozik.",
       "askedNow": "Elküldve",

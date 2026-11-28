@@ -174,6 +174,7 @@ type WorkerRequestOptions = {
 type PlacedChatPayload = RuntimeChatPayload & {
   handoff?: boolean;
   idempotencyKey?: string;
+  handoffModel?: string;
 };
 type PlacedChatTarget =
   | { mode: "cloud" }
@@ -944,6 +945,10 @@ export class StellaRuntimeHost {
           };
         }
         const handoff = payload.handoff === true;
+        const handoffModel =
+          handoff && typeof payload.model === "string" && payload.model.trim()
+            ? payload.model.trim()
+            : null;
         const scheduled = dispatch.ingress === "schedule";
         const scheduledAgent =
           scheduled &&
@@ -975,6 +980,7 @@ export class StellaRuntimeHost {
             userAuthoredPrompt: userAuthored,
             ...(scheduled ? { scheduled: true } : {}),
             ...(handoff ? { handoff: true } : {}),
+            ...(handoffModel ? { model: handoffModel } : {}),
             ...(failover ? { failover: true } : {}),
             rejectIfBusy: false,
             executionPlacementRunId: placementLocalChatRunId(
@@ -1443,6 +1449,7 @@ export class StellaRuntimeHost {
       ...(attachments.length ? { attachments } : {}),
       ...(context ? { context } : {}),
       ...(payload.handoff === true ? { handoff: true } : {}),
+      ...(payload.handoff === true && payload.handoffModel ? { model: payload.handoffModel } : {}),
     };
     const payloadBytes = Buffer.byteLength(canonicalDispatchPayloadJson(dispatchPayload), "utf8");
     if (payloadBytes > DISPATCH_PAYLOAD_MAX_BYTES) {
@@ -1541,6 +1548,7 @@ export class StellaRuntimeHost {
           conversationId?: unknown;
           target?: { mode?: unknown; deviceId?: unknown } | null;
           prompt?: unknown;
+          model?: unknown;
           brain?: unknown;
         }
       | null
@@ -1600,6 +1608,10 @@ export class StellaRuntimeHost {
     }
     if (target.mode === "automatic") return { ok: true };
     const handoffId = crypto.randomUUID();
+    const handoffModel =
+      params?.brain === true && typeof params.model === "string"
+        ? params.model.trim().slice(0, 200)
+        : "";
     const placedPayload: PlacedChatPayload = {
       conversationId,
       userPrompt: piBrainHandoffPrompt(
@@ -1610,6 +1622,7 @@ export class StellaRuntimeHost {
       userMessageEventId: `handoff-${handoffId}`,
       storageMode: "cloud",
       handoff: true,
+      ...(handoffModel ? { handoffModel } : {}),
     };
     const previous = this.pendingDestinationHandoffs.get(conversationId);
     if (previous) previous.canceled = true;

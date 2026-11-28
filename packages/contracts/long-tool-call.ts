@@ -6,6 +6,32 @@ export const waitsForUser = (tool: string): boolean => WAITS_FOR_USER.has(tool);
 
 export type CurrentToolCall = { tool: string; since: number };
 
+/**
+ * What a running call's live details carry once something inside it (an ask_user in a code cell, a held media call)
+ * waited on the user: the time held so far, and since when it still is. Held time doesn't count toward a long call.
+ */
+export type ToolCallHold = { heldMs: number; heldSince?: number };
+
+const HOLD_KEY = "stellaHold";
+
+export const toolCallHoldDetails = (hold: ToolCallHold): { [HOLD_KEY]: ToolCallHold } => ({ [HOLD_KEY]: hold });
+
+export const toolCallHoldOf = (details: unknown): ToolCallHold | undefined => {
+  if (!details || typeof details !== "object" || Array.isArray(details)) return undefined;
+  const hold = (details as Record<string, unknown>)[HOLD_KEY];
+  if (!hold || typeof hold !== "object") return undefined;
+  const { heldMs, heldSince } = hold as Record<string, unknown>;
+  if (typeof heldMs !== "number" || !Number.isFinite(heldMs)) return undefined;
+  return { heldMs: Math.max(0, heldMs), ...(typeof heldSince === "number" && Number.isFinite(heldSince) ? { heldSince } : {}) };
+};
+
+/** A call started at `startedAt` with its held time taken out, or undefined while it is held now. */
+export const unheldToolCall = (tool: string, startedAt: number, details: unknown): CurrentToolCall | undefined => {
+  const hold = toolCallHoldOf(details);
+  if (hold?.heldSince !== undefined) return undefined;
+  return { tool, since: startedAt + (hold?.heldMs ?? 0) };
+};
+
 export const longToolCall = <T extends CurrentToolCall>(call: T | undefined, now = Date.now()): T | undefined =>
   call && !waitsForUser(call.tool) && now - call.since >= LONG_TOOL_CALL_MS ? call : undefined;
 

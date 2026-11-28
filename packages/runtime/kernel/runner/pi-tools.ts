@@ -48,6 +48,7 @@ export type PiToolCall = {
   cwd?: string;
   withheld?: readonly string[];
   signal?: AbortSignal;
+  onHeld?: (held: boolean) => void;
 };
 
 export type RunnerPiTools = {
@@ -153,8 +154,8 @@ export const createRunnerPiTools = (context: RunnerContext): RunnerPiTools => ({
         stellaAppDir: context.stellaAppDir,
         stellaDataDir: context.stellaDataDir,
         store: context.runtimeStore,
-        toolExecutor: async (toolName, toolArgs, toolContext, signal, onUpdate) =>
-          await context.toolHost.executeTool(toolName, toolArgs, toolContext, signal, onUpdate),
+        toolExecutor: async (toolName, toolArgs, toolContext, signal, onUpdate, onHeld) =>
+          await context.toolHost.executeTool(toolName, toolArgs, toolContext, signal, onUpdate, onHeld),
         hookEmitter: context.hookEmitter,
         allowedToolNames: offered
           .map((tool) => tool.name)
@@ -168,6 +169,7 @@ export const createRunnerPiTools = (context: RunnerContext): RunnerPiTools => ({
         toolCallId: call.callId,
         params: call.args,
         ...(call.signal ? { signal: call.signal } : {}),
+        ...(call.onHeld ? { onHeld: call.onHeld } : {}),
       },
     );
   },

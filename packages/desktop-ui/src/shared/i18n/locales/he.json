@@ -2656,6 +2656,8 @@
       "onOtherDevices": "הכניסות השמורות שלך נמצאות ב-{names}",
       "useHereHint": "שימוש בהן כאן נותן למחשב הזה את כולן.",
       "useHere": "להשתמש בהן כאן",
+      "notSyncingWith": "לא מסונכרן עם {names}",
+      "syncHere": "סנכרון כאן",
       "asked": "נשלחה בקשה ב-{time}. יש לאשר ב-{names}.",
       "askFailed": "לא ניתן לשלוח בקשה. Stella ממשיכה לנסות.",
       "askedNow": "נשלחה בקשה",

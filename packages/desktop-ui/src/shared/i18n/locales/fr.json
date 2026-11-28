@@ -2656,6 +2656,8 @@
       "onOtherDevices": "Vos identifiants enregistrés sont sur {names}",
       "useHereHint": "Les utiliser ici les donne tous à cet ordinateur.",
       "useHere": "Les utiliser ici",
+      "notSyncingWith": "Non synchronisé avec {names}",
+      "syncHere": "Synchroniser ici",
       "asked": "Demandé à {time}. Autorisez-le sur {names}.",
       "askFailed": "La demande n’est pas partie. Stella continue d’essayer.",
       "askedNow": "Demandé",

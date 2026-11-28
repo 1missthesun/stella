@@ -2656,6 +2656,8 @@
       "onOtherDevices": "Tus inicios de sesión guardados están en {names}",
       "useHereHint": "Usarlos aquí le da a este ordenador todos ellos.",
       "useHere": "Usarlos aquí",
+      "notSyncingWith": "No se sincroniza con {names}",
+      "syncHere": "Sincronizar aquí",
       "asked": "Pedido a las {time}. Permítelo en {names}.",
       "askFailed": "No se ha podido pedir. Stella lo sigue intentando.",
       "askedNow": "Pedido",

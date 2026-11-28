@@ -168,6 +168,7 @@ export type RunnerContext = {
       context: ToolContext,
       signal?: AbortSignal,
       onUpdate?: ToolUpdateCallback,
+      onHeld?: (held: boolean) => void,
     ) => Promise<ToolResult>;
     executeToolCall: (
       toolName: string,
@@ -175,6 +176,7 @@ export type RunnerContext = {
       context: ToolContext,
       signal?: AbortSignal,
       onUpdate?: ToolUpdateCallback,
+      onHeld?: (held: boolean) => void,
     ) => Promise<ToolResult>;
     buildAgentShellEnvironment: (
       context: ToolContext,

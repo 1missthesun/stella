@@ -91,6 +91,7 @@ import {
   longToolCall,
   longToolCallText,
   longToolCallWakeText,
+  unheldToolCall,
   waitsForUser,
   type CurrentToolCall,
 } from "@stella/contracts/long-tool-call";
@@ -547,7 +548,8 @@ const currentToolCall = async (
     context,
   );
   let oldest: { slot: (typeof running)[number]; since: number } | undefined;
-  for (const { slot, since } of started) {
+  for (const { slot, since: startedAt } of started) {
+    const since = startedAt === undefined ? undefined : unheldToolCall(slot.name, startedAt, slot.details)?.since;
     if (since !== undefined && (oldest === undefined || since < oldest.since)) oldest = { slot, since };
   }
   if (!oldest) return undefined;
@@ -2078,7 +2080,21 @@ export function stellaAgents(host: StellaAgentsHost) {
   let boundHarness: Harness | undefined;
   const longCallTimers = new Map<string, ReturnType<typeof setTimeout>>();
   const LONG_CALLS_TOLD_KEPT = 16;
+  const LONG_CALL_RECHECK_MS = 60_000;
   const longCallKey = (conversationId: ConversationId, callId: string) => `${conversationId}\u0000${callId}`;
+
+  const armLongCall = (conversationId: ConversationId, callId: string, delayMs: number): void => {
+    const key = longCallKey(conversationId, callId);
+    clearTimeout(longCallTimers.get(key));
+    const timer = setTimeout(() => {
+      if (longCallTimers.get(key) === timer) longCallTimers.delete(key);
+      void wakeStarterOfLongCall(conversationId, callId).catch((error: unknown) => {
+        console.warn("[stella-agents] telling a starter about a long tool call failed", { conversationId, callId, error });
+      });
+    }, delayMs);
+    (timer as { unref?: () => void }).unref?.();
+    longCallTimers.set(key, timer);
+  };
 
   const longCallHook = hook(ToolTask, {
     beforeTool: async (call, api, context) => {
@@ -2087,15 +2103,7 @@ export function stellaAgents(host: StellaAgentsHost) {
       if (longCallTimers.has(key)) return undefined;
       const role = await api.snapshot(StellaAgentDoc, api.conversationId, context).catch(() => undefined);
       if (!role?.threadId || role.agentType === "orchestrator" || role.longCallsTold?.includes(call.id)) return undefined;
-      const conversationId = api.conversationId;
-      const timer = setTimeout(() => {
-        longCallTimers.delete(key);
-        void wakeStarterOfLongCall(conversationId, call.id).catch((error: unknown) => {
-          console.warn("[stella-agents] telling a starter about a long tool call failed", { conversationId, callId: call.id, error });
-        });
-      }, LONG_TOOL_CALL_MS);
-      (timer as { unref?: () => void }).unref?.();
-      longCallTimers.set(key, timer);
+      armLongCall(api.conversationId, call.id, LONG_TOOL_CALL_MS);
       return undefined;
     },
     afterTool: (call, _result, api) => {
@@ -2114,9 +2122,15 @@ export function stellaAgents(host: StellaAgentsHost) {
     const slot = live?.run === undefined ? undefined : live.tools?.find((tool) => tool.callId === callId && tool.status === "running");
     const taskId = slot?.taskId;
     if (!slot || taskId === undefined) return;
-    const since = await harness.commit(async (tx) => (await tx.task(taskId))?.startedAt, context);
-    const call = since === undefined ? undefined : longToolCall({ tool: slot.name, since });
-    if (!call) return;
+    const startedAt = await harness.commit(async (tx) => (await tx.task(taskId))?.startedAt, context);
+    if (startedAt === undefined) return;
+    const unheld = unheldToolCall(slot.name, startedAt, slot.details);
+    const call = longToolCall(unheld);
+    if (!call) {
+      const ranMs = unheld ? Date.now() - unheld.since : 0;
+      armLongCall(conversationId, callId, Math.max(LONG_CALL_RECHECK_MS, LONG_TOOL_CALL_MS - ranMs));
+      return;
+    }
     const self = await roleOf(harness, conversationId, context);
     const threadId = self.threadId;
     if (!threadId || self.agentType === "orchestrator") return;

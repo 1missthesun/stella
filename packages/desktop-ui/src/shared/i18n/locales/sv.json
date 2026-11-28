@@ -2646,6 +2646,8 @@
       "onOtherDevices": "Dina sparade inloggningar finns på {names}",
       "useHereHint": "Använder du dem här får den här datorn alla.",
       "useHere": "Använd dem här",
+      "notSyncingWith": "Synkroniseras inte med {names}",
+      "syncHere": "Synkronisera här",
       "asked": "Frågade kl. {time}. Tillåt den på {names}.",
       "askFailed": "Det gick inte att fråga. Stella fortsätter försöka.",
       "askedNow": "Frågat",

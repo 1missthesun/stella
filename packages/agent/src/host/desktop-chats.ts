@@ -1156,6 +1156,23 @@ export function desktopChats(options: DesktopChatsOptions) {
     return { runsOn: { model, ...(thinkingLevel ? { thinkingLevel } : {}) } };
   };
 
+  const pickStellaModel = async (conversationId: string, requested: string): Promise<{ label: string }> => {
+    const setStellaModel = options.setStellaModel;
+    if (!setStellaModel) throw new Error("This computer can't change Stella's model from here; the user picks it in the app.");
+    const choice = await agentModel(conversationId, requested);
+    const runsOn = "runsOn" in choice ? choice.runsOn : undefined;
+    if (!runsOn?.model) throw new Error(`"${requested}" can't run this conversation here.`);
+    if (onClaudeCode(runsOn.model)) {
+      const problem = await options.claudeCodeProblem?.().catch(() => undefined);
+      if (problem) throw new Error(`${problem} Pick another model, or ask the user to sign in to Claude on this computer.`);
+    }
+    const effort = /:(low|medium|high|xhigh|max)$/u.exec(requested.trim())?.[1];
+    const label = agentMoveModel(runsOn.model, effort) ?? requested;
+    await setStellaModel(label);
+    options.emit({ conversationId, events: [{ type: "model_picked", pick: label }] });
+    return { label };
+  };
+
   const engineHost = (
     engine: DesktopEngineAgents | undefined,
     defaultModel: string,
@@ -1614,22 +1631,10 @@ export function desktopChats(options: DesktopChatsOptions) {
             if (opened && (await opened.harness.snapshot(LiveDoc, opened.root.id, context))?.run === undefined) return;
           }
         };
-        const switchBrainModel = async (requested: string, brief: string | undefined) => {
-          const setStellaModel = options.setStellaModel;
-          if (!setStellaModel) throw new Error("This computer can't change Stella's model from here; the user picks it in the app.");
-          const choice = await agentModel(conversationId, requested);
-          const runsOn = "runsOn" in choice ? choice.runsOn : undefined;
-          if (!runsOn?.model) throw new Error(`"${requested}" can't run this conversation here.`);
-          if (onClaudeCode(runsOn.model)) {
-            const problem = await options.claudeCodeProblem?.().catch(() => undefined);
-            if (problem) throw new Error(`${problem} Pick another model, or ask the user to sign in to Claude on this computer.`);
-          }
-          const effort = /:(low|medium|high|xhigh|max)$/u.exec(requested.trim())?.[1];
-          const label = agentMoveModel(runsOn.model, effort) ?? requested;
-          await setStellaModel(label);
-          options.emit({ conversationId, events: [{ type: "model_picked", pick: label }] });
+        const switchBrainModel = async (requested: string, brief: string | undefined, callKey: string) => {
+          const { label } = await pickStellaModel(conversationId, requested);
           if (brief !== undefined) {
-            const requestId = `switch-model:${createHash("sha256").update(`${conversationId}\0${label}\0${brief}`).digest("hex").slice(0, 32)}`;
+            const requestId = `switch-model:${createHash("sha256").update(`${conversationId}\0${callKey}\0${label}\0${brief}`).digest("hex").slice(0, 32)}`;
             void turnEnded()
               .then(() => automation(conversationId, { requestId, prompt: switchedBrainBrief(label, brief), visible: false }))
               .then((result) => {
@@ -1641,7 +1646,7 @@ export function desktopChats(options: DesktopChatsOptions) {
         };
         const execution = desktopExecution({
           ...(moveAgent ? { moveAgent, leftBehind: workLeftBehind } : {}),
-          switchBrainModel: (requested, brief) => switchBrainModel(requested, brief),
+          switchBrainModel: (requested, brief, _context, callKey) => switchBrainModel(requested, brief, callKey),
           ...(options.deviceId ? { deviceId: options.deviceId } : {}),
           localOnly: conversationId.startsWith("local_"),
           ...(devices ? { devices } : {}),
@@ -2520,6 +2525,8 @@ export function desktopChats(options: DesktopChatsOptions) {
       steers?: boolean;
       placementRunId?: string;
       failover?: boolean;
+      /** A brain move's model, applied here before the brief runs; a refusal reaches Stella as a hidden note. */
+      model?: string;
       observe?: (events: PiChatEvent[]) => void;
     },
   ): Promise<
@@ -2540,16 +2547,31 @@ export function desktopChats(options: DesktopChatsOptions) {
     try {
       const chat = await ready(conversationId);
       placement.chat = chat;
+      const unswitched = turn.model
+        ? await pickStellaModel(conversationId, turn.model).then(
+            () => undefined,
+            (error: unknown) =>
+              `[Your switch to "${turn.model}" didn't take here (${error instanceof Error ? error.message : String(error)}), so you carry on on this computer's current model. Tell the user if it matters.]`,
+          )
+        : undefined;
       const observer = observe ? await watchConversationEvents(chat.harness, chat.root, context) : undefined;
       observer?.start(async (events) => observe?.(events));
       try {
-        return await automationTurn(conversationId, chat, turn);
+        return await automationTurn(conversationId, chat, unswitched ? withHiddenNote(turn, unswitched) : turn);
       } finally {
         await observer?.stop().catch(() => undefined);
       }
     } finally {
       if (placementRunId && placements.get(placementRunId) === placement) placements.delete(placementRunId);
     }
+  };
+
+  const withHiddenNote = <T extends { prompt: string; content?: UserInput; visible: boolean }>(turn: T, note: string): T => {
+    const noted = { type: "text", text: note, stella: { hidden: true } } as TextContent;
+    const content: UserInput =
+      turn.content ??
+      (turn.visible ? turn.prompt : [{ type: "text", text: turn.prompt, stella: { hidden: true } } as TextContent]);
+    return { ...turn, content: typeof content === "string" ? [{ type: "text", text: content }, noted] : [...content, noted] };
   };
 
   const joinedLater = async (chat: Chat, message: EntryId, answer: EntryId): Promise<boolean> => {
@@ -2845,11 +2867,12 @@ export function desktopChats(options: DesktopChatsOptions) {
 
   const cancelPlacedAgent = async (agentKey: string, runKey: string, stopped?: boolean): Promise<boolean> => {
     const placed = placedRuns.get(agentKey);
-    if (placed) {
-      if (placed.runKey !== runKey) return false;
-      placed.cancel.abort(stopped ? PLACED_AGENT_STOPPED : undefined);
-      if (!stopped) return true;
+    if (placed && placed.runKey !== runKey) return false;
+    if (!stopped) {
+      placed?.cancel.abort();
+      return placed !== undefined;
     }
+    placed?.cancel.abort(PLACED_AGENT_STOPPED);
     const candidates = new Set([...(placedIn.has(agentKey) ? [placedIn.get(agentKey)!] : []), ...chats.keys(), ...(await activeSet())]);
     for (const conversationId of candidates) {
       const chat = await open(conversationId).catch(() => undefined);

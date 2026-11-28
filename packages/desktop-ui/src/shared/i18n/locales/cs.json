@@ -2666,6 +2666,8 @@
       "onOtherDevices": "Vaše uložená přihlášení jsou na {names}",
       "useHereHint": "Když je použijete tady, tento počítač získá všechna.",
       "useHere": "Použít je tady",
+      "notSyncingWith": "Nesynchronizuje se s {names}",
+      "syncHere": "Synchronizovat zde",
       "asked": "Požádáno v {time}. Povolte ho na {names}.",
       "askFailed": "Žádost se nepodařilo odeslat. Stella to zkouší dál.",
       "askedNow": "Požádáno",

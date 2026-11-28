@@ -211,6 +211,7 @@ export const createToolHost = ({
     context: ToolContext,
     signal?: AbortSignal,
     onUpdate?: ToolHandlerExtras["onUpdate"],
+    onHeld?: ToolHandlerExtras["onHeld"],
   ) => Promise<ToolResult>;
   let toolCallHooks: Pick<HookEmitter, "emit"> | undefined;
   const executeToolCall = (
@@ -219,6 +220,7 @@ export const createToolHost = ({
     context: ToolContext,
     signal?: AbortSignal,
     onUpdate?: ToolHandlerExtras["onUpdate"],
+    onHeld?: ToolHandlerExtras["onHeld"],
   ): Promise<ToolResult> => {
     const parameters = toolCatalog.get(toolName)?.parameters;
     const prepareArguments = getToolArgumentPreparer(toolName);
@@ -232,7 +234,7 @@ export const createToolHost = ({
         : {}),
       ...(prepareArguments ? { prepareArguments } : {}),
       execute: (effectiveArgs) =>
-        executeTool(toolName, effectiveArgs, context, signal, onUpdate),
+        executeTool(toolName, effectiveArgs, context, signal, onUpdate, onHeld),
     });
   };
   const executeNestedToolCall = (
@@ -521,10 +523,12 @@ export const createToolHost = ({
     context: ToolContext,
     signal?: AbortSignal,
     onUpdate?: ToolHandlerExtras["onUpdate"],
+    onHeld?: ToolHandlerExtras["onHeld"],
   ) => {
     const extras: ToolHandlerExtras = {
       ...(signal ? { signal } : {}),
       ...(onUpdate ? { onUpdate } : {}),
+      ...(onHeld ? { onHeld } : {}),
     };
     log(`Executing tool: ${toolName}`, {
       args: toolArgs,

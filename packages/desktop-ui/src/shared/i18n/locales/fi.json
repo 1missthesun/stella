@@ -2646,6 +2646,8 @@
       "onOtherDevices": "Tallennetut kirjautumisesi ovat laitteella {names}",
       "useHereHint": "Jos käytät niitä täällä, tämä tietokone saa ne kaikki.",
       "useHere": "Käytä täällä",
+      "notSyncingWith": "Ei synkronoida laitteen {names} kanssa",
+      "syncHere": "Synkronoi täällä",
       "asked": "Pyydetty klo {time}. Salli se laitteella {names}.",
       "askFailed": "Pyyntö ei onnistunut. Stella yrittää edelleen.",
       "askedNow": "Pyydetty",

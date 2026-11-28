@@ -494,7 +494,7 @@ export const piChatsFor = (
       tools: (conversationId) => ({
         specs: (role) => session.runnerCell.get()?.piTools.specs(role) ?? [],
         readsImages: true,
-        run: async (call, context) => {
+        run: async (call, context, onHeld) => {
           const runner = session.runnerCell.get();
           if (!runner) throw new Error("Stella's runtime is restarting; try again.");
           const result = await runner.piTools.run({
@@ -507,6 +507,7 @@ export const piChatsFor = (
             ...(call.cwd ? { cwd: call.cwd } : {}),
             ...(call.withheld ? { withheld: call.withheld } : {}),
             ...(context.abortSignal ? { signal: context.abortSignal } : {}),
+            ...(onHeld ? { onHeld } : {}),
           });
           return {
             content: result.content,
@@ -1007,6 +1008,7 @@ export const piPlacedChat = async (
     context?: unknown;
     scheduled?: boolean;
     handoff?: boolean;
+    model?: string;
     failover?: boolean;
   },
 ) => {
@@ -1061,6 +1063,7 @@ export const piPlacedChat = async (
     visible: true,
     ...(run.scheduled || run.handoff ? {} : { steers: true }),
     placementRunId: run.placementRunId,
+    ...(run.handoff && run.model ? { model: run.model } : {}),
     ...(run.failover ? { failover: true } : {}),
   });
 };

@@ -2646,6 +2646,8 @@
       "onOtherDevices": "Kayıtlı girişleriniz {names} cihazında",
       "useHereHint": "Burada kullanmak hepsini bu bilgisayara verir.",
       "useHere": "Burada kullan",
+      "notSyncingWith": "{names} ile eşitlenmiyor",
+      "syncHere": "Burada eşitle",
       "asked": "{time} itibarıyla istendi. {names} cihazında izin verin.",
       "askFailed": "İstenemedi. Stella denemeye devam ediyor.",
       "askedNow": "İstendi",

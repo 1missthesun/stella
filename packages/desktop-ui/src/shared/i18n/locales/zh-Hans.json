@@ -2636,6 +2636,8 @@
       "onOtherDevices": "你保存的登录信息在 {names} 上",
       "useHereHint": "在这里使用会让这台电脑获得全部登录信息。",
       "useHere": "在这里使用",
+      "notSyncingWith": "未与 {names} 同步",
+      "syncHere": "在此同步",
       "asked": "已于 {time} 请求。请在 {names} 上允许。",
       "askFailed": "请求未能发出。Stella 会继续尝试。",
       "askedNow": "已请求",

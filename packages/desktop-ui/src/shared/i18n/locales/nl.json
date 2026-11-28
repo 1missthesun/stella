@@ -2646,6 +2646,8 @@
       "onOtherDevices": "Je opgeslagen logins staan op {names}",
       "useHereHint": "Als je ze hier gebruikt, krijgt deze computer ze allemaal.",
       "useHere": "Hier gebruiken",
+      "notSyncingWith": "Niet gesynchroniseerd met {names}",
+      "syncHere": "Hier synchroniseren",
       "asked": "Gevraagd om {time}. Sta het toe op {names}.",
       "askFailed": "Vragen is niet gelukt. Stella blijft het proberen.",
       "askedNow": "Gevraagd",

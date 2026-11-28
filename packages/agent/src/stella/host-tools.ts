@@ -9,6 +9,7 @@ import {
   needsProviderToolSchemaNormalization,
   normalizeProviderToolInputSchema,
 } from "@stella/runtime/kernel/tools/provider-tool-schema";
+import { toolCallHoldDetails, type ToolCallHold } from "@stella/contracts/long-tool-call";
 import { watchToolCallAbandonment } from "../engine/abandoned-calls.ts";
 import { StellaAgentDoc } from "./agent-doc.ts";
 import { ANTIGRAVITY_CLI_PROVIDER_ID, CLAUDE_CODE_PROVIDER_ID } from "../engine/selection.ts";
@@ -71,7 +72,8 @@ export type StellaToolOutcome = {
 export interface StellaToolHost {
   specs(role: StellaToolRole): readonly StellaToolSpec[];
   readsImages?: boolean;
-  run(call: StellaToolCall, context: Context): Promise<StellaToolOutcome>;
+  /** `onHeld` is told while the call waits on the user or a held media call inside it. */
+  run(call: StellaToolCall, context: Context, onHeld?: (held: boolean) => void): Promise<StellaToolOutcome>;
 }
 
 const jsonDetails = (details: unknown): JsonValue | undefined => {
@@ -138,6 +140,15 @@ const register = (role: StellaToolRole, spec: StellaToolSpec, host: StellaToolHo
     else parent?.addEventListener("abort", fromParent, { once: true });
     if (abandonment.signal.aborted) fromAbandonment();
     else abandonment.signal.addEventListener("abort", fromAbandonment, { once: true });
+    let hold: ToolCallHold = { heldMs: 0 };
+    let holdTold: Promise<void> = Promise.resolve();
+    const onHeld = (held: boolean) => {
+      if (held === (hold.heldSince !== undefined)) return;
+      const now = api.now();
+      hold = held ? { heldMs: hold.heldMs, heldSince: now } : { heldMs: hold.heldMs + Math.max(0, now - hold.heldSince!) };
+      const details = toolCallHoldDetails(hold);
+      holdTold = holdTold.then(() => api.details(details, context)).catch(() => undefined);
+    };
     let outcome: StellaToolOutcome;
     try {
       const running = host.run(
@@ -151,6 +162,7 @@ const register = (role: StellaToolRole, spec: StellaToolSpec, host: StellaToolHo
           ...(withheld ? { withheld } : {}),
         },
         withAbortSignal(controller.signal, withoutAbortSignal(context)),
+        onHeld,
       );
       running.catch(() => undefined);
       stopped.catch(() => undefined);
@@ -159,6 +171,7 @@ const register = (role: StellaToolRole, spec: StellaToolSpec, host: StellaToolHo
       parent?.removeEventListener("abort", fromParent);
       abandonment.signal.removeEventListener("abort", fromAbandonment);
       abandonment.release();
+      await holdTold;
     }
     const details = jsonDetails(outcome.details);
     return {

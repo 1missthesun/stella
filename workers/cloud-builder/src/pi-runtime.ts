@@ -129,7 +129,7 @@ import type { JournalCheckpointFirstKept } from "@stella/contracts/journal-check
 export { journalSeqOf } from "@stella/agent/stella/journal-sync";
 import type { AgentModelReasoningEffort, CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import type { AgentActivityEntry } from "@stella/contracts/conversation-agent-activity";
-import type { ExecutionContextSnapshot } from "@stella/contracts/execution-context";
+import { deviceModelRefusal, type ExecutionContextSnapshot } from "@stella/contracts/execution-context";
 import {
   mergePiEntries,
   piEntriesForClients,
@@ -401,7 +401,7 @@ export type PiRuntimeOptions = {
       args: { moveId: string; threadId: string; targetDeviceId: string; prompt: string; requesterThreadId?: string },
     ): Promise<AgentMoveResult>;
   };
-  moveBrain?(authority: PiAuthority, host: Extract<PiBrainHost, { host: "device" }>, brief: string): Promise<void>;
+  moveBrain?(authority: PiAuthority, host: Extract<PiBrainHost, { host: "device" }>, brief: string, model?: string): Promise<void>;
   heartbeat(): void;
   agentTools(
     authority: PiAuthority,
@@ -1459,7 +1459,7 @@ export class PiConversationRuntime {
       },
       ...(this.#options.moveBrain
         ? {
-            moveBrain: async (target, brief, context) => {
+            moveBrain: async (target, brief, context, model) => {
               if (target.kind !== "device") return { error: "You already run in the cloud." };
               const { authority } = await this.#agentState();
               const listed = await this.#gate(authority)
@@ -1473,15 +1473,15 @@ export class PiConversationRuntime {
                 };
               }
               const name = device.label?.trim() || device.deviceId;
-              const refusal = deviceRefusal(device, name);
+              const refusal = deviceRefusal(device, name) ?? (model ? deviceModelRefusal(device, model) : undefined);
               if (refusal) return { error: refusal };
               const turn = await this.#turn(context.abortSignal);
-              await this.#options.moveBrain!(turn.authority, { host: "device", deviceId: device.deviceId, label: name }, brief);
+              await this.#options.moveBrain!(turn.authority, { host: "device", deviceId: device.deviceId, label: name }, brief, model);
               return { moved: { kind: "device", deviceId: device.deviceId, label: name } };
             },
-            switchBrainModel: async (model, brief, context) => {
+            switchBrainModel: async (model, brief, context, callKey) => {
               const turn = await this.#turn(context.abortSignal);
-              const requestId = (await sha256Hex(`${turn.turnId}\0${model}`)).slice(0, 48);
+              const requestId = (await sha256Hex(`${turn.turnId}\0${callKey}\0${model}`)).slice(0, 48);
               return await this.#ownerCall<{ label: string }>(turn.authority, "agentThreads.switchOwnModel", {
                 ownerGeneration: turn.authority.ownerGeneration,
                 conversationId: turn.authority.conversationId,

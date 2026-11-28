@@ -2636,6 +2636,8 @@
       "onOtherDevices": "Thông tin đăng nhập đã lưu của bạn ở trên {names}",
       "useHereHint": "Dùng ở đây sẽ đưa tất cả vào máy tính này.",
       "useHere": "Dùng ở đây",
+      "notSyncingWith": "Không đồng bộ với {names}",
+      "syncHere": "Đồng bộ tại đây",
       "asked": "Đã hỏi lúc {time}. Hãy cho phép trên {names}.",
       "askFailed": "Không hỏi được. Stella vẫn đang thử lại.",
       "askedNow": "Đã hỏi",

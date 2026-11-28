@@ -30,12 +30,13 @@ import {
   isMapRouteArtifact,
   type MapRouteArtifact,
 } from "@stella/contracts/map-artifact";
-import type {
-  CloudBrowserBridge,
-  ToolContext,
-  ToolProcessIdentity,
-  ToolResult,
-  ToolUpdateCallback,
+import {
+  nestedToolCallId,
+  type CloudBrowserBridge,
+  type ToolContext,
+  type ToolProcessIdentity,
+  type ToolResult,
+  type ToolUpdateCallback,
 } from "../tools/types.js";
 import { isolateToolProcessLaunch } from "../tools/process-isolation.js";
 import { resolveToolProcessIdentity } from "../tools/shell.js";
@@ -356,6 +357,7 @@ type ActiveEvaluation = {
   onResponseMeta?: (meta: BrowserUseResponseMeta) => void;
   resetRequestedAt?: number;
   mapArtifacts: MapRouteArtifact[];
+  nestedCalls: Map<string, number>;
   responseMeta?: BrowserUseResponseMeta;
   content: NodeReplContentItem[];
   nextContentCursor: number;
@@ -1100,6 +1102,7 @@ class NodeReplKernel {
         content: [],
         nextContentCursor: 1,
         mapArtifacts: [],
+        nestedCalls: new Map(),
         browserActivity: {
           callCount: 0,
           mutated: false,
@@ -2471,11 +2474,17 @@ class NodeReplKernel {
     }
 
     try {
+      const sequence = active.nestedCalls.get(message.toolName) ?? 0;
+      active.nestedCalls.set(message.toolName, sequence + 1);
+      const nestedContext: ToolContext = {
+        ...active.context,
+        nestedCallId: nestedToolCallId(active.context.requestId, message.toolName, sequence),
+      };
       const execute = () =>
         this.executeTool!(
           message.toolName,
           message.args,
-          active.context,
+          nestedContext,
           active.controller.signal,
           (update) => {
             if (!this.closed && this.active === active) {
@@ -3166,7 +3175,10 @@ export class NodeReplKernelRegistry {
   async startCell(
     code: string,
     context: ToolContext,
-    options: EvaluateOptions & { yieldTimeMs?: number } = {},
+    options: EvaluateOptions & {
+      yieldTimeMs?: number;
+      onHeld?: (held: boolean) => void;
+    } = {},
   ): Promise<NodeReplCellObservation> {
     this.pruneCells();
     const { id, kernel } = await this.resolveKernel(context);
@@ -3235,13 +3247,38 @@ export class NodeReplKernelRegistry {
         this.runningCellByOwner.delete(id);
       }
     });
-    return await this.observeCell(
-      cell,
-      options.yieldTimeMs ?? 30_000,
-      options.signal,
-      undefined,
-      false,
+    return await this.whileObserving(cell, options.onHeld, () =>
+      this.observeCell(
+        cell,
+        options.yieldTimeMs ?? 30_000,
+        options.signal,
+        undefined,
+        false,
+      ),
     );
+  }
+
+  private async whileObserving<T>(
+    cell: NodeReplCellRecord,
+    onHeld: ((held: boolean) => void) | undefined,
+    observe: () => Promise<T>,
+  ): Promise<T> {
+    if (!onHeld) return await observe();
+    let told = false;
+    const tell = () => {
+      const held = !cell.outcome && cell.kernel.held;
+      if (held === told) return;
+      told = held;
+      onHeld(held);
+    };
+    const stop = cell.kernel.onHeldChange(tell);
+    tell();
+    try {
+      return await observe();
+    } finally {
+      stop();
+      if (told) onHeld(false);
+    }
   }
 
   async waitCell(
@@ -3252,6 +3289,7 @@ export class NodeReplKernelRegistry {
       terminate?: boolean;
       afterCursor?: number;
       signal?: AbortSignal;
+      onHeld?: (held: boolean) => void;
     } = {},
   ): Promise<NodeReplCellObservation> {
     this.pruneCells();
@@ -3266,11 +3304,13 @@ export class NodeReplKernelRegistry {
     if (options.terminate && !cell.outcome) {
       cell.kernel.terminate(`Code cell ${cellId} terminated by caller.`);
     }
-    return await this.observeCell(
-      cell,
-      options.waitMs ?? 10_000,
-      options.signal,
-      options.afterCursor,
+    return await this.whileObserving(cell, options.onHeld, () =>
+      this.observeCell(
+        cell,
+        options.waitMs ?? 10_000,
+        options.signal,
+        options.afterCursor,
+      ),
     );
   }
 

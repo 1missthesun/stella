@@ -94,8 +94,11 @@ export const createBootstrapServices = (options) => {
                 },
             }, code);
         },
+        // Stella opened again (a second instance, or the launcher's "focus" when it is reopened)
+        // shows the window wherever it is: minimized, or hidden in the tray after its close button
+        // on Windows, where focus() alone does nothing.
         onSecondInstanceFocus: () => {
-            state.windowManager?.getFullWindow()?.focus();
+            state.windowManager?.showWindow();
         },
         onSessionInvalidated: () => {
             for (const window of options.getAllWindows()) {

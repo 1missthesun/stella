@@ -725,7 +725,16 @@ function DockedViewer({
       if (event.button !== 0) return;
       event.preventDefault();
       const { cursor } = getComputedStyle(event.currentTarget);
-      resizeViewer(gestureStart(event), cursor, floatRect, (dx, dy, start) => {
+      // An expanded viewer resizes from the size it fills, floating once the drag moves.
+      const frame = event.currentTarget.parentElement?.getBoundingClientRect();
+      const from = stage && frame
+        ? clampFloatRect(
+            { x: frame.x, y: frame.y, width: frame.width, height: frame.height },
+            geo,
+          )
+        : floatRect;
+      const leaveStage = stage ? () => fileViewer.floatAt(from) : undefined;
+      resizeViewer(gestureStart(event), cursor, from, (dx, dy, start) => {
         let { x, y, width, height } = start;
         if (edge.includes("e")) width = start.width + dx;
         if (edge.includes("s")) height = start.height + dy;
@@ -738,7 +747,7 @@ function DockedViewer({
           y = start.y + (start.height - height);
         }
         return { x, y, width, height };
-      });
+      }, leaveStage);
     };
 
   return (
@@ -776,17 +785,15 @@ function DockedViewer({
         />
       ) : null}
       <ViewerMain item={item} surface={DOCKED} />
-      {!stage
-        ? RESIZE_EDGES.map((edge) => (
-            <div
-              key={edge}
-              className="file-viewer__resize"
-              data-edge={edge}
-              onPointerDown={startResize(edge)}
-              aria-hidden="true"
-            />
-          ))
-        : null}
+      {RESIZE_EDGES.map((edge) => (
+        <div
+          key={edge}
+          className="file-viewer__resize"
+          data-edge={edge}
+          onPointerDown={startResize(edge)}
+          aria-hidden="true"
+        />
+      ))}
     </div>
   );
 }

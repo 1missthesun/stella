@@ -187,6 +187,12 @@ export const fileViewer = {
     if (state.mode === "stage") this.collapse();
     else this.expand();
   },
+  /** Floats the viewer at `rect` in one step, e.g. when a resize starts on the stage. */
+  floatAt(rect: FileViewerRect) {
+    rememberMode("float");
+    emit({ ...state, mode: "float", rect });
+    uiState.setItem(STORAGE_KEY_RECT, JSON.stringify(rect));
+  },
   setRect(rect: FileViewerRect) {
     emit({ ...state, rect });
     uiState.setItem(STORAGE_KEY_RECT, JSON.stringify(rect));

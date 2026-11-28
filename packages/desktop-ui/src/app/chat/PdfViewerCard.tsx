@@ -1,4 +1,5 @@
 import {
+  Suspense,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -9,7 +10,10 @@ import {
 import { Document, Page, pdfjs } from "react-pdf";
 import { useFilePreviewActions } from "@/features/chat/hooks/use-file-preview-actions";
 import { FilePreviewCardShell } from "./FilePreviewCardShell";
-import { useRegisterViewerNav } from "@/shell/workspace-stage/viewer-item-context";
+import {
+  useRegisterViewerNav,
+  useViewerWindow,
+} from "@/shell/workspace-stage/viewer-item-context";
 import { useDisplayFileBytes } from "@/shared/hooks/use-display-file-data";
 import { useT } from "@/shared/i18n";
 import { PreviewBoundary, PreviewProblem } from "@/shell/display/preview-states";
@@ -42,6 +46,33 @@ const DEFAULT_PAGE_ASPECT = 792 / 612;
 type LoadStatus = "loading" | "ready" | "error";
 
 const RESIZE_DEBOUNCE_MS = 100;
+
+/**
+ * A page drawn in a viewer window keeps its pixels when the viewer docks again,
+ * but shows blank once that window closes: drawing them back onto the same
+ * canvas shows them again without rendering the page anew.
+ */
+function useRepaintAfterMove(ref: React.RefObject<HTMLElement | null>) {
+  const viewerWindow = useViewerWindow();
+  const shownIn = useRef(viewerWindow);
+  useEffect(() => {
+    if (shownIn.current === viewerWindow) return;
+    shownIn.current = viewerWindow;
+    const frame = viewerWindow.requestAnimationFrame(() => {
+      for (const canvas of ref.current?.querySelectorAll("canvas") ?? []) {
+        if (canvas.width === 0 || canvas.height === 0) continue;
+        const context = canvas.getContext("2d");
+        if (!context) continue;
+        context.save();
+        context.setTransform(1, 0, 0, 1, 0, 0);
+        context.globalCompositeOperation = "copy";
+        context.drawImage(canvas, 0, 0);
+        context.restore();
+      }
+    });
+    return () => viewerWindow.cancelAnimationFrame(frame);
+  }, [ref, viewerWindow]);
+}
 
 function useNearScrollRoot(
   ref: React.RefObject<HTMLElement | null>,
@@ -96,29 +127,44 @@ function LazyPdfPage({
       style={shouldRender ? undefined : { minHeight: estHeight }}
     >
       {shouldRender ? (
-        <Page
-          pageNumber={pageNumber}
-          width={width ?? undefined}
-          renderAnnotationLayer={false}
-          renderTextLayer={false}
-          className="pdf-viewer-card__page"
-          onRenderSuccess={
-            onFirstRender
-              ? () => {
-                  const canvas = wrapRef.current?.querySelector("canvas");
-                  if (canvas && canvas.width > 0 && canvas.height > 0) {
-                    onFirstRender(canvas.height / canvas.width);
-                  } else {
-                    onFirstRender(DEFAULT_PAGE_ASPECT);
+        // react-pdf's pages suspend while they load: each holds its own place,
+        // or the card's boundary would hide the whole card and drop its scroll.
+        <Suspense fallback={<div style={{ height: estHeight }} />}>
+          <Page
+            pageNumber={pageNumber}
+            width={width ?? undefined}
+            renderAnnotationLayer={false}
+            renderTextLayer={false}
+            className="pdf-viewer-card__page"
+            onRenderSuccess={
+              onFirstRender
+                ? () => {
+                    const canvas = wrapRef.current?.querySelector("canvas");
+                    if (canvas && canvas.width > 0 && canvas.height > 0) {
+                      onFirstRender(canvas.height / canvas.width);
+                    } else {
+                      onFirstRender(DEFAULT_PAGE_ASPECT);
+                    }
                   }
-                }
-              : undefined
-          }
-        />
+                : undefined
+            }
+          />
+        </Suspense>
       ) : null}
     </div>
   );
 }
+
+const RailThumbPlaceholder = () => (
+  <span
+    className="pdf-viewer-card__rail-thumb"
+    style={{
+      display: "block",
+      width: PAGE_RAIL_THUMB_WIDTH,
+      height: Math.round(PAGE_RAIL_THUMB_WIDTH * DEFAULT_PAGE_ASPECT),
+    }}
+  />
+);
 
 function LazyRailThumb({
   pageNumber,
@@ -146,23 +192,18 @@ function LazyRailThumb({
       onClick={onSelect}
     >
       {enabled && near ? (
-        <Page
-          pageNumber={pageNumber}
-          width={PAGE_RAIL_THUMB_WIDTH}
-          renderAnnotationLayer={false}
-          renderTextLayer={false}
-          loading={null}
-          className="pdf-viewer-card__rail-thumb"
-        />
+        <Suspense fallback={<RailThumbPlaceholder />}>
+          <Page
+            pageNumber={pageNumber}
+            width={PAGE_RAIL_THUMB_WIDTH}
+            renderAnnotationLayer={false}
+            renderTextLayer={false}
+            loading={null}
+            className="pdf-viewer-card__rail-thumb"
+          />
+        </Suspense>
       ) : (
-        <span
-          className="pdf-viewer-card__rail-thumb"
-          style={{
-            display: "block",
-            width: PAGE_RAIL_THUMB_WIDTH,
-            height: Math.round(PAGE_RAIL_THUMB_WIDTH * DEFAULT_PAGE_ASPECT),
-          }}
-        />
+        <RailThumbPlaceholder />
       )}
       <span className="pdf-viewer-card__rail-number">{pageNumber}</span>
     </button>
@@ -220,6 +261,7 @@ function PdfViewerCardContent({
   const resizeTimerRef = useRef<number | null>(null);
   const lastWidthRef = useRef<number | null>(null);
   const jumpUntilRef = useRef(0);
+  useRepaintAfterMove(layoutRef);
 
   const status: LoadStatus = fileError ? "error" : loadStatus;
   const errorMessage = fileError ?? loadErrorMessage;
@@ -376,6 +418,12 @@ function PdfViewerCardContent({
       : null,
   );
 
+  const loadingPlaceholder = (
+    <div className="file-preview-card__placeholder pdf-viewer-card__placeholder">
+      {t("app.chat.pdfViewer.loading")}
+    </div>
+  );
+
   const headerTitle =
     title?.replace(/\.pdf$/i, "") ??
     filePath
@@ -420,63 +468,63 @@ function PdfViewerCardContent({
           data-page-rail={showRail ? "true" : undefined}
         >
           {documentFile ? (
-            <Document
-              file={documentFile}
-              loading={null}
-              noData={null}
-              onLoadSuccess={handleLoadSuccess}
-              onLoadError={handleLoadError}
-              className="pdf-viewer-card__document-root"
-            >
-              {showRail ? (
-                <nav
-                  ref={railRef}
-                  className="pdf-viewer-card__rail"
-                  aria-label="Pages"
-                >
-                  {Array.from(
-                    { length: Math.min(numPages, PAGE_RAIL_MAX_PAGES) },
-                    (_, index) => {
-                      const pageNumber = index + 1;
-                      return (
-                        <LazyRailThumb
-                          key={pageNumber}
-                          pageNumber={pageNumber}
-                          current={pageNumber === currentPage}
-                          railRef={railRef}
-                          enabled={firstPageReady}
-                          onSelect={() => scrollToPage(pageNumber)}
-                        />
-                      );
-                    },
-                  )}
-                </nav>
-              ) : null}
-              <div ref={containerRef} className="pdf-viewer-card__scroll">
-              <div className="pdf-viewer-card__document">
-              {Array.from({ length: numPages }, (_, index) => {
-                const pageNumber = index + 1;
-                return (
-                  <LazyPdfPage
-                    key={pageNumber}
-                    pageNumber={pageNumber}
-                    width={pageWidth}
-                    aspect={pageAspect}
-                    scrollRef={containerRef}
-                    eager={pageNumber <= EAGER_MAIN_PAGES}
-                    onFirstRender={
-                      pageNumber === 1 ? handleFirstPageRender : undefined
-                    }
-                  />
-                );
-              })}
-              </div>
-              </div>
-            </Document>
+            <Suspense fallback={loadingPlaceholder}>
+              <Document
+                file={documentFile}
+                loading={null}
+                noData={null}
+                onLoadSuccess={handleLoadSuccess}
+                onLoadError={handleLoadError}
+                className="pdf-viewer-card__document-root"
+              >
+                {showRail ? (
+                  <nav
+                    ref={railRef}
+                    className="pdf-viewer-card__rail"
+                    aria-label="Pages"
+                  >
+                    {Array.from(
+                      { length: Math.min(numPages, PAGE_RAIL_MAX_PAGES) },
+                      (_, index) => {
+                        const pageNumber = index + 1;
+                        return (
+                          <LazyRailThumb
+                            key={pageNumber}
+                            pageNumber={pageNumber}
+                            current={pageNumber === currentPage}
+                            railRef={railRef}
+                            enabled={firstPageReady}
+                            onSelect={() => scrollToPage(pageNumber)}
+                          />
+                        );
+                      },
+                    )}
+                  </nav>
+                ) : null}
+                <div ref={containerRef} className="pdf-viewer-card__scroll">
+                <div className="pdf-viewer-card__document">
+                {Array.from({ length: numPages }, (_, index) => {
+                  const pageNumber = index + 1;
+                  return (
+                    <LazyPdfPage
+                      key={pageNumber}
+                      pageNumber={pageNumber}
+                      width={pageWidth}
+                      aspect={pageAspect}
+                      scrollRef={containerRef}
+                      eager={pageNumber <= EAGER_MAIN_PAGES}
+                      onFirstRender={
+                        pageNumber === 1 ? handleFirstPageRender : undefined
+                      }
+                    />
+                  );
+                })}
+                </div>
+                </div>
+              </Document>
+            </Suspense>
           ) : (
-            <div className="file-preview-card__placeholder pdf-viewer-card__placeholder">
-              {t("app.chat.pdfViewer.loading")}
-            </div>
+            loadingPlaceholder
           )}
         </div>
       )}

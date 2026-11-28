@@ -77,6 +77,48 @@ const copyAttributes = (from: Element, to: Element): void => {
 
 const STYLES = "style, link[rel='stylesheet']";
 
+const addFont = (target: Document, face: FontFace): void => {
+  try {
+    target.fonts.add(face);
+  } catch {
+    // A face from an @font-face rule: the window has it from the copied styles.
+  }
+};
+
+const SHARES_FONTS = Symbol.for("stella.viewerWindows.sharesFonts");
+
+/**
+ * Fonts added from script (pdf.js loads each PDF's embedded fonts this way)
+ * join only Stella's own document, while a canvas moved into a viewer window
+ * looks its fonts up in that window's document. Each one joins every open
+ * viewer window as it is added, so text drawn there never falls back to boxes.
+ */
+const shareScriptFonts = (): void => {
+  const fonts = document.fonts as FontFaceSet & { [SHARES_FONTS]?: true };
+  if (fonts[SHARES_FONTS]) return;
+  fonts[SHARES_FONTS] = true;
+  const add = fonts.add.bind(fonts);
+  const remove = fonts.delete.bind(fonts);
+  fonts.add = (face) => {
+    add(face);
+    for (const { window: open } of detachedWindows.values()) {
+      addFont(open.document, face);
+    }
+    return fonts;
+  };
+  fonts.delete = (face) => {
+    for (const { window: open } of detachedWindows.values()) {
+      open.document.fonts.delete(face);
+    }
+    return remove(face);
+  };
+};
+
+const mirrorFonts = (target: Document): void => {
+  shareScriptFonts();
+  for (const face of document.fonts) addFont(target, face);
+};
+
 const mirrorAppearance = (target: Document): (() => void) => {
   const copies = new Map<Element, Element>();
   const syncStyles = () => {
@@ -106,6 +148,7 @@ const mirrorAppearance = (target: Document): (() => void) => {
   };
   syncRoot();
   syncStyles();
+  mirrorFonts(target);
   const root = new MutationObserver(syncRoot);
   root.observe(document.documentElement, { attributes: true });
   const styles = new MutationObserver(syncStyles);

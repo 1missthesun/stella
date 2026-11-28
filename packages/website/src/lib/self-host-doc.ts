@@ -99,7 +99,7 @@ Each code works **once** and expires after **10 minutes**. Make a new one for ev
 
 Treat the link like a password until it's used or expired. Don't post it anywhere.
 
-Then the user connects their Claude or ChatGPT account in the app (Settings → **Claude and ChatGPT**): that's where the models come from, and cloud turns use it by default. Without it, and without an OpenRouter key, chats on the server have no model to answer with.
+Then the user connects their Claude or ChatGPT account in the app (Settings → **AI plans**): that's where the models come from, and cloud turns use it by default. Without it, and without an OpenRouter key, chats on the server have no model to answer with.
 
 **Done means:** the last line said \`ready\`, and the user's phone or computer shows their server's name after scanning.
 

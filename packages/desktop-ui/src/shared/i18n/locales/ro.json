@@ -2162,7 +2162,7 @@
       "active": "În uz",
       "addInCloud": "În cloud",
       "addOnComputer": "Pe acest computer",
-      "cardIntro": "Folosește abonamentul Claude sau ChatGPT pe care îl plătești deja.",
+      "cardIntro": "Folosește abonamentul Claude, ChatGPT sau Gemini pe care îl plătești deja.",
       "chatgptBrowserWaiting": "Finalizează conectarea la ChatGPT în browser.",
       "chatgptCloudSignedIn": "Cloudul tău este conectat la ChatGPT.",
       "chatgptComputerSignedIn": "Acest computer este conectat la ChatGPT.",
@@ -2642,7 +2642,7 @@
       "general": "General",
       "shortcuts": "Comenzi rapide",
       "privacy": "Confidențialitate",
-      "ai": "Claude și ChatGPT"
+      "ai": "Abonamente AI"
     },
     "title": "Setări",
     "voiceAgent": {

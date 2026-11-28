@@ -2162,7 +2162,7 @@
       "active": "Actif",
       "addInCloud": "Dans le cloud",
       "addOnComputer": "Sur cet ordinateur",
-      "cardIntro": "Utilisez le forfait Claude ou ChatGPT que vous payez déjà.",
+      "cardIntro": "Utilisez le forfait Claude, ChatGPT ou Gemini que vous payez déjà.",
       "chatgptBrowserWaiting": "Terminez la connexion à ChatGPT dans votre navigateur.",
       "chatgptCloudSignedIn": "Votre cloud est connecté à ChatGPT.",
       "chatgptComputerSignedIn": "Cet ordinateur est connecté à ChatGPT.",
@@ -2642,7 +2642,7 @@
       "general": "Général",
       "shortcuts": "Raccourcis",
       "privacy": "Confidentialité",
-      "ai": "Claude et ChatGPT"
+      "ai": "Forfaits IA"
     },
     "title": "Paramètres",
     "voiceAgent": {

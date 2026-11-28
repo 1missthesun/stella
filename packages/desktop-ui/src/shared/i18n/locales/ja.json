@@ -2142,7 +2142,7 @@
       "active": "使用中",
       "addInCloud": "クラウド",
       "addOnComputer": "このコンピュータ",
-      "cardIntro": "契約済みの Claude または ChatGPT のプランを使います。",
+      "cardIntro": "契約済みの Claude、ChatGPT、または Gemini のプランを使います。",
       "chatgptBrowserWaiting": "ブラウザで ChatGPT へのサインインを完了してください。",
       "chatgptCloudSignedIn": "クラウドは ChatGPT にサインイン済みです。",
       "chatgptComputerSignedIn": "このコンピュータは ChatGPT にサインイン済みです。",
@@ -2622,7 +2622,7 @@
       "general": "基本",
       "shortcuts": "ショートカット",
       "privacy": "プライバシー",
-      "ai": "Claude と ChatGPT"
+      "ai": "AI プラン"
     },
     "title": "設定",
     "voiceAgent": {

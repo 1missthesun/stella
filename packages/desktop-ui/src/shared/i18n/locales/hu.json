@@ -2152,7 +2152,7 @@
       "active": "Aktív",
       "addInCloud": "A felhőben",
       "addOnComputer": "Ezen a számítógépen",
-      "cardIntro": "Használd a már előfizetett Claude- vagy ChatGPT-csomagodat.",
+      "cardIntro": "Használd a már előfizetett Claude-, ChatGPT- vagy Gemini-csomagodat.",
       "chatgptBrowserWaiting": "Fejezd be a bejelentkezést a ChatGPT-be a böngésződben.",
       "chatgptCloudSignedIn": "A felhőd be van jelentkezve a ChatGPT-be.",
       "chatgptComputerSignedIn": "Ez a számítógép be van jelentkezve a ChatGPT-be.",
@@ -2632,7 +2632,7 @@
       "general": "Általános",
       "shortcuts": "Gyorsbillentyűk",
       "privacy": "Adatvédelem",
-      "ai": "Claude és ChatGPT"
+      "ai": "AI-csomagok"
     },
     "title": "Beállítások",
     "voiceAgent": {

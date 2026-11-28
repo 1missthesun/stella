@@ -2152,7 +2152,7 @@
       "active": "Ενεργός",
       "addInCloud": "Στο cloud",
       "addOnComputer": "Σε αυτόν τον υπολογιστή",
-      "cardIntro": "Χρησιμοποιήστε το πρόγραμμα Claude ή ChatGPT που ήδη πληρώνετε.",
+      "cardIntro": "Χρησιμοποιήστε το πρόγραμμα Claude, ChatGPT ή Gemini που ήδη πληρώνετε.",
       "chatgptBrowserWaiting": "Ολοκληρώστε τη σύνδεση στο ChatGPT στο πρόγραμμα περιήγησης.",
       "chatgptCloudSignedIn": "Το cloud σας είναι συνδεδεμένο στο ChatGPT.",
       "chatgptComputerSignedIn": "Αυτός ο υπολογιστής είναι συνδεδεμένος στο ChatGPT.",
@@ -2632,7 +2632,7 @@
       "general": "Γενικά",
       "shortcuts": "Συντομεύσεις",
       "privacy": "Απόρρητο",
-      "ai": "Claude και ChatGPT"
+      "ai": "Προγράμματα AI"
     },
     "title": "Ρυθμίσεις",
     "voiceAgent": {

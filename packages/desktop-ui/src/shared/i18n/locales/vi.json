@@ -2142,7 +2142,7 @@
       "active": "Đang dùng",
       "addInCloud": "Trên đám mây",
       "addOnComputer": "Trên máy tính này",
-      "cardIntro": "Dùng gói Claude hoặc ChatGPT bạn đang trả phí.",
+      "cardIntro": "Dùng gói Claude, ChatGPT hoặc Gemini bạn đang trả phí.",
       "chatgptBrowserWaiting": "Hoàn tất đăng nhập ChatGPT trong trình duyệt của bạn.",
       "chatgptCloudSignedIn": "Đám mây của bạn đã đăng nhập ChatGPT.",
       "chatgptComputerSignedIn": "Máy tính này đã đăng nhập ChatGPT.",
@@ -2622,7 +2622,7 @@
       "general": "Chung",
       "shortcuts": "Phím tắt",
       "privacy": "Quyền riêng tư",
-      "ai": "Claude và ChatGPT"
+      "ai": "Gói AI"
     },
     "title": "Cài đặt",
     "voiceAgent": {

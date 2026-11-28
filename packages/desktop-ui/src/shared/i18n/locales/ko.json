@@ -2142,7 +2142,7 @@
       "active": "사용 중",
       "addInCloud": "클라우드에서",
       "addOnComputer": "이 컴퓨터에서",
-      "cardIntro": "이미 결제 중인 Claude 또는 ChatGPT 요금제를 사용하세요.",
+      "cardIntro": "이미 결제 중인 Claude, ChatGPT 또는 Gemini 요금제를 사용하세요.",
       "chatgptBrowserWaiting": "브라우저에서 ChatGPT 로그인을 완료하세요.",
       "chatgptCloudSignedIn": "클라우드가 ChatGPT에 로그인되어 있습니다.",
       "chatgptComputerSignedIn": "이 컴퓨터가 ChatGPT에 로그인되어 있습니다.",
@@ -2622,7 +2622,7 @@
       "general": "기본",
       "shortcuts": "단축키",
       "privacy": "개인정보 보호",
-      "ai": "Claude 및 ChatGPT"
+      "ai": "AI 요금제"
     },
     "title": "설정",
     "voiceAgent": {

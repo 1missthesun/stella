@@ -2152,7 +2152,7 @@
       "active": "Aktiv",
       "addInCloud": "In der Cloud",
       "addOnComputer": "Auf diesem Computer",
-      "cardIntro": "Nutze das Claude- oder ChatGPT-Abo, das du schon bezahlst.",
+      "cardIntro": "Nutze das Claude-, ChatGPT- oder Gemini-Abo, das du schon bezahlst.",
       "chatgptBrowserWaiting": "Schließe die Anmeldung bei ChatGPT in deinem Browser ab.",
       "chatgptCloudSignedIn": "Deine Cloud ist bei ChatGPT angemeldet.",
       "chatgptComputerSignedIn": "Dieser Computer ist bei ChatGPT angemeldet.",
@@ -2632,7 +2632,7 @@
       "general": "Allgemein",
       "shortcuts": "Tastenkürzel",
       "privacy": "Datenschutz",
-      "ai": "Claude und ChatGPT"
+      "ai": "KI-Abos"
     },
     "title": "Einstellungen",
     "voiceAgent": {

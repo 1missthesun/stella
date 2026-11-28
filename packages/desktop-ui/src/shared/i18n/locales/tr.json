@@ -2152,7 +2152,7 @@
       "active": "Kullanımda",
       "addInCloud": "Bulutta",
       "addOnComputer": "Bu bilgisayarda",
-      "cardIntro": "Zaten ödediğin Claude veya ChatGPT planını kullan.",
+      "cardIntro": "Zaten ödediğin Claude, ChatGPT veya Gemini planını kullan.",
       "chatgptBrowserWaiting": "Tarayıcında ChatGPT oturum açma işlemini tamamla.",
       "chatgptCloudSignedIn": "Bulutunda ChatGPT oturumu açık.",
       "chatgptComputerSignedIn": "Bu bilgisayarda ChatGPT oturumu açık.",
@@ -2632,7 +2632,7 @@
       "general": "Genel",
       "shortcuts": "Kısayollar",
       "privacy": "Gizlilik",
-      "ai": "Claude ve ChatGPT"
+      "ai": "Yapay zekâ planları"
     },
     "title": "Ayarlar",
     "voiceAgent": {

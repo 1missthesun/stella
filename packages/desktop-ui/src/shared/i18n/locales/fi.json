@@ -2152,7 +2152,7 @@
       "active": "Aktiivinen",
       "addInCloud": "Pilvessä",
       "addOnComputer": "Tällä tietokoneella",
-      "cardIntro": "Käytä Claude- tai ChatGPT-tilausta, josta jo maksat.",
+      "cardIntro": "Käytä Claude-, ChatGPT- tai Gemini-tilausta, josta jo maksat.",
       "chatgptBrowserWaiting": "Viimeistele kirjautuminen ChatGPT:hen selaimessasi.",
       "chatgptCloudSignedIn": "Pilvesi on kirjautunut ChatGPT:hen.",
       "chatgptComputerSignedIn": "Tämä tietokone on kirjautunut ChatGPT:hen.",
@@ -2632,7 +2632,7 @@
       "general": "Yleiset",
       "shortcuts": "Pikanäppäimet",
       "privacy": "Tietosuoja",
-      "ai": "Claude ja ChatGPT"
+      "ai": "AI-tilaukset"
     },
     "title": "Asetukset",
     "voiceAgent": {

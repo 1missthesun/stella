@@ -252,7 +252,7 @@ export const claudeSignInNoteText = (
     `Claude Code on ${where} can't answer since ${new Date(since).toISOString()}: its Claude sign-in${held.email ? ` (${held.email})` : ""} there has ended or was refused, so work there that runs on Claude waits for a sign-in instead of failing. Waiting there:`,
     ...held.tasks.map((task) => `- ${task.description} (thread_id: ${task.threadId})`),
     ...(held.reply ? ["- your own reply in this chat"] : []),
-    `They continue by themselves, with their context, as soon as someone signs in to Claude on ${computer.name} (Settings › Claude and ChatGPT there), or when the login answers again (that computer tries it every few minutes, in case Anthropic refused it by mistake); they give up after 12 hours. Until then agent_status shows them as waiting for a Claude sign-in, and messages to them wait too.`,
+    `They continue by themselves, with their context, as soon as someone signs in to Claude on ${computer.name} (Settings › AI plans there), or when the login answers again (that computer tries it every few minutes, in case Anthropic refused it by mistake); they give up after 12 hours. Until then agent_status shows them as waiting for a Claude sign-in, and messages to them wait too.`,
     "Only the user can sign in, so tell them when they're next around if it matters to them. A task that can't wait can be carried on elsewhere with send_message's destination (the cloud or another computer), or stopped.",
   ].join("\n");
 };
@@ -1165,7 +1165,7 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
     if (pick?.kind === "direct" && pick.provider === CHATGPT_PROVIDER_ID && !(await hasOwnKey(pick.provider, pick.modelId))) {
       throw new Error(
-        `"${reference}" runs on your ChatGPT plan, and this computer isn't signed in to ChatGPT. Sign in with ChatGPT in Settings › Claude and ChatGPT on this computer, or pick another model.`,
+        `"${reference}" runs on your ChatGPT plan, and this computer isn't signed in to ChatGPT. Sign in with ChatGPT in Settings › AI plans on this computer, or pick another model.`,
       );
     }
     if (pick?.kind === "engine" && pick.engine === ANTIGRAVITY_CLI_PROVIDER_ID) {
@@ -1270,7 +1270,7 @@ export function desktopChats(options: DesktopChatsOptions) {
           const name = there?.label?.trim() || deviceId;
           if (there?.online && there.availability && !there.availability.capabilities.includes("claude-code")) {
             throw new Error(
-              `${name} isn't signed in to Claude Code, so a Claude Code agent can't run there. Ask the user to sign in to Claude on ${name} (Settings › Claude and ChatGPT there) and try again, or start the agent in the cloud with destination "cloud".`,
+              `${name} isn't signed in to Claude Code, so a Claude Code agent can't run there. Ask the user to sign in to Claude on ${name} (Settings › AI plans there) and try again, or start the agent in the cloud with destination "cloud".`,
             );
           }
         }
@@ -1281,7 +1281,7 @@ export function desktopChats(options: DesktopChatsOptions) {
           if (signedIn && !signedIn.includes("chatgpt")) {
             const name = there?.label?.trim() || deviceId;
             throw new Error(
-              `${name} isn't signed in to ChatGPT, so "${model}" can't run there and nothing was started. Pick a model that runs there (see the devices list), or ask the user to sign in with ChatGPT in Settings › Claude and ChatGPT on ${name}.`,
+              `${name} isn't signed in to ChatGPT, so "${model}" can't run there and nothing was started. Pick a model that runs there (see the devices list), or ask the user to sign in with ChatGPT in Settings › AI plans on ${name}.`,
             );
           }
         }
@@ -1291,7 +1291,7 @@ export function desktopChats(options: DesktopChatsOptions) {
           if (signedIn && !signedIn.includes("antigravity")) {
             const name = there?.label?.trim() || deviceId;
             throw new Error(
-              `${name} isn't signed in to Google Antigravity, so "${model}" can't run there and nothing was started. Pick a computer that is (see the devices list), or ask the user to sign in with Google under Settings › Claude and ChatGPT on ${name}.`,
+              `${name} isn't signed in to Google Antigravity, so "${model}" can't run there and nothing was started. Pick a computer that is (see the devices list), or ask the user to sign in with Google under Settings › AI plans on ${name}.`,
             );
           }
         }

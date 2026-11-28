@@ -2152,7 +2152,7 @@
       "active": "Används",
       "addInCloud": "I molnet",
       "addOnComputer": "På den här datorn",
-      "cardIntro": "Använd Claude- eller ChatGPT-abonnemanget du redan betalar för.",
+      "cardIntro": "Använd Claude-, ChatGPT- eller Gemini-abonnemanget du redan betalar för.",
       "chatgptBrowserWaiting": "Slutför inloggningen till ChatGPT i webbläsaren.",
       "chatgptCloudSignedIn": "Ditt moln är inloggat på ChatGPT.",
       "chatgptComputerSignedIn": "Den här datorn är inloggad på ChatGPT.",
@@ -2632,7 +2632,7 @@
       "general": "Allmänt",
       "shortcuts": "Genvägar",
       "privacy": "Integritet",
-      "ai": "Claude och ChatGPT"
+      "ai": "AI-abonnemang"
     },
     "title": "Inställningar",
     "voiceAgent": {

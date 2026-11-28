@@ -9,7 +9,7 @@ Settings is a dialog opened from the top bar's ⚙ **Account** menu (signed in) 
 - `settings-search` searches across tabs and jumps from a result to its owning tab.
 - `settings-close` returns to the underlying shell.
 
-Notable contents: General has language, message sound, **Desktop companion**, "Stella for Chrome" browser profiles and permissions; Privacy has **Save chat history in the cloud**, **Memory**, **Work from your other devices** (lets other devices place chats and tasks on this computer), telemetry and your data; Saved private values lists what `request_secure_input` remembered on this computer; Account & Legal has **Claude & ChatGPT accounts** (which Claude login each computer and the cloud uses, "Add Claude account", and what cloud chat runs on), **Signed-in devices**, Sign out, Delete data, Delete account, and Legal (passkeys appear where supported).
+Notable contents: General has language, message sound, **Desktop companion**, "Stella for Chrome" browser profiles and permissions; Privacy has **Save chat history in the cloud**, **Memory**, **Work from your other devices** (lets other devices place chats and tasks on this computer), telemetry and your data; Saved private values lists what `request_secure_input` remembered on this computer; Account & Legal has **AI plans** (now its own tab, with Gemini too) (which Claude login each computer and the cloud uses, "Add Claude account", and what cloud chat runs on), **Signed-in devices**, Sign out, Delete data, Delete account, and Legal (passkeys appear where supported).
 
 ## How to get to it (user POV)
 

@@ -84,7 +84,7 @@ export const handleDeviceRequestRoute = async (
   if (isDeviceClaudeLoginRequestMethod(method)) {
     return deviceRequestErrorResponse(
       "forbidden",
-      "Claude sign-ins on another computer go through Settings › Claude and ChatGPT.",
+      "Claude sign-ins on another computer go through Settings › AI plans.",
     );
   }
   const paramsJson = JSON.stringify(params);

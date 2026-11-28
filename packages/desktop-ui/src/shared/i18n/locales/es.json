@@ -2162,7 +2162,7 @@
       "active": "Activa",
       "addInCloud": "En la nube",
       "addOnComputer": "En este ordenador",
-      "cardIntro": "Usa el plan de Claude o ChatGPT que ya pagas.",
+      "cardIntro": "Usa el plan de Claude, ChatGPT o Gemini que ya pagas.",
       "chatgptBrowserWaiting": "Termina de iniciar sesión en ChatGPT en tu navegador.",
       "chatgptCloudSignedIn": "Tu nube tiene la sesión iniciada en ChatGPT.",
       "chatgptComputerSignedIn": "Este ordenador tiene la sesión iniciada en ChatGPT.",
@@ -2642,7 +2642,7 @@
       "general": "General",
       "shortcuts": "Atajos",
       "privacy": "Privacidad",
-      "ai": "Claude y ChatGPT"
+      "ai": "Planes de IA"
     },
     "title": "Ajustes",
     "voiceAgent": {

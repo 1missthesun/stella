@@ -2172,7 +2172,7 @@
       "active": "Aktywne",
       "addInCloud": "W chmurze",
       "addOnComputer": "Na tym komputerze",
-      "cardIntro": "Korzystaj z planu Claude lub ChatGPT, za który już płacisz.",
+      "cardIntro": "Korzystaj z planu Claude, ChatGPT lub Gemini, za który już płacisz.",
       "chatgptBrowserWaiting": "Dokończ logowanie do ChatGPT w przeglądarce.",
       "chatgptCloudSignedIn": "Twoja chmura jest zalogowana do ChatGPT.",
       "chatgptComputerSignedIn": "Ten komputer jest zalogowany do ChatGPT.",
@@ -2652,7 +2652,7 @@
       "general": "Podstawowe",
       "shortcuts": "Skróty",
       "privacy": "Prywatność",
-      "ai": "Claude i ChatGPT"
+      "ai": "Plany AI"
     },
     "title": "Ustawienia",
     "voiceAgent": {

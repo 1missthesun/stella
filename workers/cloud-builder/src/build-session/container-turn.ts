@@ -1925,8 +1925,8 @@ const claudeCloudAccountFor = async (
   if ("missing" in value) {
     throw new AgentTurnError(
       value.email
-        ? `Claude isn't signed in to ${value.email} in your cloud. Sign in under Settings › Claude and ChatGPT (on the phone: the chat settings), or pick another model.`
-        : "No Claude account is signed in in your cloud. Sign in under Settings › Claude and ChatGPT (on the phone: the chat settings), or pick another model.",
+        ? `Claude isn't signed in to ${value.email} in your cloud. Sign in under Settings › AI plans (on the phone: the chat settings), or pick another model.`
+        : "No Claude account is signed in in your cloud. Sign in under Settings › AI plans (on the phone: the chat settings), or pick another model.",
     );
   }
   return value;

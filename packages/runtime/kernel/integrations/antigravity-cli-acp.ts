@@ -57,7 +57,7 @@ const START_TIMEOUT_MS = 60_000;
 
 export const ANTIGRAVITY_LOGIN_REQUIRED = "ANTIGRAVITY_CLI_LOGIN_REQUIRED";
 export const ANTIGRAVITY_SIGN_IN_NEEDED =
-  "This computer isn't signed in to Gemini. Sign in with Google in Settings › Claude and ChatGPT.";
+  "This computer isn't signed in to Gemini. Sign in with Google in Settings › AI plans.";
 
 export type AntigravityToolSpec = { name: string; description: string; parameters: Record<string, unknown> };
 export type AntigravityToolOutcome = ToolResult;

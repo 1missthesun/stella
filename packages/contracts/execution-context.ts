@@ -65,7 +65,7 @@ export const deviceModelRefusal = (
       : (deviceEngineSignIns(capabilities)?.includes(engine) ?? true);
   if (runs) return undefined;
   const name = device.label?.trim() || device.deviceId;
-  return `${name} isn't signed in to ${DEVICE_ENGINE_SIGN_IN[engine]}, so "${model}" can't run there. Pick a model that runs there (see the devices list), or ask the user to sign in on ${name} (Settings › Claude and ChatGPT there).`;
+  return `${name} isn't signed in to ${DEVICE_ENGINE_SIGN_IN[engine]}, so "${model}" can't run there. Pick a model that runs there (see the devices list), or ask the user to sign in on ${name} (Settings › AI plans there).`;
 };
 
 const knownEngines = (value: unknown): DeviceEngine[] | undefined =>

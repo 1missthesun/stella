@@ -2142,7 +2142,7 @@
       "active": "使用中",
       "addInCloud": "在云端",
       "addOnComputer": "在这台电脑上",
-      "cardIntro": "使用你已付费的 Claude 或 ChatGPT 套餐。",
+      "cardIntro": "使用你已付费的 Claude、ChatGPT 或 Gemini 套餐。",
       "chatgptBrowserWaiting": "请在浏览器中完成 ChatGPT 登录。",
       "chatgptCloudSignedIn": "你的云端已登录 ChatGPT。",
       "chatgptComputerSignedIn": "这台电脑已登录 ChatGPT。",
@@ -2622,7 +2622,7 @@
       "general": "通用",
       "shortcuts": "快捷键",
       "privacy": "隐私",
-      "ai": "Claude 和 ChatGPT"
+      "ai": "AI 套餐"
     },
     "title": "设置",
     "voiceAgent": {

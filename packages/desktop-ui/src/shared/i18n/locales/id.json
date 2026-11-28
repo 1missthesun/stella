@@ -2142,7 +2142,7 @@
       "active": "Aktif",
       "addInCloud": "Di cloud",
       "addOnComputer": "Di komputer ini",
-      "cardIntro": "Gunakan paket Claude atau ChatGPT yang sudah Anda bayar.",
+      "cardIntro": "Gunakan paket Claude, ChatGPT, atau Gemini yang sudah Anda bayar.",
       "chatgptBrowserWaiting": "Selesaikan proses masuk ke ChatGPT di browser Anda.",
       "chatgptCloudSignedIn": "Cloud Anda sudah masuk ke ChatGPT.",
       "chatgptComputerSignedIn": "Komputer ini sudah masuk ke ChatGPT.",
@@ -2622,7 +2622,7 @@
       "general": "Umum",
       "shortcuts": "Pintasan",
       "privacy": "Privasi",
-      "ai": "Claude dan ChatGPT"
+      "ai": "Paket AI"
     },
     "title": "Pengaturan",
     "voiceAgent": {

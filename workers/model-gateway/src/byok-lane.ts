@@ -74,7 +74,7 @@ export const accessFor = async (
       throw new GatewayError(
         403,
         "engine_sign_in_required",
-        `Your ${provider} sign-in ended. Sign in again in Settings › Claude and ChatGPT (on the phone: the chat settings).`,
+        `Your ${provider} sign-in ended. Sign in again in Settings › AI plans (on the phone: the chat settings).`,
       );
     }
     if (result.code === "generation_stale") {

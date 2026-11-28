@@ -2172,7 +2172,7 @@
       "active": "Используется",
       "addInCloud": "В облаке",
       "addOnComputer": "На этом компьютере",
-      "cardIntro": "Используйте план Claude или ChatGPT, за который уже платите.",
+      "cardIntro": "Используйте план Claude, ChatGPT или Gemini, за который уже платите.",
       "chatgptBrowserWaiting": "Завершите вход в ChatGPT в браузере.",
       "chatgptCloudSignedIn": "В вашем облаке выполнен вход в ChatGPT.",
       "chatgptComputerSignedIn": "На этом компьютере выполнен вход в ChatGPT.",
@@ -2652,7 +2652,7 @@
       "general": "Основные",
       "shortcuts": "Горячие клавиши",
       "privacy": "Конфиденциальность",
-      "ai": "Claude и ChatGPT"
+      "ai": "Тарифы ИИ"
     },
     "title": "Настройки",
     "voiceAgent": {

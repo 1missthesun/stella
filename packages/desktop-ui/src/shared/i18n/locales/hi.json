@@ -2152,7 +2152,7 @@
       "active": "सक्रिय",
       "addInCloud": "क्लाउड में",
       "addOnComputer": "इस कंप्यूटर पर",
-      "cardIntro": "वही Claude या ChatGPT प्लान इस्तेमाल करें जिसका आप पहले से भुगतान करते हैं।",
+      "cardIntro": "वही Claude, ChatGPT या Gemini प्लान इस्तेमाल करें जिसका आप पहले से भुगतान करते हैं।",
       "chatgptBrowserWaiting": "अपने ब्राउज़र में ChatGPT में साइन इन पूरा करें।",
       "chatgptCloudSignedIn": "आपका क्लाउड ChatGPT में साइन इन है।",
       "chatgptComputerSignedIn": "यह कंप्यूटर ChatGPT में साइन इन है।",
@@ -2632,7 +2632,7 @@
       "general": "बुनियादी",
       "shortcuts": "शॉर्टकट",
       "privacy": "गोपनीयता",
-      "ai": "Claude और ChatGPT"
+      "ai": "AI प्लान"
     },
     "title": "सेटिंग्स",
     "voiceAgent": {

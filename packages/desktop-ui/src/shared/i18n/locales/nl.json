@@ -2152,7 +2152,7 @@
       "active": "Actief",
       "addInCloud": "In de cloud",
       "addOnComputer": "Op deze computer",
-      "cardIntro": "Gebruik het Claude- of ChatGPT-abonnement waarvoor je al betaalt.",
+      "cardIntro": "Gebruik het Claude-, ChatGPT- of Gemini-abonnement waarvoor je al betaalt.",
       "chatgptBrowserWaiting": "Rond het inloggen bij ChatGPT af in je browser.",
       "chatgptCloudSignedIn": "Je cloud is ingelogd bij ChatGPT.",
       "chatgptComputerSignedIn": "Deze computer is ingelogd bij ChatGPT.",
@@ -2632,7 +2632,7 @@
       "general": "Algemeen",
       "shortcuts": "Sneltoetsen",
       "privacy": "Privacy",
-      "ai": "Claude en ChatGPT"
+      "ai": "AI-abonnementen"
     },
     "title": "Instellingen",
     "voiceAgent": {

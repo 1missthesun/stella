@@ -617,8 +617,8 @@ export class ClaudeCodeCompactionLoopError extends Error {
 }
 export const claudeLoginEndedText = (email: string | undefined) =>
   email
-    ? `Your Claude sign-in for ${email} on this computer has ended. Sign in again in Settings › Claude and ChatGPT to continue.`
-    : "Your Claude sign-in on this computer has ended. Sign in again in Settings › Claude and ChatGPT to continue.";
+    ? `Your Claude sign-in for ${email} on this computer has ended. Sign in again in Settings › AI plans to continue.`
+    : "Your Claude sign-in on this computer has ended. Sign in again in Settings › AI plans to continue.";
 const CLAUDE_LOGIN_HOLD_TEXT = "Waiting for you to sign in to Claude again. Your message is kept and goes out once you do.";
 export const claudeLoginUnreachableText = (email: string | undefined) =>
   `Claude Code on this Mac can't find your Claude sign-in${email ? ` for ${email}` : ""} in the Keychain, although it is still saved in your login keychain. Usually this means the login keychain was taken off the Mac's Keychain search list. Nothing was signed out, and signing in again isn't needed: it works again once the login keychain is back on the search list.`;

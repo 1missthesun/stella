@@ -2142,7 +2142,7 @@
       "active": "กำลังใช้",
       "addInCloud": "ในคลาวด์",
       "addOnComputer": "บนคอมพิวเตอร์เครื่องนี้",
-      "cardIntro": "ใช้แพ็กเกจ Claude หรือ ChatGPT ที่คุณจ่ายอยู่แล้ว",
+      "cardIntro": "ใช้แพ็กเกจ Claude, ChatGPT หรือ Gemini ที่คุณจ่ายอยู่แล้ว",
       "chatgptBrowserWaiting": "ลงชื่อเข้าใช้ ChatGPT ในเบราว์เซอร์ให้เสร็จ",
       "chatgptCloudSignedIn": "คลาวด์ของคุณลงชื่อเข้าใช้ ChatGPT แล้ว",
       "chatgptComputerSignedIn": "คอมพิวเตอร์เครื่องนี้ลงชื่อเข้าใช้ ChatGPT แล้ว",
@@ -2622,7 +2622,7 @@
       "general": "ทั่วไป",
       "shortcuts": "ทางลัด",
       "privacy": "ความเป็นส่วนตัว",
-      "ai": "Claude และ ChatGPT"
+      "ai": "แพ็กเกจ AI"
     },
     "title": "การตั้งค่า",
     "voiceAgent": {

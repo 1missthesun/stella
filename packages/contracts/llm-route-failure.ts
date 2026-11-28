@@ -37,7 +37,7 @@ const markerSuffix = llmRouteFailureMarker;
 
 const ACCOUNT_CREDENTIAL_REMEDIES: Record<string, string> = {
   chatgpt:
-    "Sign in with ChatGPT on this computer (Settings › Claude and ChatGPT) to use it here, or run this task in the cloud, where the ChatGPT account connected to your Stella account already serves it. Sign in with ChatGPT registers each computer as its own host, so a cloud connection does not cover this one.",
+    "Sign in with ChatGPT on this computer (Settings › AI plans) to use it here, or run this task in the cloud, where the ChatGPT account connected to your Stella account already serves it. Sign in with ChatGPT registers each computer as its own host, so a cloud connection does not cover this one.",
 };
 
 const describeSelection = (

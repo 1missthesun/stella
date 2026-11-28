@@ -2192,7 +2192,7 @@
       "active": "نشط",
       "addInCloud": "في السحابة",
       "addOnComputer": "على هذا الكمبيوتر",
-      "cardIntro": "استخدم خطة Claude أو ChatGPT التي تدفع لها بالفعل.",
+      "cardIntro": "استخدم خطة Claude أو ChatGPT أو Gemini التي تدفع لها بالفعل.",
       "chatgptBrowserWaiting": "أكمل تسجيل الدخول إلى ChatGPT في متصفحك.",
       "chatgptCloudSignedIn": "تم تسجيل دخول سحابتك إلى ChatGPT.",
       "chatgptComputerSignedIn": "تم تسجيل دخول هذا الكمبيوتر إلى ChatGPT.",
@@ -2672,7 +2672,7 @@
       "general": "عام",
       "shortcuts": "الاختصارات",
       "privacy": "الخصوصية",
-      "ai": "Claude وChatGPT"
+      "ai": "خطط الذكاء الاصطناعي"
     },
     "title": "الإعدادات",
     "voiceAgent": {

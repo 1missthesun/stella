@@ -2162,7 +2162,7 @@
       "active": "פעיל",
       "addInCloud": "בענן",
       "addOnComputer": "במחשב הזה",
-      "cardIntro": "השתמשו במינוי Claude או ChatGPT שאתם כבר משלמים עליו.",
+      "cardIntro": "השתמשו במינוי Claude, ChatGPT או Gemini שאתם כבר משלמים עליו.",
       "chatgptBrowserWaiting": "סיימו את ההתחברות ל-ChatGPT בדפדפן.",
       "chatgptCloudSignedIn": "הענן שלכם מחובר ל-ChatGPT.",
       "chatgptComputerSignedIn": "המחשב הזה מחובר ל-ChatGPT.",
@@ -2642,7 +2642,7 @@
       "general": "כללי",
       "shortcuts": "קיצורים",
       "privacy": "פרטיות",
-      "ai": "Claude ו-ChatGPT"
+      "ai": "מינויי AI"
     },
     "title": "הגדרות",
     "voiceAgent": {

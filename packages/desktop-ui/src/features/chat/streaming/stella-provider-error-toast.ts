@@ -137,10 +137,10 @@ export const resolveStellaProviderErrorToast = (
       return {
         title: 'Sign in to ChatGPT on this computer',
         description:
-          'Your selected ChatGPT model needs ChatGPT signed in here. Sign in under Settings › Claude and ChatGPT, or pick another model.',
+          'Your selected ChatGPT model needs ChatGPT signed in here. Sign in under Settings › AI plans, or pick another model.',
         variant: 'error',
         duration: 10000,
-        action: { label: 'Open Claude and ChatGPT', onClick: openAiSettings },
+        action: { label: 'Open AI plans', onClick: openAiSettings },
         secondaryAction: chooseModelAction,
       }
     }

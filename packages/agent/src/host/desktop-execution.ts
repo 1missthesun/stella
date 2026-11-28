@@ -114,7 +114,7 @@ export function desktopExecution(options: {
     if (unfit) return { error: unfit };
     if (!needs.model && needs.claudeCode && device.availability && !device.availability.capabilities.includes("claude-code")) {
       return {
-        error: `${name} isn't signed in to Claude Code, so you, on Claude Code, can't run there. Ask the user to sign in to Claude on ${name} (Settings › Claude and ChatGPT there) and try again.`,
+        error: `${name} isn't signed in to Claude Code, so you, on Claude Code, can't run there. Ask the user to sign in to Claude on ${name} (Settings › AI plans there) and try again.`,
       };
     }
     return { deviceId: device.deviceId, name };

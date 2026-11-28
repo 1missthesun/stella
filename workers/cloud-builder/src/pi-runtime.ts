@@ -1313,7 +1313,7 @@ export class PiConversationRuntime {
           const name = there?.label?.trim() || deviceId;
           if (there?.online && there.availability && !there.availability.capabilities.includes("claude-code")) {
             throw new Error(
-              `${name} isn't signed in to Claude Code, so a Claude Code agent can't run there. Ask the user to sign in to Claude on ${name} (Settings › Claude and ChatGPT there) and try again, or start the agent in the cloud with destination "cloud".`,
+              `${name} isn't signed in to Claude Code, so a Claude Code agent can't run there. Ask the user to sign in to Claude on ${name} (Settings › AI plans there) and try again, or start the agent in the cloud with destination "cloud".`,
             );
           }
         }
@@ -1444,7 +1444,7 @@ export class PiConversationRuntime {
         if (refusal) return { error: refusal };
         if (needs.claudeCode && device.availability && !device.availability.capabilities.includes("claude-code")) {
           return {
-            error: `${name} isn't signed in to Claude Code, so you, on Claude Code, can't run there. Ask the user to sign in to Claude on ${name} (Settings › Claude and ChatGPT there) and try again.`,
+            error: `${name} isn't signed in to Claude Code, so you, on Claude Code, can't run there. Ask the user to sign in to Claude on ${name} (Settings › AI plans there) and try again.`,
           };
         }
         return { deviceId: device.deviceId, name };

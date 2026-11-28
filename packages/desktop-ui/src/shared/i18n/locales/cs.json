@@ -2172,7 +2172,7 @@
       "active": "Aktivní",
       "addInCloud": "V cloudu",
       "addOnComputer": "Na tomto počítači",
-      "cardIntro": "Využijte tarif Claude nebo ChatGPT, který už platíte.",
+      "cardIntro": "Využijte tarif Claude, ChatGPT nebo Gemini, který už platíte.",
       "chatgptBrowserWaiting": "Dokončete přihlášení do ChatGPT v prohlížeči.",
       "chatgptCloudSignedIn": "Váš cloud je přihlášený k ChatGPT.",
       "chatgptComputerSignedIn": "Tento počítač je přihlášený k ChatGPT.",
@@ -2652,7 +2652,7 @@
       "general": "Obecné",
       "shortcuts": "Zkratky",
       "privacy": "Soukromí",
-      "ai": "Claude a ChatGPT"
+      "ai": "Tarify AI"
     },
     "title": "Nastavení",
     "voiceAgent": {

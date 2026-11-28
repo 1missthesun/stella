@@ -29,7 +29,7 @@ const driveSizes = (): string =>
 const MODELS = (): string => `Stella is the app; the thinking comes from a model you choose. Any one of these is enough, and they mix freely.
 
 ## Use an AI plan you already pay for
-Stella adds no charge and no limit of its own on these; use counts against that plan. Sign in under Settings › Claude and ChatGPT.
+Stella adds no charge and no limit of its own on these; use counts against that plan. Sign in under Settings › AI plans.
 - **ChatGPT** (Plus, Pro and other ChatGPT plans): Sign in with ChatGPT, then turn on "Enable ChatGPT plan use" for the account. Works on your computers and in the cloud.
 - **Claude** (Pro or Max): through Claude Code, Anthropic's own tool. Stella installs it in one click if it's missing, keeps it updated and repairs a broken install. Sign in on each computer or in the cloud; connect several Claude accounts and choose which one each computer uses.
 - **Gemini** (Google AI Pro or Ultra): Sign in with Google in the same tab. Gemini runs on the computer you signed in on and shows in the model picker on that computer and on your phone.

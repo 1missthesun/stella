@@ -107,7 +107,7 @@ const engineAccessFor = async (
       throw new GatewayError(
         403,
         "engine_sign_in_required",
-        "Your cloud's ChatGPT sign-in ended. Continue with ChatGPT again in Settings › Claude and ChatGPT (on the phone: the chat settings).",
+        "Your cloud's ChatGPT sign-in ended. Continue with ChatGPT again in Settings › AI plans (on the phone: the chat settings).",
       );
     }
     if (result.code) {

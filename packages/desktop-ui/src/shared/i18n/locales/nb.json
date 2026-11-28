@@ -2152,7 +2152,7 @@
       "active": "Aktiv",
       "addInCloud": "I skyen",
       "addOnComputer": "På denne datamaskinen",
-      "cardIntro": "Bruk Claude- eller ChatGPT-abonnementet du allerede betaler for.",
+      "cardIntro": "Bruk Claude-, ChatGPT- eller Gemini-abonnementet du allerede betaler for.",
       "chatgptBrowserWaiting": "Fullfør påloggingen til ChatGPT i nettleseren.",
       "chatgptCloudSignedIn": "Skyen din er pålogget ChatGPT.",
       "chatgptComputerSignedIn": "Denne datamaskinen er pålogget ChatGPT.",
@@ -2632,7 +2632,7 @@
       "general": "Generelt",
       "shortcuts": "Snarveier",
       "privacy": "Personvern",
-      "ai": "Claude og ChatGPT"
+      "ai": "AI-abonnementer"
     },
     "title": "Innstillinger",
     "voiceAgent": {

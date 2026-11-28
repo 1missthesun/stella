@@ -40,7 +40,9 @@ export function AppsPage() {
   const session = authClient.useSession();
   const page = useAppsPage();
   const signedIn = Boolean(session.data?.user);
-  const views = useBackendView("viewIndex.list", signedIn ? {} : "skip", { rememberFor: session.data?.user?.id ?? null, persist: true }).value;
+  const viewIndex = useBackendView("viewIndex.list", signedIn ? {} : "skip", { rememberFor: session.data?.user?.id ?? null, persist: true });
+  // A backend without Stella Views answers viewIndex.list with an error: that account has no views.
+  const views = viewIndex.value ?? (viewIndex.error ? [] : undefined);
   const hasViews = (views?.length ?? 0) > 0;
 
   if (!page && !hasViews) {

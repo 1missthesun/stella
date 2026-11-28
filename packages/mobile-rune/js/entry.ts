@@ -17,6 +17,7 @@ import { restoreComputerMode } from "../ui/computer/computer-mode";
 import { listenForPairingLinks } from "../ui/computer/ConnectComputer";
 import { installJsPerf } from "./jsperf";
 import { phoneConversationCache } from "./conversation-cache";
+import { phoneChatEvidence } from "./chat-evidence";
 
 const t0 = __native.now();
 
@@ -28,6 +29,8 @@ try {
   // launch shows the latest messages at once and syncs on top.
   const conversationCache = phoneConversationCache();
   (globalThis as { __stellaConversationCache?: unknown }).__stellaConversationCache = conversationCache;
+  // The preview cards under a reply for its Drive pictures, videos and pages.
+  (globalThis as { __stellaChatEvidence?: unknown }).__stellaChatEvidence = phoneChatEvidence;
   onEngineEvent("appearance", (a: any) => {
     dom.setAppearance({ dark: !!a.dark });
     notePhoneAppearance(a);

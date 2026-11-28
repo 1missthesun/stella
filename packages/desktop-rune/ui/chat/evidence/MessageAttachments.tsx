@@ -6,11 +6,15 @@ import { useT } from "@/shared/i18n";
 import { derive, fontSize, mixOklch, radius, useTokens } from "../../theme";
 import { MEDIA_TILE_HEIGHT, MediaTile } from "./MediaTile";
 import { AttachmentPill } from "./AttachmentPill";
+import { onPhone } from "../../shell/phone";
 
 const TILE_GAP = 10;
 const MORE_TILE_WIDTH = 76;
 const EXPANDED_TILE_CAP = 48;
 const REMEMBERED_EXPANSIONS = 200;
+const PHONE_TILE_GAP = 8;
+/** The cards a phone shows under one reply (the RN app's EVIDENCE_MEDIA_CAP). */
+const PHONE_MEDIA_CAP = 8;
 
 const expandStacks = (cards: readonly EvidenceCard[]): EvidenceCard[] =>
   cards.flatMap((card) =>
@@ -131,6 +135,19 @@ export const MessageAttachments = ({
 
   if (part === "media") {
     if (media.length === 0) return null;
+    // A phone shows a reply's media as the RN app does: one row of cards that scrolls sideways
+    // under the bubble, never wrapped into a grid that pushes the conversation down.
+    if (onPhone()) {
+      return (
+        <row w="full" minW={0} mt={6} gap={PHONE_TILE_GAP} scrollX shrink={false}>
+          {media.slice(0, PHONE_MEDIA_CAP).map((card) => (
+            <box key={card.id} shrink={false}>
+              <MediaTile card={card} />
+            </box>
+          ))}
+        </row>
+      );
+    }
     return (
       <col w="full" minW={0} mt={6}>
         <row w="full" minW={0} gap={TILE_GAP} wrap={wrapped} clip={wrapped ? undefined : 0} onSize={(r) => setRowWidth(Math.floor(r.w))}>

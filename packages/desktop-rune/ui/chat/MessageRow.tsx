@@ -452,6 +452,10 @@ export const AssistantMessageRow = memo(
           return drivePath ? [drivePath] : [];
         }),
         ...(canvasDrivePath ? [canvasDrivePath] : []),
+        // The Drive files the reply made or linked: its pictures, videos and pages get cards
+        // under it like the ones its text links to (as the RN app shows its artifacts), the rest
+        // stay pills.
+        ...linkedFiles.flatMap((file) => (file.cloudDriveFile ? [file.cloudDriveFile.path.replace(/^\/+/, "")] : [])),
       ]),
     ];
     const driveCards = useDriveEvidenceCards(linkedDrivePaths.filter((drivePath) => replyAttachmentPlacement(drivePath) === "media"));

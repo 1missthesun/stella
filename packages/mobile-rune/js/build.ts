@@ -146,6 +146,16 @@ const COMPUTER_CHAT_FILES = new Map<string, (text: string) => string>([
     },
   ],
   [
+    // Not a computer's chats either: the cards a reply's Drive pictures, videos and pages get,
+    // which the phone makes itself (js/chat-evidence.ts) as Electron does on a computer.
+    path.join(DESKTOP_UI_SRC, "features/chat/hooks/use-drive-evidence-cards.ts"),
+    (text) => {
+      const read = "window.electronAPI?.chatEvidence";
+      if (text.split(read).length !== 3) throw new Error("drive evidence: use-drive-evidence-cards.ts no longer reads window.electronAPI?.chatEvidence twice as before");
+      return text.replaceAll(read, "(globalThis as { __stellaChatEvidence?: { driveCards?: (files: unknown[]) => Promise<EvidenceCard[]> } }).__stellaChatEvidence");
+    },
+  ],
+  [
     // Not a computer's chats: the chat store's cache of the last session, which the phone keeps
     // itself (js/conversation-cache.ts) rather than through a desktop API.
     path.join(DESKTOP_UI_SRC, "features/cloud/cloud-conversation-cache-client.ts"),

@@ -342,17 +342,96 @@ fn moved(node: Option<u32>, h: &rune::WindowHandle) {
     window_event(node, "move", json!({ "bounds": bounds }));
 }
 
-/// Puts the window's content in the middle of the primary display's work area, as Electron places
-/// Stella's full window; the frame's invisible resize borders stay outside it.
-pub fn centre_in_work_area(h: &rune::WindowHandle) {
-    let Some(p) = h.placement() else { return };
+/// Electron's full window size (`full-window.js` `FULL_SHELL_DEFAULT_SIZE`), the main window's
+/// size when nothing overrides it.
+pub const FULL_WINDOW: (f32, f32) = (1400.0, 940.0);
+
+/// How the main window opens when no place is given: where Electron opens Stella's full window,
+/// so the host's first `<window>` props, which full-window.js computed the same way from the
+/// `screen` the engine reports, neither resize nor move it.
+#[derive(Clone, Copy)]
+pub struct MainOpen {
+    /// The content size asked for: Electron's default, or `STELLA_RUNE_W`/`H`.
+    pub size: (f32, f32),
+    /// Fit the size into the work area as Electron does its default (not an override).
+    pub fit: bool,
+    pub min: (f32, f32),
+}
+
+impl MainOpen {
+    /// The frame's outer top-left and the content size in points for the primary display's
+    /// work area `work` (`[x, y, w, h]` points, as `screen.getPrimaryDisplay().workArea` gives
+    /// it): full-window.js's `resolveFullWindowInitialBounds` on Windows and Linux.
+    /// The origin is the outer top-left, as `BrowserWindow`'s `x`/`y` and `setBounds` take it.
+    pub fn bounds(&self, work: [f64; 4]) -> ([f64; 2], (f32, f32)) {
+        let fit = |want: f32, room: f64, min: f32| if self.fit { f64::from(want).min(room).max(f64::from(min)) } else { f64::from(want) };
+        let (w, h) = (fit(self.size.0, work[2], self.min.0), fit(self.size.1, work[3], self.min.1));
+        let x = (work[0] + ((work[2] - w) / 2.0).max(0.0)).round();
+        let y = (work[1] + ((work[3] - h) / 2.0).max(0.0)).round();
+        ([x, y], (w as f32, h as f32))
+    }
+}
+
+/// The primary display's work area in points as `screen` reports it (commands.rs `displays`),
+/// and its scale, read before any window exists so the main window is made where it belongs.
+#[cfg(windows)]
+pub fn primary_work_area() -> Option<([f64; 4], f64)> {
+    use windows::Win32::Foundation::POINT;
+    use windows::Win32::Graphics::Gdi::{GetMonitorInfoW, MONITOR_DEFAULTTOPRIMARY, MONITORINFO, MonitorFromPoint};
+    use windows::Win32::UI::HiDpi::{DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2, GetDpiForMonitor, MDT_EFFECTIVE_DPI, SetThreadDpiAwarenessContext};
+    // Per-Monitor-V2 for this query only, before winit makes the process DPI aware, so the
+    // rect is in the desktop pixels winit and `rune::displays` use.
+    // SAFETY: plain Win32 queries on the primary monitor into locals; the thread's previous
+    // awareness is put back.
+    unsafe {
+        let prev = SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
+        let monitor = MonitorFromPoint(POINT { x: 0, y: 0 }, MONITOR_DEFAULTTOPRIMARY);
+        let mut info = MONITORINFO { cbSize: std::mem::size_of::<MONITORINFO>() as u32, ..Default::default() };
+        let (mut dx, mut dy) = (0u32, 0u32);
+        let ok = !monitor.is_invalid() && GetMonitorInfoW(monitor, &mut info).as_bool() && GetDpiForMonitor(monitor, MDT_EFFECTIVE_DPI, &mut dx, &mut dy).is_ok() && dx > 0;
+        if !prev.is_invalid() {
+            SetThreadDpiAwarenessContext(prev);
+        }
+        if !ok {
+            return None;
+        }
+        let k = f64::from(dx) / 96.0;
+        let r = info.rcWork;
+        let pt = |v: i32| (f64::from(v) / k).round();
+        Some(([pt(r.left), pt(r.top), pt(r.right - r.left), pt(r.bottom - r.top)], k))
+    }
+}
+
+/// The content size and limits the main window opened with, which the host's first `<window>`
+/// props for it then find already applied.
+static MAIN_OPENED: Mutex<Option<((f32, f32), crate::engine::SizeLimits)>> = Mutex::new(None);
+
+/// Records the size and limits the main window opens with (`p`, its minimum `min`).
+pub fn main_opened(p: &Props, min: (f32, f32)) {
+    *MAIN_OPENED.lock().unwrap_or_else(|e| e.into_inner()) = Some((size_of(p), (Some([min.0, min.1]), p.max_size)));
+}
+
+/// Places the main window as Electron opens its full window, now that `rune::displays` can say
+/// where the primary work area is (Linux, which can't ask before a window exists). macOS centres
+/// it as AppKit's `center` does, as Electron does there (full-window.js gives it no place).
+pub fn place_main(h: &rune::WindowHandle, open: MainOpen) {
+    if cfg!(target_os = "macos") {
+        h.center();
+        return;
+    }
     let Some(d) = rune::displays().into_iter().find(|d| d.primary) else { return };
+    let k = if d.scale > 0.0 { d.scale } else { 1.0 };
     let ((wx, wy), (ww, wh)) = d.work_area();
-    let (cw, ch) = (p.content_size.0 as i32, p.content_size.1 as i32);
-    let x = wx + (ww as i32 - cw).max(0) / 2;
-    let y = wy + (wh as i32 - ch).max(0) / 2;
-    let (dx, dy) = (p.content_position.0 - p.position.0, p.content_position.1 - p.position.1);
-    h.set_position((x - dx, y - dy));
+    let pt = |v: f64| (v / k).round();
+    let ([x, y], size) = open.bounds([pt(f64::from(wx)), pt(f64::from(wy)), pt(f64::from(ww)), pt(f64::from(wh))]);
+    if size == open.size {
+        h.set_position(((x * k).round() as i32, (y * k).round() as i32));
+    } else {
+        h.set_bounds((x as f32, y as f32), size);
+        if let Some((opened, _)) = MAIN_OPENED.lock().unwrap_or_else(|e| e.into_inner()).as_mut() {
+            *opened = size;
+        }
+    }
 }
 
 /// The default band's height on a main window whose tree asks for no titlebar: its content
@@ -487,7 +566,10 @@ fn windows_changed(added: Vec<u32>, removed: Vec<u32>) {
                 slot.waker = waker;
                 slot.is_main = true;
                 slot.dirty = true;
-                slot.applied = Applied { dark: Some(None), ..Applied::default() };
+                // What the window opened with is applied already: props that ask for the same
+                // (full-window.js's, by default) neither resize it nor reset its limits.
+                let opened = *MAIN_OPENED.lock().unwrap_or_else(|x| x.into_inner());
+                slot.applied = Applied { dark: Some(None), size: opened.map(|o| o.0), size_limits: opened.map(|o| o.1), ..Applied::default() };
                 slot.swap_view = swap_view;
             });
         } else {

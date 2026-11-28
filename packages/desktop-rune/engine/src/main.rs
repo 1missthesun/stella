@@ -330,25 +330,49 @@ fn main() {
         e.child = Some(boot.child);
         e.main_waker = boot.waker;
     });
-    let w = std::env::var("STELLA_RUNE_W").ok().and_then(|v| v.parse().ok()).unwrap_or(1280.0);
-    let h = std::env::var("STELLA_RUNE_H").ok().and_then(|v| v.parse().ok()).unwrap_or(820.0);
+    let env_size = |k: &str| std::env::var(k).ok().and_then(|v| v.parse::<f32>().ok());
+    let (env_w, env_h) = (env_size("STELLA_RUNE_W"), env_size("STELLA_RUNE_H"));
     let main_props: props::Props = std::env::var("STELLA_RUNE_WINDOW")
         .ok()
         .and_then(|j| serde_json::from_str(&j).map_err(|e| eprintln!("stella-engine: STELLA_RUNE_WINDOW: {e}")).ok())
         .unwrap_or_default();
     let mut p = main_props.clone();
-    if p.w.is_none() {
-        p.w = Some(props::Size::Pt(w));
-        p.h = Some(props::Size::Pt(h));
-    }
+    let given = match (&p.w, &p.h) {
+        (Some(props::Size::Pt(w)), Some(props::Size::Pt(h))) => Some((*w, *h)),
+        _ => None,
+    };
+    let min = p.min_size.map_or((480.0, 600.0), |[w, h]| (w, h));
+    let open = windows::MainOpen {
+        size: given.unwrap_or((env_w.unwrap_or(windows::FULL_WINDOW.0), env_h.unwrap_or(windows::FULL_WINDOW.1))),
+        fit: given.is_none() && env_w.is_none() && env_h.is_none(),
+        min,
+    };
+    p.w = Some(props::Size::Pt(open.size.0));
+    p.h = Some(props::Size::Pt(open.size.1));
+    // Windows can say where the primary work area is before any window exists: the main window
+    // is made at Electron's place and size, never moved or resized there.
+    #[cfg(windows)]
+    let made_at = p.position.is_none().then(windows::primary_work_area).flatten().map(|(work, k)| {
+        let ([x, y], size) = open.bounds(work);
+        p.w = Some(props::Size::Pt(size.0));
+        p.h = Some(props::Size::Pt(size.1));
+        ((x * k).round() as i32, (y * k).round() as i32)
+    });
+    #[cfg(not(windows))]
+    let made_at: Option<(i32, i32)> = None;
     if p.title.is_none() {
         p.title = Some("Stella".into());
     }
+    windows::main_opened(&p, min);
     let mut spec = windows::app_spec(&p);
-    spec.min_size = p.min_size.map(|[w, h]| (w, h)).or(Some((480.0, 600.0)));
+    spec.min_size = Some(min);
     // Electron's globalShortcut takes a bare key (Show Stella's Escape discard).
     let app = App::new(spec).init(|| Win { node: 0, main: true, inputs: Default::default(), bg: None }).keep_running().allow_unmodified_shortcuts();
-    let options = windows::options(&p);
+    let mut options = windows::options(&p);
+    if let Some(at) = made_at {
+        options.position = Some(at);
+        options.logical_position = None;
+    }
     #[cfg(target_os = "macos")]
     let options = hidden_until_content(options, &p);
     let app = windows::decorate_main(app, &p).window_options(options);
@@ -368,11 +392,11 @@ fn main() {
     let app = app.on_open_url(|_s: &mut Win, url: &str, _tx| engine::send(serde_json::json!({ "t": "open-url", "url": url })));
     let _ = services::APP.set(app.handle());
     // Electron opens the full window centred in the primary work area (full-window.js) when no
-    // place is given; the system's default would cascade it.
-    let centre = std::cell::Cell::new(p.position.is_none());
+    // place is given; the system's default would cascade it. Windows made it there already.
+    let place = std::cell::Cell::new((p.position.is_none() && made_at.is_none()).then_some(open));
     app.on_window(move |h| {
-        if centre.replace(false) {
-            windows::centre_in_work_area(h);
+        if let Some(open) = place.take() {
+            windows::place_main(h, open);
         }
         let h = h.clone();
         engine::with(|e| {

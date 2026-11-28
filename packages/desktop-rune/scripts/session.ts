@@ -15,6 +15,8 @@
 // click-through, never activated, still presenting for shot/record/input); --show puts a real
 // window on screen under a shared window slot (~/projects/rune-window-slot.sh), without focus.
 // Linux --show runs on the real display (Hyprland: floating, no initial focus, W×H at POS="x y").
+// --default-size opens the main window as the launcher does (no STELLA_RUNE_W/H: Electron's size and
+// place); SCREEN=WxH sizes the private Xvfb.
 
 import { spawn, spawnSync } from "node:child_process";
 import { randomBytes } from "node:crypto";
@@ -255,7 +257,8 @@ async function start() {
       if (process.env.STELLA_RUNE_BACKEND) env.STELLA_RUNE_BACKEND = process.env.STELLA_RUNE_BACKEND;
     } else {
       display = flag("--display") ?? freeDisplay();
-      const xvfb = spawn(XVFB, [display, "-screen", "0", `${w + 40}x${h + 40}x24`, "-nolisten", "tcp"], { stdio: ["ignore", log, log], detached: true });
+      const [sw, sh] = process.env.SCREEN?.split("x").map(Number) ?? [w + 40, h + 40];
+      const xvfb = spawn(XVFB, [display, "-screen", "0", `${sw}x${sh}x24`, "-nolisten", "tcp"], { stdio: ["ignore", log, log], detached: true });
       pids.xvfb = xvfb.pid!;
       xvfb.unref();
       for (let i = 0; i < 100 && alive(xvfb.pid!) && !existsSync(`/tmp/.X11-unix/X${display.slice(1)}`); i++) await Bun.sleep(50);
@@ -263,8 +266,8 @@ async function start() {
       Object.assign(env, {
         DISPLAY: display,
         VK_ICD_FILENAMES: "/usr/share/vulkan/icd.d/lvp_icd.json",
-        STELLA_RUNE_SCREEN_W: String(w + 40),
-        STELLA_RUNE_SCREEN_H: String(h + 40),
+        STELLA_RUNE_SCREEN_W: String(sw),
+        STELLA_RUNE_SCREEN_H: String(sh),
       });
     }
     Object.assign(env, {
@@ -272,8 +275,7 @@ async function start() {
       STELLA_RUNE_BUN: BUN,
       STELLA_RUNE_T0: String(Date.now()),
       STELLA_RUNE_METRICS: path.join(RUN_DIR, "metrics.jsonl"),
-      STELLA_RUNE_W: String(w),
-      STELLA_RUNE_H: String(h),
+      ...(has("--default-size") ? {} : { STELLA_RUNE_W: String(w), STELLA_RUNE_H: String(h) }),
       STELLA_RUNE_THEME: process.env.THEME ?? "dark",
       STELLA_RUNE_SERVICES: has("--no-services") ? "0" : "1",
       ...Object.fromEntries(["STELLA_RUNE_APP", "STELLA_RUNE_WINDOW", "STELLA_RUNE_GALLERY"].filter((key) => process.env[key]).map((key) => [key, process.env[key]!])),

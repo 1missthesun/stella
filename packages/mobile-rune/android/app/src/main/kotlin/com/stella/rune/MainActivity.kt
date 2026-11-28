@@ -105,7 +105,7 @@ object App {
   /** Commands from TS (through the engine's `native` commands or `__native.post`). */
   fun command(m: JSONObject) {
     val a = activity ?: return
-    if (Pickers.handle(m) || Menus.handle(m) || Scanner.handle(m) || VideoPoster.handle(m)) return
+    if (Pickers.handle(m) || Menus.handle(m) || Scanner.handle(m) || VideoPoster.handle(m) || PdfPages.handle(m)) return
     val cmd = m.optString("cmd").ifEmpty { m.optString("t") }
     when (cmd) {
       "clipboard.writeText" -> Pickers.write(m.optString("text"), null)

@@ -42,6 +42,10 @@ pub fn route(v: Value) {
             reply(rid, Ok(Value::Null));
         }
         "mark" => reply(rid, Ok(Value::Null)),
+        "stage" => {
+            crate::stage::command(&v);
+            reply(rid, Ok(Value::Null));
+        }
         "appearance.get" => reply(rid, Ok(windows::appearance())),
         "screen.displays" => reply(rid, Ok(json!([]))),
         "window.isFocused" => reply(rid, Ok(json!(true))),

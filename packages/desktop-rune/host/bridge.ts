@@ -183,6 +183,11 @@ export type EngineEvent =
   | ({ t: "appearance" } & Appearance)
   /** A link the system opened with the app (macOS Apple Event; Windows/Linux the launch's own `stella://` arguments). Later launches' links come through the host's single-instance lock. */
   | { t: "open-url"; url: string }
+  /** The phone app went to the background (`visible: false`) or came back. */
+  | { t: "app.visible"; visible: boolean }
+  | { t: "stage"; kind: "swipe"; side: "start" | "end" }
+  | { t: "stage"; kind: "release"; open: boolean }
+  | { t: "stage"; kind: "rest"; v: number }
   | { t: "rec"; result: unknown }
   | { t: "swapfx"; stage: "run" | "none" }
   /** A window's selection settled (a drag, double/triple-click, shift-extend or select-all released) with its line boxes' union in window points as scrolled, or cleared. */

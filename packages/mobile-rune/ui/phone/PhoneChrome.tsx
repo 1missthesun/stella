@@ -1,4 +1,4 @@
-import { memo, useEffect, useLayoutEffect, useState, type ReactNode } from "react";
+import { memo, useEffect, useLayoutEffect, useMemo, useState, type ReactNode } from "react";
 import { setChatCovered, setPhoneSafeTop } from "../../../desktop-rune/ui/shell/phone";
 import { useT } from "@/shared/i18n";
 import { Icon, RetainedSurface } from "../../../desktop-rune/ui/kit";
@@ -11,7 +11,7 @@ import { glyph, tabIcon } from "./icons";
 import { PhoneViewScreen } from "./ViewScreen";
 import { GlassCircle, BRAND_TOP, BRAND_ROW, TEXT, useRn } from "./rn";
 import { StatusPill } from "./StatusPill";
-import { CLOSE_SPRING, DRAWER_SCALE, drawerProgress, drawerTravel, OPEN_SPRING, panelLook, sideOf, signOf, drawerBlur, drawerVeil, setStageBackground, stageFollow, useDrawerHost, useStage, useWindowSize, type Stage } from "./stage";
+import { blurTrack, DRAWER_RADIUS, DRAWER_SCALE, drawerTravel, held, pageTracks, panelTracks, sideOf, signOf, setStageBackground, stageFollow, useDrawerHost, useStage, useWindowSize, veilTrack, type Stage, type StageTracks } from "./stage";
 import { AccountPanel } from "./AccountPanel";
 import { ChatSettingsPanel } from "./ChatSettingsPanel";
 import { SchedulePage } from "./pages/SchedulePage";
@@ -137,6 +137,8 @@ function TabPages({ insets, tab, st }: { insets: PhoneInsets; tab: PhoneTab; st:
   useEffect(() => setVisited((v) => (v.has(tab) ? v : new Set([...v, tab]))), [tab]);
   const top = insets.top + PHONE_TOPBAR_H + 4;
   const bottom = tabBottomInset(insets);
+  const base = stageFollow(st, 0, st.size.h);
+  const follow = { ...base, stage: { ...base.stage, radius: held([[0, 0], [0.12, DRAWER_RADIUS]]) } };
   const page = (id: Exclude<PhoneTab, "chat">, body: ReactNode) =>
     visited.has(id) ? (
       <RetainedSurface id={`phone-page-${id}`} active={tab === id} layered>
@@ -146,7 +148,7 @@ function TabPages({ insets, tab, st }: { insets: PhoneInsets; tab: PhoneTab; st:
       </RetainedSurface>
     ) : null;
   return (
-    <col id="phone-tab-pages" fixed inset={0} {...stageFollow(st, 0, st.size.h)} radius={st.live ? st.radius : undefined} clip={st.live ? 0 : undefined} raise={SHEET_RAISE} fill={t.c.background} hidden={tab === "chat"}>
+    <col id="phone-tab-pages" fixed inset={0} {...follow} clip={st.live ? 0 : undefined} raise={SHEET_RAISE} fill={t.c.background} hidden={tab === "chat"}>
       <TopInsetContext.Provider value={top}>
         {page("schedule", <SchedulePage active={tab === "schedule"} bottom={bottom} />)}
         {page("apps", <AppsPage active={tab === "apps"} bottom={bottom} />)}
@@ -156,45 +158,53 @@ function TabPages({ insets, tab, st }: { insets: PhoneInsets; tab: PhoneTab; st:
   );
 }
 
+/** packages/mobile's PANEL_BLUR (intensity 34), in points: the drawer sharpens out of it as it opens. */
+const PANEL_BLUR = 9;
+
 /**
- * One drawer, behind the page: it fades in and grows from 0.95 as the page moves aside
- * (DrawerPanel). A finger dragging it toward the page pulls it shut.
+ * One drawer, behind the page: it fades in, sharpens out of a blur and grows from 0.95 as the
+ * page moves aside (DrawerPanel). A finger dragging it toward the page pulls it shut.
  */
 function DrawerPanel({ side, width, insets, children }: { side: Exclude<PhoneDrawer, null>; width: number; insets: PhoneInsets; children: ReactNode }) {
-  const { drawer, shown, drag } = usePhoneNav();
+  const { drawer, shown } = usePhoneNav();
   const size = useWindowSize();
   const travel = drawerTravel(size.w);
   const ours = shown === side;
   const open = drawer === side;
-  const v = ours ? drawerProgress(open, drag, travel) : 0;
   const sign = signOf(side);
-  const look = panelLook(v, sign, travel);
-  const bg = useTokens().c.background;
+  const tracks = useMemo(() => panelTracks(sign, travel), [sign, travel]);
+  const t = useTokens();
+  const bg = t.c.background;
   return (
     <col
       id={`phone-drawer-${sideOf(side)}`}
       role="dialog"
       absolute={sideOf(side) === "start" ? { left: 0, top: 0, bottom: 0 } : { right: 0, top: 0, bottom: 0 }}
       w={width}
-      x={look.x}
-      scale={look.scale}
-      opacity={look.opacity}
-      motion={drag !== null ? undefined : open ? OPEN_SPRING : CLOSE_SPRING}
+      stage={tracks}
       hidden={!ours}
       inert={!open}
-      onDrag={(d) => {
-        if (d.phase === "end") return phoneNav.releaseDrawer(travel);
-        phoneNav.dragDrawer(-sign * d.dx);
-      }}
+      // RN's close pan, alongside the drawer's own scroll: a finger moving toward the page (away
+      // from the far edge) pulls it shut, ahead of the scroll view under it.
+      edgeDrag={open ? (sideOf(side) === "start" ? { right: size.w } : { left: size.w }) : undefined}
+      stageDrag="close"
+      onEdgeDrag={open ? noop : undefined}
     >
       <col w="full" h="full" pl={sideOf(side) === "start" ? insets.left : 0} pr={sideOf(side) === "end" ? insets.right : 0}>
         {children}
       </col>
       {/* packages/mobile's SidebarTopFade: the background solid under the status bar, fading out 14 pt below it. */}
       <box absolute={{ left: 0, top: 0, right: 0 }} h={insets.top + 14} inert gradient={{ angle: 180, stops: [[0, bg], [insets.top / (insets.top + 14), bg], [1, alpha(bg, 0)]] }} />
+      {/* DrawerPanel's focus blur: the drawer starts blurred (BlurView, the theme's tint) and sharpens as it opens, gone from 97 %. */}
+      {ours ? <box id={`phone-drawer-${sideOf(side)}-blur`} absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} backdropBlur={PANEL_BLUR} fill={blurTint(t.dark)} stage={PANEL_FOCUS} inert /> : null}
     </col>
   );
 }
+
+const noop = () => {};
+const PANEL_FOCUS: StageTracks = { opacity: held([[0, 1], [0.9, 0]]), hideAbove: 0.97 };
+/** expo-blur's light and dark tints at the drawer's intensities: a thin wash of the material over the blur. */
+const blurTint = (dark: boolean) => (dark ? "rgba(18,18,20,0.22)" : "rgba(255,255,255,0.28)");
 
 /**
  * The drawer's button, handed off from the top bar as the drawer opens (DrawerStage's
@@ -204,23 +214,22 @@ function DrawerPanel({ side, width, insets, children }: { side: Exclude<PhoneDra
 function FloatingChevron({ side, insets }: { side: Exclude<PhoneDrawer, null>; insets: PhoneInsets }) {
   const t = useTokens();
   const tr = useT();
-  const { drawer, shown, drag } = usePhoneNav();
+  const { drawer, shown } = usePhoneNav();
   const size = useWindowSize();
   const travel = drawerTravel(size.w);
   const ours = shown === side;
   const open = drawer === side;
-  const v = ours ? drawerProgress(open, drag, travel) : 0;
   const sign = signOf(side);
   const left = sideOf(side) === "start" ? EDGE : size.w - EDGE - BUTTON;
   const top = insets.top + PHONE_TOPBAR_H - BUTTON;
   const cx = left + BUTTON / 2;
   const cy = top + BUTTON / 2;
   const openCenterY = insets.top + BRAND_TOP + BRAND_ROW / 2;
-  const s = 1 - (1 - DRAWER_SCALE) * v;
+  // At progress v the page's scale is s = 1 - (1 - 0.9) v; the button rides the page's slide and
+  // shrink about the window's centre, and rises to the drawer's title row: both linear in v.
   const settle = openCenterY - cy - (cy - size.h / 2) * (DRAWER_SCALE - 1);
-  const x = (cx - size.w / 2) * (s - 1) + sign * v * travel;
-  const y = (cy - size.h / 2) * (s - 1) + v * settle;
-  const motion = drag !== null ? undefined : open ? OPEN_SPRING : CLOSE_SPRING;
+  const k = DRAWER_SCALE - 1;
+  const ride: StageTracks = { x: [[0, 0], [1, (cx - size.w / 2) * k + sign * travel]], y: [[0, 0], [1, (cy - size.h / 2) * k + settle]] };
   const rest = side === "account" ? glyph("person-circle") : glyph("gear");
   const turn = (sign * Math.PI) / 2;
   return (
@@ -230,17 +239,15 @@ function FloatingChevron({ side, insets }: { side: Exclude<PhoneDrawer, null>; i
       // Fixed, over the page's veil and its chrome (fixed too), which it rides with.
       fixed
       raise={CHEVRON_RAISE}
-      x={x}
-      y={y}
-      motion={motion}
+      stage={ride}
       hidden={!ours}
       inert={!open}
     >
       <GlassCircle id={`phone-drawer-${sideOf(side)}-chevron-button`} label={open ? tr("mobile.common.back") : side === "account" ? tr("mobile.nav.account") : tr("mobile.nav.chatSettingsLabel")} onPress={() => phoneNav.closeDrawer()}>
-        <box absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} center rotate={turn * (1 - v)} opacity={Math.min(1, Math.max(0, (v - 0.05) / 0.35))} motion={motion}>
+        <box absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} center stage={{ rotate: held([[0, turn], [1, 0]]), opacity: held([[0.05, 0], [0.4, 1]]) }}>
           <Icon icon={glyph(sideOf(side) === "start" ? "chevron-left" : "chevron-right")} size={20} color={t.c.textStrong} />
         </box>
-        <box absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} center rotate={-turn * v} opacity={Math.max(0, 1 - v / 0.3)} motion={motion}>
+        <box absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} center stage={{ rotate: held([[0, 0], [1, -turn]]), opacity: held([[0, 1], [0.3, 0]]) }}>
           <Icon icon={rest} size={20} color={t.c.textStrong} />
         </box>
       </GlassCircle>
@@ -275,46 +282,27 @@ const PAGE_BLUR = 8;
 
 /** The page's veil: the app's background over the page as it moves aside, which a tap or a drag on closes the drawer from. Fixed, so it carries the page's transform itself. */
 function StageVeil({ st }: { st: Stage }) {
-  const bg = useTokens().c.background;
+  const t = useTokens();
+  const bg = t.c.background;
+  const page = useMemo(() => pageTracks(st.travel), [st.travel]);
+  const blur = useMemo(() => ({ ...page, opacity: blurTrack() }), [page]);
+  const veil = useMemo(() => ({ ...page, opacity: veilTrack(STRIP_VEIL) }), [page]);
   if (!st.live) return null;
   return (
     <>
-    {/* packages/mobile's page blur (DrawerStage's AnimatedBlur under the veil): the page and its
-        bars blurred as they move aside, deepening on drawerBlur's curve. */}
-    <box
-      id="phone-stage-blur"
-      fixed
-      inset={0}
-      raise={VEIL_RAISE}
-      x={st.x}
-      scale={st.scale}
-      radius={st.radius}
-      backdropBlur={PAGE_BLUR}
-      opacity={drawerBlur(st.v)}
-      motion={st.motion}
-      inert
-    />
+    {/* packages/mobile's page blur (DrawerStage's AnimatedBlur under the veil, in the theme's
+        tint): the page and its bars blurred as they move aside, deepening on drawerBlur's curve. */}
+    <box id="phone-stage-blur" fixed inset={0} raise={VEIL_RAISE} stage={blur} backdropBlur={PAGE_BLUR} fill={blurTint(t.dark)} inert />
     <box
       id="phone-stage-veil"
       fixed
       inset={0}
       raise={VEIL_RAISE}
-      x={st.x}
-      scale={st.scale}
-      radius={st.radius}
+      stage={veil}
       fill={bg}
-      opacity={drawerVeil(st.v) * STRIP_VEIL}
-      motion={st.motion}
-      enter={{ opacity: 0, dur: 0.2 }}
       onPress={st.drawer ? () => phoneNav.closeDrawer() : undefined}
-      onDrag={
-        st.drawer
-          ? (d) => {
-              if (d.phase === "end") return phoneNav.releaseDrawer(st.travel);
-              phoneNav.dragDrawer(-st.sign * d.dx);
-            }
-          : undefined
-      }
+      stageDrag="close"
+      onDrag={st.drawer ? noop : undefined}
     />
     </>
   );

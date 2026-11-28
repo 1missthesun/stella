@@ -174,6 +174,15 @@ export type BoxProps = {
    * to open a drawer). A row that scrolls sideways keeps its own pan.
    */
   edgeDrag?: { left?: number; right?: number };
+  /**
+   * Rides the phone's drawer stage, applied by the engine on every display frame as the drawer's
+   * progress `v` (0 shut, 1 open) follows a finger or a spring: each track is `[v, value]` points,
+   * linear between them and carried on past the ends, and replaces the prop. `signed` mirrors `x`
+   * and `rotate` for the end drawer; `hideAbove` hides it from that progress on. No effect on desktops.
+   */
+  stage?: { x?: [number, number][]; y?: [number, number][]; scale?: [number, number][]; opacity?: [number, number][]; rotate?: [number, number][]; radius?: [number, number][]; signed?: boolean; hideAbove?: number };
+  /** `"open"` with `edgeDrag`, `"close"` with `onDrag`: the finger drives the phone's drawer stage in the engine instead of the handler, which hears nothing. */
+  stageDrag?: "open" | "close";
   enter?: Presence; exit?: Presence;
   loop?: Loop;
   /** Changes inside land at once (search results). */

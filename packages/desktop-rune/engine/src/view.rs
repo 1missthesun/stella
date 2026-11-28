@@ -161,9 +161,18 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
     let p = if closing {
         held = closing_props(id, &n.props);
         &held
-    } else if let Some(k) = n.props.keyboard {
-        crate::windows::note_keyboard_rider(id);
-        held = k.apply(&n.props, crate::windows::keyboard_live());
+    } else if n.props.keyboard.is_some() || n.props.stage.is_some() {
+        let mut p = std::borrow::Cow::Borrowed(&*n.props);
+        if let Some(st) = &n.props.stage {
+            crate::windows::note_stage_rider(id);
+            let (v, sign) = crate::windows::stage_live();
+            p = std::borrow::Cow::Owned(st.apply(&p, v, sign));
+        }
+        if let Some(k) = n.props.keyboard {
+            crate::windows::note_keyboard_rider(id);
+            p = std::borrow::Cow::Owned(k.apply(&p, crate::windows::keyboard_live()));
+        }
+        held = p.into_owned();
         &held
     } else {
         &*n.props
@@ -323,7 +332,13 @@ pub fn handlers(mut e: El, n: u32, p: &Props, is_input: bool) -> El {
                 let mut e = e;
                 for (edge, width, side) in [(rune::SwipeEdge::Left, zones.left, "left"), (rune::SwipeEdge::Right, zones.right, "right")] {
                     let Some(width) = width else { continue };
+                    let stage = p.stage_drag.clone();
                     e = e.on_edge_drag(edge, width, move |_s: &mut Win, d: &mut rune::Drag, tx: &mut Tx| {
+                        match stage.as_deref() {
+                            Some("open") => return crate::windows::stage_open_drag(d.phase, d.dx, if side == "left" { 1.0 } else { -1.0 }, d.cancelled()),
+                            Some("close") => return crate::windows::stage_close_drag(d.phase, d.dx, d.dy, d.cancelled()),
+                            _ => {}
+                        }
                         let phase = match d.phase {
                             rune::Phase::Down => "start",
                             rune::Phase::Move => "move",
@@ -343,6 +358,9 @@ pub fn handlers(mut e: El, n: u32, p: &Props, is_input: bool) -> El {
                 element_event(n, "magnify", json!({ "phase": phase, "delta": m.delta, "x": m.x, "y": m.y, "wheel": m.wheel }), Some(tx));
                 true
             }),
+            "drag" if p.stage_drag.as_deref() == Some("close") => {
+                e.on_drag(move |_s: &mut Win, d: &mut rune::Drag, _tx: &mut Tx| crate::windows::stage_close_drag(d.phase, d.dx, d.dy, d.cancelled()))
+            }
             "drag" => e.on_drag(move |_s: &mut Win, d: &mut rune::Drag, tx: &mut Tx| {
                 let phase = match d.phase {
                     rune::Phase::Down => "start",

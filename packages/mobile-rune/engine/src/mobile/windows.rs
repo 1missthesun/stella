@@ -17,6 +17,8 @@ use crate::props::{Kind, Props};
 use crate::protocol::{Msg, Op};
 use crate::view::build;
 
+pub use crate::stage::{note_stage_rider, stage_close_drag, stage_live, stage_open_drag};
+
 #[derive(Default)]
 pub struct Win {
     pub node: u32,
@@ -337,7 +339,7 @@ fn drain() {
     mark_dirty();
 }
 
-fn mark_dirty() {
+pub(crate) fn mark_dirty() {
     engine::with(|e| {
         let d: Vec<u32> = e.tree.dirty.drain().collect();
         for w in &d {

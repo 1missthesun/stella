@@ -1098,3 +1098,17 @@ pub fn backdrop_reach(e: rune::El, _pt: f32) -> rune::El {
 
 /// An element riding the phone's keyboard: nothing to follow on desktops.
 pub fn note_keyboard_rider(_id: u32) {}
+
+/// The phone's drawer stage (props `stage`): desktops have none, so it stays shut.
+pub fn stage_live() -> (f32, f32) {
+    (0.0, 1.0)
+}
+
+/// An element riding the phone's drawer stage: nothing to follow on desktops.
+pub fn note_stage_rider(_id: u32) {}
+
+/// A swipe driving the phone's drawer stage open: desktops have no stage.
+pub fn stage_open_drag(_phase: rune::Phase, _dx: f32, _sign: f32, _cancelled: bool) {}
+
+/// A drag driving the phone's drawer stage shut: desktops have no stage.
+pub fn stage_close_drag(_phase: rune::Phase, _dx: f32, _dy: f32, _cancelled: bool) {}

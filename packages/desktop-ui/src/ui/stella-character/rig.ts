@@ -68,6 +68,9 @@ export interface CreateStellaMarkOptions {
 
   visibilityGate?: boolean;
   maxFps?: number;
+  /** Cap for the idle drift's cadence (blinks, poses and gestures keep `maxFps`). Where each
+   *  drawn step costs a whole frame (Rune's phone app), the sub-pixel drift needs only a few. */
+  ambientMaxFps?: number;
 }
 
 export interface StellaMarkHandle {
@@ -399,11 +402,14 @@ export function createStellaMark(
     paused: false,
     visibilityGate: true,
     maxFps: null as number | null,
+    ambientMaxFps: null as number | null,
     ...opts,
   };
   const maxFps =
     o.maxFps && o.maxFps > 0 ? o.maxFps : o.size && o.size <= 48 ? 30 : 60;
   const frameIntervalMs = 1000 / maxFps;
+  const ambientFloorMs =
+    o.ambientMaxFps && o.ambientMaxFps > 0 ? 1000 / o.ambientMaxFps : 0;
   const FRAME_SLACK_MS = 1.5;
   const id = `sm${++uid}`;
   const reduced =
@@ -1273,7 +1279,10 @@ export function createStellaMark(
     const interval = ambient
       ? Math.max(
           frameIntervalMs,
-          Math.min(ambientIntervalMs(), Math.min(nextPoseAt, nextBlinkAt) - t),
+          Math.min(
+            Math.max(ambientIntervalMs(), ambientFloorMs),
+            Math.min(nextPoseAt, nextBlinkAt) - t,
+          ),
         )
       : frameIntervalMs;
     gapMs = interval - FRAME_SLACK_MS;

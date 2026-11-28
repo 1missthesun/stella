@@ -106,6 +106,13 @@ impl Metrics {
         self.pending.push(Pending { generation, ack, t0, kind, received, applied });
     }
 
+    /// Hosts that never report frames (the phone's embedded layer has no `on_frame_encoded`):
+    /// drops what waits for one, which otherwise grows with every commit and element event.
+    pub fn forget_pending(&mut self) {
+        self.pending.clear();
+        self.pending_events.clear();
+    }
+
     pub fn on_frame(&mut self, f: &FrameEncoded) {
         match f.outcome() {
             FrameOutcome::Drawn => {}

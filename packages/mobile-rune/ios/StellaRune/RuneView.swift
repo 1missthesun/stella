@@ -16,11 +16,18 @@ final class RuneView: UIView {
   private var drewFirst = false
   /// Frames presented and their CPU cost, for the perf overlay and measurements.
   private(set) var frames = 0
+  /// Display link ticks (drawn or not).
+  private(set) var ticks = 0
   private(set) var frameCpuUs: [UInt64] = []
   private(set) var frameTimes: [CFTimeInterval] = []
   /// Per recorded frame: the keyboard overlap drawn, the focused field's bottom, the real keyboard's top.
   private(set) var frameKb: [[Double]] = []
   var recording = false
+  /// The app is in the background: Metal refuses drawables and command buffers there (a frame
+  /// submitted after `didEnterBackground` fails, its drawable never comes back, and the next
+  /// `nextDrawable` waits for it forever, freezing the app when it returns). No frame is drawn
+  /// until the app is back in the foreground.
+  private(set) var backgrounded = false
 
   override init(frame: CGRect) {
     super.init(frame: frame)
@@ -63,16 +70,64 @@ final class RuneView: UIView {
     }
     link.add(to: .main, forMode: .common)
     self.link = link
+    allowDrawableTimeout()
+    let nc = NotificationCenter.default
+    nc.addObserver(forName: UIApplication.didEnterBackgroundNotification, object: nil, queue: .main) { [weak self] _ in self?.enterBackground() }
+    nc.addObserver(forName: UIApplication.willEnterForegroundNotification, object: nil, queue: .main) { [weak self] _ in self?.enterForeground() }
+    // Also on becoming active: the app can start or come back without a willEnterForeground.
+    nc.addObserver(forName: UIApplication.didBecomeActiveNotification, object: nil, queue: .main) { [weak self] _ in self?.enterForeground() }
   }
 
   func wake() {
     wakeTimer?.invalidate()
     wakeTimer = nil
+    guard !backgrounded else { return }
     link?.isPaused = false
+  }
+
+  private func enterBackground() {
+    guard !backgrounded else { return }
+    backgrounded = true
+    wakeTimer?.invalidate()
+    wakeTimer = nil
+    link?.isPaused = true
+    downAt.removeAll()
+    App.shared.js.deliver(line: #"{"t":"app.visible","visible":false}"#)
+  }
+
+  private func enterForeground() {
+    guard backgrounded else { return }
+    backgrounded = false
+    downAt.removeAll()
+    if let host {
+      // Whatever changed while away (size, safe area, appearance) and a whole fresh frame.
+      let size = bounds.size
+      let scale = window?.screen.scale ?? UIScreen.main.scale
+      lastSize = size
+      lastScale = scale
+      sme_resize(host, Float(size.width), Float(size.height), Float(scale))
+      allowDrawableTimeout()
+      pushInsets()
+      sme_set_dark(host, traitCollection.userInterfaceStyle == .dark)
+    }
+    App.shared.js.deliver(line: #"{"t":"app.visible","visible":true}"#)
+    wake()
+  }
+
+  /// wgpu configures the layer to wait for a drawable forever. A drawable lost anyway (the system
+  /// reclaiming them around a background transition) would then hang the main thread for good;
+  /// with the timeout, `nextDrawable` gives up after a second and the frame is skipped.
+  private func allowDrawableTimeout() {
+    (layer as! CAMetalLayer).allowsNextDrawableTimeout = true
   }
 
   @objc private func tick(_ l: CADisplayLink) {
     guard let host else { return }
+    if backgrounded {
+      l.isPaused = true
+      return
+    }
+    ticks += 1
     KeyboardWatch.shared.frameDuration = l.targetTimestamp - l.timestamp
     KeyboardWatch.shared.frame(host)
     let f = sme_frame(host)
@@ -114,6 +169,7 @@ final class RuneView: UIView {
       lastSize = size
       lastScale = scale
       sme_resize(host, Float(size.width), Float(size.height), Float(scale))
+      allowDrawableTimeout()
       wake()
     }
   }
@@ -159,10 +215,11 @@ final class RuneView: UIView {
   private var downAt: [ObjectIdentifier: CGPoint] = [:]
 
   /// A synthetic finger (the dev debug driver): phase 0 began, 1 moved, 2 ended, 3 cancelled.
-  func inject(id: UInt64, phase: UInt32, at p: CGPoint) {
+  /// `time`: when the finger was there (a scripted gesture's own timeline), else now.
+  func inject(id: UInt64, phase: UInt32, at p: CGPoint, time: Double? = nil) {
     guard let host else { return }
     if phase == 2 { NativeFields.shared.lastTouchEnd = CACurrentMediaTime() }
-    sme_touch(host, id, phase, Float(p.x), Float(p.y), CACurrentMediaTime())
+    sme_touch(host, id, phase, Float(p.x), Float(p.y), time ?? CACurrentMediaTime())
     wake()
   }
 

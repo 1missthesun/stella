@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { command, onEngineEvent } from "../../../desktop-rune/host/bridge";
 
 /** The phone's places: the bottom bar's tabs, and the drawer beside the page (account at the start, chat settings at the end). */
 export type PhoneTab = "chat" | "schedule" | "apps" | "files";
@@ -7,28 +8,32 @@ export type PhoneDrawer = "account" | "chat-settings" | null;
 export const PHONE_TABS: readonly PhoneTab[] = ["chat", "schedule", "apps", "files"];
 
 /**
- * `drawer` is the open drawer; `shown` is the one on screen, which stays while it slides shut so
- * the page can spring home over it (packages/mobile's `useDrawerLive`). `drag` is a finger's
- * travel while it pulls the open drawer shut, in points along the drawer's own direction.
+ * `drawer` is the open drawer; `shown` is the one on screen, which stays while it springs shut so
+ * the page can spring home over it (packages/mobile's `useDrawerLive`). `swiping`: a finger is
+ * pulling a drawer open from the page.
+ *
+ * The drawer's progress itself lives in the engine (`mobile/stage.rs`), which moves it with the
+ * finger and on React Native's springs frame by frame: TS hears only where a swipe starts, where
+ * a lifted finger sends it and where it comes to rest, and asks it to open or shut.
  */
-type Nav = { tab: PhoneTab; drawer: PhoneDrawer; shown: PhoneDrawer; drag: number | null };
-let nav: Nav = { tab: "chat", drawer: null, shown: null, drag: null };
+type Nav = { tab: PhoneTab; drawer: PhoneDrawer; shown: PhoneDrawer; swiping: boolean };
+let nav: Nav = { tab: "chat", drawer: null, shown: null, swiping: false };
 const listeners = new Set<() => void>();
 let settleTimer: ReturnType<typeof setTimeout> | null = null;
 
-/** How long the page takes to spring home after a drawer closes, before the drawer stops drawing. */
-const CLOSE_SETTLE_MS = 520;
+/** In case the engine's word that the stage came to rest shut never comes. */
+const CLOSE_SETTLE_MS = 1500;
+
+const signOfDrawer = (d: PhoneDrawer) => (d === "chat-settings" ? -1 : 1);
 
 function set(next: Partial<Nav>) {
   const merged = { ...nav, ...next };
-  if (merged.tab === nav.tab && merged.drawer === nav.drawer && merged.shown === nav.shown && merged.drag === nav.drag) return;
+  if (merged.tab === nav.tab && merged.drawer === nav.drawer && merged.shown === nav.shown && merged.swiping === nav.swiping) return;
   nav = merged;
   for (const l of listeners) l();
 }
 
-function close(extra: Partial<Nav> = {}) {
-  if (!nav.drawer && !nav.shown) return set(extra);
-  set({ ...extra, drawer: null, drag: null });
+function settleLater() {
   if (settleTimer) clearTimeout(settleTimer);
   settleTimer = setTimeout(() => {
     settleTimer = null;
@@ -36,38 +41,45 @@ function close(extra: Partial<Nav> = {}) {
   }, CLOSE_SETTLE_MS);
 }
 
+function close(extra: Partial<Nav> = {}) {
+  if (!nav.drawer && !nav.shown) return set(extra);
+  set({ ...extra, drawer: null, swiping: false });
+  command({ cmd: "stage", to: 0 });
+  settleLater();
+}
+
+function open(drawer: Exclude<PhoneDrawer, null>) {
+  if (settleTimer) clearTimeout(settleTimer);
+  settleTimer = null;
+  set({ drawer, shown: drawer, swiping: false });
+  command({ cmd: "stage", sign: signOfDrawer(drawer), to: 1 });
+}
+
+onEngineEvent("stage", (e) => {
+  if (e.kind === "swipe") {
+    if (settleTimer) clearTimeout(settleTimer);
+    settleTimer = null;
+    const drawer = e.side === "start" ? "account" : "chat-settings";
+    set({ drawer, shown: drawer, swiping: true });
+  } else if (e.kind === "release") {
+    if (e.open) set({ swiping: false, drawer: nav.drawer ?? nav.shown });
+    else {
+      set({ swiping: false, drawer: null });
+      settleLater();
+    }
+  } else if (e.kind === "rest") {
+    if (e.v <= 0 && !nav.drawer) {
+      if (settleTimer) clearTimeout(settleTimer);
+      settleTimer = null;
+      set({ shown: null });
+    }
+  }
+});
+
 export const phoneNav = {
   selectTab: (tab: PhoneTab) => (nav.drawer ? close({ tab }) : set({ tab })),
-  openDrawer: (drawer: Exclude<PhoneDrawer, null>) => {
-    if (settleTimer) clearTimeout(settleTimer);
-    settleTimer = null;
-    set({ drawer, shown: drawer, drag: null });
-  },
+  openDrawer: open,
   closeDrawer: () => close(),
-  /** A finger pulling the open drawer shut has travelled `toward` points toward closing it, since it pressed. */
-  dragDrawer: (toward: number) => {
-    if (!nav.drawer) return;
-    set({ drag: Math.max(0, toward) });
-  },
-  /** A finger swiping a drawer open from the page (packages/mobile's open pan): it starts shut, `travel` from open, and follows the finger with `dragDrawer`. */
-  swipeDrawer: (drawer: Exclude<PhoneDrawer, null>, travel: number) => {
-    if (settleTimer) clearTimeout(settleTimer);
-    settleTimer = null;
-    set({ drawer, shown: drawer, drag: travel });
-  },
-  /** The swiping finger lifted, moving at `velocity` points a second toward open: open past half the travel (a flick carries a fifth of a second ahead), else shut. */
-  releaseSwipe: (travel: number, velocity: number) => {
-    if (!nav.drawer) return;
-    const progress = 1 - (nav.drag ?? 0) / travel;
-    if (progress + (velocity / travel) * 0.2 > 0.5) set({ drag: null });
-    else close();
-  },
-  /** The finger lifted: shut past a third of the travel, else spring back open. */
-  releaseDrawer: (travel: number) => {
-    if (!nav.drawer) return;
-    if ((nav.drag ?? 0) > travel * 0.3) close();
-    else set({ drag: null });
-  },
   get: () => nav,
 };
 

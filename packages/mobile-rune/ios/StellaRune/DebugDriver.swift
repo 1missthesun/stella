@@ -1,4 +1,5 @@
 #if STELLA_DEV
+import JavaScriptCore
 import UIKit
 
 /// Drives the app from the outside in dev builds, so the Simulator can be exercised without the
@@ -56,11 +57,14 @@ enum DebugDriver {
     case "/drag":
       let x = num("x", 200), y = num("y", 500), dx = num("dx", 0), dy = num("dy", -300), ms = max(16, num("ms", 250))
       let steps = max(2, Int(ms / 8))
-      app.inject(id: 9002, phase: 0, at: CGPoint(x: x, y: y))
+      let t0 = CACurrentMediaTime()
+      app.inject(id: 9002, phase: 0, at: CGPoint(x: x, y: y), time: t0)
       for i in 1...steps {
         let f = Double(i) / Double(steps)
+        // Each event carries its moment on the gesture's timeline, as a real touch's timestamp
+        // does, even when the main thread hands several over at once.
         DispatchQueue.main.asyncAfter(deadline: .now() + ms / 1000 * f) {
-          app.inject(id: 9002, phase: i == steps ? 2 : 1, at: CGPoint(x: x + dx * f, y: y + dy * f))
+          app.inject(id: 9002, phase: i == steps ? 2 : 1, at: CGPoint(x: x + dx * f, y: y + dy * f), time: t0 + ms / 1000 * f)
         }
       }
     case "/pinch":
@@ -95,6 +99,15 @@ enum DebugDriver {
     case "/a11y":
       // Reduce Transparency (glass solid) as the system setting would, for measurements.
       if let h = app.host { sme_accessibility(h, q["rt"] == "1", false, false); app.wake() }
+    case "/gc":
+      // A full JavaScriptCore collection, then the footprint, for leak checks.
+      App.shared.js.perform {
+        JSGarbageCollect(App.shared.js.context.jsGlobalContextRef)
+        AppLog.shared.write("info", String(format: "gc: footprint %.1f MB", Memory.residentMB()))
+      }
+    case "/frames":
+      // Frames drawn so far (idle checks: two reads a few seconds apart, without perf recording).
+      AppLog.shared.write("info", "frames: \(app.frames) ticks: \(app.ticks)")
     case "/blur":
       app.endEditing(true)
     case "/perf":

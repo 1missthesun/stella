@@ -309,6 +309,8 @@ function replayFresh() {
  *  same key and rect again) goes to the successor, when that hasn't heard one yet. */
 const layoutHolder = new Map<string, Instance>();
 const releasedIds = new Map<number, string>();
+/** Live host elements, for leak checks (the phone's dev JS perf log). */
+export const liveInstances = () => instances.size;
 
 function heir(e: ElementEvent): Instance | undefined {
   if (e.e !== "layout") return undefined;

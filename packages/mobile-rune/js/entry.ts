@@ -15,15 +15,23 @@ import { startPush } from "../ui/native/push";
 import { installBackButton } from "../ui/phone/back";
 import { restoreComputerMode } from "../ui/computer/computer-mode";
 import { listenForPairingLinks } from "../ui/computer/ConnectComputer";
+import { installJsPerf } from "./jsperf";
 
 const t0 = __native.now();
 
 try {
   void listen();
   const env = __native.env;
+  if (env.env.STELLA_JSPERF === "1") installJsPerf();
   onEngineEvent("appearance", (a: any) => {
     dom.setAppearance({ dark: !!a.dark });
     notePhoneAppearance(a);
+  });
+  // Backgrounding and coming back, as a browser tab's visibility and focus: the chat socket
+  // checks itself and reconnects on `visibilitychange` (use-conversation), timers catch up.
+  onEngineEvent("app.visible", ({ visible }) => {
+    dom.setVisible(visible);
+    dom.setFocused(visible);
   });
   const store = createStore((app as any).initialState?.() ?? {});
   (globalThis as any).stella = { store, useStore: makeUseStore(store), command, now, engine, on: onEngineEvent, windowPortal, pressedByKeys, views: createPhoneViews(), phone: { env, post: (m: object) => __native.post(JSON.stringify(m)) } };

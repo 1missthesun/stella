@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { EdgeDrag } from "../../desktop-rune/host/rune-jsx/props";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import { FullWindow } from "../../desktop-rune/ui/app/FullWindow";
 import { chatAtEnd, chatFit } from "../../desktop-rune/ui/chat/chat-at-end";
 import { ToastPlacementContext } from "../../desktop-rune/ui/kit/Toast";
@@ -7,8 +6,8 @@ import { useTokens, WindowPaintsBackground } from "../../desktop-rune/ui/theme";
 import type { HostElement } from "../../desktop-rune/host/reconciler";
 import { usePhoneInsets } from "./phone/insets";
 import { barBase, PHONE_TOPBAR_H } from "./phone/PhoneChrome";
-import { phoneNav, usePhoneNav, type PhoneDrawer } from "./phone/nav";
-import { CLOSE_SPRING, drawerProgress, drawerTravel, noteWindowSize, OPEN_SPRING, setDrawerHost, signOf, stageLook, useStageBackground, useWindowSize } from "./phone/stage";
+import { usePhoneNav } from "./phone/nav";
+import { drawerTravel, noteWindowSize, pageTracks, setDrawerHost, useStageBackground, useWindowSize } from "./phone/stage";
 import { ConnectComputerLayer } from "./computer/ConnectComputer";
 
 
@@ -49,17 +48,12 @@ export function PhoneRoot() {
     document.documentElement.dataset.stellaPhone = "true";
   }, []);
 
-  const { drawer, shown, drag } = usePhoneNav();
+  const { shown } = usePhoneNav();
   const size = useWindowSize();
   const travel = drawerTravel(size.w);
-  const swipe = useDrawerSwipe(size.w, travel);
+  const zones = useDrawerSwipeZones(size.w);
   const live = shown !== null;
-  const v = drawerProgress(drawer !== null, drag, travel);
-  const sign = signOf(shown);
-  const stage = stageLook(v, sign, travel);
-  // Only while a drawer is out: an element's motion reaches every change beneath it (the keyboard
-  // ride, the whole app), which must otherwise land at once.
-  const motion = drag !== null || !live ? undefined : drawer ? OPEN_SPRING : CLOSE_SPRING;
+  const tracks = useMemo(() => pageTracks(travel), [travel]);
   const stageBg = useStageBackground();
   const hostRef = useCallback((el: HostElement | null) => setDrawerHost(el), []);
 
@@ -70,14 +64,12 @@ export function PhoneRoot() {
         id="phone-stage"
         w="full"
         h="full"
-        x={stage.x}
-        scale={stage.scale}
-        radius={live ? stage.radius : undefined}
+        stage={tracks}
         clip={live ? 0 : undefined}
         fill={live ? (stageBg ?? t.c.background) : undefined}
-        motion={motion}
-        edgeDrag={swipe.zones}
-        onEdgeDrag={swipe.zones ? swipe.onEdgeDrag : undefined}
+        edgeDrag={zones}
+        stageDrag="open"
+        onEdgeDrag={zones ? noop : undefined}
         onSize={(r) => noteWindowSize(r.w, r.h)}
       >
         <col
@@ -100,45 +92,16 @@ export function PhoneRoot() {
   );
 }
 
+const noop = () => {};
+
 /**
  * packages/mobile's open pan (useDrawerOpenPan): a sideways swipe anywhere on the page pulls a
  * drawer open with the finger, the account drawer from the left on every tab and chat settings
- * from the right on the chat. Let go past half the travel (a flick carries ahead), it opens;
- * short of it, it shuts. A row that scrolls sideways keeps its own pan.
+ * from the right on the chat. The engine runs it (`stageDrag`): it follows the finger, and let go
+ * past half the travel (a flick carries a fifth of a second ahead) it opens, short of it it
+ * shuts. A row that scrolls sideways keeps its own pan.
  */
-function useDrawerSwipe(width: number, travel: number) {
-  const { tab, drawer } = usePhoneNav();
-  const swipe = useRef<{ side: Exclude<PhoneDrawer, null>; sign: number; samples: [number, number][] } | null>(null);
-  const [swiping, setSwiping] = useState(false);
-  const onEdgeDrag = useCallback(
-    (d: EdgeDrag) => {
-      if (d.phase === "start") {
-        const nav = phoneNav.get();
-        const side = d.edge === "left" ? "account" : "chat-settings";
-        if (nav.drawer || (side === "chat-settings" && nav.tab !== "chat")) return;
-        swipe.current = { side, sign: signOf(side), samples: [[performance.now(), 0]] };
-        setSwiping(true);
-        phoneNav.swipeDrawer(side, travel);
-        return;
-      }
-      const s = swipe.current;
-      if (!s) return;
-      const along = s.sign * d.dx;
-      if (d.phase === "move") {
-        s.samples.push([performance.now(), along]);
-        if (s.samples.length > 5) s.samples.shift();
-        phoneNav.dragDrawer(travel - along);
-        return;
-      }
-      swipe.current = null;
-      setSwiping(false);
-      if (d.cancelled) return phoneNav.closeDrawer();
-      const [t0, a0] = s.samples[0];
-      const dt = performance.now() - t0;
-      phoneNav.releaseSwipe(travel, dt > 0 ? ((along - a0) / dt) * 1000 : 0);
-    },
-    [travel],
-  );
-  const zones = drawer && !swiping ? undefined : { left: width, ...(tab === "chat" ? { right: width } : {}) };
-  return { zones, onEdgeDrag };
+function useDrawerSwipeZones(width: number) {
+  const { tab, drawer, swiping } = usePhoneNav();
+  return drawer && !swiping ? undefined : { left: width, ...(tab === "chat" ? { right: width } : {}) };
 }

@@ -253,6 +253,73 @@ impl KeyboardP {
     }
 }
 
+/// Follows the phone's drawer stage (packages/mobile's DrawerStage): its progress `v`, 0 shut to
+/// 1 open (a little past 1 while a finger pulls it open beyond its travel), applied by the engine
+/// on each display frame, so what rides it moves with the finger and the stage's spring with no
+/// TS round trip. Each track is `[v, value]` points, linear between them and carried on past the
+/// ends along the end segments, and its value replaces the prop's. On desktops `v` stays 0.
+#[derive(Clone, Debug, Default, Deserialize, PartialEq)]
+#[serde(rename_all = "camelCase", default)]
+pub struct StageP {
+    pub x: Option<Vec<[f32; 2]>>,
+    pub y: Option<Vec<[f32; 2]>>,
+    pub scale: Option<Vec<[f32; 2]>>,
+    pub opacity: Option<Vec<[f32; 2]>>,
+    pub rotate: Option<Vec<[f32; 2]>>,
+    pub radius: Option<Vec<[f32; 2]>>,
+    /// `x` and `rotate` follow the open drawer's side: they are given for the start (left)
+    /// drawer and mirrored for the end one.
+    pub signed: bool,
+    /// Hidden at or above this progress.
+    pub hide_above: Option<f32>,
+}
+
+impl StageP {
+    /// The props with the stage at progress `v`, its drawer on side `sign` (1 start, -1 end).
+    pub fn apply(&self, p: &Props, v: f32, sign: f32) -> Props {
+        let mut out = p.clone();
+        out.stage = None;
+        let s = if self.signed { sign } else { 1.0 };
+        let at = |t: &Option<Vec<[f32; 2]>>| t.as_deref().filter(|t| !t.is_empty()).map(|t| track_at(t, v));
+        if let Some(x) = at(&self.x) {
+            out.x = Some(x * s);
+        }
+        if let Some(y) = at(&self.y) {
+            out.y = Some(y);
+        }
+        if let Some(k) = at(&self.scale) {
+            out.scale = Some(k);
+        }
+        if let Some(o) = at(&self.opacity) {
+            out.opacity = Some(o.clamp(0.0, 1.0));
+        }
+        if let Some(r) = at(&self.rotate) {
+            out.rotate = Some(r * s);
+        }
+        if let Some(r) = at(&self.radius) {
+            out.radius = Some(r.max(0.0));
+        }
+        if self.hide_above.is_some_and(|h| v >= h) {
+            out.hidden = true;
+        }
+        out
+    }
+}
+
+/// A piecewise-linear track at `v`, carried on past its ends along the end segments.
+fn track_at(t: &[[f32; 2]], v: f32) -> f32 {
+    if t.len() == 1 {
+        return t[0][1];
+    }
+    let seg = t.windows(2).position(|w| v <= w[1][0]).unwrap_or(t.len() - 2);
+    let [a, b] = [t[seg], t[seg + 1]];
+    let span = b[0] - a[0];
+    if span.abs() < 1e-6 {
+        return b[1];
+    }
+    a[1] + (b[1] - a[1]) * (v - a[0]) / span
+}
+
 #[derive(Clone, Copy, Debug, Deserialize)]
 pub struct MotionP {
     #[serde(default = "dur_default")]
@@ -571,6 +638,11 @@ pub struct Props {
     pub keyboard: Option<KeyboardP>,
     /// Edge swipe zones for `onEdgeDrag` (`EdgeDragP`).
     pub edge_drag: Option<EdgeDragP>,
+    /// Follows the phone's drawer stage frame by frame (`StageP`).
+    pub stage: Option<StageP>,
+    /// `"open"` on an `edgeDrag` element, `"close"` on a `drag` one: the finger drives the
+    /// phone's drawer stage in the engine, and TS hears only where it settles.
+    pub stage_drag: Option<String>,
     pub enter: Option<PresenceP>,
     pub exit: Option<PresenceP>,
     #[serde(rename = "loop")]

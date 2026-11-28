@@ -216,14 +216,18 @@ fn host<'a>(h: *mut Host) -> Option<&'a mut Host> {
 #[unsafe(no_mangle)]
 pub extern "C" fn sme_frame(h: *mut Host) -> SmeFrame {
     let Some(h) = host(h) else { return SmeFrame { drew: false, animating: false, wake_after: -1.0, cpu_us: 0 } };
+    crate::stage::step();
     let f = h.host.frame();
+    if f.drew {
+        crate::metrics::METRICS.lock().unwrap_or_else(|e| e.into_inner()).forget_pending();
+    }
     crate::native::sync();
     crate::view_frames::after_frame();
     let haptics = h.host.take_haptics();
     for hp in haptics {
         crate::native::send(json!({ "t": "haptic", "kind": format!("{hp:?}") }));
     }
-    SmeFrame { drew: f.drew, animating: f.animating, wake_after: f.wake_after_secs.unwrap_or(-1.0), cpu_us: f.cpu_us }
+    SmeFrame { drew: f.drew, animating: f.animating || crate::stage::moving(), wake_after: f.wake_after_secs.unwrap_or(-1.0), cpu_us: f.cpu_us }
 }
 
 #[unsafe(no_mangle)]
@@ -266,6 +270,7 @@ pub extern "C" fn sme_keyboard_frame(_h: *mut Host, height: f32) {
 /// A touch: phase 0 began, 1 moved, 2 ended, 3 cancelled; `x`,`y` in points; `time` seconds.
 #[unsafe(no_mangle)]
 pub extern "C" fn sme_touch(h: *mut Host, id: u64, phase: u32, x: f32, y: f32, time: f64) {
+    crate::stage::note_touch_time(time);
     if let Some(h) = host(h) {
         let phase = match phase {
             0 => TouchPhase::Started,

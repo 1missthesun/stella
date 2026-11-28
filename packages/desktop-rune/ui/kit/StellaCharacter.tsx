@@ -12,6 +12,8 @@ export type StellaCharacterProps = {
   glow?: boolean;
   paused?: boolean;
   followPointer?: boolean;
+  /** How often the idle drift steps (see the rig's `ambientMaxFps`). */
+  ambientFps?: number;
   handleRef?: MutableRefObject<StellaMarkHandle | null>;
 };
 
@@ -133,9 +135,29 @@ const serialize = (el: Node, resolve: (value: string) => string): string => {
   return `<${tag}${attrs}>${kids}</${tag}>`;
 };
 
+// Every step the rig draws costs the engine a frame (two: the new SVG, then its raster), so the
+// idle drift, which moves less than a device pixel a step, steps a few times a second instead of
+// at the display rate. Blinks, poses and gestures still run at full rate.
+const AMBIENT_FPS = 8;
+
+/** Whether the app is in the background, where nothing it draws is seen. */
+function useDocumentHidden() {
+  const [hidden, setHidden] = useState(() => typeof document !== "undefined" && document.visibilityState === "hidden");
+  useEffect(() => {
+    if (typeof document === "undefined") return undefined;
+    const update = () => setHidden(document.visibilityState === "hidden");
+    document.addEventListener("visibilitychange", update);
+    update();
+    return () => document.removeEventListener("visibilitychange", update);
+  }, []);
+  return hidden;
+}
+
 /** desktop-ui's `StellaCharacter`: its rig runs unchanged on a detached DOM, and each frame it draws is handed to the engine as one SVG, set on the vector directly rather than through a render. */
-export function StellaCharacter({ size, state = "idle", shape = "star", ink = "aurora", eyeColor, glow = false, paused = false, followPointer = false, handleRef }: StellaCharacterProps) {
+export function StellaCharacter({ size, state = "idle", shape = "star", ink = "aurora", eyeColor, glow = false, paused: pausedProp = false, followPointer = false, ambientFps = AMBIENT_FPS, handleRef }: StellaCharacterProps) {
   const t = useTokens();
+  const hidden = useDocumentHidden();
+  const paused = pausedProp || hidden;
   const [svg, setSvg] = useState("");
   const vector = useRef<HostElement | null>(null);
   const markRef = useRef<StellaMarkHandle | null>(null);
@@ -162,7 +184,7 @@ export function StellaCharacter({ size, state = "idle", shape = "star", ink = "a
     }) as typeof document.createElementNS;
     let mark: StellaMarkHandle;
     try {
-      mark = createStellaMark(host, { size, ink, glow, followPointer, visibilityGate: false, ...motion.current, ...(eyeColor ? { eyeColor } : {}) });
+      mark = createStellaMark(host, { size, ink, glow, followPointer, visibilityGate: false, ambientMaxFps: ambientFps, ...motion.current, ...(eyeColor ? { eyeColor } : {}) });
     } finally {
       document.createElement = createElement;
       document.createElementNS = createElementNS;
@@ -231,7 +253,7 @@ export function StellaCharacter({ size, state = "idle", shape = "star", ink = "a
       if (handleRef?.current === mark) handleRef.current = null;
       mark.destroy();
     };
-  }, [size, ink, glow, eyeColor, followPointer, handleRef]);
+  }, [size, ink, glow, eyeColor, followPointer, ambientFps, handleRef]);
 
   useEffect(() => {
     markRef.current?.setState(state);

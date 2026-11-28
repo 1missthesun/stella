@@ -301,6 +301,11 @@ fn vector_raster_key(svg: &str, p: &Props) -> (u32, u64) {
     (px, h)
 }
 
+/// Vectors up to this size (an icon or Stella's mark) rasterize their next pose inline: it takes
+/// well under a millisecond, and the frame the change arrives on then shows it, rather than that
+/// frame and another once the raster thread is done.
+const INLINE_RASTER_PX: u32 = 128;
+
 /// Repaints node `n`'s `<vector svg>` in place for new props that change only its drawing,
 /// when it has drawn before. `false`: it needs building.
 pub fn repaint_vector(n: u32, p: &Props) -> bool {
@@ -311,7 +316,11 @@ pub fn repaint_vector(n: u32, p: &Props) -> bool {
         let Some(entry) = m.get_mut(&n) else { return false };
         if entry.0 != h {
             entry.0 = h;
-            raster_later(n, svg.to_owned(), px, entry.1.clone());
+            if px <= INLINE_RASTER_PX {
+                raster_svg(n, svg, px, &entry.1);
+            } else {
+                raster_later(n, svg.to_owned(), px, entry.1.clone());
+            }
         }
         true
     })

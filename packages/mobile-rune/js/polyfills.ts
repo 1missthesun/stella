@@ -57,6 +57,7 @@ g.clearTimeout = g.clearInterval = (id?: number) => {
   if (id == null || !timers.delete(id)) return;
   N.clearTimer(id);
 };
+g.__liveTimers = () => { let r = 0; for (const t of timers.values()) if (t.repeats) r++; return `${timers.size}(${r} repeating)`; };
 g.setImmediate = (fn: (...a: any[]) => void, ...args: any[]) => g.setTimeout(fn, 0, ...args);
 g.clearImmediate = g.clearTimeout;
 g.queueMicrotask ??= (fn: () => void) => { Promise.resolve().then(fn).catch((e) => console.error("microtask failed", e)); };

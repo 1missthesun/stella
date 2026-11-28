@@ -66,6 +66,8 @@ mod control;
 mod input;
 #[path = "mobile/native.rs"]
 mod native;
+#[path = "mobile/stage.rs"]
+mod stage;
 #[path = "mobile/view_frames.rs"]
 mod view_frames;
 #[path = "mobile/windows.rs"]

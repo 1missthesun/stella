@@ -4,7 +4,7 @@ import type { Loop } from "../../../../desktop-rune/host/rune-jsx/props";
 import { Icon } from "../../../../desktop-rune/ui/kit";
 import { glyph } from "../icons";
 import { BRAND_TOP, Dot, GUTTER, rt, TEXT, useRn } from "../rn";
-import { OPEN_SPRING } from "../stage";
+import { OPEN_SETTLE_S } from "../stage";
 import type { PhoneInsets } from "../insets";
 
 // The Account drawer's own pieces of packages/mobile's kit: SettingsScroll's page, StartRise,
@@ -62,7 +62,7 @@ function riseLoop(i: number, odd: boolean): Loop {
     const v = 1 - (1 - at) ** 3;
     return { at, opacity: Math.max(0, Math.min(1, (v - from) / 0.5)), x: dx * (1 - v) };
   });
-  const loop: Loop = { kind: "sequence", period: OPEN_SPRING.dur + (odd ? 0.001 : 0), times: 1, ease: "linear", frames };
+  const loop: Loop = { kind: "sequence", period: OPEN_SETTLE_S + (odd ? 0.001 : 0), times: 1, ease: "linear", frames };
   riseLoops.set(key, loop);
   return loop;
 }

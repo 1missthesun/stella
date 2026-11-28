@@ -129,6 +129,9 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
             let slot = e.windows.entry(s.node).or_default();
             let size = Some((w, h));
             let changed = slot.size != size;
+            if changed && slot.size.is_some() {
+                slot.resized_at = Some(std::time::Instant::now());
+            }
             slot.size = size;
             (w, h, changed)
         });
@@ -513,6 +516,13 @@ thread_local! {
 /// How long after a hot swap lands its follow-up commits (layout-driven reveals) skip motion.
 const SWAP_SETTLE: std::time::Duration = std::time::Duration::from_millis(600);
 
+/// How long after the window's size last changed the host's commits lay out as the resize does
+/// (`Tx::follows_resize`): what the UI sizes from measured layout or the window's width (the
+/// composer, the top bar, breakpoints) answers a step a bridge round trip or two later, and
+/// springing it there would trail the window's edge. Longer than a slow chain of answers, shorter
+/// than a person going from the edge to a control.
+pub const RESIZE_ECHO: std::time::Duration = std::time::Duration::from_millis(250);
+
 /// Drains the bridge: applies ops, runs global commands, queues window commands, and wakes the
 /// windows it dirtied.
 fn drain(polling: u32) {
@@ -842,6 +852,7 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
     let taken = engine::with(|e| {
         let settling = e.swap_settle.is_some_and(|(until, input)| std::time::Instant::now() < until && crate::swap_view::USER_INPUT.load(std::sync::atomic::Ordering::Relaxed) == input);
         let slot = e.windows.get_mut(&node)?;
+        let resizing = slot.resized_at.is_some_and(|at| at.elapsed() < RESIZE_ECHO);
         let dirty = std::mem::take(&mut slot.dirty);
         let cmds = std::mem::take(&mut slot.cmds);
         let first_commit = dirty && !slot.committed;
@@ -849,10 +860,10 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
             slot.committed = true;
             e.first_commit = true;
         }
-        Some((dirty, cmds, first_commit, settling))
+        Some((dirty, cmds, first_commit, settling, resizing))
     });
     let mut changed = false;
-    if let Some((dirty, cmds, first_commit, settling)) = taken {
+    if let Some((dirty, cmds, first_commit, settling, resizing)) = taken {
         if dirty {
             apply_window_props(node, tx);
             sync_inputs(s);
@@ -864,6 +875,9 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
                 tx.animated();
                 if let Some(d) = engine::read(|e| e.color_motion) {
                     tx.color_motion(Spring::new(d, 0.0));
+                }
+                if resizing {
+                    tx.follows_resize();
                 }
             }
             changed = true;

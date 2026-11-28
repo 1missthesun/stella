@@ -149,6 +149,15 @@ pub fn command(s: &mut Win, tx: &mut Tx, rid: Option<u64>, cmd: &str, v: &Value)
             record(handle, s.node, dir, fps, seconds, shots, rid);
             Err(String::from("\u{0}pending"))
         }
+        #[cfg(target_os = "macos")]
+        "control.liveResize" => {
+            let handle = engine::read(|e| e.windows.get(&s.node).and_then(|w| w.handle.clone())).ok_or("window not open")?;
+            let number = handle.window_number().ok_or("window has no number")?;
+            let dx = v.get("dx").and_then(Value::as_f64).unwrap_or(-300.0);
+            let ms = v.get("ms").and_then(Value::as_f64).unwrap_or(2000.0).clamp(50.0, 20_000.0);
+            live_resize(number, dx, ms, rid)?;
+            Err(String::from("\u{0}pending"))
+        }
         other => Err(format!("unknown command {other}")),
     }
 }
@@ -363,4 +372,69 @@ fn record(handle: rune::WindowHandle, window: u32, dir: std::path::PathBuf, fps:
     if let Err(e) = spawned {
         engine::reply_any_thread(rid, Err(e.to_string()));
     }
+}
+
+/// A person dragging the window's right edge out by `dx` points and back on a half sine over
+/// `ms`, an event every 8 ms: AppKit's own live resize (`inLiveResize`), from mouse events
+/// posted to this app's queue, so the real pointer never moves. Replies when the drag is over.
+#[cfg(target_os = "macos")]
+#[allow(unsafe_code)]
+fn live_resize(number: u32, dx: f64, ms: f64, rid: Option<u64>) -> Result<(), String> {
+    use objc2::rc::{Retained, autoreleasepool};
+    use objc2::runtime::AnyObject;
+    use objc2::{class, msg_send};
+    use objc2_core_foundation::{CGPoint, CGRect};
+    const DOWN: usize = 1;
+    const UP: usize = 2;
+    const DRAGGED: usize = 6;
+    // SAFETY: AppKit reads on the main thread, where window commands run.
+    let size = unsafe {
+        let app: Retained<AnyObject> = msg_send![class!(NSApplication), sharedApplication];
+        let window: Option<Retained<AnyObject>> = msg_send![&*app, windowWithWindowNumber: number as isize];
+        let window = window.ok_or("no NSWindow with that number")?;
+        let frame: CGRect = msg_send![&*window, frame];
+        frame.size
+    };
+    let post = move |kind: usize, x: f64| {
+        autoreleasepool(|_| {
+            // SAFETY: NSEvent and NSApplication class methods; postEvent:atStart: may be called
+            // from any thread.
+            unsafe {
+                let info: Retained<AnyObject> = msg_send![class!(NSProcessInfo), processInfo];
+                let now: f64 = msg_send![&*info, systemUptime];
+                let at = CGPoint { x, y: size.height / 2.0 };
+                let event: Option<Retained<AnyObject>> = msg_send![class!(NSEvent),
+                    mouseEventWithType: kind, location: at, modifierFlags: 0usize, timestamp: now,
+                    windowNumber: number as isize, context: std::ptr::null_mut::<AnyObject>(), eventNumber: 0isize,
+                    clickCount: 1isize, pressure: if kind == UP { 0.0f32 } else { 1.0f32 }];
+                let app: Retained<AnyObject> = msg_send![class!(NSApplication), sharedApplication];
+                if let Some(event) = event {
+                    let _: () = msg_send![&*app, postEvent: &*event, atStart: false];
+                }
+            }
+        });
+    };
+    let edge = size.width + 2.0;
+    std::thread::Builder::new()
+        .name("stella-live-resize".into())
+        .spawn(move || {
+            let start = Instant::now();
+            post(DOWN, edge);
+            let mut steps = 0u32;
+            loop {
+                std::thread::sleep(Duration::from_millis(8));
+                let k = start.elapsed().as_secs_f64() * 1000.0 / ms;
+                if k >= 1.0 {
+                    break;
+                }
+                post(DRAGGED, edge + dx * (k * std::f64::consts::PI).sin());
+                steps += 1;
+            }
+            post(DRAGGED, edge);
+            std::thread::sleep(Duration::from_millis(8));
+            post(UP, edge);
+            engine::reply_any_thread(rid, Ok(json!({ "steps": steps })));
+        })
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }

@@ -45,8 +45,16 @@ export const COMPOSER_PAD_TOP = 4;
 export const COMPOSER_GAP = 8;
 const COMPOSER_PAD_X = 24;
 
+/** The extra inset `.composer-shell`'s `max-width: min(50rem, 100% - 48px)` puts inside the padded `.composer` column. */
+const COMPOSER_SHELL_INSET = 24;
+/**
+ * The column's side padding where the shell is capped: the cap's `100% - 48px` is laid out as padding, not
+ * worked out from a measured width, so the shell follows the window in the frame it resizes instead of a
+ * bridge round trip later.
+ */
+export const COMPOSER_CAPPED_PAD_X = COMPOSER_PAD_X + COMPOSER_SHELL_INSET;
 /** `.composer-shell` / `.composer-context-peek-anchor` max-width: `min(50rem, 100% - 48px)` of the padded `.composer` column. */
-export const composerShellMaxW = (composerW: number) => (composerW > 0 ? Math.min(COMPOSER_MAX_W, composerW - COMPOSER_PAD_X * 2 - 48) : COMPOSER_MAX_W);
+export const composerShellMaxW = (composerW: number) => (composerW > 0 ? Math.min(COMPOSER_MAX_W, composerW - COMPOSER_CAPPED_PAD_X * 2) : COMPOSER_MAX_W);
 const MENU_KEYS = ["ArrowUp", "ArrowDown", "Tab", "Escape", "Enter"];
 const STOP_KEYS = ["Escape"];
 const NO_KEYS: string[] = [];
@@ -236,10 +244,11 @@ function ComposerImpl({
   const look = composerShellLook(tokens);
   const mentionMarks = useMentionMarks(message, tokens);
   const narrow = composerW > 0 && composerW < COMPOSER_NARROW_W;
-  const shellMaxW = variant === "sidebar" || (variant === "full" && narrow) ? undefined : composerShellMaxW(composerW);
+  const capped = !(variant === "sidebar" || (variant === "full" && narrow));
+  const shellMaxW = capped ? COMPOSER_MAX_W : undefined;
   const column = sidebar
-    ? { gap: 6, pt: 4, pb: 8, px: variant === "sidebar-wide" ? COMPOSER_PAD_X : window.innerWidth <= COMPOSER_NARROW_W ? 6 : 12 }
-    : { gap: COMPOSER_GAP, pt: COMPOSER_PAD_TOP, pb: 10, px: narrow ? 8 : COMPOSER_PAD_X };
+    ? { gap: 6, pt: 4, pb: 8, px: capped ? COMPOSER_CAPPED_PAD_X : window.innerWidth <= COMPOSER_NARROW_W ? 6 : 12 }
+    : { gap: COMPOSER_GAP, pt: COMPOSER_PAD_TOP, pb: 10, px: capped ? COMPOSER_CAPPED_PAD_X : 8 };
   const radius = isExpanded || hasAttachedChips ? EXPANDED_RADIUS : MIN_COMPOSER_SHELL_HEIGHT / 2;
   const addMenu = <ComposerAddMenu title={t("app.chat.composer.add")} setChatContext={setChatContext} />;
   const hiddenFileInput = <ComposerAddMenu setChatContext={setChatContext} buttonHidden />;

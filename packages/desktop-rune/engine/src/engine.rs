@@ -32,6 +32,9 @@ pub struct WinSlot {
     pub fonts_applied: usize,
     pub families_applied: u64,
     pub size: Option<(f32, f32)>,
+    /// When the window's size last changed after it first laid out: the host's commits answering
+    /// a resize (layouts it measured, breakpoints) land with it until `windows::RESIZE_ECHO` after.
+    pub resized_at: Option<std::time::Instant>,
     pub focused: bool,
     /// What had focus at the window's last poll.
     pub focus: Option<crate::swap_view::Seen>,

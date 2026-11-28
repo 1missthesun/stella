@@ -604,6 +604,13 @@ that takes, and share it.
   `RUNE_OPEN_INACTIVE=1` alone shows the windows but never takes focus.
 - `engine.control.record(dir, {fps, seconds, window})` writes the presented frames to
   `dir/frame-NNNNN.png` and replies `{frames, asked, errors}` once all are written.
+- `POST /control/request {cmd:"control.liveResize", dx, ms, window}` (macOS) drags the window's
+  right edge out by `dx` points and back over `ms` as a person would: AppKit's own live resize,
+  from mouse events posted to the app, so the real pointer never moves. It replies `{steps}` when
+  the drag is over. Record the screen around it to check that layout follows the edge frame by
+  frame. During a resize and `windows::RESIZE_ECHO` after, the host's commits land with
+  `Tx::follows_resize`: what answers the new size (measured layout, `window.innerWidth`
+  breakpoints) lays out at once rather than springing behind the edge.
 - `STELLA_RUNE_APP=<path.tsx>` swaps the app entry (`demo/gallery/App.tsx` exercises everything
   here). An entry that exports `Root` renders its own `<window>`s; one that exports `App` is
   wrapped in `<window id="main">`.

@@ -14,6 +14,7 @@ import {
 import type { ClaudeLocalLogin, EngineConnection } from "@stella/contracts/backend/engines";
 import { readStoredClaudeLogin, type StoredClaudeLogin } from "@stella/contracts/claude-login";
 import { buildExternalCliChildEnv } from "@stella/node-shared/integrations/external-cli-resolution";
+import { effectiveClaudeConfigDir, readClaudeLogin } from "@stella/node-shared/integrations/claude-login-store";
 import type {
   ClaudeCliInstallProgress,
   ClaudeCliInstallResult,
@@ -45,34 +46,22 @@ type ConfigStatus = ClaudeLocalConfig & {
   createdAt: number;
 };
 
-/**
- * The login stored in a config directory, read from Claude Code's own file
- * without any secret leaving this function. Used when `claude auth status`
- * reports a different credential (a token in Claude Code's settings) than
- * the login Stella's turns run on. macOS keeps the login in the keychain,
- * where the status is read instead.
- */
 /** Claude Code's own default: `CLAUDE_CONFIG_DIR` when set, else ~/.claude. */
 const defaultConfigDir = (): string | null => process.env.CLAUDE_CONFIG_DIR?.trim() || null;
 
-const readStoredLogin = (dir: string | null): StoredClaudeLogin & { plan?: string } => {
-  let raw: string | null = null;
-  try {
-    raw = fs.readFileSync(
-      path.join(dir ?? defaultConfigDir() ?? path.join(homedir(), ".claude"), ".credentials.json"),
-      "utf8",
-    );
-  } catch {
-    return { present: false, alive: false };
-  }
-  const stored = readStoredClaudeLogin(raw);
-  let plan: string | undefined;
-  try {
-    plan = text((JSON.parse(raw) as { claudeAiOauth?: { subscriptionType?: unknown } }).claudeAiOauth?.subscriptionType);
-  } catch {
-    plan = undefined;
-  }
-  return { ...stored, ...(plan ? { plan } : {}) };
+/**
+ * The login stored for a config directory, read where Claude Code keeps it
+ * (on macOS the login keychain by path, not through the Keychain search list)
+ * without any secret leaving this function. Used when `claude auth status`
+ * reports a different credential (a token in Claude Code's settings), or none
+ * because its own Keychain lookup came back empty: the stored login is what
+ * Stella's turns run on (the runtime hands it to Claude Code).
+ */
+const readStoredLogin = async (dir: string | null): Promise<StoredClaudeLogin & { plan?: string }> => {
+  const stored = await readClaudeLogin(effectiveClaudeConfigDir(dir)).catch(() => null);
+  if (!stored) return { present: false, alive: false };
+  const plan = text(stored.oauth.subscriptionType);
+  return { ...readStoredClaudeLogin(JSON.stringify(stored.document)), ...(plan ? { plan } : {}) };
 };
 
 const storedEmail = (dir: string | null): string | undefined => {
@@ -222,7 +211,11 @@ export class ClaudeLocalAccounts {
   async noteRejected(configDir: string | null): Promise<void> {
     const found = (this.configs ?? []).find((entry) => entry.dir === configDir);
     if (!found) return;
-    const unreachable = (await claudeKeychainReach(configDir ?? defaultConfigDir())) === "unreachable";
+    // A login Stella can read by path is handed to Claude Code as it is, so a
+    // refusal of it is Anthropic's, whatever the Keychain search list says.
+    const unreachable =
+      !(await readStoredLogin(configDir)).present &&
+      (await claudeKeychainReach(configDir ?? defaultConfigDir())) === "unreachable";
     const config = (this.configs ?? []).find((entry) => entry.configId === found.configId);
     if (!config) return;
     if (unreachable) {
@@ -644,7 +637,7 @@ export class ClaudeLocalAccounts {
       plan = text(status.subscriptionType);
       loginExpiresAt = epochMs(status.loginExpiresAt);
     } else {
-      const stored = readStoredLogin(dir);
+      const stored = await readStoredLogin(dir);
       loggedIn = stored.alive;
       present = stored.present;
       email = storedEmail(dir);

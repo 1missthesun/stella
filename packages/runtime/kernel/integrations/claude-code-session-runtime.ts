@@ -57,6 +57,7 @@ import {
   stellaToolNameFromClaudeCode,
 } from "@stella/contracts/claude-code-tool-names";
 import { getClaudeCodeConfig } from "../storage/local-llm-credential-access.js";
+import { prepareClaudeHostLogin, CLAUDE_HOST_LOGIN_FD, type ClaudeHostLogin } from "./claude-code-host-login.js";
 import {
   claudeCliHasOption,
   claudeCliResumesAtMessage,
@@ -271,6 +272,8 @@ type ClaudeCodeProcessState = {
   lastEntryUuid?: string;
   handleLine?: (line: ClaudeStreamEvent) => "stop" | undefined;
   toolChannel?: ClaudeCodeToolControlChannel;
+  /** macOS: the login Stella hands this process and keeps fresh (claude-code-host-login.ts). */
+  hostLogin?: ClaudeHostLogin;
   adrift?: {
     lines: ClaudeStreamEvent[];
     woke: boolean;
@@ -2908,9 +2911,11 @@ class ClaudeCodeSessionRuntime {
           (session.backgroundTasks ?? 0) > 0 ||
           session.process.adrift !== undefined)
       ) {
+        await session.process.hostLogin?.sync();
         return session.process;
       }
       if (session.process.pending.length > 0) {
+        await session.process.hostLogin?.sync();
         return session.process;
       }
       this.resetStreamingProcess(request.sessionKey, session);
@@ -2932,13 +2937,26 @@ class ClaudeCodeSessionRuntime {
     );
     // Claude Code prefers an API key or an injected token over its own
     // login, so a stray one in the environment would run on something other
-    // than the login the user chose. Stella never injects a credential.
+    // than the login the user chose.
     delete childEnv.ANTHROPIC_API_KEY;
     delete childEnv.ANTHROPIC_AUTH_TOKEN;
     delete childEnv.CLAUDE_CODE_OAUTH_TOKEN;
+    // And what only goes with an injected token: its pipe, its plan, its wait.
+    for (const name of [
+      "CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR",
+      "CLAUDE_CODE_OAUTH_401_WAIT_MS",
+      "CLAUDE_CODE_SUBSCRIPTION_TYPE",
+      "CLAUDE_CODE_RATE_LIMIT_TIER",
+    ]) {
+      delete childEnv[name];
+    }
     if (claudeConfigDir) {
       childEnv.CLAUDE_CONFIG_DIR = claudeConfigDir;
     }
+    // On macOS Stella hands Claude Code that login itself (on a private pipe),
+    // so the Mac's Keychain search list never decides whether it is signed in.
+    const hostLogin = await prepareClaudeHostLogin(childEnv.CLAUDE_CONFIG_DIR || null);
+    if (hostLogin) Object.assign(childEnv, hostLogin.env);
     if (effortLevel) {
       childEnv.CLAUDE_CODE_EFFORT_LEVEL = effortLevel;
     }
@@ -2982,13 +3000,14 @@ class ClaudeCodeSessionRuntime {
         ...(resumeAt ? ["--resume-session-at", resumeAt] : []),
       ],
       {
-        stdio: ["pipe", "pipe", "pipe"],
+        stdio: hostLogin?.stdio ?? ["pipe", "pipe", "pipe"],
         detached: process.platform !== "win32",
         windowsHide: true,
         cwd: request.cwd,
         env: childEnv,
       },
-    );
+    ) as ClaudeCodeChild;
+    hostLogin?.handOver(child.stdio[CLAUDE_HOST_LOGIN_FD] as Writable | null | undefined);
     watchChildStdio(child, `claude-code ${request.sessionKey}`);
     trackAgentProcess(child, `claude-code ${request.sessionKey}`, {
       processGroup: process.platform !== "win32",
@@ -3009,7 +3028,11 @@ class ClaudeCodeSessionRuntime {
       cliIdentity,
       executable: executablePath,
       printed: false,
+      ...(hostLogin ? { hostLogin } : {}),
     };
+    hostLogin?.attach((line) => {
+      if (!processState.closed) child.stdin.write(`${line}\n`, () => {});
+    });
     if (mcpHost) {
       const channel = mcpHost.openControlChannel((line) => {
         if (!processState.closed) child.stdin.write(`${line}\n`, () => {});
@@ -3276,6 +3299,7 @@ class ClaudeCodeSessionRuntime {
         if (!parsedLine) {
           continue;
         }
+        if (processState.hostLogin?.handle(parsedLine)) continue;
         if (processState.toolChannel?.handle(parsedLine)) continue;
         if (
           this.holdAdrift(request.sessionKey, session, processState, parsedLine)
@@ -3309,6 +3333,7 @@ class ClaudeCodeSessionRuntime {
       if (!processState.printed) noteClaudeCliLaunchFailed(executablePath);
       processState.closed = true;
       processState.toolChannel?.close();
+      processState.hostLogin?.close();
       const ownsSessionProcess = session.process === processState;
       if (ownsSessionProcess) {
         resetSessionMcpClients(session, wrapped);
@@ -3335,6 +3360,7 @@ class ClaudeCodeSessionRuntime {
       endAdrift(processState);
       if (session.process === processState) releaseMcpTurnWaiters(session);
       processState.toolChannel?.close();
+      processState.hostLogin?.close();
       if (session.resumeReady) {
         try {
           request.onSessionCheckpoint?.({

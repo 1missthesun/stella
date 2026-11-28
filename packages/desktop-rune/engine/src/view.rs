@@ -311,7 +311,14 @@ pub fn handlers(mut e: El, n: u32, p: &Props, is_input: bool) -> El {
             "focusWithin" => e.on_focus_within_change(move |_s: &mut Win, within: bool, tx: &mut Tx| {
                 element_event(n, "focusWithin", json!({ "within": within }), Some(tx))
             }),
-            "layout" => e.on_layout(move |_s: &mut Win, r: [f32; 4]| element_event(n, "layout", json!({ "x": r[0], "y": r[1], "w": r[2], "h": r[3] }), None)),
+            // On a webview this takes the place of its slot's own layout handler (`webview::slot`).
+            "layout" => e.on_layout(move |s: &mut Win, r: [f32; 4]| {
+                #[cfg(feature = "webview")]
+                crate::webview::laid_out(n, s.node, r);
+                #[cfg(not(feature = "webview"))]
+                let _ = s;
+                element_event(n, "layout", json!({ "x": r[0], "y": r[1], "w": r[2], "h": r[3] }), None)
+            }),
             "farFromBottom" => {
                 let min = p.far_from_bottom.unwrap_or(180.0);
                 e.on_far_from_bottom(min, move |_s: &mut Win, far: bool| element_event(n, "farFromBottom", json!({ "far": far }), None))

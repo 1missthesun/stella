@@ -150,58 +150,92 @@ function rewriteGlobs(src: string, file: string): string {
   return hoisted.join("\n") + (hoisted.length ? "\n" : "") + out + src.slice(at);
 }
 
-export const viteCompat: BunPlugin = {
-  name: "stella-vite-compat",
-  setup(build) {
-    // The UI is a client, as in Chromium; Bun's `bun` condition would make the router a server.
-    build.onResolve({ filter: /^@tanstack\/router-core\/isServer$/ }, (args) => {
-      const pkg = Bun.resolveSync("@tanstack/router-core/package.json", args.importer);
-      return { path: join(dirname(pkg), "dist/esm/isServer/client.js") };
-    });
+const READY = slashed(resolve(import.meta.dir, "services/ui-ready.ts"));
+/** `import("./x")` / `import("@/x")` of a UI source module (not JSON, an asset or a query). */
+const DYNAMIC_IMPORT = /(?<![\w$.])import\(\s*(["'])((?:\.{1,2}|@)\/[^"'\n?]+?)\1\s*\)/g;
+const NOT_SOURCE = /\.(json|css)$|\.(png|jpe?g|gif|webp|avif|svg|ico|bmp|woff2?|ttf|otf|mp3|wav|ogg|m4a|mp4|webm|mov|wasm|pdf|txt|md|html)$/i;
 
-    build.onResolve({ filter: /^@\// }, (args) => {
-      const path = resolveSpecifier(args.path, args.importer);
-      return path ? { path: replacementFor(path, args.importer) ?? path } : undefined;
-    });
+/**
+ * The desktop UI is one bundle that holds every module it can import, yet Bun answers its
+ * `import()` a microtask later, and `React.lazy` suspends on that: each lazily imported viewer,
+ * dialog or tab showed nothing on its first open for React's fallback throttle (300 ms). Here an
+ * `import()` of a UI module takes the bundled module at once, as a settled thenable (ui-ready.ts)
+ * that React's `lazy` reads within the render. Type positions (`typeof import("./x")`,
+ * `import("./x").Name`) stay as they are. The helper's import goes last, keeping line numbers.
+ */
+function readyImports(src: string): string {
+  let n = 0;
+  const out = src.replace(DYNAMIC_IMPORT, (all: string, _quote: string, spec: string, at: number) => {
+    if (NOT_SOURCE.test(spec) || /\btypeof\s*$/.test(src.slice(Math.max(0, at - 24), at))) return all;
+    if (/^\s*\.\s*(?!(?:then|catch|finally)\b)[A-Za-z_$]/.test(src.slice(at + all.length, at + all.length + 40))) return all;
+    n++;
+    return `__stellaReadyImport(() => require(${JSON.stringify(spec)}))`;
+  });
+  return n ? `${out}\nimport { readyImport as __stellaReadyImport } from ${JSON.stringify(READY)};\n` : src;
+}
 
-    build.onResolve({ filter: /^\.\.?\// }, (args) => {
-      if (!args.importer.startsWith(DESKTOP_UI_SRC + sep)) return undefined;
-      const path = resolveSpecifier(args.path, args.importer);
-      const replacement = path && replacementFor(path, args.importer);
-      return replacement ? { path: replacement } : undefined;
-    });
+/**
+ * The Bun plugin for building desktop-ui's modules as Vite would. `readyImports` (the desktop
+ * UI bundle, which holds every module) settles `import()` of the UI's own modules at once.
+ */
+export function viteCompatPlugin(options: { readyImports?: boolean } = {}): BunPlugin {
+  return {
+    name: "stella-vite-compat",
+    setup(build) {
+      // The UI is a client, as in Chromium; Bun's `bun` condition would make the router a server.
+      build.onResolve({ filter: /^@tanstack\/router-core\/isServer$/ }, (args) => {
+        const pkg = Bun.resolveSync("@tanstack/router-core/package.json", args.importer);
+        return { path: join(dirname(pkg), "dist/esm/isServer/client.js") };
+      });
 
-    build.onResolve({ filter: /\?(url|raw|inline|worker|worker&url)$/ }, (args) => {
-      const [spec, query] = args.path.split("?");
-      const path = resolveSpecifier(spec, args.importer) ?? (spec.startsWith("/") ? spec : undefined);
-      return path ? { path, namespace: "vite-asset", pluginData: { query } } : undefined;
-    });
+      build.onResolve({ filter: /^@\// }, (args) => {
+        const path = resolveSpecifier(args.path, args.importer);
+        return path ? { path: replacementFor(path, args.importer) ?? path } : undefined;
+      });
 
-    build.onLoad({ filter: /.*/, namespace: "vite-asset" }, (args) => {
-      const query = (args as { pluginData?: { query?: string } }).pluginData?.query ?? "url";
-      if (query === "raw") return { contents: `export default ${JSON.stringify(readFileSync(args.path, "utf8"))};`, loader: "js" };
-      return { contents: assetUrl(args.path), loader: "js" };
-    });
+      build.onResolve({ filter: /^\.\.?\// }, (args) => {
+        if (!args.importer.startsWith(DESKTOP_UI_SRC + sep)) return undefined;
+        const path = resolveSpecifier(args.path, args.importer);
+        const replacement = path && replacementFor(path, args.importer);
+        return replacement ? { path: replacement } : undefined;
+      });
 
-    build.onLoad({ filter: /\.css$/ }, () => ({ contents: "export default {};", loader: "js" }));
+      build.onResolve({ filter: /\?(url|raw|inline|worker|worker&url)$/ }, (args) => {
+        const [spec, query] = args.path.split("?");
+        const path = resolveSpecifier(spec, args.importer) ?? (spec.startsWith("/") ? spec : undefined);
+        return path ? { path, namespace: "vite-asset", pluginData: { query } } : undefined;
+      });
 
-    build.onLoad({ filter: ASSET }, (args) => {
-      if (args.path.includes("/node_modules/") && !/\.(png|jpe?g|gif|webp|svg)$/i.test(args.path)) return undefined;
-      return { contents: assetUrl(args.path), loader: "js" };
-    });
+      build.onLoad({ filter: /.*/, namespace: "vite-asset" }, (args) => {
+        const query = (args as { pluginData?: { query?: string } }).pluginData?.query ?? "url";
+        if (query === "raw") return { contents: `export default ${JSON.stringify(readFileSync(args.path, "utf8"))};`, loader: "js" };
+        return { contents: assetUrl(args.path), loader: "js" };
+      });
 
-    build.onLoad({ filter: SOURCE }, (args) => {
-      const src = readFileSync(args.path, "utf8");
-      const ownPaths = MODULE_PATHS.test(src);
-      if (/[\\/]node_modules[\\/]/.test(args.path) && !ownPaths) return undefined;
-      const glob = src.includes("import.meta.glob");
-      const env = src.includes("import.meta.env");
-      if (!glob && !env && !ownPaths) return undefined;
-      let contents = glob ? rewriteGlobs(src, args.path) : src;
-      if (env) contents = contents.replace(/\bimport\.meta\.env\b/g, `(${JSON.stringify(viteEnv())})`);
-      if (ownPaths) contents = relocateModulePaths(contents, args.path, REPO_ROOT, AT_APP);
-      const ext = args.path.match(SOURCE)![1];
-      return { contents, loader: (ext === "mjs" ? "js" : ext) as "ts" | "tsx" | "js" | "jsx" };
-    });
-  },
-};
+      build.onLoad({ filter: /\.css$/ }, () => ({ contents: "export default {};", loader: "js" }));
+
+      build.onLoad({ filter: ASSET }, (args) => {
+        if (args.path.includes("/node_modules/") && !/\.(png|jpe?g|gif|webp|svg)$/i.test(args.path)) return undefined;
+        return { contents: assetUrl(args.path), loader: "js" };
+      });
+
+      build.onLoad({ filter: SOURCE }, (args) => {
+        const src = readFileSync(args.path, "utf8");
+        const ownPaths = MODULE_PATHS.test(src);
+        if (/[\\/]node_modules[\\/]/.test(args.path) && !ownPaths) return undefined;
+        const glob = src.includes("import.meta.glob");
+        const env = src.includes("import.meta.env");
+        const ready = !!options.readyImports && src.includes("import(");
+        if (!glob && !env && !ownPaths && !ready) return undefined;
+        let contents = glob ? rewriteGlobs(src, args.path) : src;
+        if (ready) contents = readyImports(contents);
+        if (env) contents = contents.replace(/\bimport\.meta\.env\b/g, `(${JSON.stringify(viteEnv())})`);
+        if (ownPaths) contents = relocateModulePaths(contents, args.path, REPO_ROOT, AT_APP);
+        const ext = args.path.match(SOURCE)![1];
+        return { contents, loader: (ext === "mjs" ? "js" : ext) as "ts" | "tsx" | "js" | "jsx" };
+      });
+    },
+  };
+}
+
+export const viteCompat: BunPlugin = viteCompatPlugin();

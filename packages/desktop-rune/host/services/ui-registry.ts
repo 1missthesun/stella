@@ -18,6 +18,7 @@ import type * as ReactNS from "react";
 import path from "node:path";
 import { evaluateInScope, mapFileLines, type UiScope } from "./ui-scope";
 import { declaredExports, DEPS_KEY, type DepsInfo, type ModuleNode } from "./ui-modules-format";
+import { Ready } from "./ui-ready";
 
 type React = typeof ReactNS;
 type Factory = (exports: object, require: Require, module: { exports: any }, filename: string, dirname: string) => void;
@@ -433,15 +434,12 @@ export function createUiRegistry(options: UiRegistryOptions) {
     return entry.cjs ? entry.instance!.module.exports : entry.facade;
   }
 
-  /** `import()` of a UI module, loaded now: an already-fulfilled thenable that `use()` reads on the same render. */
+  /** `import()` of a UI module, loaded now: a settled thenable that `use()` and the UI's `lazy` read on the same render (ui-ready.ts). */
   function dynamic(id: string): PromiseLike<unknown> {
     try {
-      const value = resolve(id);
-      return Object.assign(Promise.resolve(value), { status: "fulfilled", value });
+      return Ready.resolve(resolve(id));
     } catch (error) {
-      const rejected = Object.assign(Promise.reject(error), { status: "rejected", reason: error });
-      rejected.catch(() => {});
-      return rejected;
+      return Ready.reject(error);
     }
   }
 

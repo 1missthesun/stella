@@ -3,7 +3,7 @@
 // also runs one of these, at low priority, to write the boot bundle (ui-cache.ts) once builds settle.
 
 import path from "node:path";
-import { viteCompat } from "../vite-compat";
+import { viteCompatPlugin } from "../vite-compat";
 import { writeUiCache, type UiCacheSpec } from "./ui-cache";
 import { uiBuildMode } from "./ui-mode";
 import { buildModules, writeModulesFiles } from "./ui-modules-build";
@@ -18,13 +18,16 @@ export type UiBuildReply =
 const send = (reply: UiBuildReply) => process.send!(reply);
 const rssMb = () => process.memoryUsage().rss / 1048576;
 
+/** The UI as one bundle holds every module it imports, so its `import()`s settle at once (vite-compat.ts). */
+const bundlePlugin = viteCompatPlugin({ readyImports: true });
+
 const bundle = (spec: UiCacheSpec, extra: Record<string, unknown>) => Bun.build({
   entrypoints: [spec.entry],
   external: spec.external,
   target: "bun",
   format: "cjs",
   tsconfig: spec.tsconfig,
-  plugins: [viteCompat],
+  plugins: [bundlePlugin],
   jsx: { development: uiBuildMode() === "development" },
   metafile: true,
   ...extra,

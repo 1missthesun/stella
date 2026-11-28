@@ -160,6 +160,11 @@ thread_local! {
     static VIEWS: RefCell<HashMap<u32, View>> = RefCell::new(HashMap::new());
     /// Views placed before their window had a native handle, with where they go.
     static WAITING: RefCell<HashMap<u32, (u32, [f32; 4])>> = RefCell::new(HashMap::new());
+    /// Views started at their slot's laid-out rect before it was drawn there (`slot`), with their
+    /// window and that rect: they load hidden while the slot is on its way (a viewer opening).
+    static EARLY: RefCell<HashMap<u32, (u32, [f32; 4])>> = RefCell::new(HashMap::new());
+    /// Where each frame draws each webview's slot (`El::drawn_rect_into`), read when its page loads.
+    static DRAWN: RefCell<HashMap<u32, rune::Live<[f32; 4]>>> = RefCell::new(HashMap::new());
 }
 
 static PENDING: Mutex<Option<HashMap<u64, RequestAsyncResponder>>> = Mutex::new(None);
@@ -357,16 +362,61 @@ fn shape(n: u32, window: u32, r: [f32; 4]) -> Option<Shape> {
 
 /// The slot element: an empty box whose drawn rect the WebView follows, showing the page's
 /// snapshot while an overlay covers or backs it.
+///
+/// Its drawn rect is reported once every motion of it and its ancestors rests, including the
+/// tail of an opening viewer's fade, most of a second after the fade looks done. So a slot's
+/// first WebView starts at the slot's laid-out rect as soon as layout places it, loads hidden,
+/// and shows when its page has loaded if the slot is drawn there by then (an opacity fade moves
+/// nothing); otherwise the drawn rect shows it where it rests.
 pub fn slot(n: u32) -> El {
     let e = match COVERS.with(|c| c.borrow().get(&n).cloned()) {
         Some(pixels) => el().pixels(&pixels),
         None => el(),
     };
-    e.on_drawn_layout_tx(move |s: &mut Win, r: [f32; 4], tx: &mut rune::Tx| {
-        tx.live_only();
-        place(n, s.node, r);
-        reconcile(s.node);
-    })
+    let drawn = DRAWN.with(|d| d.borrow_mut().entry(n).or_insert_with(|| rune::Live::new([0.0; 4])).clone());
+    e.drawn_rect_into(&drawn)
+        .on_layout_tx(move |s: &mut Win, r: [f32; 4], tx: &mut rune::Tx| {
+            tx.live_only();
+            laid_out(n, s.node, r);
+        })
+        .on_drawn_layout_tx(move |s: &mut Win, r: [f32; 4], tx: &mut rune::Tx| {
+            tx.live_only();
+            EARLY.with(|e| e.borrow_mut().remove(&n));
+            place(n, s.node, r);
+            reconcile(s.node);
+        })
+}
+
+/// Node `n` was laid out at `r` in `window`: a webview with no WebView yet starts it there,
+/// hidden, unless it shows nowhere yet, and one started early follows its layout. (An element's
+/// `layout` handler calls this too, since a webview that reports its layout to the UI has that
+/// handler in place of its slot's.)
+pub fn laid_out(n: u32, window: u32, r: [f32; 4]) {
+    if r[2] < 1.0 || r[3] < 1.0 || WAITING.with(|w| w.borrow().contains_key(&n)) {
+        return;
+    }
+    let early = EARLY.with(|e| e.borrow().contains_key(&n));
+    if !early && VIEWS.with(|v| v.borrow().contains_key(&n)) {
+        return;
+    }
+    if !early && (!engine::read(|e| e.tree.get(n).is_some_and(|node| node.kind == crate::props::Kind::Webview)) || unseen(n)) {
+        return;
+    }
+    EARLY.with(|e| e.borrow_mut().insert(n, (window, r)));
+    place(n, window, r);
+}
+
+/// Node `n`'s page loaded: a WebView started early shows now if its slot is drawn where it was
+/// laid out, within the half point Rune's drawn reports tell apart.
+fn loaded(n: u32) {
+    let Some((window, r)) = EARLY.with(|e| e.borrow().get(&n).copied()) else { return };
+    let Some(drawn) = DRAWN.with(|d| d.borrow().get(&n).map(|l| l.get())) else { return };
+    if drawn.iter().zip(r).any(|(a, b)| (a - b).abs() > 0.5) {
+        return;
+    }
+    EARLY.with(|e| e.borrow_mut().remove(&n));
+    place(n, window, drawn);
+    reconcile(window);
 }
 
 thread_local! {
@@ -745,11 +795,43 @@ fn create(n: u32, window: u32, p: &Props, r: [f32; 4]) -> Result<WebView, String
     build(n, window, p, r, WebViewBuilder::new(), &p.protocols)
 }
 
+/// Starts WebView2 a second after the main window first commits, so the first page anyone opens
+/// (the welcome guide, a canvas, an app) doesn't wait seconds for it. The warm controller keeps
+/// WebView2's browser and one renderer up until the first view, the memory Electron spends on
+/// Chromium from launch; a launch with no page open still shows as soon as without it.
+#[cfg(target_os = "windows")]
+pub fn prewarm(window: u32, tx: &mut rune::Tx) {
+    const AFTER: std::time::Duration = std::time::Duration::from_secs(1);
+    thread_local! {
+        static SINCE: std::cell::Cell<Option<Option<std::time::Instant>>> = const { std::cell::Cell::new(None) };
+    }
+    let since = match SINCE.get() {
+        Some(None) => return,
+        Some(Some(at)) => at,
+        None => {
+            if !engine::read(|e| e.windows.get(&window).is_some_and(|w| w.committed)) || hwnd_of(window).0.is_null() {
+                return;
+            }
+            let now = std::time::Instant::now();
+            SINCE.set(Some(Some(now)));
+            now
+        }
+    };
+    match AFTER.checked_sub(since.elapsed()) {
+        Some(left) if !left.is_zero() => tx.wake_after(left),
+        _ => {
+            SINCE.set(Some(None));
+            win_env::ready(hwnd_of(window));
+        }
+    }
+}
+
 /// WebView2 takes seconds to start cold: its environment, then the browser and renderer the
 /// first controller brings up. wry would do both inside `build_as_child`, blocking the UI thread,
 /// so the engine starts the environment asynchronously with the options wry would set, warms it
-/// with a hidden controller in the view's window, and holds views back until then (they wait
-/// like views whose window has no native handle yet). Views share the environment; the warm
+/// with a hidden controller in the main window (`prewarm`, or the first view's window if that
+/// comes sooner), and holds views back until then (they wait like views whose window has no
+/// native handle yet). Views share the environment; the warm
 /// controller closes once the first view is up. If the environment fails, wry makes its own.
 #[cfg(target_os = "windows")]
 mod win_env {
@@ -884,6 +966,7 @@ fn build(n: u32, window: u32, p: &Props, r: [f32; 4], b: WebViewBuilder<'_>, sch
             page_event(n, "load", json!({ "phase": phase, "url": scheme_url::from_view(&load_protocols, &url) }));
             if matches!(ev, PageLoadEvent::Finished) {
                 reback(live(n));
+                loaded(live(n));
             }
         });
     #[cfg(target_os = "linux")]
@@ -1284,7 +1367,7 @@ pub fn place(n: u32, window: u32, r: [f32; 4]) {
             let _ = view.view.set_bounds(rect(window, r));
             view.rect = r;
         }
-        let hidden = r[2] < 1.0 || r[3] < 1.0 || shape.is_none() || view.covered || unseen;
+        let hidden = r[2] < 1.0 || r[3] < 1.0 || shape.is_none() || view.covered || unseen || EARLY.with(|e| e.borrow().contains_key(&n));
         if view.zoomed_at != (k, z) {
             view.zoomed_at = (k, z);
             zoom(view, k, z);
@@ -2237,6 +2320,8 @@ fn expire_parked() {
 
 /// Drops the WebView (and its web process) of a removed node.
 pub fn close(n: u32) {
+    EARLY.with(|e| e.borrow_mut().remove(&n));
+    DRAWN.with(|d| d.borrow_mut().remove(&n));
     let gone = VIEWS.with(|v| v.borrow_mut().remove(&n));
     #[cfg(target_os = "linux")]
     crate::webview_input::forget(n);

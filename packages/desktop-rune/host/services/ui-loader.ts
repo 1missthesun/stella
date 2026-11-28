@@ -21,6 +21,7 @@ import { holdBuild } from "./source-stamps";
 import { bootMark } from "./boot-trace";
 import { uiBuildMode } from "./ui-mode";
 import { createUiRegistry, type SwapResult, type UiRegistry } from "./ui-registry";
+import { installReadyLazy } from "./ui-ready";
 import { DEPS_KEY, HELPERS_KEY, MODULES_LINES, type ModulesBootFile, type ModulesBuild, type ModulesLines } from "./ui-modules-format";
 
 const CHILD = path.join(import.meta.dir, "ui-build-child.ts");
@@ -76,6 +77,8 @@ export function createUiLoader(options: UiLoaderOptions) {
   /** Whether the next load is one bundle. */
   const bundleNext = () => modulesFrom === "never" || (modulesFrom === "swap" && loads <= 1 && !registry);
   const hostRequire = createRequire(options.requireFrom ?? options.entry);
+  // A lazy component over a module the UI already holds renders on its first render (ui-ready.ts).
+  installReadyLazy(hostRequire("react"));
   let nextId = 0;
   let child: Child | null = null;
   let idleTimer: ReturnType<typeof setTimeout> | null = null;

@@ -898,6 +898,8 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
     crate::control::tick(s, tx);
     if s.main {
         crate::views::poll(tx);
+        #[cfg(all(feature = "webview", target_os = "windows"))]
+        crate::webview::prewarm(s.node, tx);
     }
     #[cfg(feature = "webview")]
     if crate::webview::active() {

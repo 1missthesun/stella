@@ -3266,12 +3266,12 @@ export class NodeReplKernelRegistry {
     if (!onHeld) return await observe();
     let told = false;
     const tell = () => {
-      const held = !cell.outcome && cell.kernel.held;
+      const held = !cell.outcome && cell.kernel.awaitingUser;
       if (held === told) return;
       told = held;
       onHeld(held);
     };
-    const stop = cell.kernel.onHeldChange(tell);
+    const stop = cell.kernel.onAwaitingUserChange(tell);
     tell();
     try {
       return await observe();

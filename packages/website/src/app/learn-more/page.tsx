@@ -18,7 +18,6 @@ import {
   Zap,
 } from "lucide-react";
 import { DownloadButton } from "@/components/download-button";
-import { WindowsInstallNote } from "@/components/windows-install-note";
 import { Her, Me, MockChat, MockStage, Stamp, Task } from "@/components/landing/chat-mock";
 import { Finale } from "@/components/landing/closing";
 import { InView } from "@/components/landing/in-view";
@@ -171,9 +170,6 @@ export default function LearnMore() {
           <Link className={pg.secondary} href="/chat">
             Open Stella
           </Link>
-        </div>
-        <div className={pg.note}>
-          <WindowsInstallNote />
         </div>
         <p className={pg.reassure}>{PRICE_LINE}</p>
         <nav className={lm.index} aria-label="Learn More sections">

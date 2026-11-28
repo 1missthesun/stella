@@ -2,7 +2,6 @@ import { PRICE_LINE } from "@/lib/answers";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Bell, CalendarClock, Cpu, FileText, KeyRound } from "lucide-react";
-import { WindowsInstallNote } from "@/components/windows-install-note";
 import { Card, Her, Me, MockChat, MockStage, Stamp, Task } from "@/components/landing/chat-mock";
 import { Finale } from "@/components/landing/closing";
 import { PageShell } from "@/components/landing/page-shell";
@@ -33,7 +32,6 @@ export default function OneChatPage() {
             </>
           }
           note={PRICE_LINE}
-          after={<WindowsInstallNote />}
         />
       }
     >

@@ -10,7 +10,7 @@ import { LinkedText } from "@/components/landing/linked-text";
 import f from "@/components/landing/faq.module.css";
 import { HeroMascot } from "@/components/problems/hero-mascot";
 import h from "@/components/problems/how.module.css";
-import { ModelStrip } from "@/components/problems/model-strip";
+import { ModelStrip, PlanCallout } from "@/components/problems/model-strip";
 import { BackLink, GuideGrid, HeroCta, HowTitle, PromptCard } from "@/components/problems/how-ui";
 import { StellaDemo } from "@/components/stella-demo/stella-demo";
 import {
@@ -102,7 +102,11 @@ export default async function ProblemPageRoute({ params }: Params) {
             <HowTitle text={page.h1} />
             <p className={h.sub}>{page.lede}</p>
             <HeroCta />
-            {niche.recommended ? <ModelStrip recommended={niche.recommended} className={h.models} /> : null}
+            {niche.needsTopModel ? (
+              <PlanCallout recommended={niche.recommended} className={h.plan} />
+            ) : niche.recommended ? (
+              <ModelStrip recommended={niche.recommended} className={h.models} />
+            ) : null}
           </header>
 
           <Stage page={page} />

@@ -82,6 +82,17 @@
   animation: rise 1100ms cubic-bezier(0.2, 1, 0.3, 1) 240ms both;
 }
 
+.hero .plan {
+  margin-top: clamp(36px, 5.5svh, 60px);
+  animation: rise 1100ms cubic-bezier(0.2, 1, 0.3, 1) 240ms both;
+}
+
+@media (max-width: 640px) {
+  .hero .plan {
+    margin-top: 32px;
+  }
+}
+
 .heroMascot {
   display: none;
 }

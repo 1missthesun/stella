@@ -5,7 +5,6 @@ import { notFound } from "next/navigation";
 import { ArrowRight, Check, Search } from "lucide-react";
 import { CopyPromptButton } from "@/components/copy-prompt-button";
 import { DownloadButton } from "@/components/download-button";
-import { WindowsInstallNote } from "@/components/windows-install-note";
 import { Her, Me, MockChat, MockStage } from "@/components/landing/chat-mock";
 import { Finale } from "@/components/landing/closing";
 import { InView } from "@/components/landing/in-view";
@@ -60,7 +59,6 @@ export default async function FixPage({
           body="Download Stella for Mac or Windows and tell it what's broken."
           actions={<Link href="/fix">More things Stella fixes</Link>}
           note={PRICE_LINE}
-          after={<WindowsInstallNote />}
         />
       }
     >
@@ -76,9 +74,6 @@ export default async function FixPage({
             See pricing
             <ArrowRight size={16} />
           </Link>
-        </div>
-        <div className={pg.note}>
-          <WindowsInstallNote />
         </div>
         <p className={pg.reassure}>{PRICE_LINE}</p>
       </section>

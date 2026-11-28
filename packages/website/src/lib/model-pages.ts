@@ -346,7 +346,7 @@ export const MODEL_PAGES_DATA: ModelPage[] = [
     guides: ["game-mods/mod-skyrim", "game-mods/mod-gta-5", "game-mods/gta-5-mods-not-working", "game-mods/mod-baldurs-gate-3", "game-mods/ai-mod-maker", "game-mods/install-minecraft-mods"],
     questions: [
       { q: "Can AI make a mod?", a: "Yes. Describe it, play it and ask for changes. See [AI mod maker](/how/game-mods/ai-mod-maker)." },
-      { q: "Are there GTA 6 mods?", a: "GTA 6 is on PS5 and Xbox; today's [GTA 6 mods](/how/game-mods/gta-6-mods) are for GTA 5 on PC." },
+      { q: "Are there GTA 6 mods?", a: "Yes. GTA 6 already runs on PC through fan-made ports, and the first [GTA 6 mods](/how/game-mods/gta-6-mods), like mod menus, are out." },
     ],
   },
   {

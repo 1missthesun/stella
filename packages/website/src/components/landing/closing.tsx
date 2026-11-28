@@ -104,13 +104,11 @@ export function Finale({
   body,
   actions,
   note = "Free.",
-  after,
 }: {
   title?: ReactNode;
   body?: ReactNode;
   actions?: ReactNode;
   note?: ReactNode;
-  after?: ReactNode;
 }) {
   return (
     <section id="get" className={`${o.finale} ${l.invert}`} data-tone="dark" data-bg="#060609" aria-labelledby="get-title">
@@ -133,7 +131,6 @@ export function Finale({
         <DownloadButton />
         <span className={o.free}>{note}</span>
       </div>
-      {after ? <div className={o.after}>{after}</div> : null}
       <div className={o.stores}>
         <a href={APP_STORE_URL} target="_blank" rel="noopener noreferrer">
           iPhone

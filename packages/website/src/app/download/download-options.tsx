@@ -11,7 +11,6 @@ import {
   type Platform,
 } from "@/components/download-button";
 import { reportGoogleAdsDownload } from "@/components/google-ads-tag";
-import { WindowsInstallNote } from "@/components/windows-install-note";
 import pg from "@/components/landing/page.module.css";
 import { INSTALL_COMMAND } from "@/lib/downloads";
 import d from "./download.module.css";
@@ -150,9 +149,6 @@ export function DownloadOptions() {
           <DownloadButton />
         </div>
         <p className={pg.reassure}>No credit card, no trial.</p>
-        <div className={pg.note}>
-          <WindowsInstallNote />
-        </div>
       </section>
 
       <section className={d.list} data-tone="light" data-bg="#ffffff" aria-labelledby="all-downloads">

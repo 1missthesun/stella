@@ -13,7 +13,6 @@ type Status = "idle" | "playing" | "paused" | "done";
 
 export function StellaDemoPlayer({ steps, theme = "dark", label }: { steps: DemoStep[]; theme?: "dark" | "light"; label: string }) {
   const items = chatItems(steps);
-  const task = steps.find((step): step is Extract<DemoStep, { task: string }> => "task" in step);
   const frameRef = useRef<HTMLElement>(null);
   const parts = useRef<Partial<DemoParts>>({ rows: new Map() });
   const playerRef = useRef<DemoPlayer | null>(null);
@@ -155,44 +154,6 @@ export function StellaDemoPlayer({ steps, theme = "dark", label }: { steps: Demo
                 </div>
               </div>
 
-              {task ? (
-                <div
-                  data-component="popover-content"
-                  className={`shell-topbar-activity-menu-popover ${s.menu}`}
-                  ref={(el) => void (parts.current.menu = el ?? undefined)}
-                  aria-hidden="true"
-                  hidden
-                >
-                  <div className="shell-topbar-activity-menu">
-                    <div className="sidebar-search">
-                      <div className="sidebar-search__body">
-                        <section className="chat-workspace-strip__section">
-                          <div className="chat-workspace-strip__section-body">
-                            <div className={`chat-workspace-strip__task-row ${s.taskRow}`} data-status="running" ref={(el) => void (parts.current.taskRow = el ?? undefined)}>
-                              <div className="chat-workspace-strip__task-row-head">
-                                <span className="chat-workspace-strip__task-button">
-                                  <span className="chat-workspace-strip__task-icon-wrap">
-                                    <span className={s.taskIcon} data-icon="running">
-                                      <AppIcon name="CircleDot" size={15} />
-                                    </span>
-                                    <span className={s.taskIcon} data-icon="done">
-                                      <AppIcon name="CheckCircle2" size={15} />
-                                    </span>
-                                  </span>
-                                  <span className="chat-workspace-strip__task-label" ref={(el) => void (parts.current.taskLabel = el ?? undefined)}>
-                                    {task.task}
-                                  </span>
-                                </span>
-                              </div>
-                              <ul className={`chat-workspace-strip__task-progress ${s.progress}`} ref={(el) => void (parts.current.progress = el ?? undefined)} />
-                            </div>
-                          </div>
-                        </section>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              ) : null}
             </div>
           </div>
         </div>

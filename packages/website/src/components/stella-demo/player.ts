@@ -30,10 +30,6 @@ export type DemoParts = {
   dockField: HTMLElement;
   dockForm: HTMLElement;
   dockSubmit: HTMLElement;
-  menu?: HTMLElement;
-  taskRow?: HTMLElement;
-  taskLabel?: HTMLElement;
-  progress?: HTMLElement;
   indicatorMark: RefObject<StellaMarkHandle | null>;
   topMark: RefObject<StellaMarkHandle | null>;
   replay?: () => void;
@@ -62,10 +58,8 @@ const PACE = {
   firstReplyAfterSend: 1900,
   ackAfterSend: 2900,
   taskBeforeAck: 650,
-  menuAfterAck: 700,
-  rowEvery: 1500,
-  doneAfterLastRow: 1300,
-  menuCloseAfterDone: 650,
+  workPerRow: 1800,
+  workMin: 4000,
   replyAfterDone: 1900,
   cardAfterReply: 700,
   readPerWord: 150,
@@ -373,33 +367,6 @@ export function playDemo(steps: DemoStep[], parts: DemoParts, onStatus: (status:
     );
   };
 
-  const openMenu = () => {
-    const menu = p.menu;
-    if (!menu) return;
-    menu.hidden = false;
-    animate(menu, [{ opacity: 0, transform: "translateY(-2px) scale(0.98)" }, { opacity: 1, transform: "none" }], { duration: 160, easing: SWAP_EASE });
-  };
-  const closeMenu = () => {
-    const menu = p.menu;
-    if (!menu || menu.hidden) return;
-    animate(menu, [{ opacity: 1 }, { opacity: 0, transform: "translateY(-2px) scale(0.98)" }], { duration: 140, easing: "ease-in", fill: "forwards" }).finished.then(
-      () => {
-        if (!destroyed) menu.hidden = true;
-      },
-      () => undefined,
-    );
-  };
-  const addProgress = (text: string) => {
-    const list = p.progress;
-    if (!list) return;
-    list.querySelector("[data-newest]")?.removeAttribute("data-newest");
-    const item = document.createElement("li");
-    item.className = "chat-workspace-strip__task-progress-item";
-    item.dataset.newest = "true";
-    item.textContent = text;
-    list.append(item);
-  };
-
   const setCaption = (text: string) => {
     const host = p.caption;
     const old = host.firstElementChild as HTMLElement | null;
@@ -429,10 +396,6 @@ export function playDemo(steps: DemoStep[], parts: DemoParts, onStatus: (status:
     setField(p.dockField, p.dockForm, p.dockSubmit, "", false);
     p.topLabel.hidden = true;
     p.topLabel.innerHTML = "";
-    if (p.menu) p.menu.hidden = true;
-    if (p.progress) p.progress.innerHTML = "";
-    if (p.taskRow) p.taskRow.dataset.status = "running";
-    if (p.taskLabel) shimmer(p.taskLabel, p.taskLabel.textContent ?? "", 20);
     p.caption.innerHTML = "";
     p.scroller.scrollTop = 0;
     p.topMark.current?.setState("idle");
@@ -513,22 +476,8 @@ export function playDemo(steps: DemoStep[], parts: DemoParts, onStatus: (status:
         at(t, () => showTask(title));
         t += PACE.taskBeforeAck;
       }
-      t += PACE.menuAfterAck;
-      at(t, openMenu);
-      for (const row of step.rows) {
-        t += PACE.rowEvery;
-        at(t, () => addProgress(row));
-      }
-      t += PACE.doneAfterLastRow;
-      at(t, () => {
-        if (p.taskRow) p.taskRow.dataset.status = "completed";
-        if (p.taskLabel) unshimmer(p.taskLabel);
-      });
-      t += PACE.menuCloseAfterDone;
-      at(t, () => {
-        closeMenu();
-        settleTask();
-      });
+      t += Math.max(PACE.workMin, step.rows.length * PACE.workPerRow);
+      at(t, settleTask);
       afterTask = true;
       return;
     }

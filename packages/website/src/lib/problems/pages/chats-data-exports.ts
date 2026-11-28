@@ -110,36 +110,37 @@ export const CHATS_DATA_EXPORTS_PAGES: ProblemPage[] = [
     ],
     title: "See who doesn't follow you back on Instagram, without an app",
     description:
-      "See who doesn't follow you back on Instagram without an unfollower app or handing over your password. Stella (stella.sh) compares the lists for you.",
+      "See who doesn't follow you back on Instagram without an unfollower app. Stella (stella.sh) gets your followers data in your own browser and compares the lists.",
     h1: "See who doesn't follow you back on Instagram",
     short: "Who doesn't follow you back",
     lede: "Find the people you follow who don't follow you back",
     answer:
-      "Download your followers data from Instagram, then ask Stella (stella.sh) who doesn't follow you back. It compares both lists on your computer, so no unfollower app gets your password.",
+      "Ask Stella (stella.sh). It requests your followers data from Instagram in the browser you're signed in to, downloads the zip when it's ready and compares both lists on your computer. No unfollower app gets your password.",
     gets: [
+      "Your Instagram data requested and downloaded for you",
       "Everyone who doesn't follow back, A to Z",
       "A link to each profile",
       "Waiting follow requests kept off the list",
     ],
     prompt:
-      "I downloaded my Instagram data, it's the zip in my Downloads. Who do I follow that doesn't follow me back? Save the names in a file.",
+      "Get my followers data from Instagram, then tell me who I follow that doesn't follow me back. Save the names in a file.",
     demo: {
-      ack: "Let me check your two lists.",
+      ack: "On it. Asking Instagram for your data first.",
       task: "Who doesn't follow you back",
-      rows: ["Reading the 380 accounts you follow", "Reading all 1,288 followers"],
+      rows: ["Requesting your data from Instagram", "Downloading the zip when it's ready", "Comparing 380 follows with 1,288 followers"],
       reply:
         "**52 accounts** you follow don't follow you back. The list is in your Downloads, A to Z, with a link to each profile.",
       files: ["instagram-not-following-back.txt"],
     },
     faq: [
+      ["How long does Instagram take to send the data?", "Minutes, sometimes hours. Stella waits and downloads it when it's ready."],
+      ["I already downloaded my data.", "Tell Stella where the zip is and it goes straight to comparing."],
       ["How do I see who unfollowed me on Instagram without an app?", "Download your followers now and again later. Anyone in the older list but missing from the newer one has unfollowed you."],
-      ["Which JSON files have my followers?", "following.json is who you follow. Followers are split across followers_1.json, followers_2.json and so on, so check them all."],
     ],
     byHand: [
       "Instagram profile, menu, Accounts Center, Your information and permissions, Download your information. Pick Followers and following, JSON, All time.",
       "Unzip it and open connections/followers_and_following.",
-      "In Google Sheets, look up each name in following.json among the followers files. Names not found don't follow back.",
-      "recently_unfollowed_profiles.json is accounts you unfollowed, not people who unfollowed you.",
+      "In Google Sheets, look up each name in following.json among all the followers_*.json files. Names not found don't follow back.",
     ],
     related: [
       "chats-data-exports/read-facebook-messages-from-data-download",
@@ -147,7 +148,7 @@ export const CHATS_DATA_EXPORTS_PAGES: ProblemPage[] = [
       "photos-files/fix-google-takeout-photo-dates",
     ],
     platforms: ["windows", "mac", "linux"],
-    lastChecked: "2026-11-24",
+    lastChecked: "2026-11-27",
   }),
   shortGuide({
     slug: "see-your-spotify-listening-history",

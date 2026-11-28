@@ -90,11 +90,6 @@
   color: rgba(10, 10, 13, 0.55);
 }
 
-.note {
-  width: min(520px, 100%);
-  margin-top: 18px;
-}
-
 .split {
   display: grid;
   grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.1fr);

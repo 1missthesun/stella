@@ -87,3 +87,57 @@
     content: none;
   }
 }
+
+.plan {
+  max-width: 34rem;
+  padding-top: clamp(22px, 3svh, 30px);
+  border-top: 1px solid rgba(10, 10, 13, 0.12);
+  font-family: var(--l-sans);
+  color: #0a0a0d;
+}
+
+.plan .planTitle {
+  margin: 0;
+  font-size: clamp(23px, 2.1vw, 30px);
+  font-weight: 700;
+  line-height: 1.12;
+  letter-spacing: -0.035em;
+  text-wrap: balance;
+}
+
+.plan .planBody {
+  max-width: 40ch;
+  margin: 10px 0 0;
+  font-size: clamp(16px, 1.2vw, 18px);
+  font-weight: 480;
+  line-height: 1.45;
+  letter-spacing: -0.012em;
+  color: rgba(10, 10, 13, 0.62);
+}
+
+.planList {
+  margin-top: 18px;
+  gap: 10px 0;
+  font-size: 18px;
+  letter-spacing: -0.015em;
+  color: rgba(10, 10, 13, 0.55);
+}
+
+.planList .logo {
+  width: 18px;
+  height: 18px;
+}
+
+.planList .model + .model::before {
+  margin: 0 14px;
+}
+
+.planList .pick {
+  font-size: 14.5px;
+}
+
+@media (max-width: 640px) {
+  .planList {
+    gap: 10px 18px;
+  }
+}

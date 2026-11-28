@@ -4,6 +4,7 @@ export const NICHES: Niche[] = [
   {
     slug: "game-mods",
     recommended: "claude",
+    needsTopModel: true,
     name: "Game mods",
     h1: "Game mods, installed and working.",
     title: "Game mods: get them in your game, fixed or made for you",
@@ -44,6 +45,7 @@ export const NICHES: Niche[] = [
   {
     slug: "apps",
     recommended: "claude",
+    needsTopModel: true,
     name: "Your own apps",
     h1: "Little apps, made just for you.",
     title: "Make your own app without coding: trackers, planners, tools",
@@ -61,6 +63,7 @@ export const NICHES: Niche[] = [
   {
     slug: "websites",
     recommended: "claude",
+    needsTopModel: true,
     name: "Your own website",
     h1: "Your own website, without code.",
     title: "Make a website without code: portfolio, wedding or business",
@@ -113,6 +116,7 @@ export const NICHES: Niche[] = [
   {
     slug: "emulation",
     recommended: "gemini",
+    needsTopModel: true,
     name: "Emulators and retro games",
     h1: "Console and retro games, on your computer.",
     title: "Emulators made easy: Switch, PS2, PS3, 3DS, GameCube, RetroArch",
@@ -130,6 +134,7 @@ export const NICHES: Niche[] = [
   {
     slug: "local-ai",
     recommended: "claude",
+    needsTopModel: true,
     name: "Local AI and ComfyUI",
     h1: "AI that runs on your own computer.",
     title: "Local AI made easy: ComfyUI, Ollama and models on your PC",
@@ -149,6 +154,7 @@ export const NICHES: Niche[] = [
   {
     slug: "pc-gaming",
     recommended: "claude",
+    needsTopModel: true,
     name: "PC and gaming fixes",
     h1: "A PC that runs games smoothly.",
     title: "PC gaming fixes: FPS drops, stutter, crashes, drivers, temps",
@@ -168,6 +174,7 @@ export const NICHES: Niche[] = [
   {
     slug: "game-servers",
     recommended: "claude",
+    needsTopModel: true,
     name: "Game servers and Discord",
     h1: "A server for you and your friends.",
     title: "Game servers made easy: Minecraft, Palworld, Valheim, Discord",
@@ -203,6 +210,7 @@ export const NICHES: Niche[] = [
   {
     slug: "make-games",
     recommended: "claude",
+    needsTopModel: true,
     name: "Make your own game",
     h1: "Your own game, from your idea.",
     title: "Make your own game without coding: Roblox, Ren'Py, browser games",
@@ -221,6 +229,7 @@ export const NICHES: Niche[] = [
   {
     slug: "sideloading",
     recommended: "gemini",
+    needsTopModel: true,
     name: "Phone, VR and console mods",
     h1: "Apps and mods on your phone, headset and console.",
     title: "Sideloading made easy: iPhone, Android, Quest and handhelds",
@@ -600,6 +609,7 @@ export const NICHES: Niche[] = [
   {
     slug: "torrenting",
     recommended: "gemini",
+    needsTopModel: true,
     name: "Torrenting",
     h1: "Torrents, set up, fixed and automated.",
     title: "Torrenting made easy: set up, fixed and sorted",
@@ -611,6 +621,7 @@ export const NICHES: Niche[] = [
   {
     slug: "reverse-engineering",
     recommended: "gemini",
+    needsTopModel: true,
     name: "Reverse engineering",
     h1: "Programs, games and files, taken apart.",
     title: "Reverse engineering made easy: just ask",

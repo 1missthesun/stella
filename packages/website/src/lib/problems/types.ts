@@ -41,4 +41,5 @@ export type Niche = {
   intro: string;
   sections?: { title: string; slugs: string[] }[];
   recommended?: "claude" | "gemini" | "chatgpt";
+  needsTopModel?: boolean;
 };

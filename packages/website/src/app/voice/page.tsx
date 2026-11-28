@@ -1,7 +1,6 @@
 import { PRICE_LINE } from "@/lib/answers";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { WindowsInstallNote } from "@/components/windows-install-note";
 import { Finale } from "@/components/landing/closing";
 import { PageShell } from "@/components/landing/page-shell";
 import pg from "@/components/landing/page.module.css";
@@ -23,7 +22,6 @@ export default function VoicePage() {
           title="Type less. Say more."
           body="Whether it's a quick note or a full conversation, Stella's ready the second you start talking — hands-free, on every computer."
           note={PRICE_LINE}
-          after={<WindowsInstallNote />}
         />
       }
     >

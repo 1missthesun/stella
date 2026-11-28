@@ -8,7 +8,7 @@ import { LandingHeader } from "@/components/landing/landing-header";
 import l from "@/components/landing/landing.module.css";
 import { HeroMascot } from "@/components/problems/hero-mascot";
 import h from "@/components/problems/how.module.css";
-import { ModelStrip } from "@/components/problems/model-strip";
+import { ModelStrip, PlanCallout } from "@/components/problems/model-strip";
 import { BackLink, GuideGrid, HeroCta, HowTitle } from "@/components/problems/how-ui";
 import {
   HOW_INDEX_PATH,
@@ -92,7 +92,11 @@ export default async function NicheHub({ params }: Params) {
             <HowTitle text={niche.h1} />
             <p className={h.sub}>{niche.intro.split(/(?<=\.) /)[0]}</p>
             <HeroCta />
-            {niche.recommended ? <ModelStrip recommended={niche.recommended} className={h.models} /> : null}
+            {niche.needsTopModel ? (
+              <PlanCallout recommended={niche.recommended} className={h.plan} />
+            ) : niche.recommended ? (
+              <ModelStrip recommended={niche.recommended} className={h.models} />
+            ) : null}
           </header>
 
           {nicheSections(niche).map((group, i) =>

@@ -134,28 +134,6 @@
   flex-direction: column;
 }
 
-.menu {
-  position: absolute;
-  top: 0;
-  left: 50%;
-  z-index: 30;
-  translate: -50% 0;
-}
-
-.taskIcon {
-  display: inline-flex;
-}
-
-.taskRow[data-status="running"] .taskIcon[data-icon="done"],
-.taskRow[data-status="completed"] .taskIcon[data-icon="running"] {
-  display: none;
-}
-
-.progress {
-  margin: 4px 0 2px;
-  padding-left: 31px;
-}
-
 .controls {
   display: flex;
   justify-content: flex-end;

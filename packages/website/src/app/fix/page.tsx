@@ -3,7 +3,6 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { DownloadButton } from "@/components/download-button";
-import { WindowsInstallNote } from "@/components/windows-install-note";
 import { Finale } from "@/components/landing/closing";
 import { InView } from "@/components/landing/in-view";
 import { PageShell } from "@/components/landing/page-shell";
@@ -37,9 +36,6 @@ export default function FixIndexPage() {
             Step-by-step guides
             <ArrowRight size={16} />
           </Link>
-        </div>
-        <div className={pg.note}>
-          <WindowsInstallNote />
         </div>
         <p className={pg.reassure}>{PRICE_LINE}</p>
       </section>

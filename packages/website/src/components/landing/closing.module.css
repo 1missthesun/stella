@@ -354,13 +354,6 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.4);
 }
 
-.after {
-  position: relative;
-  width: min(520px, 100%);
-  margin-top: 22px;
-  color: rgba(255, 255, 255, 0.75);
-}
-
 .getRow > a:not(:global(.button--download)) {
   display: inline-flex;
   align-items: center;

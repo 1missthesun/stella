@@ -17,6 +17,10 @@ final class Menus: NSObject, UIEditMenuInteractionDelegate {
     // A menu still open is closed unpicked before the next one opens.
     if pending != nil { answer(nil) }
     let items = m["items"] as? [[String: Any]] ?? []
+    if let sheet = m["sheet"] as? [String: Any] {
+      presentSheet(sheet, items, rid)
+      return true
+    }
     guard let view = App.shared.rune, !items.isEmpty else {
       Pickers.reply(rid, nil)
       return true
@@ -36,6 +40,37 @@ final class Menus: NSObject, UIEditMenuInteractionDelegate {
     Haptics.play("medium")
     interaction?.presentEditMenu(with: UIEditMenuConfiguration(identifier: nil, sourcePoint: CGPoint(x: x, y: y)))
     return true
+  }
+
+  /// `sheet` on a `menu.popup`: the items as an action sheet or an alert (UIAlertController), the
+  /// way packages/mobile asks with ActionSheetIOS and Alert: a title, a message, the items (one may be
+  /// destructive) and a cancel button that answers null.
+  private func presentSheet(_ sheet: [String: Any], _ items: [[String: Any]], _ rid: UInt64?) {
+    var top = App.shared.window?.rootViewController
+    while let next = top?.presentedViewController { top = next }
+    guard let top else {
+      Pickers.reply(rid, nil)
+      return
+    }
+    let style: UIAlertController.Style = (sheet["alert"] as? Bool) == true ? .alert : .actionSheet
+    let title = sheet["title"] as? String
+    let message = sheet["message"] as? String
+    let alert = UIAlertController(title: title?.isEmpty == false ? title : nil, message: message?.isEmpty == false ? message : nil, preferredStyle: style)
+    let destructive = sheet["destructive"] as? String
+    for it in items where it["type"] as? String != "separator" && (it["visible"] as? Bool) != false {
+      let id = it["id"] as? String
+      let action = UIAlertAction(title: it["label"] as? String ?? "", style: id != nil && id == destructive ? .destructive : .default) { _ in Pickers.reply(rid, id) }
+      action.isEnabled = (it["enabled"] as? Bool) != false
+      alert.addAction(action)
+    }
+    alert.addAction(UIAlertAction(title: sheet["cancel"] as? String ?? "Cancel", style: .cancel) { _ in Pickers.reply(rid, nil) })
+    // An iPhone's sheet rises from the bottom, as ActionSheetIOS's does; only an iPad's needs a point to pop from.
+    if UIDevice.current.userInterfaceIdiom == .pad {
+      alert.popoverPresentationController?.sourceView = top.view
+      alert.popoverPresentationController?.sourceRect = CGRect(x: top.view.bounds.midX, y: top.view.bounds.midY, width: 0, height: 0)
+    }
+    Haptics.play("light")
+    top.present(alert, animated: true)
   }
 
   /// The dev driver's `menu?pick=N`: picks the open menu's Nth item (in reading order), as a tap would.

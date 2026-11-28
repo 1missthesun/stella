@@ -66,8 +66,17 @@ fn fit(p: &Props) -> SurfaceFit {
     }
 }
 
+/// Device pixels per point an `<image>` decodes for: phones draw at 3×, the desktop's screens at 2×.
+const DECODE_SCALE: f32 = if cfg!(any(target_os = "ios", target_os = "android")) { 3.0 } else { 2.0 };
+
+/// The decoded image for `src` with its longest side about `size` points; one decode per size
+/// bucket, so a photo first drawn as a small peek isn't reused at that size on a larger tile.
 pub fn load(eng: &Engine, src: &str, size: f32) -> Option<rune::image::Image> {
-    if let Some(img) = IMAGES.with(|m| m.borrow().get(src).cloned()) {
+    let size = size.max(16.0);
+    // Buckets of 32 pt keep a resized element from decoding again for every few points.
+    let bucket = (size / 32.0).ceil() * 32.0;
+    let key = if src.starts_with("blob:") { src.to_owned() } else { format!("{src}\u{1}{bucket}") };
+    if let Some(img) = IMAGES.with(|m| m.borrow().get(&key).cloned()) {
         return Some(img);
     }
     let img = CACHE.with(|c| {
@@ -78,14 +87,15 @@ pub fn load(eng: &Engine, src: &str, size: f32) -> Option<rune::image::Image> {
             return Some(cache.load(bytes));
         }
         let path = src.strip_prefix("file://").unwrap_or(src);
-        Some(cache.file(path, size.max(16.0), 2.0))
+        // At most 2048 px on its longest side, as before, however large it draws.
+        Some(cache.file(path, bucket, DECODE_SCALE.min((2048.0 / bucket).max(1.0))))
     })?;
     IMAGES.with(|m| {
         let mut m = m.borrow_mut();
         if m.len() >= MAX_IMAGES {
             m.clear();
         }
-        m.insert(src.to_owned(), img.clone());
+        m.insert(key, img.clone());
     });
     Some(img)
 }
@@ -162,9 +172,18 @@ fn note_drawn(n: u32, window: u32, rect: [f32; 4], natural: [f32; 2], cover: boo
 /// at once it has laid out, the first raster until that one lands.
 pub fn image(eng: &Engine, n: u32, p: &Props) -> El {
     let Some(src) = p.src.as_deref() else { return el() };
-    let size = match &p.w {
-        Some(crate::props::Size::Pt(w)) => *w,
-        _ => 64.0,
+    // The longest side it draws at; a cover-fitted image crops its long side, so it decodes half
+    // again as large to keep a wide photo's short side sharp.
+    let side = |s: &Option<crate::props::Size>| match s {
+        Some(crate::props::Size::Pt(v)) => Some(*v),
+        _ => None,
+    };
+    let size = match (side(&p.w), side(&p.h)) {
+        (Some(w), Some(h)) if !matches!(p.fit.as_deref(), Some("contain") | Some("stretch")) => w.max(h) * 1.5,
+        (Some(w), Some(h)) => w.max(h),
+        (Some(w), None) => w,
+        (None, Some(h)) => h,
+        (None, None) => 64.0,
     };
     let Some(img) = load(eng, src, size) else { return el() };
     let svg = is_svg(eng, src);

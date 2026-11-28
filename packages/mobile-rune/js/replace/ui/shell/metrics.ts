@@ -3,5 +3,5 @@
 export const SHELL_TOPBAR_HEIGHT = 38;
 /** `--shell-topbar-panel-controls-width`. */
 export const SHELL_TOPBAR_PANEL_CONTROLS_WIDTH = 76;
-/** The chat starts just under the phone's 52pt top bar, without the desktop's tall gap. */
-export const CHAT_TOP_PAD = 52 + 20;
+/** packages/mobile ChatPane: the list starts 84 pt under its 42 pt top bar (LIST_TOP_GAP). */
+export const CHAT_TOP_PAD = 42 + 84;

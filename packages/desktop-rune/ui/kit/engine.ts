@@ -1,4 +1,4 @@
-import type { engine as BridgeEngine, MenuItem } from "../../host/bridge";
+import type { engine as BridgeEngine, MenuItem, MenuSheet } from "../../host/bridge";
 
 export type NativeMenuItem = MenuItem;
 
@@ -22,7 +22,7 @@ export const engine = {
   background(color: string) {
     setTimeout(() => void api()?.background(color).catch(() => {}), 0);
   },
-  popupMenu(items: NativeMenuItem[], at: { window?: string; x?: number; y?: number; anchor?: string }): Promise<string | null> {
+  popupMenu(items: NativeMenuItem[], at: { window?: string; x?: number; y?: number; anchor?: string; sheet?: MenuSheet }): Promise<string | null> {
     return api()?.menu.popup(items, at) ?? Promise.resolve(null);
   },
   async writeText(text: string): Promise<boolean> {

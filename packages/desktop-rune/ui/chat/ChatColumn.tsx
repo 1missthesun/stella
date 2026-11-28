@@ -28,6 +28,7 @@ import { Icon, Icons, withStroke } from "../kit";
 import { derive, mix, useTokens } from "../theme";
 import { UnderGlassContext, type LegendContentStyle } from "./ChatTimeline";
 import { CHAT_TOP_PAD, SHELL_TOPBAR_HEIGHT } from "../shell/metrics";
+import { onPhone } from "../shell/phone";
 import { AdaptiveGlass, chromeGlass, composerGroupGlass, GlassSheen, useGlassBackdrop } from "../shell/glass";
 import { useFileDrop } from "./use-file-drop";
 import { COMPOSER_GAP, COMPOSER_NARROW_W, COMPOSER_PAD_TOP, composerShellMaxW } from "./Composer";
@@ -278,7 +279,8 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
   );
   const composerArea = useComposerAreaReport();
   const [composerStackH, setComposerStackH] = useState(0);
-  const contentStyle = useMemo<LegendContentStyle>(() => ({ ...FULL_CHAT_CONTENT_STYLE, paddingBottom: CONTENT_PAD_BOTTOM + composerStackH - COMPOSER_OVERLAP }), [composerStackH]);
+  // packages/mobile's chat list sits 12 pt from the screen's sides (CHAT_HORIZONTAL_INSET).
+  const contentStyle = useMemo<LegendContentStyle>(() => ({ ...FULL_CHAT_CONTENT_STYLE, ...(onPhone() ? { paddingLeft: 12, paddingRight: 12 } : {}), paddingBottom: CONTENT_PAD_BOTTOM + composerStackH - COMPOSER_OVERLAP }), [composerStackH]);
   const { isDragOver, dropHandlers } = useFileDrop({ setChatContext: composer.setChatContext });
 
   const replyComposerRef = useRef(composer);
@@ -373,7 +375,8 @@ export const ChatColumn = memo(function ChatColumn({ conversation, composer, scr
             </col>
           </col>
         </col>
-        <ChatScrollbar bind={bindThumb} onDrag={handleThumbDrag} />
+        {/* A phone scrolls by touch and shows no scroll bar, as packages/mobile's lists don't. */}
+        {onPhone() ? null : <ChatScrollbar bind={bindThumb} onDrag={handleThumbDrag} />}
       </row>
     </row>
   );

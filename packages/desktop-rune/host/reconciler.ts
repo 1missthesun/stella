@@ -401,11 +401,11 @@ const config: any = {
   shouldSetTextContent: (type: string, props: any) => type === "text" || (textOf(props.children) !== undefined && type !== "row" && type !== "col" && type !== "box" && type !== "window"),
   appendInitialChild: (p: Instance, c: Instance) => ops.append(p.id, c.id),
   appendChild: (p: Instance, c: Instance) => ops.append(p.id, c.id),
-  appendChildToContainer: (_: Container, c: Instance) => ops.append(0, c.id),
+  appendChildToContainer: (p: Container | Instance, c: Instance) => ops.append(p.id, c.id),
   insertBefore: (p: Instance, c: Instance, b: Instance) => ops.insert(p.id, c.id, b.id),
-  insertInContainerBefore: (_: Container, c: Instance, b: Instance) => ops.insert(0, c.id, b.id),
+  insertInContainerBefore: (p: Container | Instance, c: Instance, b: Instance) => ops.insert(p.id, c.id, b.id),
   removeChild: (p: Instance, c: Instance) => { release(c); ops.remove(p.id, c.id); },
-  removeChildFromContainer: (_: Container, c: Instance) => { release(c); ops.remove(0, c.id); },
+  removeChildFromContainer: (p: Container | Instance, c: Instance) => { release(c); ops.remove(p.id, c.id); },
   commitUpdate(inst: Instance, _type: string, _old: any, next: any) {
     const json = serialize(inst, next);
     if (json !== inst.json) { inst.json = json; ops.props(inst.id, json); }
@@ -482,6 +482,15 @@ export const batched = (fn: () => void) => reconciler.batchedUpdates(fn, null);
 /** Renders `children` (a `<window>`) as a root child from anywhere in the tree, keeping context. */
 export function windowPortal(children: ReactNode, key?: string | null): ReactNode {
   return reconciler.createPortal(children, container, null, key ?? null) as unknown as ReactNode;
+}
+
+/**
+ * Renders `children` inside the host element `host` (a ref's current) from anywhere in the tree,
+ * keeping context: for content that must sit outside an ancestor's transform or clip (the phone's
+ * drawers beside its sliding page). `host` renders no React children of its own.
+ */
+export function elementPortal(children: ReactNode, host: HostElement, key?: string | null): ReactNode {
+  return reconciler.createPortal(children, host, null, key ?? null) as unknown as ReactNode;
 }
 
 const prefixed = (prefix: string, id: unknown) => {

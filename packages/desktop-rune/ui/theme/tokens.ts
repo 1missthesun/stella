@@ -1,3 +1,4 @@
+import { onPhone } from "../shell/phone";
 import { deriveTokens, parseColorOr, THEME_CSS_VARS, type ThemeColors, type ThemeTokens } from "@stella/theme";
 import { hex, mix } from "./color";
 
@@ -162,6 +163,11 @@ export function buildTokens(input: { themeId: string; colors: ThemeColors; dark:
     menuHighlight: mix(t.foreground, 7, "transparent"),
     scrim: hex("rgba(0,0,0,0.35)"),
   };
+  // The phone app's dark page is true black, as the React Native app draws it (OLED); its surfaces keep the theme's.
+  if (dark && onPhone()) {
+    c.background = "#000000";
+    c.surfaceBase = "#000000";
+  }
   const vars: Record<string, string> = {};
   for (const [name, key] of THEME_CSS_VARS) vars[name] = t[key];
   for (const [k, v] of Object.entries(c)) if (!(camelToVar(k) in vars)) vars[camelToVar(k)] = v;
@@ -171,7 +177,8 @@ export function buildTokens(input: { themeId: string; colors: ThemeColors; dark:
   vars["--text-error"] = t.destructive;
   vars["--diff-add"] = t.success;
   vars["--diff-del"] = t.destructive;
-  vars["--sidebar"] = t.background;
+  vars["--sidebar"] = c.background;
+  vars["--background"] = c.background;
   vars["--sidebar-foreground"] = t.foreground;
   vars["--sidebar-primary"] = t.primary;
   vars["--sidebar-accent"] = t.muted;
@@ -183,7 +190,7 @@ export function buildTokens(input: { themeId: string; colors: ThemeColors; dark:
     material,
     colors,
     c,
-    shadow: shadows(dark, t.background, c.ring),
+    shadow: shadows(dark, c.background, c.ring),
     gradient: {
       overlay: vertical(c.overlayTop, c.overlayBottom),
       glass: vertical(c.glassTop, c.glassBottom),

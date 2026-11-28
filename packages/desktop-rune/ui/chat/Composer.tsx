@@ -38,6 +38,7 @@ const MemoComposerSubmitButton = memo(ComposerSubmitButton);
 
 export const COMPOSER_MAX_W = 800;
 export const MIN_COMPOSER_SHELL_HEIGHT = 46;
+const PHONE_PILL_H = 56;
 const EXPANDED_RADIUS = 20;
 const SHELL_SPRING = { dur: 0.35, bounce: 0 };
 const LINE = fontSize.md * 1.5;
@@ -171,7 +172,8 @@ function ComposerImpl({
   };
 
   const composerState = deriveComposerState({ message, chatContext, selectedText, conversationId, requireConversationId: !sidebar });
-  const placeholder = t(composerState.placeholderKey);
+  // The phone says what packages/mobile's chat does ("Message Stella") where the desktop says "Do anything".
+  const placeholder = t(onPhone() && composerState.placeholderKey === "app.chat.composer.placeholder.default" ? "mobile.chat.composerPlaceholder" : composerState.placeholderKey);
   const dictationInFlight = dictation.isRecording || dictation.isTranscribing;
   const canSubmitWithDictation = canSubmit || dictationInFlight;
   useDictationPaste({ active: dictationInFlight, setMessage, setChatContext });
@@ -242,7 +244,9 @@ function ComposerImpl({
   const column = sidebar
     ? { gap: 6, pt: 4, pb: 8, px: variant === "sidebar-wide" ? COMPOSER_PAD_X : window.innerWidth <= COMPOSER_NARROW_W ? 6 : 12 }
     : { gap: COMPOSER_GAP, pt: COMPOSER_PAD_TOP, pb: 10, px: narrow ? 8 : COMPOSER_PAD_X };
-  const radius = isExpanded || hasAttachedChips ? EXPANDED_RADIUS : MIN_COMPOSER_SHELL_HEIGHT / 2;
+  // packages/mobile's pill is 56 pt tall (formPill: minHeight 56, 11 pt above and below its 32 pt controls).
+  const pillH = onPhone() ? PHONE_PILL_H : MIN_COMPOSER_SHELL_HEIGHT;
+  const radius = isExpanded || hasAttachedChips ? EXPANDED_RADIUS : pillH / 2;
   const addMenu = <ComposerAddMenu title={t("app.chat.composer.add")} setChatContext={setChatContext} />;
   const hiddenFileInput = <ComposerAddMenu setChatContext={setChatContext} buttonHidden />;
   const field = (
@@ -300,7 +304,8 @@ function ComposerImpl({
             />
             {showRealtimeVoice ? <ComposerRealtimeVoiceButton active={Boolean(uiState.isVoiceRtcActive)} onPress={toggleRealtimeVoice} /> : null}
           </row>
-          {showRealtimeVoice ? null : <MemoComposerSubmitButton disabled={!canSubmitWithDictation} animated onPress={submitComposer} />}
+          {/* packages/mobile's pill composer shows its send button only once there is something to send. */}
+          {showRealtimeVoice || (onPhone() && !isExpanded && !canSubmitWithDictation) ? null : <MemoComposerSubmitButton disabled={!canSubmitWithDictation} animated onPress={submitComposer} />}
         </>
       )}
     </row>
@@ -314,7 +319,7 @@ function ComposerImpl({
         id={sidebar ? undefined : COMPOSER_GLASS_ID}
         w="full"
         maxW={shellMaxW}
-        minH={MIN_COMPOSER_SHELL_HEIGHT}
+        minH={pillH}
         pad={1}
         radius={radius}
         clip={radius}
@@ -337,7 +342,7 @@ function ComposerImpl({
         ) : null}
         <BrowserAttachmentTray />
         <col w="full" gap={isExpanded ? 8 : 0} role="form" label="chat-composer">
-          <row w="full" align="center" gap={8} minH={isExpanded ? undefined : 44} py={isExpanded ? 0 : 6} px={isExpanded ? 0 : sidebar ? 6 : 8}>
+          <row w="full" align="center" gap={8} minH={isExpanded ? undefined : pillH - 2} py={isExpanded ? 0 : onPhone() ? 11 : 6} px={isExpanded ? 0 : sidebar ? 6 : 8}>
             {isExpanded ? hiddenFileInput : <box key="add">{addMenu}</box>}
             {field}
             {isExpanded ? null : hiddenFileInput}

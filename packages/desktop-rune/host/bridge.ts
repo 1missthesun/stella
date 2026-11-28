@@ -273,6 +273,9 @@ export async function listen(extra?: (e: EngineEvent) => void) {
 
 // ---------------------------------------------------------------- typed engine API
 
+/** The phone's way to show a pop-up menu: iOS's action sheet or alert, with a title and message (a desktop shows the plain menu). */
+export type MenuSheet = { title?: string; message?: string; destructive?: string; cancel?: string; alert?: boolean };
+
 export type MenuItem = {
   id?: string; label?: string; type?: "normal" | "separator" | "checkbox" | "radio" | "submenu";
   enabled?: boolean; checked?: boolean; visible?: boolean; accelerator?: string; role?: string; submenu?: MenuItem[];
@@ -351,8 +354,8 @@ export function engineApi(request: <T = void>(cmd: string, args?: Record<string,
     },
     menu: {
       /** A native pop-up menu at a window point, or under an element (`anchor` = its `id`). Resolves with the picked id. */
-      popup: (items: MenuItem[], at: { window?: string; x?: number; y?: number; anchor?: string }) =>
-        request<string | null>("menu.popup", { items, window: at.window, x: at.x, y: at.y, target: at.anchor }),
+      popup: (items: MenuItem[], at: { window?: string; x?: number; y?: number; anchor?: string; sheet?: MenuSheet }) =>
+        request<string | null>("menu.popup", { items, window: at.window, x: at.x, y: at.y, target: at.anchor, ...(at.sheet ? { sheet: at.sheet } : {}) }),
       /** The macOS menu bar from an Electron-style template (top-level submenus; `role: "appMenu"` is the app menu). Picks arrive as `menu` events. A no-op off macOS. */
       setApplicationMenu: (items: MenuItem[] | null) => request("menu.setApplicationMenu", { items: items ?? [] }),
     },

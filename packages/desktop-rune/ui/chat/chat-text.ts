@@ -1,5 +1,6 @@
 import { createContext, useContext } from "react";
 import { CHAT_TEXT, CHAT_TEXT_COMPACT, type ChatText } from "../kit";
+import { onPhone } from "../shell/phone";
 
 /** `.chat-viewport-region`'s `--chat-text-*` metrics as an engine text look. */
 export const CHAT_TEXT_LOOK = {
@@ -55,4 +56,14 @@ const SIDEBAR_LOOK: ChatSurfaceLook = {
   assistant: { radius: 14, maxW: "85%", py: 6, px: 12 },
 };
 
-export const useChatSurfaceLook = (): ChatSurfaceLook => (useContext(ChatVariantContext) === "sidebar" ? SIDEBAR_LOOK : FULL_LOOK);
+/** packages/mobile's chat (MessageRow, AssistantMarkdown): 17 pt text at 1.52, the assistant's bubble as wide as the column, the user's up to 92%. */
+const PHONE_TEXT: ChatText = { ...CHAT_TEXT, size: 17, lineHeight: 1.52 };
+const PHONE_LOOK: ChatSurfaceLook = {
+  text: textLook(PHONE_TEXT),
+  line: textLook(PHONE_TEXT).lineHeight,
+  markdown: { ...PHONE_TEXT, strongWeight: STREAMDOWN_BOLD },
+  user: { radius: 18, maxW: "92%", py: 6, px: 14 },
+  assistant: { radius: 18, maxW: "100%", py: 9, px: 14 },
+};
+
+export const useChatSurfaceLook = (): ChatSurfaceLook => (useContext(ChatVariantContext) === "sidebar" ? SIDEBAR_LOOK : onPhone() ? PHONE_LOOK : FULL_LOOK);

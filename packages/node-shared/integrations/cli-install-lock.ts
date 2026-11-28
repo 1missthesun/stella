@@ -2,6 +2,8 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import type { ExternalCli } from "./external-cli-resolution.js";
+// Dependency-free: install-agent-clis.mjs loads this while the first `bun install` is still running.
+import { setTimeout as sleep } from "node:timers/promises";
 
 /**
  * A first install has the launcher install Claude Code and Google Antigravity
@@ -68,7 +70,7 @@ export const waitForCliInstall = async (
 ): Promise<boolean> => {
   if (!cliInstallInProgress(cli)) return false;
   while (cliInstallInProgress(cli) && !signal?.aborted) {
-    await new Promise((resolve) => setTimeout(resolve, POLL_MS));
+    await sleep(POLL_MS);
   }
   return true;
 };

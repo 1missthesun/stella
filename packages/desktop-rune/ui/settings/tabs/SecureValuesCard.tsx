@@ -45,9 +45,13 @@ export function SecureValuesCard() {
     }
   }, [t]);
 
+  // Synced logins can arrive while this is open (this device just joined, or
+  // another device saved one), so the list follows the sync's state.
+  const syncedAt = sync?.lastSyncedAt;
+  const standing = sync?.standing;
   useEffect(() => {
     void load();
-  }, [load]);
+  }, [load, syncedAt, standing]);
 
   const toggleSync = useCallback(
     async (enabled: boolean) => {

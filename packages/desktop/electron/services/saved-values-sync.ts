@@ -853,7 +853,7 @@ export class SavedValuesSync {
           ...(state.joinPaused === "removed"
             ? { removed: true }
             : state.joinPaused === "skipped"
-              ? { skipped: true }
+              ? { skipped: true, approvers: this.approverNames(state, roster, remote, now) }
               : { declined: true }),
         },
         devices: [],

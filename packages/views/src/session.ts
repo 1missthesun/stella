@@ -42,9 +42,34 @@ export interface ViewStorage {
   clear(): Promise<void>;
   /** Changes made elsewhere (another device, another window), when the platform syncs them. */
   subscribe?(listener: (key: string, value: unknown) => void): () => void;
+  /** What went wrong keeping a change (a server refused it), when the platform syncs storage. */
+  onProblem?(listener: (message: string) => void): () => void;
 }
 
 export type ViewCallContext = { viewId: string; title: string };
+
+/**
+ * Calls that act as the user (a chat turn): each needs a press, submit or key the user made in the
+ * view within the last few seconds, takes that gesture, and is rate-limited per view, so a view
+ * can't make them as it opens or in a loop.
+ */
+const GESTURE_METHODS: ReadonlySet<ViewCallMethod> = new Set<ViewCallMethod>(["send"]);
+const GESTURE_EVENTS: ReadonlySet<string> = new Set(["onPress", "onDoublePress", "onLongPress", "onSubmit", "onRowPress"]);
+const GESTURE_MS = 10_000;
+const GESTURE_CALLS_PER_MINUTE = 6;
+
+/** The event name of each handler id in a tree (`h: { onPress: 3 }` gives 3 → "onPress"). */
+const handlerNames = (tree: ViewChild | null): Map<number, string> => {
+  const names = new Map<number, string>();
+  const stack: ViewChild[] = tree ? [tree] : [];
+  while (stack.length) {
+    const node = stack.pop()!;
+    if (typeof node === "string") continue;
+    if (node.h) for (const [name, id] of Object.entries(node.h)) names.set(id, name);
+    if (node.c) stack.push(...node.c);
+  }
+  return names;
+};
 export type ViewCapability = (args: unknown[], context: ViewCallContext) => Promise<unknown>;
 export type ViewCapabilities = Partial<Record<ViewCallMethod, ViewCapability>>;
 
@@ -107,10 +132,15 @@ export class ViewSession {
   private loadStartedAt = 0;
   private disposed = false;
   private unsubscribeStorage: (() => void) | null = null;
+  private unsubscribeStorageProblems: (() => void) | null = null;
   /** Storage changes heard while no run was there to take them (one is starting), newest per key. */
   private storageWhileStarting = new Map<string, unknown>();
   /** The run started from the last one's state, and should start fresh instead if that state breaks it. */
   private freshIfStateBreaks = false;
+  /** When the user last pressed, submitted or keyed in the view, until a gesture-gated call takes it. */
+  private gestureAt: number | null = null;
+  private gestureCalls: number[] = [];
+  private names: { tree: ViewChild | null; map: Map<number, string> } | null = null;
   readonly logs: ViewLog[] = [];
 
   constructor(options: ViewSessionOptions) {
@@ -127,6 +157,11 @@ export class ViewSession {
         }
         if (this.run) this.run.deliver([{ t: "storage", key, value }]);
         else this.storageWhileStarting.set(key, value);
+      }) ?? null;
+    this.unsubscribeStorageProblems =
+      options.storage.onProblem?.((message) => {
+        this.log("error", `storage: ${message}`);
+        this.publish({ problem: { phase: "storage", message } });
       }) ?? null;
   }
 
@@ -335,6 +370,7 @@ export class ViewSession {
       } else {
         const capability = this.options.capabilities[method];
         if (!capability) throw new Error(`${method} isn't available here`);
+        if (GESTURE_METHODS.has(method)) this.takeGesture(method);
         value = await capability(args, context);
       }
       this.deliver({ t: "reply", id, ok: true, v: value === undefined ? null : value });
@@ -347,6 +383,25 @@ export class ViewSession {
     this.run?.deliver([message]);
   }
 
+  private grantGesture() {
+    this.gestureAt = this.options.now();
+  }
+
+  private takeGesture(method: ViewCallMethod) {
+    const at = this.options.now();
+    if (this.gestureAt === null || at - this.gestureAt > GESTURE_MS) throw new Error(`${method} works only right after the user presses something in the view`);
+    this.gestureCalls = this.gestureCalls.filter((t) => at - t < 60_000);
+    if (this.gestureCalls.length >= GESTURE_CALLS_PER_MINUTE) throw new Error(`${method} is limited to ${GESTURE_CALLS_PER_MINUTE} calls a minute per view`);
+    this.gestureAt = null;
+    this.gestureCalls.push(at);
+  }
+
+  private handlerName(handler: number): string | undefined {
+    const tree = this.snapshot.tree;
+    if (this.names?.tree !== tree) this.names = { tree, map: handlerNames(tree) };
+    return this.names.map.get(handler);
+  }
+
   /** A problem the host found (the file went away, it can't be read). */
   report(phase: string, message: string) {
     this.publish({ status: this.snapshot.tree ? this.snapshot.status : "failed", problem: { phase, message } });
@@ -354,10 +409,13 @@ export class ViewSession {
 
   /** A handler id from the tree fired (a press, a change). */
   dispatch(handler: number, value?: unknown) {
+    const name = this.handlerName(handler);
+    if (name && GESTURE_EVENTS.has(name)) this.grantGesture();
     this.deliver(value === undefined ? { t: "event", h: handler } : { t: "event", h: handler, v: value });
   }
 
   key(chord: string, key = chord) {
+    this.grantGesture();
     this.deliver({ t: "key", chord, key });
   }
 
@@ -394,6 +452,7 @@ export class ViewSession {
     this.run?.stop();
     this.run = null;
     this.unsubscribeStorage?.();
+    this.unsubscribeStorageProblems?.();
     this.listeners.clear();
   }
 }

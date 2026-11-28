@@ -13,6 +13,8 @@ import {
   type IndexedViewSource,
   type ViewIndexRecordArgs,
 } from "@stella/contracts/backend/view-index";
+import { VIEW_CLOCK_SKEW_MS } from "@stella/views/conversation";
+import { viewIdentityFromPath } from "@stella/views/paths";
 import { empty, json, number, object, optional, string } from "../args.js";
 import { RpcError } from "../errors.js";
 import { enforceOwnerRateLimit } from "../rate-limit.js";
@@ -104,6 +106,32 @@ export const readIndexedView = (db: OwnerDbReader, id: string): IndexedViewSourc
 
 export type RecordedVersion = { recorded: boolean; version: number };
 
+
+/** A version's time from a device, bounded by the server's clock, so no version can claim to be newer than everything after it. */
+export const boundedViewTime = (createdAt: number, now: number): number => Math.max(0, Math.min(createdAt, now + VIEW_CLOCK_SKEW_MS));
+
+const FLAT_VIEW_RE = /(?:^|[\\/])outputs[\\/]views[\\/]([\w.-]{1,128})\.view\.(?:tsx|ts|jsx|js)$/iu;
+
+/**
+ * A view's path names the view it is (devices take its storage and file from it), so it must be
+ * this conversation's: `…/outputs/views/<this conversation>/<slug>.view.tsx`, or, for a view from
+ * before chats had folders, `…/outputs/views/<slug>.view.tsx` that no other conversation's view has.
+ */
+export const assertOwnViewPath = (db: OwnerDbReader, conversationId: string, slug: string, filePath: string): void => {
+  const refuse = () => {
+    throw new RpcError("FORBIDDEN", "That path belongs to another view.");
+  };
+  if (/(?:^|[\\/])\.\.?(?:[\\/]|$)/u.test(filePath)) refuse();
+  const named = viewIdentityFromPath(filePath);
+  if (named) {
+    if (named.conversationId !== conversationId || named.slug !== slug) refuse();
+  } else if (FLAT_VIEW_RE.exec(filePath)?.[1] !== slug) {
+    refuse();
+  }
+  const other = db.one<{ conversation_id: string }>("SELECT conversation_id FROM view_index WHERE file_path = ? AND conversation_id != ? LIMIT 1", filePath, conversationId);
+  if (other) refuse();
+};
+
 /**
  * Records one version of a view. Newer than the row's newest (or the first): it becomes the view's
  * version and the view returns to the list if it was taken off. Older: nothing changes.
@@ -121,11 +149,14 @@ export const recordViewVersion = async (ctx: OwnerContext, args: ViewIndexRecord
     const text = JSON.stringify(args.data);
     if (text !== undefined && encoder.encode(text).byteLength <= VIEW_INDEX_LIMITS.maxDataBytes) dataJson = text;
   }
+  assertOwnViewPath(ctx.db, args.conversationId, args.slug, args.filePath);
+  const createdAt = boundedViewTime(args.createdAt, ctx.now);
   const existing = ctx.db.one<{ version: number; updated_at: number; source: string; data_json: string | null; title: string; removed_at: number | null }>(
     "SELECT version, updated_at, source, data_json, title, removed_at FROM view_index WHERE id = ?",
     id,
   );
-  if (existing && existing.updated_at > args.createdAt) return { recorded: false, version: existing.version };
+  // A row stamped ahead of the server's clock (before times were bounded) holds no version back.
+  if (existing && boundedViewTime(existing.updated_at, ctx.now) > createdAt) return { recorded: false, version: existing.version };
   if (
     existing &&
     existing.source === args.source &&
@@ -148,7 +179,7 @@ export const recordViewVersion = async (ctx: OwnerContext, args: ViewIndexRecord
       args.source,
       args.data !== undefined ? 1 : 0,
       dataJson,
-      args.createdAt,
+      createdAt,
       id,
     );
   } else {
@@ -164,8 +195,8 @@ export const recordViewVersion = async (ctx: OwnerContext, args: ViewIndexRecord
       icon,
       args.source,
       dataJson,
-      args.createdAt,
-      args.createdAt,
+      createdAt,
+      createdAt,
     );
   }
   const version = (existing?.version ?? 0) + 1;

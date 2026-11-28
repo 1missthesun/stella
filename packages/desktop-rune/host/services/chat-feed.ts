@@ -23,7 +23,7 @@ const toMessage = (id: string, message: PiMessage): Message | null => {
   return { id, role: message.role, text, at: clock((message as { timestamp?: number }).timestamp) };
 };
 
-export type ChatFeed = { conversationId: string; send(text: string): Promise<void>; dispose(): void };
+export type ChatFeed = { conversationId: string; send(text: string, messageMetadata?: Record<string, unknown>): Promise<void>; dispose(): void };
 
 export async function startChatFeed(api: ElectronApi, store: Store): Promise<ChatFeed> {
   const backendUrl = process.env.VITE_STELLA_BACKEND_URL;
@@ -93,8 +93,8 @@ export async function startChatFeed(api: ElectronApi, store: Store): Promise<Cha
 
   return {
     conversationId,
-    async send(text) {
-      await api.piChat.request({ op: "submit", conversationId, requestId: `rune-${Date.now().toString(36)}`, text });
+    async send(text, messageMetadata) {
+      await api.piChat.request({ op: "submit", conversationId, requestId: `rune-${Date.now().toString(36)}`, text, ...(messageMetadata ? { send: { messageMetadata } } : {}) });
     },
     dispose() {
       off();

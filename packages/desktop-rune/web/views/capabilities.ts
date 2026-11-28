@@ -2,10 +2,11 @@
 // (host/views/views-host.ts) do with the engine: the browser's fetch, clipboard, new tabs,
 // notifications, downloads and file picker, the Web Share sheet and geolocation, and the chat.
 import type { ViewCapabilities } from "@stella/views/session";
+import { requireViewOpenableUrl } from "@stella/views/links";
+import { mayBePublicHost } from "@stella/views/network";
 import { STELLA_SEND_MESSAGE_EVENT, type StellaSendMessageDetail } from "@/shared/lib/stella-send-message";
-import { VIEW_ASK_LIMITS } from "@stella/contracts/backend/views";
+import { VIEW_ASK_LIMITS, VIEW_SEND_TRIGGER } from "@stella/contracts/backend/views";
 
-const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|\[?::1\]?$|\[?f[cd][0-9a-f]{2}:|0\.0\.0\.0)/iu;
 const MAX_BODY = 8 * 1024 * 1024;
 const MAX_PICKED = 4 * 1024 * 1024;
 
@@ -55,7 +56,8 @@ export function browserCapabilities(notice: (viewId: string, kind: "copied") => 
     fetch: async ([url, init]) => {
       const target = new URL(string(url));
       if (target.protocol !== "https:" && target.protocol !== "http:") throw new Error(`fetch can reach only http(s) URLs, not ${target.protocol}`);
-      if (PRIVATE_HOST.test(target.hostname)) throw new Error(`fetch can't reach ${target.hostname}: views reach only the public internet`);
+      // A page can't see where a name resolves: the browser's own private-network rules and CORS cover the rest.
+      if (!mayBePublicHost(target.hostname)) throw new Error(`fetch can't reach ${target.hostname}: views reach only the public internet`);
       const options = (init ?? {}) as { method?: string; headers?: Record<string, string>; body?: string };
       let response: Response;
       try {
@@ -85,9 +87,8 @@ export function browserCapabilities(notice: (viewId: string, kind: "copied") => 
     },
     "clipboard.readText": async () => navigator.clipboard.readText(),
     openUrl: async ([url]) => {
-      const target = new URL(string(url));
-      if (!/^(https?|mailto|tel):$/u.test(target.protocol)) throw new Error(`openUrl opens web, mail and phone links, not ${target.protocol}`);
-      if (target.protocol === "mailto:" || target.protocol === "tel:") window.location.href = target.toString();
+      const target = requireViewOpenableUrl(url);
+      if (!target.protocol.startsWith("http")) window.location.href = target.toString();
       else window.open(target.toString(), "_blank", "noopener,noreferrer");
     },
     notify: async ([title, options], context) => {
@@ -119,7 +120,7 @@ export function browserCapabilities(notice: (viewId: string, kind: "copied") => 
       await navigator.clipboard.writeText(text);
       notice(context.viewId, "copied");
     },
-    send: async ([text]) => {
+    send: async ([text], context) => {
       const message = string(text).trim();
       if (!message) return;
       const accepted = await new Promise<boolean>((resolve) => {
@@ -128,6 +129,8 @@ export function browserCapabilities(notice: (viewId: string, kind: "copied") => 
           new CustomEvent<StellaSendMessageDetail>(STELLA_SEND_MESSAGE_EVENT, {
             detail: {
               text: message,
+              triggerKind: VIEW_SEND_TRIGGER,
+              triggerSource: context.title,
               onResult: (ok) => {
                 clearTimeout(timer);
                 resolve(ok);

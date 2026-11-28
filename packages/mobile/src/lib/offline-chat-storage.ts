@@ -455,6 +455,7 @@ function parseStoredViews(value: unknown): ChatViewRef[] {
       createdAt: typeof v.createdAt === "number" ? v.createdAt : 0,
       toolCallId: v.toolCallId,
       ...(parseStoredViewAuthor(v.by) ? { by: parseStoredViewAuthor(v.by)! } : {}),
+      ...(v.problems === true ? { problems: true as const } : {}),
     }];
   });
 }

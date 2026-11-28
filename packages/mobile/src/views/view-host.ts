@@ -69,9 +69,12 @@ export function publishConversationViews(conversationId: string, messages: reado
     if (!message.views) continue;
     for (let v = message.views.length - 1; v >= 0; v -= 1) {
       const ref = message.views[v]!;
-      // One view, wherever its copy lives (a computer's file, the cloud's Drive copy).
+      // One view, wherever its copy lives (a computer's file, the cloud's Drive copy). The newest good
+      // version is live: a broken draft after it (the agent fixes it next, or never did) doesn't hide
+      // it, and is live only when the view has no good version at all.
       const key = viewLiveKey(ref.filePath);
-      if (!next.has(key)) next.set(key, { messageId: message.id, ref });
+      const seen = next.get(key);
+      if (!seen || (seen.ref.problems && !ref.problems)) next.set(key, { messageId: message.id, ref });
     }
   }
   for (const [key, ref] of restoring) {

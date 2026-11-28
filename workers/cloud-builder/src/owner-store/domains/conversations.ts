@@ -28,7 +28,7 @@ import {
   viewCardGroup,
 } from "@stella/contracts/view-card";
 import { empty, json, number, object, optional, string } from "../args.js";
-import { recordViewVersion } from "./view-index.js";
+import { assertOwnViewPath, boundedViewTime, recordViewVersion } from "./view-index.js";
 import { RpcError } from "../errors.js";
 import {
   CONVERSATION_PURGE_JOB,
@@ -486,7 +486,15 @@ const publishView = async (ctx: OwnerContext, args: PublishViewArgs): Promise<{ 
   if (!isLiveConversation(ctx.db, args.conversationId)) {
     throw new RpcError("NOT_FOUND", "That conversation doesn't exist.");
   }
-  const card = parseViewCard({ type: VIEW_CARD_TYPE, ...args });
+  assertOwnViewPath(ctx.db, args.conversationId, args.slug, args.filePath);
+  // The card's times order the view's versions on every device: bounded by the server's clock.
+  const createdAt = boundedViewTime(args.createdAt, ctx.now);
+  const card = parseViewCard({
+    type: VIEW_CARD_TYPE,
+    ...args,
+    createdAt,
+    ...(args.restoredFrom !== undefined ? { restoredFrom: Math.min(args.restoredFrom, createdAt) } : {}),
+  });
   if (!card) throw new RpcError("BAD_REQUEST", "That isn't a view.");
   const snapshot = await ctx.host.snapshot();
   if (!snapshot.writable) return { posted: false };

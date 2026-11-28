@@ -26,6 +26,8 @@ import { DEPS_KEY, HELPERS_KEY, MODULES_LINES, type ModulesBootFile, type Module
 const CHILD = path.join(import.meta.dir, "ui-build-child.ts");
 /** Quiet time after a build before the boot bundle is written. */
 const CACHE_SETTLE_MS = 1500;
+/** How long a new bundler process has to say it is ready. */
+const STARTUP_TIMEOUT_MS = 60_000;
 
 export type UiModule = Record<string, any>;
 
@@ -80,22 +82,40 @@ export function createUiLoader(options: UiLoaderOptions) {
 
   const spawnChild = (onGone: (c: Child) => void = (c) => { if (child === c) child = null; }): Child => {
     let resolveReady!: () => void;
-    const c: Child = { proc: null!, ready: new Promise((r) => (resolveReady = r)), builds: 0, pending: new Map() };
+    let rejectReady!: (error: Error) => void;
+    let started = false;
+    const c: Child = { proc: null!, ready: new Promise((resolve, reject) => { resolveReady = resolve; rejectReady = reject; }), builds: 0, pending: new Map() };
+    // Whoever awaits `ready` sees the failure; a child nobody waited on yet mustn't be an unhandled rejection.
+    c.ready.catch(() => undefined);
+    let startup: ReturnType<typeof setTimeout> | undefined;
     c.proc = Bun.spawn([process.execPath, options.builder ?? CHILD], {
       cwd: path.dirname(options.entry),
       env: { ...process.env, NODE_ENV: uiBuildMode() },
       stdio: ["ignore", "ignore", "inherit"],
       ipc(reply: UiBuildReply) {
-        if (reply.id === 0) return resolveReady();
+        if (reply.id === 0) {
+          started = true;
+          clearTimeout(startup);
+          return resolveReady();
+        }
         c.pending.get(reply.id)?.(reply);
         c.pending.delete(reply.id);
       },
-      onExit(_proc, code) {
-        for (const settle of c.pending.values()) settle({ id: -1, ok: false, error: `UI builder exited (${code})`, rssMb: 0 });
+      onExit(_proc, code, signal) {
+        clearTimeout(startup);
+        const why = `UI builder exited (${signal ?? code})`;
+        if (!started) rejectReady(new Error(`${why} before it was ready`));
+        for (const settle of c.pending.values()) settle({ id: -1, ok: false, error: why, rssMb: 0 });
         c.pending.clear();
         onGone(c);
       },
     });
+    startup = setTimeout(() => {
+      if (started) return;
+      rejectReady(new Error(`UI builder didn't start within ${STARTUP_TIMEOUT_MS / 1000} s`));
+      c.proc.kill();
+    }, STARTUP_TIMEOUT_MS);
+    startup.unref();
     return c;
   };
 
@@ -127,7 +147,13 @@ export function createUiLoader(options: UiLoaderOptions) {
       cacheTimer = null;
       const c = (cacheChild = spawnChild((gone) => { if (cacheChild === gone) cacheChild = null; }));
       try { os.setPriority(c.proc.pid, os.constants.priority.PRIORITY_LOW); } catch {}
-      await c.ready;
+      try {
+        await c.ready;
+      } catch (error) {
+        console.error("[ui] boot file builder failed:", error instanceof Error ? error.message : error);
+        if (cacheChild === c) cancelCache();
+        return;
+      }
       if (cacheChild !== c) return;
       const id = ++nextId;
       await new Promise<UiBuildReply>((resolve) => {

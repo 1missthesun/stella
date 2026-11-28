@@ -9,13 +9,13 @@ import { VIEW_ASK_LIMITS } from "@stella/contracts/backend/views";
 import * as Haptics from "expo-haptics";
 import * as Notifications from "expo-notifications";
 import type { ViewCapabilities } from "@stella/views/session";
+import { requireViewOpenableUrl } from "@stella/views/links";
+import { mayBePublicHost } from "@stella/views/network";
 import { getBackendClient } from "../lib/backend";
 import { sendToChat } from "../lib/chat-send-queue";
 import { openWebLink } from "../lib/open-web-link";
 import { saveViewFile } from "./native-vm";
 
-const PRIVATE_HOST =
-  /^(localhost|.*\.local|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|100\.(6[4-9]|[7-9]\d|1[01]\d|12[0-7])\.|0\.|\[?::1?\]?$|\[?f[cd][0-9a-f]{2}:|\[?fe80:)/iu;
 const MAX_RESPONSE_CHARS = 8 * 1024 * 1024;
 const MAX_PICKED_BYTES = 4 * 1024 * 1024;
 
@@ -70,7 +70,7 @@ export const viewCapabilities: ViewCapabilities = {
     const target = new URL(string(url));
     if (target.protocol !== "https:") throw new Error(`fetch reaches only https URLs, not ${target.protocol}`);
     if (target.username || target.password) throw new Error("fetch URLs can't carry credentials");
-    if (PRIVATE_HOST.test(target.hostname)) throw new Error(`fetch can't reach ${target.hostname}: views reach only the public internet`);
+    if (!mayBePublicHost(target.hostname)) throw new Error(`fetch can't reach ${target.hostname}: views reach only the public internet`);
     const options = (init ?? {}) as { method?: string; headers?: Record<string, string>; body?: string };
     const headers: Record<string, string> = {};
     for (const [name, value] of Object.entries(options.headers ?? {})) {
@@ -96,8 +96,7 @@ export const viewCapabilities: ViewCapabilities = {
   },
   "clipboard.readText": async () => Clipboard.getStringAsync(),
   openUrl: async ([url]) => {
-    const target = new URL(string(url));
-    if (!/^(https?|mailto|tel|sms):$/u.test(target.protocol)) throw new Error(`openUrl opens web, mail and phone links, not ${target.protocol}`);
+    const target = requireViewOpenableUrl(url);
     if (target.protocol.startsWith("http")) await openWebLink(target.toString());
     else await Linking.openURL(target.toString());
   },

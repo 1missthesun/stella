@@ -137,6 +137,9 @@ export class SyncedViewStorage implements ViewStorage {
   private saveTimer: ReturnType<typeof setTimeout> | null = null;
   /** When the newest change was made here, for measuring how long it takes to reach the server. */
   private onSynced: ((seq: number) => void) | null = null;
+  /** A refused write left values here the server doesn't have: the next snapshot puts them back. */
+  private reconciling = false;
+  private problemListeners = new Set<(message: string) => void>();
 
   constructor(
     readonly viewId: string,
@@ -228,6 +231,14 @@ export class SyncedViewStorage implements ViewStorage {
     };
   }
 
+  /** Calls `listener` with what went wrong when the server refuses a change made here (the values go back to the server's). */
+  onProblem(listener: (message: string) => void): () => void {
+    this.problemListeners.add(listener);
+    return () => {
+      this.problemListeners.delete(listener);
+    };
+  }
+
   // ------------------------------------------------------------ sync
 
   /** Starts (or moves) syncing through `remote`; null keeps the view local until one comes. */
@@ -265,7 +276,7 @@ export class SyncedViewStorage implements ViewStorage {
   }
 
   private watch() {
-    if (this.unwatch || !this.remote || (this.listeners.size === 0 && this.synced)) return;
+    if (this.unwatch || !this.remote || (this.listeners.size === 0 && this.synced && !this.reconciling)) return;
     const remote = this.remote;
     this.unwatch = remote.watch(
       this.viewId,
@@ -277,7 +288,7 @@ export class SyncedViewStorage implements ViewStorage {
   }
 
   private maybeUnwatch() {
-    if (this.listeners.size > 0 || !this.synced) return;
+    if (this.listeners.size > 0 || !this.synced || this.reconciling) return;
     this.unwatch?.();
     this.unwatch = null;
   }
@@ -318,6 +329,7 @@ export class SyncedViewStorage implements ViewStorage {
     const seqMoved = state.seq !== this.seq;
     this.seq = state.seq;
     this.values = next;
+    this.reconciling = false;
     if (changed.length > 0) {
       for (const key of changed) this.sized(key, next[key]);
       for (const key of changed) for (const listener of this.listeners) listener(key, key in next ? next[key] : null);
@@ -329,6 +341,7 @@ export class SyncedViewStorage implements ViewStorage {
       this.retryTimer = null;
     }
     this.kick();
+    this.maybeUnwatch();
   }
 
   private changedHere() {
@@ -369,10 +382,13 @@ export class SyncedViewStorage implements ViewStorage {
       this.retryMs = RETRY_MIN_MS;
     } catch (error) {
       if (isFatal(error)) {
-        // The server won't ever take this batch (too big, malformed): drop it, and let the next
-        // snapshot bring this device back to the server's values.
+        // The server won't ever take this batch (too big, malformed): drop it, and take the
+        // server's values again, so what it refused doesn't stay here as if it were saved.
         this.log("the server refused a view storage write", error);
         this.confirm(sent, sentClear, sentSeed, null);
+        this.reconcile();
+        const reason = error instanceof Error && error.message ? error.message : "the server refused it";
+        for (const listener of this.problemListeners) listener(`A change to this view's saved data wasn't kept (${reason}); it's back to what was saved.`);
       } else {
         this.retryTimer = setTimeout(() => {
           this.retryTimer = null;
@@ -389,6 +405,14 @@ export class SyncedViewStorage implements ViewStorage {
       fn?.(this.confirmed);
       this.maybeUnwatch();
     } else this.kick();
+  }
+
+  /** Asks for the server's values afresh: the snapshot that comes replaces what it refused. */
+  private reconcile() {
+    this.reconciling = true;
+    this.unwatch?.();
+    this.unwatch = null;
+    this.watch();
   }
 
   /** Drops what a write carried from the queue; `seq` is the server's for it, null when it refused the write. */
@@ -534,6 +558,8 @@ export class ViewStorageSync {
 export class MovableViewStorage implements ViewStorage {
   private listeners = new Set<Listener>();
   private off: (() => void) | null = null;
+  private problemListeners = new Set<(message: string) => void>();
+  private offProblem: (() => void) | null = null;
   private moving: Promise<void> = Promise.resolve();
 
   constructor(private current: ViewStorage) {
@@ -547,12 +573,32 @@ export class MovableViewStorage implements ViewStorage {
   private follow() {
     this.off?.();
     this.off = null;
+    this.offProblem?.();
+    this.offProblem = null;
+    if (this.problemListeners.size > 0) {
+      this.offProblem =
+        this.current.onProblem?.((message) => {
+          for (const listener of this.problemListeners) listener(message);
+        }) ?? null;
+    }
     if (this.listeners.size === 0) return;
     this.off =
       this.current.subscribe?.((key, value) => {
         for (const listener of this.listeners) listener(key, value);
       }) ?? null;
   }
+
+  onProblem = (listener: (message: string) => void) => {
+    this.problemListeners.add(listener);
+    if (this.problemListeners.size === 1) this.follow();
+    return () => {
+      this.problemListeners.delete(listener);
+      if (this.problemListeners.size === 0) {
+        this.offProblem?.();
+        this.offProblem = null;
+      }
+    };
+  };
 
   /** Moves to `next`, telling the view about every key that differs. */
   move(next: ViewStorage): Promise<void> {

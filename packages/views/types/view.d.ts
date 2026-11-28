@@ -318,7 +318,7 @@ declare module "@stella/view" {
     saveFile(name: string, content: string | object): Promise<string | null>;
     /** Asks Stella's language model; resolves with its reply text. */
     ask(prompt: string, options?: { system?: string }): Promise<string>;
-    /** Sends a message to the conversation the view belongs to, as the user. */
+    /** Sends a message to the conversation the view belongs to, marked as from the view. Call it from a press, submit or key handler: one message per press, within 10 s of it (it rejects otherwise, and past 6 a minute). */
     send(message: string): Promise<void>;
     location(): Promise<{ latitude: number; longitude: number; accuracy: number } | null>;
     readonly platform: "desktop" | "web" | "ios" | "android";

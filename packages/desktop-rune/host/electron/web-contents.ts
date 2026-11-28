@@ -6,7 +6,7 @@
 
 import { EventEmitter } from "node:events";
 import { RendererIpc } from "./ipc";
-import { defaultSession, fetchProtocolIn, sessionFor, type Session } from "./session";
+import { defaultSession, fetchProtocolIn, frameOf, sessionFor, type Session } from "./session";
 import { warnOnce } from "./engine";
 import { ChromiumPage, toStandIn, type PageKey, type PagePointer, type PageWheel, type ScreencastFrame } from "./chromium-page";
 import { chromiumTargetFor } from "./chromium-profiles";
@@ -493,7 +493,7 @@ export class WebContents extends EventEmitter {
           const server = browserSchemes.get(scheme);
           if (server) return await server.fetch(request, this);
         }
-        return await fetchProtocolIn(this.session, request);
+        return await fetchProtocolIn(this.session, request, frameOf(this.url));
       },
     };
   }

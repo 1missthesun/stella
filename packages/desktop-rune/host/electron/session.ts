@@ -55,10 +55,52 @@ class Cookies extends EventEmitter {
 
 type Listener = ((details: any, callback: (response: any) => void) => void) | null;
 
+/** The page a custom-scheme request came from, as Electron's `details.frame` gives it. */
+export type RequestFrame = { origin: string; url: string };
+
+/** An origin as Chromium reports it for a standard scheme (`stella-app://desktop`); WHATWG URL gives "null" for custom schemes. */
+export const frameOrigin = (url: string | null | undefined): string => {
+  try {
+    const parsed = new URL(String(url ?? ""));
+    if (!parsed.host || parsed.protocol === "data:" || parsed.protocol === "about:" || parsed.protocol === "blob:") return "null";
+    return `${parsed.protocol}//${parsed.host}`;
+  } catch {
+    return "null";
+  }
+};
+
+export const frameOf = (url: string | null | undefined): RequestFrame => ({ origin: frameOrigin(url), url: String(url ?? "") });
+
+/** The host's own interface (the stand-in for Electron's renderer at `stella-app://desktop`). */
+export const APP_FRAME: RequestFrame = frameOf("stella-app://desktop/");
+
+const urlPattern = (pattern: string) => new RegExp(`^${pattern.replace(/[.+?^${}()|[\]\\]/g, "\\$&").replace(/\*/g, ".*")}$`, "i");
+
+let requestIds = 0;
+
 class WebRequest {
   readonly listeners = new Map<string, Listener>();
+  private readonly filters = new Map<string, RegExp[] | null>();
   private set(name: string, a: unknown, b?: unknown) {
+    const urls = typeof a === "object" && a !== null ? (a as { urls?: unknown }).urls : undefined;
+    this.filters.set(name, Array.isArray(urls) && urls.length ? urls.map((u) => urlPattern(String(u))) : null);
     this.listeners.set(name, (typeof a === "function" ? a : b ?? null) as Listener);
+  }
+  /** Runs the session's `onBeforeRequest` listener for a custom-scheme request, as Chromium does before it reaches the protocol handler. */
+  async allows(request: Request, frame: RequestFrame | null): Promise<boolean> {
+    const listener = this.listeners.get("beforeRequest");
+    if (!listener) return true;
+    const filter = this.filters.get("beforeRequest");
+    if (filter && !filter.some((re) => re.test(request.url))) return true;
+    const details = { id: ++requestIds, url: request.url, method: request.method, resourceType: "other", referrer: request.headers.get("referer") ?? "", timestamp: Date.now(), uploadData: [], frame };
+    const response = await new Promise<{ cancel?: boolean } | undefined>((resolve) => {
+      try {
+        listener(details, (value) => resolve(value as { cancel?: boolean } | undefined));
+      } catch {
+        resolve({ cancel: true });
+      }
+    });
+    return response?.cancel !== true;
   }
   onBeforeRequest(a: unknown, b?: unknown) { this.set("beforeRequest", a, b); }
   onBeforeSendHeaders(a: unknown, b?: unknown) { this.set("beforeSendHeaders", a, b); }
@@ -203,15 +245,22 @@ export function sessionFor(partition?: string): Session {
 
 export const defaultSession = () => sessionFor("");
 
-/** Answers a WebView request to a custom scheme (stella-app, stella-media, canvas, ...). */
-export async function fetchProtocol(partition: string, request: Request): Promise<Response | null> {
-  return await fetchProtocolIn(sessionFor(partition), request);
+/**
+ * Answers a request to a custom scheme (stella-app, stella-media, canvas, ...) from `frame`, the
+ * page that made it: the serving session's `webRequest.onBeforeRequest` judges it first, as in
+ * Chromium, so a scheme that only its own pages may read (stella-media) refuses other pages.
+ */
+export async function fetchProtocol(partition: string, request: Request, frame: RequestFrame): Promise<Response | null> {
+  return await fetchProtocolIn(sessionFor(partition), request, frame);
 }
 
-export async function fetchProtocolIn(session: Session, request: Request): Promise<Response | null> {
+export async function fetchProtocolIn(session: Session, request: Request, frame: RequestFrame): Promise<Response | null> {
   const scheme = new URL(request.url).protocol.slice(0, -1).toLowerCase();
-  const handler = session.protocol.handlers.get(scheme) ?? defaultSession().protocol.handlers.get(scheme);
-  return handler ? await handler(request) : null;
+  const owner = session.protocol.handlers.has(scheme) ? session : defaultSession();
+  const handler = owner.protocol.handlers.get(scheme);
+  if (!handler) return null;
+  if (!(await owner.webRequest.allows(request, frame))) return new Response("Blocked", { status: 403, headers: { "content-type": "text/plain" } });
+  return await handler(request);
 }
 
 export const session = {

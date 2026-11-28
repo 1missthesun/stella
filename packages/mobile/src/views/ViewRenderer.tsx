@@ -38,6 +38,7 @@ import { Image } from "expo-image";
 import Svg, { Path } from "react-native-svg";
 import type { ViewChild, ViewNode } from "@stella/views/protocol";
 import { centreViewContent } from "@stella/views/layout";
+import { viewHrefUrl } from "@stella/views/links";
 import { AssistantMarkdown } from "../components/AssistantMarkdown";
 import { AudioPlayerView } from "../components/AudioPlayerView";
 import { SegmentedControl } from "../components/SegmentedControl";
@@ -69,7 +70,8 @@ const fillMain = (width: unknown, inRow: boolean): ViewStyle => {
 };
 
 const openLink = (href: string) => {
-  if (/^https?:/iu.test(href)) void openWebLink(href);
+  const url = viewHrefUrl(href);
+  if (url) void openWebLink(url.toString());
 };
 
 // ------------------------------------------------------------------ motion

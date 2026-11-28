@@ -6,6 +6,7 @@ import { dirname, isAbsolute, join } from "node:path";
 
 export { VIEW_FILE_RE, conversationViewRelPath, isViewPath, viewDataPath, viewIdentityFromPath, viewKey, viewSourceHash, viewTitle } from "./paths";
 import { conversationViewRelPath, viewKey, viewSourceHash } from "./paths";
+import { VIEW_CLOCK_SKEW_MS } from "./conversation";
 
 /** The uid on POSIX: Bun's `userInfo().username` follows `$USER`, which a host's child processes may not have. */
 const user = (() => {
@@ -166,8 +167,10 @@ export async function applyViewRestore(
     if (restore.told) await tellViewRestore(dataDir, filePath, createdAt, restore.told);
     return "current";
   }
-  // An older restore (a newer one landed already), or one made before the file's latest write.
-  if ((mark && mark.createdAt > createdAt) || modifiedAt > createdAt) return "newer";
+  // An older restore (a newer one landed already), or one made before the file's latest write. A mark
+  // stamped ahead of this computer's clock holds nothing back.
+  const markAt = mark && mark.createdAt <= Date.now() + VIEW_CLOCK_SKEW_MS ? mark.createdAt : null;
+  if ((markAt !== null && markAt > createdAt) || modifiedAt > createdAt) return "newer";
   const next: ViewRestoreMark = { filePath, createdAt, restoredFrom, source: viewSourceHash(source), told };
   if (current !== source) await writeAtomic(filePath, source);
   await writeViewRestoreMark(dataDir, next);

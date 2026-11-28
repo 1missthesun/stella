@@ -3,7 +3,7 @@
 // when it gave some), and its result names the file it wrote, so the newest successful call for a
 // file is the view to run. The source is read from the call: the cloud journal redacts tool results
 // (any `name="value"` looks like a secret to it), which leaves a result's copy of the source broken.
-import { isViewPath } from "./paths";
+import { isViewPath, viewIdentityFromPath } from "./paths";
 
 /** Who made a version: Stella's own `view` call, a task's view card, or the user restoring an earlier one. */
 export type ViewAuthor = { kind: "stella" } | { kind: "task"; agentId: string; title?: string } | { kind: "restore"; from: number };
@@ -31,6 +31,18 @@ export const viewAuthorOf = (details: Record<string, unknown>): ViewAuthor => {
   return { kind: "stella" };
 };
 
+/**
+ * Whether a view as a conversation carries it is that conversation's own: a path in a chat's
+ * folder (`outputs/views/<conversation>/<slug>.view.tsx`) names its view, so a card whose path
+ * names another conversation, or another slug, claims a view that isn't its and is left out.
+ */
+export const viewOwnedBy = (view: { filePath: string; slug?: string }, conversationId: string | null | undefined): boolean => {
+  const named = viewIdentityFromPath(view.filePath);
+  if (!named) return true;
+  if (view.slug !== undefined && view.slug !== named.slug) return false;
+  return !conversationId || named.conversationId === conversationId;
+};
+
 /** The loose shape of a tool result event (desktop events, and the web's journal records alike). */
 export type ViewToolEvent = {
   type?: string;
@@ -41,6 +53,9 @@ export type ViewToolEvent = {
 };
 
 export const VIEW_TOOL = "view";
+
+/** How far a version's own time may run ahead of the event that carries it. */
+export const VIEW_CLOCK_SKEW_MS = 5 * 60_000;
 
 const record = (v: unknown): Record<string, unknown> | null => (v && typeof v === "object" && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
 
@@ -61,7 +76,10 @@ export function viewFromToolEvent(event: ViewToolEvent, call?: Record<string, un
   const source = typeof call?.source === "string" ? call.source : typeof details.source === "string" ? details.source : "";
   const from = call && "data" in call ? call : details;
   if (!filePath || !source || !isViewPath(filePath)) return null;
-  const createdAt = typeof details.createdAt === "number" && Number.isFinite(details.createdAt) ? details.createdAt : (event.timestamp ?? 0);
+  const stamped = typeof event.timestamp === "number" && Number.isFinite(event.timestamp) ? event.timestamp : null;
+  const claimed = typeof details.createdAt === "number" && Number.isFinite(details.createdAt) ? details.createdAt : null;
+  // A version's own time orders it, but never past the event that carries it: no clock ahead can pin a view.
+  const createdAt = Math.max(0, claimed === null ? (stamped ?? 0) : stamped === null ? claimed : Math.min(claimed, stamped + VIEW_CLOCK_SKEW_MS));
   return {
     filePath,
     source,

@@ -6,7 +6,7 @@
 // kept in IndexedDB (storage.ts), and the capabilities are the browser's (capabilities.ts).
 import { ViewSession, type ViewCapabilities, type ViewSnapshot } from "@stella/views/session";
 import type { ViewTheme } from "@stella/views/protocol";
-import { latestConversationViews, type ConversationView, type ViewToolEvent } from "@stella/views/conversation";
+import { latestConversationViews, viewOwnedBy, type ConversationView, type ViewToolEvent } from "@stella/views/conversation";
 import { isViewPath, viewFileName, viewIdentityFromPath, viewKey, viewTitle } from "@stella/views/paths";
 import { browserCapabilities } from "./capabilities";
 import { MovableViewStorage, ViewStorageSync, backendViewStorageRemote, syncedViewId, viewSlugFromPath, type ViewStorageBackend, type ViewStorageRemote } from "@stella/views/storage-sync";
@@ -282,6 +282,7 @@ export function createWebViewsHost(options: WebViewsHostOptions = {}) {
           scanned.set(events, views);
         }
         for (const view of views.values()) {
+          if (!viewOwnedBy(view, conversationId)) continue;
           any = true;
           // A view in a chat's own folder is named by its path; an older one by the chat that made it.
           const named = viewIdentityFromPath(view.filePath);

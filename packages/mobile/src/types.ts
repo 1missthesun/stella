@@ -215,6 +215,8 @@ export type ChatViewRef = {
   toolCallId: string;
   /** Who made this version: Stella, a task, or the user's restore. */
   by?: ViewAuthor;
+  /** A broken draft (it was saved but doesn't compile, lint or render): never live over a good version. */
+  problems?: true;
 };
 
 export type MobileTask = {

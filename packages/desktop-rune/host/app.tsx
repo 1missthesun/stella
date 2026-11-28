@@ -73,7 +73,11 @@ export async function runHost(options: { bundled?: boolean } = {}): Promise<void
     });
   }
 
-  let app = await loadApp();
+  // A bundler that died before building gets one fresh process before the launch fails.
+  let app = await loadApp().catch((error: unknown) => {
+    console.error("[ui] first load failed, building again:", error instanceof Error ? error.message : error);
+    return loadApp();
+  });
   bootMark("ui-loaded");
   const store = createStore(app.initialState?.() ?? {});
   const g = globalThis as any;

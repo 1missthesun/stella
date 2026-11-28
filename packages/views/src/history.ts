@@ -5,7 +5,7 @@
 // the card a restore publishes.
 import type { PublishViewArgs } from "@stella/contracts/backend/conversations";
 import { VIEW_RESTORE_AUTHOR } from "@stella/contracts/view-card";
-import { viewAuthorOf, viewFromToolEvent, viewToolCallArgs, type ViewAuthor, type ViewToolEvent } from "./conversation";
+import { viewAuthorOf, viewFromToolEvent, viewOwnedBy, viewToolCallArgs, type ViewAuthor, type ViewToolEvent } from "./conversation";
 import { viewLiveKey, viewSourceHash } from "./paths";
 import type { ViewStorage } from "./session";
 
@@ -80,7 +80,7 @@ export class ViewHistory {
   private listeners = new Set<(filePath: string) => void>();
   private previews = new Map<string, string>();
 
-  /** A conversation's messages, as the chat has them: replaces the history of each view they carry. */
+  /** A conversation's messages, as the chat has them: adds the versions of each view they carry. */
   offerMessages(messages: readonly Message[], conversationId?: string | null) {
     const versions: ViewVersion[] = [];
     for (const message of messages) {
@@ -96,10 +96,11 @@ export class ViewHistory {
     this.offerVersions(versions, conversationId);
   }
 
-  /** Versions from one conversation (in any order): replaces the history of each view among them. */
+  /** Versions from one conversation (in any order), merged by identity into each view's history. */
   offerVersions(versions: readonly ViewVersion[], conversationId?: string | null) {
     const grouped = new Map<string, ViewVersion[]>();
     for (const version of versions) {
+      if (!viewOwnedBy(version, conversationId)) continue;
       const key = viewLiveKey(version.filePath);
       const list = grouped.get(key) ?? [];
       list.push(version);
@@ -114,7 +115,8 @@ export class ViewHistory {
         if (still.length) this.pending.set(filePath, still);
         else this.pending.delete(filePath);
       }
-      this.set(filePath, list);
+      // What's offered adds to what's known (the chat's versions and the Apps list's newest alike).
+      this.set(filePath, [...(this.byFile.get(filePath) ?? []), ...list]);
     }
   }
 

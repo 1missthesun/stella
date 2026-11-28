@@ -5,6 +5,7 @@
 import { createContext, memo, useContext, useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { ViewChild, ViewNode } from "@stella/views/protocol";
 import { VIEW_CENTRE_PROP, centreViewContent } from "@stella/views/layout";
+import { viewHrefUrl } from "@stella/views/links";
 import { Button, Dialog, DialogBody, DialogCloseButton, DialogHeader, DialogTitle, Icon, Icons, ImageLightbox, Markdown, Select, Switch, Tabs, TextField, type IconData } from "../kit";
 import { font, fontSize, hex, look, mix, radius as radii, useTokens, type Tokens } from "../theme";
 import type { Cursor } from "../rune";
@@ -126,7 +127,7 @@ function textRuns(children: ViewChild[] | undefined, paint: Paint, inherited: Om
     if (p.italic) run.i = true;
     if (p.strike) run.st = true;
     if (typeof p.size === "number") run.s = p.size;
-    if (typeof p.href === "string") {
+    if (typeof p.href === "string" && viewHrefUrl(p.href)) {
       run.href = p.href;
       run.u = run.c ?? paint("accent");
       run.c = run.c ?? paint("accent");
@@ -165,14 +166,16 @@ function ViewText({ node, paint, t }: { node: ViewNode; paint: Paint; t: Tokens 
   return <text {...style}>{(node.c ?? []).join("")}</text>;
 }
 
-/** A link in a view: the engine opens it where there is one; a page alone (a shared view) opens web, mail and phone links. */
+/** A web link in a view: the engine opens it where there is one, a page alone (a shared view) in a new tab. */
 function openViewLink(href: string): void {
+  const url = viewHrefUrl(href);
+  if (!url) return;
   const engine = (globalThis as { stella?: { engine?: { shell: { openExternal(u: string): Promise<void> } } } }).stella?.engine;
   if (engine) {
-    void engine.shell.openExternal(href);
+    void engine.shell.openExternal(url.toString());
     return;
   }
-  if (/^(https?:|mailto:|tel:)/iu.test(href)) window.open(href, "_blank", "noopener,noreferrer");
+  window.open(url.toString(), "_blank", "noopener,noreferrer");
 }
 
 // ------------------------------------------------------------------ icons

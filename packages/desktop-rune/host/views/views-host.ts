@@ -9,7 +9,7 @@ import { homedir } from "node:os";
 import { basename, dirname, isAbsolute, join } from "node:path";
 import { ViewSession, type ViewCapabilities, type ViewRun, type ViewSnapshot, type ViewStorage, type ViewVm } from "@stella/views/session";
 import type { ViewMessage, ViewPost, ViewTheme } from "@stella/views/protocol";
-import { latestConversationViews, type ConversationView, type ViewToolEvent } from "@stella/views/conversation";
+import { latestConversationViews, viewOwnedBy, type ConversationView, type ViewToolEvent } from "@stella/views/conversation";
 import {
   applyViewRestore,
   conversationViewRelPath,
@@ -38,9 +38,11 @@ import {
   type ViewStorageDisk,
   type ViewStorageRemote,
 } from "@stella/views/storage-sync";
+import { requireViewOpenableUrl } from "@stella/views/links";
+import { publicFetch } from "./public-fetch";
 import type { engine as BridgeEngine, onEngineEvent as BridgeOn } from "../bridge";
 import { mainContext } from "../services/main-context";
-import { VIEW_ASK_LIMITS } from "@stella/contracts/backend/views";
+import { VIEW_ASK_LIMITS, viewSendMetadata } from "@stella/contracts/backend/views";
 import { LLM_ROUTE_FAILURE_MARKERS } from "@stella/contracts/llm-route-failure";
 
 type Engine = typeof BridgeEngine;
@@ -271,8 +273,6 @@ function identityIndex() {
   };
 }
 
-const PRIVATE_HOST = /^(localhost|127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|169\.254\.|\[?::1\]?$|\[?f[cd][0-9a-f]{2}:|0\.0\.0\.0)/iu;
-
 /** Caps on `stella.ask`: the backend's (`views.ask`, which the web and phones call), and a per-view rate. */
 const ASK = { ...VIEW_ASK_LIMITS, perViewPerMinute: 10 } as const;
 const ASK_SYSTEM = "You answer a request from a small app the user is using inside Stella. Reply with only what the app asked for: no preamble, no follow-up questions.";
@@ -378,43 +378,30 @@ function capabilities(engine: Engine, notice: (viewId: string, kind: ViewNotice[
     },
     fetch: async ([url, init]) => {
       const target = new URL(string(url));
-      if (target.protocol !== "https:" && target.protocol !== "http:") throw new Error(`fetch can reach only http(s) URLs, not ${target.protocol}`);
-      if (PRIVATE_HOST.test(target.hostname) && process.env.STELLA_VIEWS_LOCAL_NETWORK !== "1") throw new Error(`fetch can't reach ${target.hostname}: views reach only the public internet`);
-      const options = (init ?? {}) as { method?: string; headers?: Record<string, string>; body?: string };
-      const response = await fetch(target, {
-        method: options.method ?? "GET",
-        ...(options.headers ? { headers: options.headers } : {}),
-        ...(typeof options.body === "string" ? { body: options.body } : {}),
-        redirect: "follow",
-        signal: AbortSignal.timeout(30_000),
-      });
-      const body = await response.text();
-      if (body.length > 8 * 1024 * 1024) throw new Error("The response is bigger than 8 MB");
-      const headers: Record<string, string> = {};
-      response.headers.forEach((value, key) => {
-        headers[key] = value;
-      });
-      return { status: response.status, statusText: response.statusText, headers, url: response.url, body };
+      const options = (init ?? {}) as { method?: string; headers?: Record<string, string>; body?: unknown };
+      return await publicFetch(
+        target,
+        { ...(options.method ? { method: string(options.method) } : {}), ...(options.headers ? { headers: options.headers } : {}), ...(typeof options.body === "string" ? { body: options.body } : {}) },
+        { allowPrivate: process.env.STELLA_VIEWS_LOCAL_NETWORK === "1", timeoutMs: 30_000, maxBytes: 8 * 1024 * 1024 },
+      );
     },
     "clipboard.writeText": async ([text]) => {
       await engine.clipboard.writeText(string(text));
     },
     "clipboard.readText": async () => engine.clipboard.readText(),
     openUrl: async ([url]) => {
-      const target = new URL(string(url));
-      if (!/^(https?|mailto|tel):$/u.test(target.protocol)) throw new Error(`openUrl opens web, mail and phone links, not ${target.protocol}`);
-      await engine.shell.openExternal(target.toString());
+      await engine.shell.openExternal(requireViewOpenableUrl(url).toString());
     },
     notify: async ([title, options], context) => {
       const body = (options as { body?: string } | undefined)?.body;
       await engine.notify({ id: `view-${context.viewId}-${Date.now()}`, title: string(title) || context.title, ...(body ? { body } : {}) });
     },
     haptic: async () => undefined,
-    send: async ([text]) => {
-      const chat = (globalThis as { stella?: { chat?: { send(text: string): Promise<void> } } }).stella?.chat;
+    send: async ([text], context) => {
+      const chat = (globalThis as { stella?: { chat?: { send(text: string, messageMetadata?: Record<string, unknown>): Promise<void> } } }).stella?.chat;
       if (!chat) throw new Error("send needs Stella's chat, which isn't running here");
       const message = string(text).trim();
-      if (message) await chat.send(message);
+      if (message) await chat.send(message, viewSendMetadata(context.title));
     },
     saveFile: async ([name, content]) => {
       const path = await engine.dialog.saveFile({ defaultPath: string(name) });
@@ -847,6 +834,7 @@ export function createViewsHost(engine: Engine, on: On) {
           scanned.set(events, views);
         }
         for (const view of views.values()) {
+          if (!viewOwnedBy(view, conversationId)) continue;
           const previous = known.get(view.filePath);
           if (previous && (previous.createdAt > view.createdAt || (previous.source === view.source && previous.data === view.data))) continue;
           known.set(view.filePath, view);
@@ -862,6 +850,7 @@ export function createViewsHost(engine: Engine, on: On) {
         if (!conversationId || bound.get(events) === conversationId) continue;
         bound.set(events, conversationId);
         for (const view of views.values()) {
+          if (!viewOwnedBy(view, conversationId)) continue;
           // A view in a chat's own folder is named by its path; an older one learns its id from the chat.
           const viewId = viewIdFromPath(view.filePath) ?? syncedViewId(conversationId, view.slug ?? viewSlugFromPath(view.filePath));
           if (!viewId) continue;

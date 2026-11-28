@@ -19,7 +19,9 @@
     "./storage-sync": "./src/storage-sync.ts",
     "./chart": "./src/chart.ts",
     "./format": "./src/format.ts",
-    "./layout": "./src/layout.ts"
+    "./layout": "./src/layout.ts",
+    "./links": "./src/links.ts",
+    "./network": "./src/network.ts"
   },
   "scripts": {
     "gen": "bun scripts/gen-runtime.ts && bun scripts/gen-icons.ts",

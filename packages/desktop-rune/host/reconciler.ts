@@ -85,8 +85,8 @@ const APP_SCHEME_SRC = /^(?!file:|blob:)[a-z][a-z0-9+.-]*:\/\//i;
 
 async function fetchSrc(src: string): Promise<Response> {
   if (!APP_SCHEME_SRC.test(src) || /^(https?|blob):/i.test(src)) return fetch(src);
-  const { fetchProtocol } = await import("./electron/session");
-  const response = await fetchProtocol("", new Request(src));
+  const { APP_FRAME, fetchProtocol } = await import("./electron/session");
+  const response = await fetchProtocol("", new Request(src), APP_FRAME);
   if (!response) throw new Error(`no protocol handler for ${src}`);
   return response;
 }

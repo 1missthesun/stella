@@ -5,6 +5,7 @@ import { loadHostedHtml } from "./dom/hosted-html";
 import { elementOf } from "./dom/registry";
 import { downloadPath } from "./downloads";
 import { createEngineViews } from "./views/wasm-vm";
+import { viewOpenableUrl } from "@stella/views/links";
 
 type Engine = typeof BridgeEngine;
 type Listener = (e: any) => void;
@@ -183,7 +184,12 @@ export const webEngine: Engine = {
   mic: { start: () => {}, stop: () => {} },
   inputHook: { start: () => unsupported("inputhook"), stop: async () => ({ stopped: true }) },
   shell: {
-    openExternal: async (url) => { window.open(url, "_blank", "noopener,noreferrer"); },
+    openExternal: async (url) => {
+      const target = viewOpenableUrl(url);
+      if (!target) throw new Error(`Only web, mail and phone links open from the browser, not ${String(url).split(":")[0]}:`);
+      if (target.protocol.startsWith("http")) window.open(target.toString(), "_blank", "noopener,noreferrer");
+      else window.location.href = target.toString();
+    },
     openPath: async () => "Opening files isn't available in the browser",
     showItemInFolder: async () => {},
   },

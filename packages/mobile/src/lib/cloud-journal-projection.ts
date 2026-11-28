@@ -160,7 +160,12 @@ const viewRefs = (
       toolCallId: block.id,
       by: view.by ?? { kind: "stella" },
     };
-    if (!viewResultHasProblems(result.payload)) all.push(ref);
+    if (viewResultHasProblems(result.payload)) {
+      // A broken draft stands for its file only until a good version does: it never replaces one.
+      ref.problems = true;
+      const prior = byFile.get(view.filePath);
+      if (prior && !prior.problems) continue;
+    } else all.push(ref);
     byFile.delete(view.filePath);
     byFile.set(view.filePath, ref);
   }

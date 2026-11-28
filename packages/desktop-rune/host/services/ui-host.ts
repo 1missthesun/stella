@@ -7,7 +7,7 @@ import { blob, freeBlob } from "../bridge";
 import { BrowserWindow, hostWindows, openWindowFrom, type WindowSnapshot } from "../electron/browser-window";
 import { engine } from "../electron/engine";
 import { hostDialogs, type HostDialogRequest } from "../electron/native";
-import { defaultSession, fetchProtocolIn } from "../electron/session";
+import { defaultSession, fetchProtocolIn, frameOf } from "../electron/session";
 import { WebContents } from "../electron/web-contents";
 import type { PageKey, PagePointer, PageWheel } from "../electron/chromium-page";
 import { rendererApiFor, type ElectronApi } from "./renderer-api";
@@ -262,10 +262,13 @@ export function createUiHost(): UiHost {
         const e = engine();
         if (!e) return;
         const respond = (status: number, headers: Record<string, string>, body: string | Uint8Array) => void e.webview.respond(req.rid, { status, headers, body }).catch(() => {});
-        const session = contentsId === undefined ? rendererSession() ?? defaultSession() : contentsById(contentsId)?.session;
+        const contents = contentsId === undefined ? undefined : contentsById(contentsId);
+        const session = contentsId === undefined ? rendererSession() ?? defaultSession() : contents?.session;
         if (!session) return respond(404, {}, "");
         const hasBody = req.body !== undefined && req.method !== "GET" && req.method !== "HEAD";
-        fetchProtocolIn(session, new Request(req.url, { method: req.method, headers: req.headers, body: hasBody ? req.body ?? undefined : undefined }))
+        // A WebView without contents of its own is a canvas page (agent-made HTML): an opaque origin, never the app's.
+        const frame = contents ? frameOf(contents.getURL()) : frameOf(null);
+        fetchProtocolIn(session, new Request(req.url, { method: req.method, headers: req.headers, body: hasBody ? req.body ?? undefined : undefined }), frame)
           .then(async (response) => {
             if (!response) return respond(404, { "content-type": "text/plain" }, "Not found");
             const headers: Record<string, string> = {};

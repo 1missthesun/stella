@@ -22,7 +22,8 @@ import {
 
 export { stellaP2pAvailable };
 
-/** Set once this phone has paired, so the link comes up at launch only for people who use it. */
+/** Set once this phone has paired, so the link comes up at launch only for people who use it;
+ * everyone else's link stays off until they open Use your computer's Stella. */
 const PAIRED_KEY = "stella-p2p-paired-v1";
 
 const deviceName = () => (Device.deviceName || Device.modelName || (Platform.OS === "ios" ? "iPhone" : "Phone")).trim();
@@ -39,6 +40,9 @@ const startLink = (): Promise<void> =>
     relay: "default",
     // A phone is never anyone's computer, so it never answers nearby devices.
     discoverable: false,
+    // This app pairs only by QR code, link or typed code, so the link never looks around the local
+    // network (no mDNS, no router port mapping) and iOS never asks for local network access.
+    localNetwork: false,
     ...(rendezvous ? { rendezvous } : {}),
   }).catch((error: unknown) => {
     started = null;
@@ -130,7 +134,6 @@ export const bootDeviceLink = (): Promise<void> => {
   return booting;
 };
 
-/** At launch: brings the link up only when this phone has paired with a computer before. */
 /** Starts the link when this phone has paired a computer before; says whether it has. */
 export const resumeDeviceLinkIfPaired = async (): Promise<boolean> => {
   if (!stellaP2pAvailable) return false;

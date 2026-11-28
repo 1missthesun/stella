@@ -3956,6 +3956,10 @@
       "unpaired": "{name} memutuskan pasangan perangkat ini.",
       "back": "Kembali ke komputer ini"
     },
+    "local": {
+      "label": "Cari perangkat di jaringan ini",
+      "description": "Ponsel dan komputer di jaringan yang sama bisa dipasangkan tanpa kode. Komputer Anda mungkin meminta izin akses jaringan lokal."
+    },
     "nearby": {
       "title": "Komputer di sekitar",
       "looking": "Mencari komputer di jaringan ini…",

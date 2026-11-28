@@ -1,6 +1,7 @@
 // This computer's device link: the engine's `p2p.*` commands (crate stella-p2p) as a P2pTransport,
 // and the paired devices and computers as the UI sees them, kept current from the link's events.
 
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { homedir, hostname } from "node:os";
 import { join } from "node:path";
 import type { P2pComputer, P2pDevice, P2pNodeEvent, P2pPeers, P2pStatus, P2pTransport } from "@stella/contracts/p2p";
@@ -13,7 +14,38 @@ export const computerName = () => {
   return name || "Computer";
 };
 
+const readJson = (path: string): Record<string, unknown> | null => {
+  try {
+    const value: unknown = JSON.parse(readFileSync(path, "utf8"));
+    return value && typeof value === "object" ? (value as Record<string, unknown>) : null;
+  } catch {
+    return null;
+  }
+};
+
+const settingsPath = () => join(p2pDataDir(), "settings.json");
+
+/** Finding devices on this network: off until the person turns it on in Settings. */
+export const localNetworkSetting = (): boolean => readJson(settingsPath())?.localNetwork === true;
+
+export const saveLocalNetworkSetting = (on: boolean) => {
+  mkdirSync(p2pDataDir(), { recursive: true, mode: 0o700 });
+  writeFileSync(settingsPath(), `${JSON.stringify({ ...readJson(settingsPath()), localNetwork: on }, null, 2)}\n`, { mode: 0o600 });
+};
+
+/** Whether this computer has paired a device or a computer (the crate's peers.json), read without starting the link. */
+export const hasPairedPeers = (): boolean => {
+  const path = join(p2pDataDir(), "peers.json");
+  if (!existsSync(path)) return false;
+  const peers = readJson(path);
+  const count = (key: string) => (Array.isArray(peers?.[key]) ? (peers[key] as unknown[]).length : 0);
+  return count("devices") + count("computers") > 0;
+};
+
 let started: Promise<P2pStatus> | null = null;
+
+/** Whether the link is running (or starting); nothing starts it but pairing, a paired peer or the setting. */
+export const linkStarted = () => started !== null;
 
 export const engineTransport: P2pTransport = {
   command: async <T>(name: string, args: Record<string, unknown> = {}) => {
@@ -28,6 +60,7 @@ export const startLink = (): Promise<P2pStatus> =>
     dataDir: p2pDataDir(),
     name: computerName(),
     platform: process.platform,
+    localNetwork: localNetworkSetting(),
     relay: process.env.STELLA_P2P_RELAY || "default",
     rendezvous: process.env.STELLA_P2P_RENDEZVOUS || "default",
   }).catch((error: unknown) => {

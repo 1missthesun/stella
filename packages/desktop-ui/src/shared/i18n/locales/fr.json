@@ -4072,6 +4072,10 @@
       "unpaired": "{name} a dissocié cet appareil.",
       "back": "Revenir à cet ordinateur"
     },
+    "local": {
+      "label": "Trouver des appareils sur ce réseau",
+      "description": "Les téléphones et ordinateurs du même réseau peuvent s’associer sans code. Votre ordinateur peut demander l’autorisation d’accéder au réseau local."
+    },
     "nearby": {
       "title": "Ordinateurs à proximité",
       "looking": "Recherche d’ordinateurs sur ce réseau…",

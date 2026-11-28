@@ -4015,6 +4015,10 @@
       "unpaired": "{name} poisti pariliitoksen tähän laitteeseen.",
       "back": "Takaisin tähän tietokoneeseen"
     },
+    "local": {
+      "label": "Etsi laitteita tästä verkosta",
+      "description": "Samassa verkossa olevat puhelimet ja tietokoneet voi yhdistää ilman koodia. Tietokone saattaa pyytää lupaa lähiverkon käyttöön."
+    },
     "nearby": {
       "title": "Lähellä olevat tietokoneet",
       "looking": "Etsitään tietokoneita tästä verkosta…",

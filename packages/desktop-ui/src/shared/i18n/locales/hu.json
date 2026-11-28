@@ -4015,6 +4015,10 @@
       "unpaired": "{name} megszüntette a párosítást ezzel az eszközzel.",
       "back": "Vissza ehhez a számítógéphez"
     },
+    "local": {
+      "label": "Eszközök keresése ezen a hálózaton",
+      "description": "Az azonos hálózaton lévő telefonok és számítógépek kód nélkül párosíthatók. A számítógép engedélyt kérhet a helyi hálózat eléréséhez."
+    },
     "nearby": {
       "title": "Közeli számítógépek",
       "looking": "Számítógépek keresése ezen a hálózaton…",

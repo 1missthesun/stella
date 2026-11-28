@@ -132,7 +132,7 @@ export type P2pConfirmRequest = { request: number; code: string; device: { id: s
 
 export type P2pPairResult = { computer: P2pComputer; conversationId: string | null };
 
-export type P2pStatus = { id: string; name: string; platform: string; relay: string | null; addrs: string[] };
+export type P2pStatus = { id: string; name: string; platform: string; relay: string | null; addrs: string[]; localNetwork?: boolean };
 
 /** What the UI reaches (Rune: `stella.host.p2p`). */
 export type P2pApi = {
@@ -151,7 +151,14 @@ export type P2pApi = {
   onShortCodeEnded(listener: (reason: string) => void): () => void;
   /** Pairs this device to the computer whose code (full or short) this is; resolves with its chat. */
   pair(code: string): Promise<P2pPairResult>;
-  /** Computers on this network, kept current while anyone watches. */
+  /**
+   * Finding and answering devices on this network (mDNS, router port mapping). Off until the person
+   * turns it on in Settings, so opening Stella never asks for local network access.
+   */
+  localNetwork(): boolean;
+  subscribeLocalNetwork(listener: () => void): () => void;
+  setLocalNetwork(on: boolean): Promise<void>;
+  /** Computers on this network, kept current while anyone watches (empty while localNetwork is off). */
   nearby(): P2pNearbyComputer[];
   watchNearby(listener: () => void): () => void;
   /** Asks a nearby computer to pair; it then shows six digits for `confirmNearby`. */

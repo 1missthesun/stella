@@ -4072,6 +4072,10 @@
       "unpaired": "{name} ha scollegato questo dispositivo.",
       "back": "Torna a questo computer"
     },
+    "local": {
+      "label": "Trova dispositivi su questa rete",
+      "description": "Telefoni e computer sulla stessa rete possono associarsi senza codice. Il computer potrebbe chiedere di consentire l’accesso alla rete locale."
+    },
     "nearby": {
       "title": "Computer nelle vicinanze",
       "looking": "Ricerca di computer su questa rete…",

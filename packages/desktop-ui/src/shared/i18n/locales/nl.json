@@ -4015,6 +4015,10 @@
       "unpaired": "{name} heeft dit apparaat ontkoppeld.",
       "back": "Terug naar deze computer"
     },
+    "local": {
+      "label": "Apparaten op dit netwerk zoeken",
+      "description": "Telefoons en computers op hetzelfde netwerk kunnen zonder code koppelen. Je computer kan vragen om toegang tot het lokale netwerk."
+    },
     "nearby": {
       "title": "Computers in de buurt",
       "looking": "Zoeken naar computers op dit netwerk…",

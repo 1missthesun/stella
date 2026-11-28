@@ -1,5 +1,5 @@
-import { SettingsCard, SettingsCardHeader } from "../../settings/parts";
-import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Monitor, MoreHorizontal, Plus, Press, Smartphone, T, tx } from "../../kit/compat";
+import { SettingsCard, SettingsCardHeader, SettingsRow } from "../../settings/parts";
+import { Button, Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Monitor, MoreHorizontal, Plus, Press, Smartphone, Switch, T, tx } from "../../kit/compat";
 import { DropdownMenu, MenuItem } from "../../kit";
 import { useSelfHost } from "../self-host/self-host.styles";
 import { useSettings } from "../../settings/settings.styles";
@@ -12,7 +12,7 @@ import { settingsDialog } from "@/shell/settings-dialog-store";
 import { useChatStorageMode } from "@/features/chat/services/chat-storage-preference";
 import { EnterCodeDialog } from "./EnterCodeDialog";
 import { PairDeviceDialog } from "./PairDeviceDialog";
-import { isPhone, p2p, useDevices } from "./use-devices";
+import { isPhone, p2p, useDevices, useLocalNetwork } from "./use-devices";
 
 const UNITS: [Intl.RelativeTimeFormatUnit, number][] = [
   ["day", 86_400_000],
@@ -38,6 +38,7 @@ export function DevicesCard() {
   const navigate = useNavigate();
   const storage = useChatStorageMode();
   const { devices, computers } = useDevices();
+  const localNetwork = useLocalNetwork();
   const [dialog, setDialog] = useState<"pair" | "enter" | null>(null);
   const [menu, setMenu] = useState<string | null>(null);
   const [pending, setPending] = useState<Pending | null>(null);
@@ -154,6 +155,19 @@ export function DevicesCard() {
           </Press>
         </row>
       </col>
+      <SettingsRow>
+        <col {...sSettings.settingsRowInfo}>
+          <T w="full" {...sSettings.settingsRowLabel}>
+            {t("devices.local.label")}
+          </T>
+          <T w="full" {...sSettings.settingsRowSublabel}>
+            {t("devices.local.description")}
+          </T>
+        </col>
+        <row {...sSettings.settingsRowControl}>
+          <Switch checked={localNetwork} onCheckedChange={(on: boolean) => void p2p()!.setLocalNetwork(on)} aria-label={t("devices.local.label")} hideLabel />
+        </row>
+      </SettingsRow>
 
       {dialog === "pair" ? <PairDeviceDialog onClose={() => setDialog(null)} /> : null}
       {dialog === "enter" ? (

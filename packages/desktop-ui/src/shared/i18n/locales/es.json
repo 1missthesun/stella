@@ -4072,6 +4072,10 @@
       "unpaired": "{name} desvinculó este dispositivo.",
       "back": "Volver a este ordenador"
     },
+    "local": {
+      "label": "Buscar dispositivos en esta red",
+      "description": "Los teléfonos y ordenadores de la misma red pueden vincularse sin código. Es posible que tu ordenador pida permiso para acceder a la red local."
+    },
     "nearby": {
       "title": "Ordenadores cercanos",
       "looking": "Buscando ordenadores en esta red…",

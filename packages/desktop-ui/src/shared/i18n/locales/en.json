@@ -4015,6 +4015,10 @@
       "unpaired": "{name} unpaired this device.",
       "back": "Back to this computer"
     },
+    "local": {
+      "label": "Find devices on this network",
+      "description": "Phones and computers on the same network can pair without a code. Your computer may ask to allow local network access."
+    },
     "nearby": {
       "title": "Nearby computers",
       "looking": "Looking for computers on this network…",

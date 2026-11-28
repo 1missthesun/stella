@@ -4072,6 +4072,10 @@
       "unpaired": "{name} desemparelhou este dispositivo.",
       "back": "Voltar a este computador"
     },
+    "local": {
+      "label": "Encontrar dispositivos nesta rede",
+      "description": "Telefones e computadores na mesma rede podem emparelhar sem código. Seu computador pode pedir permissão de acesso à rede local."
+    },
     "nearby": {
       "title": "Computadores próximos",
       "looking": "Procurando computadores nesta rede…",

@@ -4072,6 +4072,10 @@
       "unpaired": "{name} a anulat asocierea cu acest dispozitiv.",
       "back": "Înapoi la acest computer"
     },
+    "local": {
+      "label": "Găsește dispozitive în această rețea",
+      "description": "Telefoanele și computerele din aceeași rețea se pot asocia fără cod. Computerul poate cere permisiunea de acces la rețeaua locală."
+    },
     "nearby": {
       "title": "Computere din apropiere",
       "looking": "Se caută computere în această rețea…",

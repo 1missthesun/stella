@@ -3956,6 +3956,10 @@
       "unpaired": "{name} đã hủy ghép đôi thiết bị này.",
       "back": "Quay lại máy tính này"
     },
+    "local": {
+      "label": "Tìm thiết bị trên mạng này",
+      "description": "Điện thoại và máy tính trên cùng mạng có thể ghép nối mà không cần mã. Máy tính có thể hỏi quyền truy cập mạng cục bộ."
+    },
     "nearby": {
       "title": "Máy tính ở gần",
       "looking": "Đang tìm máy tính trên mạng này…",

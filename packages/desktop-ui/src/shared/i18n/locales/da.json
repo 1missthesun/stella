@@ -4015,6 +4015,10 @@
       "unpaired": "{name} fjernede parringen med denne enhed.",
       "back": "Tilbage til denne computer"
     },
+    "local": {
+      "label": "Find enheder på dette netværk",
+      "description": "Telefoner og computere på samme netværk kan parres uden en kode. Din computer beder muligvis om adgang til det lokale netværk."
+    },
     "nearby": {
       "title": "Computere i nærheden",
       "looking": "Leder efter computere på dette netværk…",

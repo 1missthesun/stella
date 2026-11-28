@@ -4015,6 +4015,10 @@
       "unpaired": "{name} fjernet paringen med denne enheten.",
       "back": "Tilbake til denne datamaskinen"
     },
+    "local": {
+      "label": "Finn enheter på dette nettverket",
+      "description": "Telefoner og datamaskiner på samme nettverk kan kobles sammen uten kode. Datamaskinen kan be om tilgang til det lokale nettverket."
+    },
     "nearby": {
       "title": "Datamaskiner i nærheten",
       "looking": "Ser etter datamaskiner på dette nettverket…",

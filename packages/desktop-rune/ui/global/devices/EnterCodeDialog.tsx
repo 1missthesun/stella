@@ -3,7 +3,7 @@ import { useSelfHost } from "../self-host/self-host.styles";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useT } from "@/shared/i18n";
 import type { P2pNearbyComputer } from "@stella/contracts/p2p";
-import { p2p } from "./use-devices";
+import { p2p, useLocalNetwork } from "./use-devices";
 import { useDevicesStyles } from "./devices.styles";
 
 const NONE: P2pNearbyComputer[] = [];
@@ -18,7 +18,10 @@ export function EnterCodeDialog({ initialCode, onClose, onPaired }: { initialCod
   const d = useDevicesStyles();
   const t = useT();
   const api = p2p();
-  const nearby = useSyncExternalStore(api ? api.watchNearby : noop, api ? api.nearby : () => NONE, () => NONE);
+  // Nearby computers are looked for only while the person has turned on finding devices on this network.
+  const localNetwork = useLocalNetwork();
+  const watching = api && localNetwork;
+  const nearby = useSyncExternalStore(watching ? api.watchNearby : noop, watching ? api.nearby : () => NONE, () => NONE);
   const [text, setText] = useState(initialCode ?? "");
   const [asking, setAsking] = useState<P2pNearbyComputer | null>(null);
   const [digits, setDigits] = useState("");
@@ -133,6 +136,7 @@ export function EnterCodeDialog({ initialCode, onClose, onPaired }: { initialCod
               pairWithCode();
             }}
           >
+            {localNetwork ? (
             <col w="full" gap={4}>
               <T {...d.sectionLabel}>{t("devices.nearby.title")}</T>
               {unpaired.length ? (
@@ -153,6 +157,7 @@ export function EnterCodeDialog({ initialCode, onClose, onPaired }: { initialCod
                 </T>
               )}
             </col>
+            ) : null}
             <DialogDescription {...s.selfHostDialogDescription}>{t("devices.enter.intro")}</DialogDescription>
             <Input {...s.selfHostDialogInput} value={text} spellCheck={false} placeholder="K7M-49PX" label={t("devices.enter.label")} onChange={(event) => setText(event.target.value)} disabled={busy !== null} />
             {error ? (

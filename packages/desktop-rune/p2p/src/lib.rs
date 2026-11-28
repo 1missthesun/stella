@@ -9,7 +9,7 @@
 //!
 //! Commands: `status`, `rename {name}`, `pairing.create {ttlMs?}`, `pairing.short`,
 //! `pairing.cancel`, `pairing.deny {request}`, `pair {code}`, `pair.short {code}`,
-//! `nearby.start`, `nearby.stop`, `nearby.list`, `pair.nearby {id}`, `pair.nearby.confirm {id, code}`,
+//! `local.set {on}`, `nearby.start`, `nearby.stop`, `nearby.list`, `pair.nearby {id}`, `pair.nearby.confirm {id, code}`,
 //! `pair.nearby.cancel {id}`, `peers`, `device.revoke {id}`, `computer.forget {id}`,
 //! `computer.connect {id}`, `computer.disconnect {id}`, `computer.retry {id?}`,
 //! `request {id, body, timeoutMs?}`, `respond {req, ok, body?, error?}`, `emit {id?, body}`, `stop`.
@@ -18,9 +18,14 @@
 //! `{kind:"computer", id, state: paired|connecting|online|offline|revoked|not_paired|forgotten, ...}`,
 //! `{kind:"pairing", state: used|expired|withdrawn|short_ended|confirm|confirm_done, ...}`,
 //! `{kind:"nearby", id, state: found|lost|ended, ...}`.
+//!
+//! Local-network discovery (mDNS) and router port mapping stay off unless the config's
+//! `localNetwork` (or `local.set {on: true}`) turns them on: a node that only pairs by QR or short
+//! code never probes the local network, so starting it never raises the OS's local network prompt.
 
 mod client;
 mod host;
+mod local;
 mod nearby;
 pub mod pairing;
 pub mod pake;
@@ -38,7 +43,7 @@ use std::sync::atomic::AtomicU64;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-use iroh::endpoint::{BindOpts, QuicTransportConfig, presets};
+use iroh::endpoint::{BindOpts, PortmapperConfig, QuicTransportConfig, presets};
 use iroh::{Endpoint, RelayMode, RelayUrl, SecretKey};
 use serde_json::{Value, json};
 use tokio::sync::{mpsc, oneshot, watch};
@@ -74,6 +79,8 @@ pub struct Config {
     pub port: Option<u16>,
     /// Answer nearby devices on the local network. Phones, which are never computers, turn it off.
     pub discoverable: bool,
+    /// Local-network discovery (mDNS) and router port mapping, off unless the person turned it on.
+    pub local_network: bool,
     /// The mailbox behind short codes; `None` turns them off.
     pub rendezvous: Option<String>,
 }
@@ -82,7 +89,7 @@ pub const DEFAULT_RENDEZVOUS: &str = "https://p2p.stella.sh";
 
 impl Config {
     /// `{dataDir, name, platform, relay?: "default"|"off"|<url>, port?, discoverable?,
-    /// rendezvous?: "off"|<url>}`.
+    /// localNetwork?, rendezvous?: "off"|<url>}`.
     pub fn from_json(v: &Value) -> Result<Config, String> {
         let s = |k: &str| v.get(k).and_then(|x| x.as_str()).map(str::to_owned);
         let data_dir = s("dataDir").filter(|d| !d.is_empty()).ok_or("dataDir is required")?;
@@ -98,6 +105,7 @@ impl Config {
             relay,
             port: v.get("port").and_then(|p| p.as_u64()).map(|p| p as u16),
             discoverable: v.get("discoverable").and_then(|d| d.as_bool()).unwrap_or(true),
+            local_network: v.get("localNetwork").and_then(|d| d.as_bool()).unwrap_or(false),
             rendezvous: match s("rendezvous").as_deref() {
                 None | Some("") | Some("default") => Some(DEFAULT_RENDEZVOUS.to_owned()),
                 Some("off") => None,
@@ -132,7 +140,7 @@ pub(crate) struct Inner {
     next_rid: AtomicU64,
     devices: Mutex<HashMap<String, DeviceLink>>,
     computers: Mutex<HashMap<String, ComputerLink>>,
-    mdns: Option<iroh_mdns_address_lookup::MdnsAddressLookup>,
+    local: local::LocalLookup,
     discoverable: bool,
     rendezvous: Option<String>,
     confirming: Mutex<Option<nearby::Confirming>>,
@@ -157,8 +165,7 @@ fn transport_config() -> QuicTransportConfig {
         .build()
 }
 
-async fn bind(config: &Config, key: SecretKey, port: u16) -> Result<(Endpoint, Option<iroh_mdns_address_lookup::MdnsAddressLookup>), String> {
-    let key_id = key.public();
+async fn bind(config: &Config, key: SecretKey, port: u16, local: &local::LocalLookup) -> Result<Endpoint, String> {
     let mut builder = match &config.relay {
         Relay::Off => Endpoint::builder(presets::N0DisableRelay),
         Relay::Default => Endpoint::builder(presets::N0),
@@ -171,10 +178,10 @@ async fn bind(config: &Config, key: SecretKey, port: u16) -> Result<(Endpoint, O
         .secret_key(key)
         .alpns(vec![ALPN.to_vec(), PAIR_ALPN.to_vec()])
         .transport_config(transport_config());
-    let mdns = iroh_mdns_address_lookup::MdnsAddressLookup::builder().service_name("stella-p2p").advertise(config.discoverable).build(key_id);
-    match &mdns {
-        Ok(mdns) => builder = builder.address_lookup(mdns.clone()),
-        Err(e) => eprintln!("stella-p2p: no local network discovery ({e})"),
+    builder = builder.address_lookup(local.clone());
+    if !config.local_network {
+        // UPnP, PCP and NAT-PMP talk to the router on the local network.
+        builder = builder.portmapper_config(PortmapperConfig::Disabled);
     }
     if port != 0 {
         builder = builder
@@ -183,8 +190,7 @@ async fn bind(config: &Config, key: SecretKey, port: u16) -> Result<(Endpoint, O
             .bind_addr_with_opts(SocketAddr::from((Ipv6Addr::UNSPECIFIED, port)), BindOpts::default().set_is_required(false))
             .map_err(|e| e.to_string())?;
     }
-    let endpoint = builder.bind().await.map_err(|e| e.to_string())?;
-    Ok((endpoint, mdns.ok()))
+    builder.bind().await.map_err(|e| e.to_string())
 }
 
 impl Node {
@@ -197,20 +203,16 @@ impl Node {
             .map_err(|e| format!("can't start the device link: {e}"))?;
         let (store, key) = store::Store::open(&config.data_dir)?;
         let port = config.port.or(store.peers.port).unwrap_or(0);
-        let (endpoint, mdns, seen) = runtime.block_on(async {
-            let (endpoint, mdns) = match bind(&config, key.clone(), port).await {
-                Ok(bound) => bound,
+        let local = local::LocalLookup::default();
+        let endpoint = runtime.block_on(async {
+            match bind(&config, key.clone(), port, &local).await {
+                Ok(bound) => Ok(bound),
                 Err(e) if port != 0 => {
                     eprintln!("stella-p2p: port {port} is taken ({e}); listening on another");
-                    bind(&config, key, 0).await?
+                    bind(&config, key, 0, &local).await
                 }
-                Err(e) => return Err(e),
-            };
-            let seen = match &mdns {
-                Some(mdns) => Some(mdns.subscribe().await),
-                None => None,
-            };
-            Ok::<_, String>((endpoint, mdns, seen))
+                Err(e) => Err(e),
+            }
         })?;
         let inner = Arc::new(Inner {
             endpoint,
@@ -223,7 +225,7 @@ impl Node {
             next_rid: AtomicU64::new(1),
             devices: Mutex::new(HashMap::new()),
             computers: Mutex::new(HashMap::new()),
-            mdns,
+            local,
             discoverable: config.discoverable,
             rendezvous: config.rendezvous.clone(),
             confirming: Mutex::new(None),
@@ -239,9 +241,10 @@ impl Node {
                 let _ = store.save();
             }
         }
-        if let Some(seen) = seen {
-            let _guard = runtime.enter();
-            nearby::track(inner.clone(), seen);
+        if config.local_network
+            && let Err(e) = runtime.block_on(nearby::set_local(&inner, true))
+        {
+            eprintln!("stella-p2p: {e}");
         }
         runtime.spawn(host::accept_loop(inner.clone()));
         Ok(Node { runtime, inner })
@@ -311,6 +314,11 @@ async fn run(inner: Arc<Inner>, cmd: &str, args: Value) -> Result<Value, String>
         "pairing.short" => short::create(&inner).await,
         "pairing.deny" => Ok(json!(nearby::deny(&inner, args.get("request").and_then(|r| r.as_u64()).ok_or("request is required")?))),
         "pair.short" => short::pair(&inner, str_arg(&args, "code")?).await,
+        "local.set" => {
+            let on = args.get("on").and_then(|o| o.as_bool()).ok_or("on is required")?;
+            nearby::set_local(&inner, on).await?;
+            Ok(json!({ "localNetwork": inner.local.is_on() }))
+        }
         "nearby.start" => nearby::start(&inner),
         "nearby.stop" => {
             nearby::stop(&inner);
@@ -382,6 +390,7 @@ async fn status(inner: &Inner) -> Value {
         "relay": relay,
         "addrs": addrs,
         "port": lock(&inner.store).peers.port,
+        "localNetwork": inner.local.is_on(),
     })
 }
 

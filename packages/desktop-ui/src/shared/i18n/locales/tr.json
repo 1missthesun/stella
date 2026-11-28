@@ -4015,6 +4015,10 @@
       "unpaired": "{name} bu cihazın eşlemesini kaldırdı.",
       "back": "Bu bilgisayara dön"
     },
+    "local": {
+      "label": "Bu ağdaki cihazları bul",
+      "description": "Aynı ağdaki telefonlar ve bilgisayarlar kod olmadan eşleşebilir. Bilgisayarınız yerel ağ erişimi için izin isteyebilir."
+    },
     "nearby": {
       "title": "Yakındaki bilgisayarlar",
       "looking": "Bu ağdaki bilgisayarlar aranıyor…",

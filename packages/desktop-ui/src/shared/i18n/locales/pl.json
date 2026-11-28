@@ -4129,6 +4129,10 @@
       "unpaired": "{name} rozłączył parowanie z tym urządzeniem.",
       "back": "Wróć do tego komputera"
     },
+    "local": {
+      "label": "Szukaj urządzeń w tej sieci",
+      "description": "Telefony i komputery w tej samej sieci mogą się sparować bez kodu. Komputer może poprosić o zgodę na dostęp do sieci lokalnej."
+    },
     "nearby": {
       "title": "Pobliskie komputery",
       "looking": "Szukanie komputerów w tej sieci…",

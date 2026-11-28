@@ -1,7 +1,8 @@
 //! Pairing with a computer on the same network, with nothing to copy: computers answer on mDNS
 //! (service `stella-p2p`), a device lists them, and asking one to pair makes it show six digits
 //! that are typed on the device. The digits are a SPAKE2 password bound to both keys, so a
-//! look-alike on the network that relays the request still can't finish it.
+//! look-alike on the network that relays the request still can't finish it. All of it waits for
+//! local-network discovery to be turned on (`local.set`, crate::local).
 
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
@@ -43,7 +44,8 @@ pub(crate) struct Nearby {
 
 pub async fn answer_info(inner: &Inner, conn: Connection, mut send: SendStream) {
     let name = lock(&inner.name).clone();
-    let _ = wire::write(&mut send, &json!({ "name": name, "platform": inner.platform, "nearby": inner.discoverable })).await;
+    let nearby = inner.discoverable && inner.local.is_on();
+    let _ = wire::write(&mut send, &json!({ "name": name, "platform": inner.platform, "nearby": nearby })).await;
     let _ = send.finish();
     let _ = tokio::time::timeout(Duration::from_secs(3), conn.closed()).await;
 }
@@ -63,7 +65,7 @@ fn ids(device: EndpointId, computer: EndpointId) -> (Vec<u8>, Vec<u8>) {
 pub async fn host_confirm(inner: Arc<Inner>, conn: Connection, mut send: SendStream, mut recv: RecvStream, hello: Value) {
     let device = conn.remote_id();
     let refuse = |error: &'static str| json!({ "ok": false, "error": error });
-    if !inner.discoverable {
+    if !inner.discoverable || !inner.local.is_on() {
         let _ = wire::write(&mut send, &refuse("off")).await;
         let _ = send.finish();
         return;
@@ -159,10 +161,35 @@ pub fn list(inner: &Inner) -> Value {
     json!(list)
 }
 
-/// Follows the computers mDNS sees for the node's whole life. The lookup tells a subscriber only
-/// about computers that are new or changed since it last saw them, so subscribing when a dialog opens
-/// would miss everything already on the network.
-pub fn track(inner: Arc<Inner>, mut events: impl tokio_stream::Stream<Item = DiscoveryEvent> + Unpin + Send + 'static) {
+/// Turns local-network discovery on (mDNS, advertising this node if it answers nearby devices) or
+/// off (mDNS stops, what it found is forgotten).
+pub async fn set_local(inner: &Arc<Inner>, on: bool) -> Result<(), String> {
+    if !on {
+        inner.local.turn_off();
+        let lost: Vec<String> = {
+            let mut nearby = lock(&inner.nearby);
+            nearby.addrs.clear();
+            nearby.found.drain().map(|(id, _)| id).collect()
+        };
+        for id in lost {
+            (inner.emit)(json!({ "kind": "nearby", "id": id, "state": "lost" }));
+        }
+        return Ok(());
+    }
+    if inner.local.is_on() {
+        return Ok(());
+    }
+    let mdns = inner.local.turn_on(inner.endpoint.id(), inner.discoverable)?;
+    let seen = mdns.subscribe().await;
+    drop(mdns);
+    track(inner.clone(), seen);
+    Ok(())
+}
+
+/// Follows the computers mDNS sees while discovery is on (the stream ends when it is turned off).
+/// The lookup tells a subscriber only about computers that are new or changed since it last saw
+/// them, so subscribing when a dialog opens would miss everything already on the network.
+fn track(inner: Arc<Inner>, mut events: impl tokio_stream::Stream<Item = DiscoveryEvent> + Unpin + Send + 'static) {
     tokio::spawn(async move {
         while let Some(event) = events.next().await {
             match event {
@@ -214,8 +241,8 @@ fn spawn_probe(inner: &Arc<Inner>, addr: EndpointAddr) {
 }
 
 pub fn start(inner: &Arc<Inner>) -> Result<Value, String> {
-    if inner.mdns.is_none() {
-        return Err("Nearby computers aren't available on this device.".into());
+    if !inner.local.is_on() {
+        return Err("Finding computers on this network is off. Turn it on in Settings.".into());
     }
     let known: Vec<EndpointAddr> = {
         let mut nearby = lock(&inner.nearby);

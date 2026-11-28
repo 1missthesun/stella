@@ -11,6 +11,12 @@ export const useDevices = (): P2pPeers => {
   return useSyncExternalStore(api ? api.subscribe : noop, api ? api.peers : () => EMPTY, () => EMPTY);
 };
 
+/** Finding devices on this network, which stays off until the person turns it on. */
+export const useLocalNetwork = (): boolean => {
+  const api = p2p();
+  return useSyncExternalStore(api ? api.subscribeLocalNetwork : noop, api ? api.localNetwork : () => false, () => false);
+};
+
 /** The computer whose chat this is, when it's a paired computer's. */
 export const useChatComputer = (conversationId: string | null | undefined): P2pComputer | null => {
   const { computers } = useDevices();

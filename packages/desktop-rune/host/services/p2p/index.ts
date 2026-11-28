@@ -1,5 +1,7 @@
 // The device link in the windowed app: this computer serves the devices paired to it, reaches the
-// computers it paired to, and the UI gets both through `stella.host.p2p`.
+// computers it paired to, and the UI gets both through `stella.host.p2p`. The link stays off at
+// launch until there is something to serve or reach (a paired peer, a pairing the person starts, or
+// local-network discovery turned on in Settings), so a plain launch never touches the network.
 
 import { join } from "node:path";
 import type { PiChatEventsPayload, PiChatRequest } from "@stella/contracts/pi-chat";
@@ -7,7 +9,7 @@ import { parseRemoteConversationId, peerTag, type P2pApi, type P2pDevice, type P
 import { mainContext } from "../main-context";
 import type { ElectronApi } from "../renderer-api";
 import { serveDevices } from "./computer";
-import { computerName, createPeerStore, engineTransport, p2pDataDir, startLink, type PeerStore } from "./link";
+import { computerName, createPeerStore, engineTransport, hasPairedPeers, linkStarted, localNetworkSetting, p2pDataDir, saveLocalNetworkSetting, startLink, type PeerStore } from "./link";
 import { createConfirmStore, createNearbyStore } from "./nearby";
 import { createPeerChats, type PeerChats } from "./peer-chats";
 
@@ -33,6 +35,8 @@ let confirms: ReturnType<typeof createConfirmStore> | null = null;
 const pairedListeners = new Set<(device: P2pDevice) => void>();
 const shortEndedListeners = new Set<(reason: string) => void>();
 const nearbyEndedListeners = new Set<(id: string, reason: string) => void>();
+const localListeners = new Set<() => void>();
+let localNetwork = false;
 
 /** Starts the link and returns the window's API with paired computers' chats routed to them. */
 export function startP2p(api: ElectronApi): ElectronApi {
@@ -83,12 +87,15 @@ export function startP2p(api: ElectronApi): ElectronApi {
     }
   });
 
-  void startLink()
-    .then(() => store!.refresh())
-    .then(() => {
-      for (const computer of store!.get().computers) void transport.command("computer.connect", { id: computer.id }).catch(() => undefined);
-    })
-    .catch((error: unknown) => console.error("[p2p] the device link didn't start:", error));
+  localNetwork = localNetworkSetting();
+  if (localNetwork || hasPairedPeers()) {
+    void startLink()
+      .then(() => store!.refresh())
+      .then(() => {
+        for (const computer of store!.get().computers) void transport.command("computer.connect", { id: computer.id }).catch(() => undefined);
+      })
+      .catch((error: unknown) => console.error("[p2p] the device link didn't start:", error));
+  }
 
   return chats.wrap(api);
 }
@@ -140,6 +147,17 @@ export function p2pApi(): P2pApi {
       const short = isShortCode(code);
       const paired = await engineTransport.command<{ id: string }>(short ? "pair.short" : "pair", { code: code.trim() });
       return await finishPairing(paired.id);
+    },
+    localNetwork: () => localNetwork,
+    subscribeLocalNetwork: (listener) => listen(localListeners, listener),
+    async setLocalNetwork(on) {
+      if (on === localNetwork) return;
+      saveLocalNetworkSetting(on);
+      localNetwork = on;
+      for (const listener of localListeners) listener();
+      // Turning it on starts the link if it wasn't running (it reads the setting); off only has
+      // something to stop when the link runs.
+      if (on || linkStarted()) await engineTransport.command("local.set", { on }).catch((error: unknown) => console.error("[p2p] local network:", error));
     },
     nearby: () => nearby?.get() ?? [],
     watchNearby: (listener) => nearby?.watch(listener) ?? (() => {}),

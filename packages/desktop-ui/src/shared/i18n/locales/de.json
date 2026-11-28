@@ -4015,6 +4015,10 @@
       "unpaired": "{name} hat dieses Gerät entkoppelt.",
       "back": "Zurück zu diesem Computer"
     },
+    "local": {
+      "label": "Geräte in diesem Netzwerk finden",
+      "description": "Telefone und Computer im selben Netzwerk können ohne Code gekoppelt werden. Dein Computer fragt eventuell nach Zugriff auf das lokale Netzwerk."
+    },
     "nearby": {
       "title": "Computer in der Nähe",
       "looking": "Suche nach Computern in diesem Netzwerk…",

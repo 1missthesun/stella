@@ -4015,6 +4015,10 @@
       "unpaired": "{name} kopplade från den här enheten.",
       "back": "Tillbaka till den här datorn"
     },
+    "local": {
+      "label": "Hitta enheter i det här nätverket",
+      "description": "Telefoner och datorer i samma nätverk kan parkopplas utan kod. Datorn kan be om åtkomst till det lokala nätverket."
+    },
     "nearby": {
       "title": "Datorer i närheten",
       "looking": "Letar efter datorer i det här nätverket…",

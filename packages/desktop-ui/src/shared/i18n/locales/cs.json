@@ -4129,6 +4129,10 @@
       "unpaired": "{name} zrušil spárování s tímto zařízením.",
       "back": "Zpět na tento počítač"
     },
+    "local": {
+      "label": "Hledat zařízení v této síti",
+      "description": "Telefony a počítače ve stejné síti se mohou spárovat bez kódu. Počítač se může zeptat na povolení přístupu k místní síti."
+    },
     "nearby": {
       "title": "Počítače v okolí",
       "looking": "Hledání počítačů v této síti…",

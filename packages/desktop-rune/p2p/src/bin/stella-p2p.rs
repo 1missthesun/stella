@@ -12,7 +12,9 @@
 //!       pairing (as a device that was never shown the code, or was unpaired): prints how the
 //!       computer answered, which must be `not_paired`.
 //!
-//! Events print as JSON lines on stdout.
+//! `--local` turns on local-network discovery (mDNS and router port mapping), which `nearby`,
+//! `pair-nearby` and a `serve` that answers nearby devices need; without it the node stays off the
+//! local network. Events print as JSON lines on stdout.
 
 use std::sync::Arc;
 use std::time::Duration;
@@ -37,7 +39,8 @@ fn main() {
     };
     let rendezvous = take("--rendezvous");
     let short = args.iter().position(|a| a == "--short").map(|i| args.remove(i)).is_some();
-    let start = |data: &str, name: &str, relay: Relay, emit: stella_p2p::Emit| start(data, name, relay, rendezvous.clone(), emit);
+    let local = args.iter().position(|a| a == "--local").map(|i| args.remove(i)).is_some();
+    let start = |data: &str, name: &str, relay: Relay, emit: stella_p2p::Emit| start(data, name, relay, rendezvous.clone(), local, emit);
     let command = args.first().cloned().unwrap_or_else(|| die("a command is required"));
 
     if command == "impostor" {
@@ -142,13 +145,13 @@ fn main() {
     node.shutdown();
 }
 
-fn start(data: &str, name: &str, relay: Relay, rendezvous: Option<String>, emit: stella_p2p::Emit) -> Node {
+fn start(data: &str, name: &str, relay: Relay, rendezvous: Option<String>, local_network: bool, emit: stella_p2p::Emit) -> Node {
     let rendezvous = match rendezvous.as_deref() {
         Some("off") => None,
         Some(url) => Some(url.to_owned()),
         None => Some(stella_p2p::DEFAULT_RENDEZVOUS.to_owned()),
     };
-    let config = Config { data_dir: data.into(), name: name.into(), platform: std::env::consts::OS.into(), relay, port: Some(0), discoverable: true, rendezvous };
+    let config = Config { data_dir: data.into(), name: name.into(), platform: std::env::consts::OS.into(), relay, port: Some(0), discoverable: true, local_network, rendezvous };
     Node::start(config, emit).unwrap_or_else(|e| die(&e))
 }
 

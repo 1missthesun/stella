@@ -671,9 +671,34 @@
     "tryAgainHint": "Próbáld újra.",
     "heldSend": {
       "title": "Az üzeneted várakozik",
-      "description": "Jelentkezz be a Stellába, vagy kapcsold össze a ChatGPT- vagy Claude-előfizetésedet. Amint megteszed, elküldjük.",
+      "description": "Jelentkezz be a Stellába, vagy kapcsold össze a ChatGPT-, Claude- vagy Gemini-előfizetésedet. Amint megteszed, elküldjük.",
       "signIn": "Bejelentkezés",
       "connect": "Válaszd ki az AI-t"
+    },
+    "connectPlan": {
+      "outTitle": "Elhasználtad az ingyenes keretet",
+      "outBody": "Folytasd ingyen a már meglévő MI-előfizetéseddel.",
+      "outBodyChatGpt": "Folytasd ingyen a már meglévő ChatGPT-előfizetéseddel.",
+      "nearTitle": "Az ingyenes keret majdnem elfogyott",
+      "nearBody": "Utána folytasd ingyen a már meglévő MI-előfizetéseddel.",
+      "nearBodyChatGpt": "Utána folytasd ingyen a már meglévő ChatGPT-előfizetéseddel.",
+      "chooseTitle": "Kapcsold össze az MI-előfizetésedet",
+      "chooseBody": "A Stella ingyen fut vele. Az üzeneted elmegy, amint összekapcsoltad.",
+      "chooseBodyNoResend": "A Stella ingyen fut vele.",
+      "connect": "MI-előfizetés összekapcsolása",
+      "connectChatGpt": "ChatGPT összekapcsolása",
+      "plans": "Csomagok megtekintése",
+      "noPlan": "Nincs MI-előfizetésed?",
+      "plus": "Stella Plus · {price}/hó",
+      "otherWays": "API-kulcs vagy helyi modell használata",
+      "waiting": "Fejezd be a bejelentkezést a böngészőben.",
+      "claudeCliMissing": "Előbb telepítsd a Claude Code-ot, aztán próbáld újra.",
+      "failed": "Nem sikerült összekapcsolni. Újrapróbálod?",
+      "sending": "Összekapcsolva. Üzenet küldése…",
+      "connected": "Összekapcsolva. Minden kész.",
+      "plusSending": "Már Stella Plus-előfizető vagy. Üzenet küldése…",
+      "plusReady": "Már Stella Plus-előfizető vagy.",
+      "bubble": "Elhasználtad az ingyenes Stella-keretet. Kapcsold össze a ChatGPT-, Claude- vagy Gemini-előfizetésedet, hogy ingyen folytasd, vagy válts Stella Plusra."
     }
   },
   "cloudBrowser": {
@@ -2248,7 +2273,7 @@
       "antigravityHint": "Gemini a Google-előfizetéseddel",
       "antigravityOpened": "Megnyílt a Google bejelentkezési oldala a böngésződben. Jelentkezz be ott, majd illeszd be a megjelenő kódot.",
       "antigravityCode": "Illeszd be a Google által mutatott kódot",
-      "antigravityPreparing": "A Google Antigravity előkészítése…"
+      "antigravityPreparing": "Gemini előkészítése…"
     },
     "engineModels": {
       "ariaLabel": "{engine} modellek",

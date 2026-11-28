@@ -677,9 +677,34 @@
     "tryAgainHint": "Inténtalo de nuevo.",
     "heldSend": {
       "title": "Tu mensaje está esperando",
-      "description": "Inicia sesión en Stella o conecta tu plan de ChatGPT o Claude. Se enviará en cuanto lo hagas.",
+      "description": "Inicia sesión en Stella o conecta tu plan de ChatGPT, Claude o Gemini. Se enviará en cuanto lo hagas.",
       "signIn": "Iniciar sesión",
       "connect": "Elige tu IA"
+    },
+    "connectPlan": {
+      "outTitle": "Has usado tu uso gratuito",
+      "outBody": "Sigue gratis con el plan de IA que ya tienes.",
+      "outBodyChatGpt": "Sigue gratis con el plan de ChatGPT que ya tienes.",
+      "nearTitle": "Tu uso gratuito casi se ha agotado",
+      "nearBody": "Después, sigue gratis con el plan de IA que ya tienes.",
+      "nearBodyChatGpt": "Después, sigue gratis con el plan de ChatGPT que ya tienes.",
+      "chooseTitle": "Conecta tu plan de IA",
+      "chooseBody": "Stella funciona gratis con él. Tu mensaje se envía en cuanto te conectes.",
+      "chooseBodyNoResend": "Stella funciona gratis con él.",
+      "connect": "Conectar tu plan de IA",
+      "connectChatGpt": "Conectar ChatGPT",
+      "plans": "Ver planes",
+      "noPlan": "¿No tienes un plan de IA?",
+      "plus": "Obtener Stella Plus · {price}/mes",
+      "otherWays": "Usar una clave de API o un modelo local",
+      "waiting": "Termina de iniciar sesión en tu navegador.",
+      "claudeCliMissing": "Instala Claude Code primero y vuelve a intentarlo.",
+      "failed": "No se pudo conectar. ¿Lo intentas de nuevo?",
+      "sending": "Conectado. Enviando tu mensaje…",
+      "connected": "Conectado. Todo listo.",
+      "plusSending": "Ya tienes Stella Plus. Enviando tu mensaje…",
+      "plusReady": "Ya tienes Stella Plus.",
+      "bubble": "Has usado tu uso gratuito de Stella. Conecta tu plan de ChatGPT, Claude o Gemini para seguir gratis, o consigue Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2258,7 +2283,7 @@
       "antigravityHint": "Gemini con tu plan de Google",
       "antigravityOpened": "La página de inicio de sesión de Google se abrió en tu navegador. Inicia sesión ahí y luego pega el código que te muestra.",
       "antigravityCode": "Pega el código que muestra Google",
-      "antigravityPreparing": "Preparando Google Antigravity…"
+      "antigravityPreparing": "Preparando Gemini…"
     },
     "engineModels": {
       "ariaLabel": "Modelos de {engine}",

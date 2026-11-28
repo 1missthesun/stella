@@ -17,9 +17,9 @@ import { useLocale, useT } from "@/shared/i18n";
 import { useAuthSessionState } from "@/global/auth/hooks/use-auth-session-state";
 import { openExternalUrl } from "@/platform/electron/open-external";
 import { planUsageDialog } from "./plan-usage-dialog-store";
-import { CONNECT_PLAN_COPY } from "@stella/contracts/connect-plan-offer";
+import { getBillingReturnUrl } from "./billing-return-url";
 import {
-  connectPlanChatGptOnly,
+  connectPlanActionLabel,
   connectPlanCopy,
   connectPlanOfferEnabled,
   openConnectPlan,
@@ -62,15 +62,6 @@ export const usedShare = (used: number, limit: number): number => {
 
 const errorText = (error: unknown, fallback: string) =>
   error instanceof Error && error.message ? error.message : fallback;
-
-const getBillingReturnUrl = async (): Promise<string> => {
-  let baseUrl = (import.meta.env.VITE_STELLA_WEB_URL as string | undefined)?.trim() || "https://stella.sh";
-  try {
-    const resolved = await window.electronAPI?.website?.getBaseUrl?.();
-    if (resolved) baseUrl = resolved;
-  } catch {}
-  return new URL("/billing", baseUrl).toString();
-};
 
 const openSignInDialog = () => {
   void import("@/router").then(({ router }) => {
@@ -359,10 +350,10 @@ function UsageSection({
                 className="billing-btn billing-btn--primary"
                 onClick={() => {
                   planUsageDialog.close();
-                  openConnectPlan({ conversationId: null, reason: "allowance", choose: true });
+                  openConnectPlan({ conversationId: null, reason: "allowance" });
                 }}
               >
-                {connectPlanChatGptOnly() ? CONNECT_PLAN_COPY.connectChatGpt : CONNECT_PLAN_COPY.connect}
+                {connectPlanActionLabel()}
               </button>
             ) : null}
             {next ? (

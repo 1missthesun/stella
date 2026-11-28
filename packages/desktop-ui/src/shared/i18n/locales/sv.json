@@ -671,9 +671,34 @@
     "tryAgainHint": "Försök igen.",
     "heldSend": {
       "title": "Ditt meddelande väntar",
-      "description": "Logga in på Stella eller anslut ditt ChatGPT- eller Claude-abonnemang. Det skickas så snart du gör det.",
+      "description": "Logga in på Stella eller anslut ditt ChatGPT-, Claude- eller Gemini-abonnemang. Det skickas så fort du gör det.",
       "signIn": "Logga in",
       "connect": "Välj AI"
+    },
+    "connectPlan": {
+      "outTitle": "Du har använt din gratisanvändning",
+      "outBody": "Fortsätt gratis med AI-abonnemanget du redan har.",
+      "outBodyChatGpt": "Fortsätt gratis med ChatGPT-abonnemanget du redan har.",
+      "nearTitle": "Din gratisanvändning är nästan slut",
+      "nearBody": "Därefter fortsätter du gratis med AI-abonnemanget du redan har.",
+      "nearBodyChatGpt": "Därefter fortsätter du gratis med ChatGPT-abonnemanget du redan har.",
+      "chooseTitle": "Anslut ditt AI-abonnemang",
+      "chooseBody": "Stella körs gratis med det. Ditt meddelande skickas när du är ansluten.",
+      "chooseBodyNoResend": "Stella körs gratis med det.",
+      "connect": "Anslut ditt AI-abonnemang",
+      "connectChatGpt": "Anslut ChatGPT",
+      "plans": "Se abonnemang",
+      "noPlan": "Inget AI-abonnemang?",
+      "plus": "Skaffa Stella Plus · {price}/mån",
+      "otherWays": "Använd en API-nyckel eller en lokal modell",
+      "waiting": "Slutför inloggningen i webbläsaren.",
+      "claudeCliMissing": "Installera Claude Code först och försök sedan igen.",
+      "failed": "Det gick inte att ansluta. Försöka igen?",
+      "sending": "Ansluten. Skickar ditt meddelande…",
+      "connected": "Ansluten. Allt är klart.",
+      "plusSending": "Du har Stella Plus nu. Skickar ditt meddelande…",
+      "plusReady": "Du har Stella Plus nu.",
+      "bubble": "Du har använt din gratisanvändning av Stella. Anslut ditt ChatGPT-, Claude- eller Gemini-abonnemang för att fortsätta gratis, eller skaffa Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2248,7 +2273,7 @@
       "antigravityHint": "Gemini på ditt Google-abonnemang",
       "antigravityOpened": "Googles inloggningssida öppnades i webbläsaren. Logga in där och klistra sedan in koden som visas.",
       "antigravityCode": "Klistra in koden som Google visar",
-      "antigravityPreparing": "Gör Google Antigravity redo…"
+      "antigravityPreparing": "Gör Gemini redo…"
     },
     "engineModels": {
       "ariaLabel": "{engine}-modeller",

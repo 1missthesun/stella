@@ -671,9 +671,34 @@
     "tryAgainHint": "कृपया फिर से कोशिश करें।",
     "heldSend": {
       "title": "आपका संदेश इंतज़ार कर रहा है",
-      "description": "Stella में साइन इन करें, या अपना ChatGPT या Claude प्लान जोड़ें। ऐसा करते ही यह भेज दिया जाएगा।",
+      "description": "Stella में साइन इन करें, या अपना ChatGPT, Claude या Gemini प्लान कनेक्ट करें। जैसे ही आप ऐसा करेंगे, यह भेज दिया जाएगा।",
       "signIn": "साइन इन करें",
       "connect": "अपना AI चुनें"
+    },
+    "connectPlan": {
+      "outTitle": "आपका मुफ़्त इस्तेमाल पूरा हो गया",
+      "outBody": "अपने मौजूदा AI प्लान के साथ मुफ़्त में जारी रखें।",
+      "outBodyChatGpt": "अपने मौजूदा ChatGPT प्लान के साथ मुफ़्त में जारी रखें।",
+      "nearTitle": "आपका मुफ़्त इस्तेमाल लगभग पूरा हो गया है",
+      "nearBody": "उसके बाद, अपने मौजूदा AI प्लान के साथ मुफ़्त में जारी रखें।",
+      "nearBodyChatGpt": "उसके बाद, अपने मौजूदा ChatGPT प्लान के साथ मुफ़्त में जारी रखें।",
+      "chooseTitle": "अपना AI प्लान कनेक्ट करें",
+      "chooseBody": "Stella उस पर मुफ़्त चलती है। कनेक्ट होते ही आपका संदेश भेज दिया जाएगा।",
+      "chooseBodyNoResend": "Stella उस पर मुफ़्त चलती है।",
+      "connect": "अपना AI प्लान कनेक्ट करें",
+      "connectChatGpt": "ChatGPT कनेक्ट करें",
+      "plans": "प्लान देखें",
+      "noPlan": "कोई AI प्लान नहीं है?",
+      "plus": "Stella Plus लें · {price}/महीना",
+      "otherWays": "API कुंजी या लोकल मॉडल इस्तेमाल करें",
+      "waiting": "अपने ब्राउज़र में साइन इन पूरा करें।",
+      "claudeCliMissing": "पहले Claude Code इंस्टॉल करें, फिर दोबारा कोशिश करें।",
+      "failed": "कनेक्ट नहीं हो पाया। दोबारा कोशिश करें?",
+      "sending": "कनेक्ट हो गया। आपका संदेश भेजा जा रहा है…",
+      "connected": "कनेक्ट हो गया। सब तैयार है।",
+      "plusSending": "अब आप Stella Plus पर हैं। आपका संदेश भेजा जा रहा है…",
+      "plusReady": "अब आप Stella Plus पर हैं।",
+      "bubble": "आपका मुफ़्त Stella इस्तेमाल पूरा हो गया। मुफ़्त में जारी रखने के लिए अपना ChatGPT, Claude या Gemini प्लान कनेक्ट करें, या Stella Plus लें।"
     }
   },
   "cloudBrowser": {
@@ -2248,7 +2273,7 @@
       "antigravityHint": "आपके Google प्लान पर Gemini",
       "antigravityOpened": "Google का साइन-इन पेज आपके ब्राउज़र में खुल गया है। वहाँ साइन इन करें, फिर दिखाया गया कोड यहाँ पेस्ट करें।",
       "antigravityCode": "Google का दिखाया कोड पेस्ट करें",
-      "antigravityPreparing": "Google Antigravity तैयार हो रहा है…"
+      "antigravityPreparing": "Gemini तैयार हो रहा है…"
     },
     "engineModels": {
       "ariaLabel": "{engine} मॉडल",

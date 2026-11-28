@@ -1,7 +1,6 @@
 import { classifyStellaProviderError } from "@/features/chat/streaming/stella-provider-error-classifier";
 import { dismissComposerNotice, presentComposerNotice } from "@/features/chat/composer-notice-store";
 import { openConnectPlan } from "@/features/chat/connect-plan/connect-plan";
-import { CONNECT_PLAN_COPY } from "@stella/contracts/connect-plan-offer";
 import { translateNow } from "@/shared/i18n/active-translator";
 import { detectLlmRouteFailureKind } from "@stella/contracts/llm-route-failure";
 
@@ -70,7 +69,7 @@ const openEnginePicker = (conversationId: string | null) => {
   openConnectPlan({
     conversationId,
     reason: "no-engine",
-    description: CONNECT_PLAN_COPY.chooseBody,
+    description: translateNow("chat.connectPlan.chooseBody"),
     resend: () => void retryHeldSend({ attempts: 3 }),
   });
 };

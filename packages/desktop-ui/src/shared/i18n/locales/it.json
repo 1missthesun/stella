@@ -677,9 +677,34 @@
     "tryAgainHint": "Riprova.",
     "heldSend": {
       "title": "Il tuo messaggio è in attesa",
-      "description": "Accedi a Stella o collega il tuo abbonamento ChatGPT o Claude. Verrà inviato appena lo fai.",
+      "description": "Accedi a Stella o collega il tuo piano ChatGPT, Claude o Gemini. Verrà inviato appena lo fai.",
       "signIn": "Accedi",
       "connect": "Scegli la tua IA"
+    },
+    "connectPlan": {
+      "outTitle": "Hai esaurito l'uso gratuito",
+      "outBody": "Continua gratis con il piano IA che hai già.",
+      "outBodyChatGpt": "Continua gratis con il piano ChatGPT che hai già.",
+      "nearTitle": "L'uso gratuito è quasi esaurito",
+      "nearBody": "Poi continua gratis con il piano IA che hai già.",
+      "nearBodyChatGpt": "Poi continua gratis con il piano ChatGPT che hai già.",
+      "chooseTitle": "Collega il tuo piano IA",
+      "chooseBody": "Stella funziona gratis con quello. Il messaggio parte appena ti colleghi.",
+      "chooseBodyNoResend": "Stella funziona gratis con quello.",
+      "connect": "Collega il tuo piano IA",
+      "connectChatGpt": "Collega ChatGPT",
+      "plans": "Vedi i piani",
+      "noPlan": "Nessun piano IA?",
+      "plus": "Passa a Stella Plus · {price}/mese",
+      "otherWays": "Usa una chiave API o un modello locale",
+      "waiting": "Completa l'accesso nel browser.",
+      "claudeCliMissing": "Installa prima Claude Code, poi riprova.",
+      "failed": "Il collegamento non è riuscito. Riprovare?",
+      "sending": "Collegato. Invio del messaggio…",
+      "connected": "Collegato. È tutto pronto.",
+      "plusSending": "Ora hai Stella Plus. Invio del messaggio…",
+      "plusReady": "Ora hai Stella Plus.",
+      "bubble": "Hai esaurito l'uso gratuito di Stella. Collega il tuo piano ChatGPT, Claude o Gemini per continuare gratis, oppure passa a Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2258,7 +2283,7 @@
       "antigravityHint": "Gemini con il tuo piano Google",
       "antigravityOpened": "La pagina di accesso di Google si è aperta nel browser. Accedi lì, poi incolla il codice che ti mostra.",
       "antigravityCode": "Incolla il codice mostrato da Google",
-      "antigravityPreparing": "Preparazione di Google Antigravity…"
+      "antigravityPreparing": "Preparazione di Gemini…"
     },
     "engineModels": {
       "ariaLabel": "Modelli {engine}",

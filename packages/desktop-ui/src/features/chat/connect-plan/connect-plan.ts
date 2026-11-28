@@ -1,16 +1,16 @@
-import {
-  CONNECT_PLAN_COPY as COPY,
-  CONNECT_PLAN_OFFER_ENABLED,
-} from "@stella/contracts/connect-plan-offer";
-import { OPEN_MODEL_PICKER_EVENT } from "@/global/billing/byok-action";
+import { CONNECT_PLAN_OFFER_ENABLED } from "@stella/contracts/connect-plan-offer";
+import { openModelPickerAt } from "@/global/billing/byok-action";
 import { planUsageDialog } from "@/global/billing/plan-usage-dialog-store";
 import { isWebsiteHost } from "@/platform/capabilities";
 import { presentComposerNotice } from "@/features/chat/composer-notice-store";
+import { translateNow } from "@/shared/i18n/active-translator";
 import type { ToastOptions } from "@/ui/toast";
 import { classifyStellaProviderError } from "@/features/chat/streaming/stella-provider-error-classifier";
 import type { ConnectPlanNoticeState, ConnectPlanReason } from "./connect-plan-types";
 
 export type { ConnectPlanNoticeState, ConnectPlanReason } from "./connect-plan-types";
+
+const K = "chat.connectPlan";
 
 export const connectPlanOfferEnabled = (): boolean => CONNECT_PLAN_OFFER_ENABLED;
 
@@ -22,23 +22,28 @@ export const connectPlanCopy = (
   const chatGptOnly = connectPlanChatGptOnly();
   if (reason === "allowance-near") {
     return {
-      title: COPY.nearTitle,
-      description: chatGptOnly ? COPY.nearBodyChatGpt : COPY.nearBody,
+      title: translateNow(`${K}.nearTitle`),
+      description: translateNow(chatGptOnly ? `${K}.nearBodyChatGpt` : `${K}.nearBody`),
     };
   }
   if (reason === "no-engine") {
     return {
-      title: COPY.chooseTitle,
-      description: COPY.chooseBodyNoResend,
+      title: translateNow(`${K}.chooseTitle`),
+      description: translateNow(`${K}.chooseBodyNoResend`),
     };
   }
   return {
-    title: COPY.outTitle,
-    description: chatGptOnly ? COPY.outBodyChatGpt : COPY.outBody,
+    title: translateNow(`${K}.outTitle`),
+    description: translateNow(chatGptOnly ? `${K}.outBodyChatGpt` : `${K}.outBody`),
   };
 };
 
+export const connectPlanActionLabel = (): string =>
+  translateNow(connectPlanChatGptOnly() ? `${K}.connectChatGpt` : `${K}.connect`);
+
 export const openPlans = (): void => planUsageDialog.openPlans();
+
+export const openOtherModels = (): void => openModelPickerAt();
 
 export const openEngineConnectFallback = (): void => {
   if (typeof window === "undefined") return;
@@ -46,7 +51,7 @@ export const openEngineConnectFallback = (): void => {
     void import("@/shell/settings-dialog-store").then(({ settingsDialog }) => settingsDialog.openAt("ai"));
     return;
   }
-  window.dispatchEvent(new Event(OPEN_MODEL_PICKER_EVENT));
+  openModelPickerAt();
 };
 
 export type OpenConnectPlanInput = ConnectPlanNoticeState & {
@@ -59,16 +64,15 @@ export const openConnectPlan = (input: OpenConnectPlanInput): void => {
   const copy = connectPlanCopy(input.reason);
   const title = input.title ?? copy.title;
   const description = input.description ?? copy.description;
-  const connectLabel = connectPlanChatGptOnly() ? COPY.connectChatGpt : COPY.connect;
   const fallback: ToastOptions = {
     title,
     description,
     variant: input.reason === "allowance-near" ? "default" : "error",
     duration: 10000,
-    action: { label: connectLabel, onClick: openEngineConnectFallback },
+    action: { label: connectPlanActionLabel(), onClick: openEngineConnectFallback },
     ...(input.reason === "no-engine"
       ? {}
-      : { secondaryAction: { label: COPY.plans, onClick: openPlans } }),
+      : { secondaryAction: { label: translateNow(`${K}.plans`), onClick: openPlans } }),
   };
   presentComposerNotice(
     {
@@ -79,7 +83,6 @@ export const openConnectPlan = (input: OpenConnectPlanInput): void => {
       connectPlan: {
         reason: input.reason,
         ...(input.resend ? { resend: input.resend } : {}),
-        ...(input.choose ? { choose: true } : {}),
       },
     },
     fallback,

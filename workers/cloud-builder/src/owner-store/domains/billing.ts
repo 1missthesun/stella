@@ -422,10 +422,9 @@ const accessFor = (
   }
   const retryAfterMs = Math.max(1_000, blocking.window.resetAt - now);
   const label = config.plans[current].label;
-  const message = current === "free"
-    ? blocking.lifetime
-      ? STELLA_USAGE_LIMIT_MESSAGES.free_allowance
-      : "Free plan usage limit reached. Upgrade to keep going, or wait until it resets."
+  const freeAllowance = current === "free";
+  const message = freeAllowance
+    ? STELLA_USAGE_LIMIT_MESSAGES.free_allowance
     : `You've used this period's ${label} budget. Add credit or upgrade to keep going, or wait until it resets.`;
   return {
     ...base,
@@ -434,7 +433,7 @@ const accessFor = (
     audience: audienceFor(current),
     retryAfterMs,
     message,
-    usageLimit: blocking.lifetime
+    usageLimit: freeAllowance
       ? { reason: "free_allowance", message }
       : { reason: "plan_limit", message, retryAfterMs },
   };

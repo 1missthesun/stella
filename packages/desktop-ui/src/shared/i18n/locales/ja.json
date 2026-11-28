@@ -665,9 +665,34 @@
     "tryAgainHint": "もう一度お試しください。",
     "heldSend": {
       "title": "メッセージは送信待ちです",
-      "description": "Stella にサインインするか、ChatGPT または Claude のプランを接続してください。接続するとすぐに送信されます。",
+      "description": "Stella にサインインするか、ChatGPT、Claude、Gemini のプランを接続してください。接続するとすぐに送信されます。",
       "signIn": "サインイン",
       "connect": "AI を選択"
+    },
+    "connectPlan": {
+      "outTitle": "無料枠を使い切りました",
+      "outBody": "お持ちの AI プランで、引き続き無料で使えます。",
+      "outBodyChatGpt": "お持ちの ChatGPT プランで、引き続き無料で使えます。",
+      "nearTitle": "無料枠がもうすぐなくなります",
+      "nearBody": "その後は、お持ちの AI プランで引き続き無料で使えます。",
+      "nearBodyChatGpt": "その後は、お持ちの ChatGPT プランで引き続き無料で使えます。",
+      "chooseTitle": "AI プランを接続",
+      "chooseBody": "Stella はそのプランで無料で動きます。接続するとメッセージが送信されます。",
+      "chooseBodyNoResend": "Stella はそのプランで無料で動きます。",
+      "connect": "AI プランを接続",
+      "connectChatGpt": "ChatGPT を接続",
+      "plans": "プランを見る",
+      "noPlan": "AI プランをお持ちでない場合",
+      "plus": "Stella Plus にする · 月額{price}",
+      "otherWays": "API キーまたはローカルモデルを使う",
+      "waiting": "ブラウザでサインインを完了してください。",
+      "claudeCliMissing": "先に Claude Code をインストールしてから、もう一度お試しください。",
+      "failed": "接続できませんでした。もう一度試しますか？",
+      "sending": "接続しました。メッセージを送信しています…",
+      "connected": "接続しました。準備完了です。",
+      "plusSending": "Stella Plus になりました。メッセージを送信しています…",
+      "plusReady": "Stella Plus になりました。",
+      "bubble": "Stella の無料枠を使い切りました。ChatGPT、Claude、Gemini のプランを接続すると引き続き無料で使えます。または Stella Plus にアップグレードしてください。"
     }
   },
   "cloudBrowser": {
@@ -2238,7 +2263,7 @@
       "antigravityHint": "Google のプランで使う Gemini",
       "antigravityOpened": "Google のログインページをブラウザで開きました。そこでログインし、表示されたコードを貼り付けてください。",
       "antigravityCode": "Google に表示されたコードを貼り付け",
-      "antigravityPreparing": "Google Antigravity を準備しています…"
+      "antigravityPreparing": "Gemini を準備しています…"
     },
     "engineModels": {
       "ariaLabel": "{engine} のモデル",

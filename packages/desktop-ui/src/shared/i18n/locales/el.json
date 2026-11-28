@@ -671,9 +671,34 @@
     "tryAgainHint": "Δοκιμάστε ξανά.",
     "heldSend": {
       "title": "Το μήνυμά σας περιμένει",
-      "description": "Συνδεθείτε στη Stella ή συνδέστε τη συνδρομή σας στο ChatGPT ή στο Claude. Θα σταλεί μόλις το κάνετε.",
+      "description": "Συνδέσου στη Stella ή σύνδεσε τη συνδρομή σου ChatGPT, Claude ή Gemini. Θα σταλεί μόλις το κάνεις.",
       "signIn": "Σύνδεση",
       "connect": "Επιλέξτε AI"
+    },
+    "connectPlan": {
+      "outTitle": "Χρησιμοποίησες τη δωρεάν χρήση σου",
+      "outBody": "Συνέχισε δωρεάν με τη συνδρομή AI που ήδη έχεις.",
+      "outBodyChatGpt": "Συνέχισε δωρεάν με τη συνδρομή ChatGPT που ήδη έχεις.",
+      "nearTitle": "Η δωρεάν χρήση σου σχεδόν τελείωσε",
+      "nearBody": "Μετά, συνέχισε δωρεάν με τη συνδρομή AI που ήδη έχεις.",
+      "nearBodyChatGpt": "Μετά, συνέχισε δωρεάν με τη συνδρομή ChatGPT που ήδη έχεις.",
+      "chooseTitle": "Σύνδεσε τη συνδρομή AI σου",
+      "chooseBody": "Η Stella λειτουργεί δωρεάν με αυτήν. Το μήνυμά σου στέλνεται μόλις συνδεθείς.",
+      "chooseBodyNoResend": "Η Stella λειτουργεί δωρεάν με αυτήν.",
+      "connect": "Σύνδεση συνδρομής AI",
+      "connectChatGpt": "Σύνδεση ChatGPT",
+      "plans": "Δες τα πλάνα",
+      "noPlan": "Δεν έχεις συνδρομή AI;",
+      "plus": "Απόκτησε Stella Plus · {price}/μήνα",
+      "otherWays": "Χρήση κλειδιού API ή τοπικού μοντέλου",
+      "waiting": "Ολοκλήρωσε τη σύνδεση στο πρόγραμμα περιήγησης.",
+      "claudeCliMissing": "Εγκατάστησε πρώτα το Claude Code και δοκίμασε ξανά.",
+      "failed": "Η σύνδεση δεν πέτυχε. Δοκιμή ξανά;",
+      "sending": "Συνδέθηκε. Αποστολή του μηνύματός σου…",
+      "connected": "Συνδέθηκε. Όλα έτοιμα.",
+      "plusSending": "Έχεις πλέον Stella Plus. Αποστολή του μηνύματός σου…",
+      "plusReady": "Έχεις πλέον Stella Plus.",
+      "bubble": "Χρησιμοποίησες τη δωρεάν χρήση της Stella. Σύνδεσε τη συνδρομή ChatGPT, Claude ή Gemini για να συνεχίσεις δωρεάν, ή απόκτησε Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2248,7 +2273,7 @@
       "antigravityHint": "Gemini με το πρόγραμμα Google σας",
       "antigravityOpened": "Η σελίδα σύνδεσης της Google άνοιξε στο πρόγραμμα περιήγησής σας. Συνδεθείτε εκεί και μετά επικολλήστε τον κωδικό που εμφανίζεται.",
       "antigravityCode": "Επικολλήστε τον κωδικό που δείχνει η Google",
-      "antigravityPreparing": "Προετοιμασία του Google Antigravity…"
+      "antigravityPreparing": "Προετοιμασία του Gemini…"
     },
     "engineModels": {
       "ariaLabel": "Μοντέλα {engine}",

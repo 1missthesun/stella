@@ -683,9 +683,34 @@
     "tryAgainHint": "Spróbuj ponownie.",
     "heldSend": {
       "title": "Twoja wiadomość czeka",
-      "description": "Zaloguj się do Stelli albo połącz swój plan ChatGPT lub Claude. Wyślemy ją, gdy tylko to zrobisz.",
+      "description": "Zaloguj się do Stelli albo połącz swój plan ChatGPT, Claude lub Gemini. Wiadomość wyśle się, gdy tylko to zrobisz.",
       "signIn": "Zaloguj się",
       "connect": "Wybierz AI"
+    },
+    "connectPlan": {
+      "outTitle": "Wykorzystano darmowy limit",
+      "outBody": "Korzystaj dalej za darmo z planem AI, który już masz.",
+      "outBodyChatGpt": "Korzystaj dalej za darmo z planem ChatGPT, który już masz.",
+      "nearTitle": "Darmowy limit prawie się wyczerpał",
+      "nearBody": "Potem korzystaj dalej za darmo z planem AI, który już masz.",
+      "nearBodyChatGpt": "Potem korzystaj dalej za darmo z planem ChatGPT, który już masz.",
+      "chooseTitle": "Połącz swój plan AI",
+      "chooseBody": "Stella działa na nim za darmo. Wiadomość wyśle się, gdy tylko się połączysz.",
+      "chooseBodyNoResend": "Stella działa na nim za darmo.",
+      "connect": "Połącz swój plan AI",
+      "connectChatGpt": "Połącz ChatGPT",
+      "plans": "Zobacz plany",
+      "noPlan": "Nie masz planu AI?",
+      "plus": "Weź Stella Plus · {price}/mies.",
+      "otherWays": "Użyj klucza API lub modelu lokalnego",
+      "waiting": "Dokończ logowanie w przeglądarce.",
+      "claudeCliMissing": "Najpierw zainstaluj Claude Code, potem spróbuj ponownie.",
+      "failed": "Nie udało się połączyć. Spróbować ponownie?",
+      "sending": "Połączono. Wysyłanie wiadomości…",
+      "connected": "Połączono. Wszystko gotowe.",
+      "plusSending": "Masz już Stella Plus. Wysyłanie wiadomości…",
+      "plusReady": "Masz już Stella Plus.",
+      "bubble": "Wykorzystano darmowy limit Stelli. Połącz swój plan ChatGPT, Claude lub Gemini, aby korzystać dalej za darmo, albo weź Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2268,7 +2293,7 @@
       "antigravityHint": "Gemini w ramach Twojego planu Google",
       "antigravityOpened": "Strona logowania Google otworzyła się w przeglądarce. Zaloguj się tam, a potem wklej wyświetlony kod.",
       "antigravityCode": "Wklej kod wyświetlony przez Google",
-      "antigravityPreparing": "Przygotowywanie Google Antigravity…"
+      "antigravityPreparing": "Przygotowywanie Gemini…"
     },
     "engineModels": {
       "ariaLabel": "Modele {engine}",

@@ -671,9 +671,34 @@
     "tryAgainHint": "Please try again.",
     "heldSend": {
       "title": "Your message is waiting",
-      "description": "Sign in to Stella, or connect your ChatGPT or Claude plan. It sends as soon as you do.",
+      "description": "Sign in to Stella, or connect your ChatGPT, Claude or Gemini plan. It sends as soon as you do.",
       "signIn": "Sign in",
       "connect": "Choose your AI"
+    },
+    "connectPlan": {
+      "outTitle": "You've used your free usage",
+      "outBody": "Keep going free with the AI plan you already have.",
+      "outBodyChatGpt": "Keep going free with the ChatGPT plan you already have.",
+      "nearTitle": "Your free usage is almost used up",
+      "nearBody": "After that, keep going free with the AI plan you already have.",
+      "nearBodyChatGpt": "After that, keep going free with the ChatGPT plan you already have.",
+      "chooseTitle": "Connect your AI plan",
+      "chooseBody": "Stella runs free on it. Your message sends once you're connected.",
+      "chooseBodyNoResend": "Stella runs free on it.",
+      "connect": "Connect your AI plan",
+      "connectChatGpt": "Connect ChatGPT",
+      "plans": "See plans",
+      "noPlan": "No AI plan?",
+      "plus": "Get Stella Plus · {price}/mo",
+      "otherWays": "Use an API key or a local model",
+      "waiting": "Finish signing in in your browser.",
+      "claudeCliMissing": "Install Claude Code first, then try again.",
+      "failed": "That didn't connect. Try again?",
+      "sending": "Connected. Sending your message…",
+      "connected": "Connected. You're all set.",
+      "plusSending": "You're on Stella Plus. Sending your message…",
+      "plusReady": "You're on Stella Plus.",
+      "bubble": "You've used your free Stella usage. Connect your ChatGPT, Claude or Gemini plan to keep going free, or get Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2248,7 +2273,7 @@
       "antigravityHint": "Gemini on your Google plan",
       "antigravityOpened": "Google's sign-in page opened in your browser. Sign in there, then paste the code it shows you.",
       "antigravityCode": "Paste the code Google shows",
-      "antigravityPreparing": "Getting Google Antigravity ready…"
+      "antigravityPreparing": "Getting Gemini ready…"
     },
     "engineModels": {
       "ariaLabel": "{engine} models",

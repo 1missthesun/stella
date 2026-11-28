@@ -16,82 +16,88 @@
   gap: 9px;
 }
 
-.composer-notice--compact .connect-plan__head .composer-notice__actions {
-  width: 100%;
-  justify-content: flex-end;
-}
-
-.connect-plan__options {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
+.connect-plan__plans {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(96px, 1fr));
+  gap: 8px;
   margin-right: -28px;
 }
 
-.connect-plan__option {
+.connect-plan__plan {
   display: flex;
   align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 8px 10px;
-  border: 0;
+  justify-content: center;
+  gap: 8px;
+  min-width: 0;
+  height: 40px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
   border-radius: var(--radius-lg, 10px);
-  background: transparent;
-  color: inherit;
-  text-align: left;
+  background: color-mix(in oklch, var(--foreground) 3%, transparent);
+  color: var(--text-strong);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
   cursor: pointer;
+  transition: background-color 120ms ease, border-color 120ms ease;
 }
 
-.connect-plan__option:hover:not(:disabled),
-.connect-plan__option:focus-visible {
-  background: color-mix(in oklch, var(--foreground) 6%, transparent);
+.connect-plan__plan:hover:not(:disabled),
+.connect-plan__plan:focus-visible {
+  background: color-mix(in oklch, var(--foreground) 8%, transparent);
+  border-color: color-mix(in oklch, var(--foreground) 18%, transparent);
 }
 
-.connect-plan__option:disabled {
+.connect-plan__plan:disabled {
   cursor: default;
   opacity: 0.55;
 }
 
-.connect-plan__option[data-pending] {
+.connect-plan__plan[data-pending] {
   opacity: 1;
+  cursor: default;
 }
 
-.connect-plan__option-icon {
+.connect-plan__plan-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.composer-notice--compact .connect-plan__plan {
+  height: 36px;
+  font-size: 12.5px;
+}
+
+.connect-plan__foot {
   display: flex;
   align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 34px;
-  height: 34px;
-  border-radius: 10px;
-  border: 1px solid var(--border);
-  color: var(--text-strong);
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-right: -28px;
 }
 
-.connect-plan__option-text {
+.connect-plan__upgrade {
   display: flex;
-  flex-direction: column;
-  flex: 1;
+  align-items: center;
+  gap: 8px;
   min-width: 0;
 }
 
-.connect-plan__option-title {
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--text-strong);
-}
-
-.connect-plan__option-body {
+.connect-plan__lead {
   font-size: 12.5px;
-  line-height: 1.35;
   color: var(--text-weak);
 }
 
-.connect-plan__option-state {
-  flex: none;
-  font-size: 12.5px;
-  font-weight: 500;
-  color: var(--primary);
+.connect-plan__link.connect-plan__other {
+  font-size: 12px;
+  color: var(--text-weak);
+}
+
+.connect-plan__link.connect-plan__other:hover,
+.connect-plan__link.connect-plan__other:focus-visible {
+  color: var(--text-strong);
 }
 
 .connect-plan__spinner {
@@ -108,32 +114,6 @@
   to {
     transform: rotate(360deg);
   }
-}
-
-.connect-plan__key-form {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-right: -28px;
-}
-
-.connect-plan__key-form > :first-child {
-  flex: 0 0 11rem;
-  width: 11rem;
-  min-width: 0;
-}
-
-.connect-plan__key-input {
-  flex: 1 1 auto;
-  width: auto;
-  min-width: 0;
-  height: 30px;
-  padding: 0 10px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-lg, 10px);
-  background: transparent;
-  color: var(--text-strong);
-  font-size: 12.5px;
 }
 
 .connect-plan__flow {

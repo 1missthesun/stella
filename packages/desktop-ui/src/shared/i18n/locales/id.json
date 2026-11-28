@@ -665,9 +665,34 @@
     "tryAgainHint": "Silakan coba lagi.",
     "heldSend": {
       "title": "Pesan Anda sedang menunggu",
-      "description": "Masuk ke Stella, atau hubungkan paket ChatGPT atau Claude Anda. Pesan akan terkirim begitu Anda melakukannya.",
+      "description": "Masuk ke Stella, atau hubungkan paket ChatGPT, Claude, atau Gemini-mu. Pesan akan terkirim begitu kamu melakukannya.",
       "signIn": "Masuk",
       "connect": "Pilih AI Anda"
+    },
+    "connectPlan": {
+      "outTitle": "Penggunaan gratismu sudah habis",
+      "outBody": "Lanjutkan gratis dengan paket AI yang sudah kamu punya.",
+      "outBodyChatGpt": "Lanjutkan gratis dengan paket ChatGPT yang sudah kamu punya.",
+      "nearTitle": "Penggunaan gratismu hampir habis",
+      "nearBody": "Setelah itu, lanjutkan gratis dengan paket AI yang sudah kamu punya.",
+      "nearBodyChatGpt": "Setelah itu, lanjutkan gratis dengan paket ChatGPT yang sudah kamu punya.",
+      "chooseTitle": "Hubungkan paket AI-mu",
+      "chooseBody": "Stella berjalan gratis dengannya. Pesanmu terkirim begitu kamu terhubung.",
+      "chooseBodyNoResend": "Stella berjalan gratis dengannya.",
+      "connect": "Hubungkan paket AI-mu",
+      "connectChatGpt": "Hubungkan ChatGPT",
+      "plans": "Lihat paket",
+      "noPlan": "Belum punya paket AI?",
+      "plus": "Ambil Stella Plus · {price}/bln",
+      "otherWays": "Gunakan kunci API atau model lokal",
+      "waiting": "Selesaikan masuk di browsermu.",
+      "claudeCliMissing": "Pasang Claude Code dulu, lalu coba lagi.",
+      "failed": "Gagal terhubung. Coba lagi?",
+      "sending": "Terhubung. Mengirim pesanmu…",
+      "connected": "Terhubung. Semua siap.",
+      "plusSending": "Kamu sekarang di Stella Plus. Mengirim pesanmu…",
+      "plusReady": "Kamu sekarang di Stella Plus.",
+      "bubble": "Penggunaan gratis Stella-mu sudah habis. Hubungkan paket ChatGPT, Claude, atau Gemini-mu untuk lanjut gratis, atau ambil Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2238,7 +2263,7 @@
       "antigravityHint": "Gemini dengan paket Google Anda",
       "antigravityOpened": "Halaman masuk Google terbuka di browser Anda. Masuk di sana, lalu tempelkan kode yang ditampilkan.",
       "antigravityCode": "Tempelkan kode yang ditampilkan Google",
-      "antigravityPreparing": "Menyiapkan Google Antigravity…"
+      "antigravityPreparing": "Menyiapkan Gemini…"
     },
     "engineModels": {
       "ariaLabel": "Model {engine}",

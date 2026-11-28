@@ -671,9 +671,34 @@
     "tryAgainHint": "Yritä uudelleen.",
     "heldSend": {
       "title": "Viestisi odottaa",
-      "description": "Kirjaudu Stellaan tai yhdistä ChatGPT- tai Claude-tilauksesi. Se lähtee heti, kun teet sen.",
+      "description": "Kirjaudu Stellaan tai yhdistä ChatGPT-, Claude- tai Gemini-tilauksesi. Viesti lähtee heti, kun teet sen.",
       "signIn": "Kirjaudu",
       "connect": "Valitse tekoäly"
+    },
+    "connectPlan": {
+      "outTitle": "Ilmainen käyttösi on käytetty",
+      "outBody": "Jatka ilmaiseksi tekoälytilauksella, joka sinulla jo on.",
+      "outBodyChatGpt": "Jatka ilmaiseksi ChatGPT-tilauksella, joka sinulla jo on.",
+      "nearTitle": "Ilmainen käyttösi on melkein käytetty",
+      "nearBody": "Sen jälkeen jatka ilmaiseksi tekoälytilauksella, joka sinulla jo on.",
+      "nearBodyChatGpt": "Sen jälkeen jatka ilmaiseksi ChatGPT-tilauksella, joka sinulla jo on.",
+      "chooseTitle": "Yhdistä tekoälytilauksesi",
+      "chooseBody": "Stella toimii sillä ilmaiseksi. Viestisi lähtee heti, kun olet yhdistänyt.",
+      "chooseBodyNoResend": "Stella toimii sillä ilmaiseksi.",
+      "connect": "Yhdistä tekoälytilauksesi",
+      "connectChatGpt": "Yhdistä ChatGPT",
+      "plans": "Katso tilaukset",
+      "noPlan": "Ei tekoälytilausta?",
+      "plus": "Hanki Stella Plus · {price}/kk",
+      "otherWays": "Käytä API-avainta tai paikallista mallia",
+      "waiting": "Viimeistele kirjautuminen selaimessa.",
+      "claudeCliMissing": "Asenna ensin Claude Code ja yritä sitten uudelleen.",
+      "failed": "Yhdistäminen ei onnistunut. Yritetäänkö uudelleen?",
+      "sending": "Yhdistetty. Lähetetään viestiäsi…",
+      "connected": "Yhdistetty. Kaikki valmista.",
+      "plusSending": "Sinulla on nyt Stella Plus. Lähetetään viestiäsi…",
+      "plusReady": "Sinulla on nyt Stella Plus.",
+      "bubble": "Ilmainen Stella-käyttösi on käytetty. Yhdistä ChatGPT-, Claude- tai Gemini-tilauksesi jatkaaksesi ilmaiseksi, tai hanki Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2248,7 +2273,7 @@
       "antigravityHint": "Gemini Google-tilauksellasi",
       "antigravityOpened": "Googlen kirjautumissivu avautui selaimeesi. Kirjaudu siellä sisään ja liitä sitten sen näyttämä koodi.",
       "antigravityCode": "Liitä Googlen näyttämä koodi",
-      "antigravityPreparing": "Valmistellaan Google Antigravitya…"
+      "antigravityPreparing": "Gemini valmistellaan…"
     },
     "engineModels": {
       "ariaLabel": "Mallit: {engine}",

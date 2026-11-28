@@ -27,9 +27,8 @@ import {
   presentComposerNotice,
   type ComposerNoticeKind,
 } from '@/features/chat/composer-notice-store'
-import { CONNECT_PLAN_COPY } from '@stella/contracts/connect-plan-offer'
 import {
-  connectPlanChatGptOnly,
+  connectPlanActionLabel,
   connectPlanCopy,
   connectPlanOfferEnabled,
   openEngineConnectFallback,
@@ -276,13 +275,8 @@ export const resolveStellaProviderErrorToast = (
           description: copy.description,
           variant: 'error',
           duration: 10000,
-          action: {
-            label: connectPlanChatGptOnly()
-              ? CONNECT_PLAN_COPY.connectChatGpt
-              : CONNECT_PLAN_COPY.connect,
-            onClick: openEngineConnectFallback,
-          },
-          secondaryAction: { label: CONNECT_PLAN_COPY.plans, onClick: openBilling },
+          action: { label: connectPlanActionLabel(), onClick: openEngineConnectFallback },
+          secondaryAction: { label: t('chat.connectPlan.plans'), onClick: openBilling },
         }
       }
       return {

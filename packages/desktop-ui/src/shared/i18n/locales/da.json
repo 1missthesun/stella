@@ -671,9 +671,34 @@
     "tryAgainHint": "Prøv igen.",
     "heldSend": {
       "title": "Din besked venter",
-      "description": "Log ind på Stella, eller forbind dit ChatGPT- eller Claude-abonnement. Den sendes, så snart du gør.",
+      "description": "Log ind på Stella, eller forbind dit ChatGPT-, Claude- eller Gemini-abonnement. Den sendes, så snart du gør det.",
       "signIn": "Log ind",
       "connect": "Vælg din AI"
+    },
+    "connectPlan": {
+      "outTitle": "Du har brugt dit gratis forbrug",
+      "outBody": "Fortsæt gratis med det AI-abonnement, du allerede har.",
+      "outBodyChatGpt": "Fortsæt gratis med det ChatGPT-abonnement, du allerede har.",
+      "nearTitle": "Dit gratis forbrug er næsten brugt",
+      "nearBody": "Derefter kan du fortsætte gratis med det AI-abonnement, du allerede har.",
+      "nearBodyChatGpt": "Derefter kan du fortsætte gratis med det ChatGPT-abonnement, du allerede har.",
+      "chooseTitle": "Forbind dit AI-abonnement",
+      "chooseBody": "Stella kører gratis på det. Din besked sendes, så snart du er forbundet.",
+      "chooseBodyNoResend": "Stella kører gratis på det.",
+      "connect": "Forbind dit AI-abonnement",
+      "connectChatGpt": "Forbind ChatGPT",
+      "plans": "Se abonnementer",
+      "noPlan": "Intet AI-abonnement?",
+      "plus": "Få Stella Plus · {price}/md.",
+      "otherWays": "Brug en API-nøgle eller en lokal model",
+      "waiting": "Gør login færdigt i din browser.",
+      "claudeCliMissing": "Installer Claude Code først, og prøv så igen.",
+      "failed": "Det lykkedes ikke at forbinde. Prøv igen?",
+      "sending": "Forbundet. Sender din besked…",
+      "connected": "Forbundet. Du er klar.",
+      "plusSending": "Du har nu Stella Plus. Sender din besked…",
+      "plusReady": "Du har nu Stella Plus.",
+      "bubble": "Du har brugt dit gratis Stella-forbrug. Forbind dit ChatGPT-, Claude- eller Gemini-abonnement for at fortsætte gratis, eller få Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2248,7 +2273,7 @@
       "antigravityHint": "Gemini på dit Google-abonnement",
       "antigravityOpened": "Googles loginside er åbnet i din browser. Log ind dér, og indsæt derefter den kode, den viser.",
       "antigravityCode": "Indsæt koden, som Google viser",
-      "antigravityPreparing": "Gør Google Antigravity klar…"
+      "antigravityPreparing": "Gør Gemini klar…"
     },
     "engineModels": {
       "ariaLabel": "{engine}-modeller",

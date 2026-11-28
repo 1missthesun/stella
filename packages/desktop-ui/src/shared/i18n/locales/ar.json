@@ -695,9 +695,34 @@
     "tryAgainHint": "يرجى المحاولة مرة أخرى.",
     "heldSend": {
       "title": "رسالتك في الانتظار",
-      "description": "سجّل الدخول إلى Stella، أو اربط اشتراكك في ChatGPT أو Claude. ستُرسل فور قيامك بذلك.",
+      "description": "سجّل الدخول إلى Stella، أو اربط اشتراكك في ChatGPT أو Claude أو Gemini. ستُرسل فور قيامك بذلك.",
       "signIn": "تسجيل الدخول",
       "connect": "اختر الذكاء الاصطناعي"
+    },
+    "connectPlan": {
+      "outTitle": "لقد استخدمت الاستخدام المجاني",
+      "outBody": "تابع مجانًا مع اشتراك الذكاء الاصطناعي الذي لديك بالفعل.",
+      "outBodyChatGpt": "تابع مجانًا مع اشتراك ChatGPT الذي لديك بالفعل.",
+      "nearTitle": "أوشك استخدامك المجاني على النفاد",
+      "nearBody": "بعد ذلك، تابع مجانًا مع اشتراك الذكاء الاصطناعي الذي لديك بالفعل.",
+      "nearBodyChatGpt": "بعد ذلك، تابع مجانًا مع اشتراك ChatGPT الذي لديك بالفعل.",
+      "chooseTitle": "اربط اشتراك الذكاء الاصطناعي",
+      "chooseBody": "تعمل Stella عليه مجانًا. ستُرسل رسالتك فور الربط.",
+      "chooseBodyNoResend": "تعمل Stella عليه مجانًا.",
+      "connect": "ربط اشتراك الذكاء الاصطناعي",
+      "connectChatGpt": "ربط ChatGPT",
+      "plans": "عرض الخطط",
+      "noPlan": "ليس لديك اشتراك ذكاء اصطناعي؟",
+      "plus": "احصل على Stella Plus · {price}/شهريًا",
+      "otherWays": "استخدام مفتاح API أو نموذج محلي",
+      "waiting": "أكمل تسجيل الدخول في متصفحك.",
+      "claudeCliMissing": "ثبّت Claude Code أولًا، ثم حاول مرة أخرى.",
+      "failed": "تعذّر الربط. هل تريد المحاولة مرة أخرى؟",
+      "sending": "تم الربط. جارٍ إرسال رسالتك…",
+      "connected": "تم الربط. كل شيء جاهز.",
+      "plusSending": "أصبحت على Stella Plus. جارٍ إرسال رسالتك…",
+      "plusReady": "أصبحت على Stella Plus.",
+      "bubble": "لقد استخدمت استخدامك المجاني في Stella. اربط اشتراكك في ChatGPT أو Claude أو Gemini لتتابع مجانًا، أو احصل على Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2288,7 +2313,7 @@
       "antigravityHint": "Gemini ضمن خطة Google الخاصة بك",
       "antigravityOpened": "فُتحت صفحة تسجيل الدخول من Google في متصفحك. سجّل الدخول هناك، ثم الصق الرمز الذي يظهر لك.",
       "antigravityCode": "الصق الرمز الذي تعرضه Google",
-      "antigravityPreparing": "جارٍ تجهيز Google Antigravity…"
+      "antigravityPreparing": "جارٍ تجهيز Gemini…"
     },
     "engineModels": {
       "ariaLabel": "نماذج {engine}",

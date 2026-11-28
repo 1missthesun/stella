@@ -665,9 +665,34 @@
     "tryAgainHint": "Vui lòng thử lại.",
     "heldSend": {
       "title": "Tin nhắn của bạn đang chờ",
-      "description": "Đăng nhập Stella, hoặc kết nối gói ChatGPT hay Claude của bạn. Tin nhắn sẽ được gửi ngay khi bạn làm xong.",
+      "description": "Đăng nhập Stella, hoặc kết nối gói ChatGPT, Claude hoặc Gemini của bạn. Tin nhắn sẽ được gửi ngay khi bạn làm vậy.",
       "signIn": "Đăng nhập",
       "connect": "Chọn AI của bạn"
+    },
+    "connectPlan": {
+      "outTitle": "Bạn đã dùng hết lượt miễn phí",
+      "outBody": "Tiếp tục miễn phí với gói AI bạn đang có.",
+      "outBodyChatGpt": "Tiếp tục miễn phí với gói ChatGPT bạn đang có.",
+      "nearTitle": "Lượt miễn phí của bạn sắp hết",
+      "nearBody": "Sau đó, tiếp tục miễn phí với gói AI bạn đang có.",
+      "nearBodyChatGpt": "Sau đó, tiếp tục miễn phí với gói ChatGPT bạn đang có.",
+      "chooseTitle": "Kết nối gói AI của bạn",
+      "chooseBody": "Stella chạy miễn phí trên gói đó. Tin nhắn sẽ được gửi ngay khi bạn kết nối.",
+      "chooseBodyNoResend": "Stella chạy miễn phí trên gói đó.",
+      "connect": "Kết nối gói AI của bạn",
+      "connectChatGpt": "Kết nối ChatGPT",
+      "plans": "Xem các gói",
+      "noPlan": "Chưa có gói AI?",
+      "plus": "Dùng Stella Plus · {price}/tháng",
+      "otherWays": "Dùng khóa API hoặc mô hình cục bộ",
+      "waiting": "Hoàn tất đăng nhập trong trình duyệt.",
+      "claudeCliMissing": "Hãy cài Claude Code trước rồi thử lại.",
+      "failed": "Không kết nối được. Thử lại?",
+      "sending": "Đã kết nối. Đang gửi tin nhắn…",
+      "connected": "Đã kết nối. Mọi thứ đã sẵn sàng.",
+      "plusSending": "Bạn đã có Stella Plus. Đang gửi tin nhắn…",
+      "plusReady": "Bạn đã có Stella Plus.",
+      "bubble": "Bạn đã dùng hết lượt Stella miễn phí. Kết nối gói ChatGPT, Claude hoặc Gemini để tiếp tục miễn phí, hoặc dùng Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2238,7 +2263,7 @@
       "antigravityHint": "Gemini theo gói Google của bạn",
       "antigravityOpened": "Trang đăng nhập của Google đã mở trong trình duyệt. Hãy đăng nhập ở đó rồi dán mã hiển thị.",
       "antigravityCode": "Dán mã Google hiển thị",
-      "antigravityPreparing": "Đang chuẩn bị Google Antigravity…"
+      "antigravityPreparing": "Đang chuẩn bị Gemini…"
     },
     "engineModels": {
       "ariaLabel": "Mô hình {engine}",

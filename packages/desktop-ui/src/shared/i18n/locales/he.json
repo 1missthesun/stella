@@ -677,9 +677,34 @@
     "tryAgainHint": "אנא נסו שוב.",
     "heldSend": {
       "title": "ההודעה שלך ממתינה",
-      "description": "התחבר ל-Stella, או חבר את המינוי שלך ל-ChatGPT או ל-Claude. היא תישלח ברגע שתעשה זאת.",
+      "description": "התחבר ל-Stella, או חבר את מנוי ה-ChatGPT, Claude או Gemini שלך. היא תישלח ברגע שתעשה זאת.",
       "signIn": "התחברות",
       "connect": "בחר AI"
+    },
+    "connectPlan": {
+      "outTitle": "השתמשת בשימוש החינמי שלך",
+      "outBody": "אפשר להמשיך בחינם עם מנוי ה-AI שכבר יש לך.",
+      "outBodyChatGpt": "אפשר להמשיך בחינם עם מנוי ה-ChatGPT שכבר יש לך.",
+      "nearTitle": "השימוש החינמי שלך כמעט נגמר",
+      "nearBody": "אחר כך אפשר להמשיך בחינם עם מנוי ה-AI שכבר יש לך.",
+      "nearBodyChatGpt": "אחר כך אפשר להמשיך בחינם עם מנוי ה-ChatGPT שכבר יש לך.",
+      "chooseTitle": "חיבור מנוי ה-AI שלך",
+      "chooseBody": "Stella פועלת עליו בחינם. ההודעה שלך תישלח ברגע שתתחבר.",
+      "chooseBodyNoResend": "Stella פועלת עליו בחינם.",
+      "connect": "חיבור מנוי ה-AI שלך",
+      "connectChatGpt": "חיבור ChatGPT",
+      "plans": "הצגת תוכניות",
+      "noPlan": "אין לך מנוי AI?",
+      "plus": "מעבר ל-Stella Plus · {price} לחודש",
+      "otherWays": "שימוש במפתח API או במודל מקומי",
+      "waiting": "יש לסיים את ההתחברות בדפדפן.",
+      "claudeCliMissing": "יש להתקין קודם את Claude Code ולנסות שוב.",
+      "failed": "החיבור לא הצליח. לנסות שוב?",
+      "sending": "מחובר. ההודעה שלך נשלחת…",
+      "connected": "מחובר. הכול מוכן.",
+      "plusSending": "עברת ל-Stella Plus. ההודעה שלך נשלחת…",
+      "plusReady": "עברת ל-Stella Plus.",
+      "bubble": "השתמשת בשימוש החינמי שלך ב-Stella. אפשר לחבר את מנוי ה-ChatGPT, Claude או Gemini שלך כדי להמשיך בחינם, או לעבור ל-Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2258,7 +2283,7 @@
       "antigravityHint": "Gemini בתוכנית Google שלך",
       "antigravityOpened": "דף הכניסה של Google נפתח בדפדפן שלך. יש להיכנס שם ואז להדביק את הקוד שמוצג.",
       "antigravityCode": "הדבקת הקוד ש-Google מציגה",
-      "antigravityPreparing": "מכינים את Google Antigravity…"
+      "antigravityPreparing": "מכינים את Gemini…"
     },
     "engineModels": {
       "ariaLabel": "מודלים של {engine}",

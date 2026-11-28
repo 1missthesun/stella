@@ -671,9 +671,34 @@
     "tryAgainHint": "Lütfen tekrar deneyin.",
     "heldSend": {
       "title": "Mesajın bekliyor",
-      "description": "Stella'ya giriş yap ya da ChatGPT veya Claude planını bağla. Bunu yaptığın anda gönderilir.",
+      "description": "Stella'ya giriş yap veya ChatGPT, Claude ya da Gemini planını bağla. Bunu yaptığın anda gönderilir.",
       "signIn": "Giriş yap",
       "connect": "Yapay zekânı seç"
+    },
+    "connectPlan": {
+      "outTitle": "Ücretsiz kullanımını bitirdin",
+      "outBody": "Zaten sahip olduğun yapay zekâ planıyla ücretsiz devam et.",
+      "outBodyChatGpt": "Zaten sahip olduğun ChatGPT planıyla ücretsiz devam et.",
+      "nearTitle": "Ücretsiz kullanımın neredeyse bitti",
+      "nearBody": "Sonrasında, zaten sahip olduğun yapay zekâ planıyla ücretsiz devam et.",
+      "nearBodyChatGpt": "Sonrasında, zaten sahip olduğun ChatGPT planıyla ücretsiz devam et.",
+      "chooseTitle": "Yapay zekâ planını bağla",
+      "chooseBody": "Stella onunla ücretsiz çalışır. Bağlandığın anda mesajın gönderilir.",
+      "chooseBodyNoResend": "Stella onunla ücretsiz çalışır.",
+      "connect": "Yapay zekâ planını bağla",
+      "connectChatGpt": "ChatGPT'yi bağla",
+      "plans": "Planları gör",
+      "noPlan": "Yapay zekâ planın yok mu?",
+      "plus": "Stella Plus al · {price}/ay",
+      "otherWays": "API anahtarı veya yerel model kullan",
+      "waiting": "Girişi tarayıcında tamamla.",
+      "claudeCliMissing": "Önce Claude Code'u yükle, sonra tekrar dene.",
+      "failed": "Bağlanamadı. Tekrar denensin mi?",
+      "sending": "Bağlandı. Mesajın gönderiliyor…",
+      "connected": "Bağlandı. Her şey hazır.",
+      "plusSending": "Artık Stella Plus'tasın. Mesajın gönderiliyor…",
+      "plusReady": "Artık Stella Plus'tasın.",
+      "bubble": "Stella'daki ücretsiz kullanımını bitirdin. Ücretsiz devam etmek için ChatGPT, Claude veya Gemini planını bağla ya da Stella Plus al."
     }
   },
   "cloudBrowser": {
@@ -2248,7 +2273,7 @@
       "antigravityHint": "Google planındaki Gemini",
       "antigravityOpened": "Google'ın oturum açma sayfası tarayıcınızda açıldı. Orada oturum açın, sonra gösterdiği kodu yapıştırın.",
       "antigravityCode": "Google'ın gösterdiği kodu yapıştırın",
-      "antigravityPreparing": "Google Antigravity hazırlanıyor…"
+      "antigravityPreparing": "Gemini hazırlanıyor…"
     },
     "engineModels": {
       "ariaLabel": "{engine} modelleri",

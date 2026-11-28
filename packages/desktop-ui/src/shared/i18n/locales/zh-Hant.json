@@ -665,9 +665,34 @@
     "tryAgainHint": "請重試。",
     "heldSend": {
       "title": "你的訊息正在等待傳送",
-      "description": "登入 Stella，或連結你的 ChatGPT 或 Claude 方案。完成後會立即傳送。",
+      "description": "登入 Stella，或連結你的 ChatGPT、Claude 或 Gemini 訂閱。完成後會立即傳送。",
       "signIn": "登入",
       "connect": "選擇你的 AI"
+    },
+    "connectPlan": {
+      "outTitle": "你的免費額度已用完",
+      "outBody": "用你已有的 AI 訂閱繼續免費使用。",
+      "outBodyChatGpt": "用你已有的 ChatGPT 訂閱繼續免費使用。",
+      "nearTitle": "你的免費額度快用完了",
+      "nearBody": "之後可以用你已有的 AI 訂閱繼續免費使用。",
+      "nearBodyChatGpt": "之後可以用你已有的 ChatGPT 訂閱繼續免費使用。",
+      "chooseTitle": "連結你的 AI 訂閱",
+      "chooseBody": "Stella 可在其上免費運作。連結後會立即傳送你的訊息。",
+      "chooseBodyNoResend": "Stella 可在其上免費運作。",
+      "connect": "連結你的 AI 訂閱",
+      "connectChatGpt": "連結 ChatGPT",
+      "plans": "查看方案",
+      "noPlan": "沒有 AI 訂閱？",
+      "plus": "升級 Stella Plus · {price}/月",
+      "otherWays": "使用 API 金鑰或本機模型",
+      "waiting": "請在瀏覽器中完成登入。",
+      "claudeCliMissing": "請先安裝 Claude Code，然後再試一次。",
+      "failed": "連結失敗。要再試一次嗎？",
+      "sending": "已連結。正在傳送你的訊息…",
+      "connected": "已連結。一切就緒。",
+      "plusSending": "你已升級 Stella Plus。正在傳送你的訊息…",
+      "plusReady": "你已升級 Stella Plus。",
+      "bubble": "你的 Stella 免費額度已用完。連結你的 ChatGPT、Claude 或 Gemini 訂閱即可繼續免費使用，或升級 Stella Plus。"
     }
   },
   "cloudBrowser": {
@@ -2238,7 +2263,7 @@
       "antigravityHint": "使用你的 Google 方案執行 Gemini",
       "antigravityOpened": "Google 登入頁面已在瀏覽器中開啟。請在那裡登入，然後貼上顯示的代碼。",
       "antigravityCode": "貼上 Google 顯示的代碼",
-      "antigravityPreparing": "正在準備 Google Antigravity…"
+      "antigravityPreparing": "正在準備 Gemini…"
     },
     "engineModels": {
       "ariaLabel": "{engine} 模型",

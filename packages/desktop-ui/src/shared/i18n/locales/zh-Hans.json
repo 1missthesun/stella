@@ -665,9 +665,34 @@
     "tryAgainHint": "请重试。",
     "heldSend": {
       "title": "你的消息正在等待发送",
-      "description": "登录 Stella，或连接你的 ChatGPT 或 Claude 套餐。完成后会立即发送。",
+      "description": "登录 Stella，或连接你的 ChatGPT、Claude 或 Gemini 订阅。完成后会立即发送。",
       "signIn": "登录",
       "connect": "选择你的 AI"
+    },
+    "connectPlan": {
+      "outTitle": "你的免费额度已用完",
+      "outBody": "用你已有的 AI 订阅继续免费使用。",
+      "outBodyChatGpt": "用你已有的 ChatGPT 订阅继续免费使用。",
+      "nearTitle": "你的免费额度快用完了",
+      "nearBody": "之后可以用你已有的 AI 订阅继续免费使用。",
+      "nearBodyChatGpt": "之后可以用你已有的 ChatGPT 订阅继续免费使用。",
+      "chooseTitle": "连接你的 AI 订阅",
+      "chooseBody": "Stella 可在其上免费运行。连接后会立即发送你的消息。",
+      "chooseBodyNoResend": "Stella 可在其上免费运行。",
+      "connect": "连接你的 AI 订阅",
+      "connectChatGpt": "连接 ChatGPT",
+      "plans": "查看方案",
+      "noPlan": "没有 AI 订阅？",
+      "plus": "开通 Stella Plus · {price}/月",
+      "otherWays": "使用 API 密钥或本地模型",
+      "waiting": "请在浏览器中完成登录。",
+      "claudeCliMissing": "请先安装 Claude Code，然后重试。",
+      "failed": "连接失败。要重试吗？",
+      "sending": "已连接。正在发送你的消息…",
+      "connected": "已连接。一切就绪。",
+      "plusSending": "你已开通 Stella Plus。正在发送你的消息…",
+      "plusReady": "你已开通 Stella Plus。",
+      "bubble": "你的 Stella 免费额度已用完。连接你的 ChatGPT、Claude 或 Gemini 订阅即可继续免费使用，或开通 Stella Plus。"
     }
   },
   "cloudBrowser": {
@@ -2238,7 +2263,7 @@
       "antigravityHint": "使用你的 Google 方案运行 Gemini",
       "antigravityOpened": "Google 登录页面已在浏览器中打开。请在那里登录，然后粘贴显示的代码。",
       "antigravityCode": "粘贴 Google 显示的代码",
-      "antigravityPreparing": "正在准备 Google Antigravity…"
+      "antigravityPreparing": "正在准备 Gemini…"
     },
     "engineModels": {
       "ariaLabel": "{engine} 模型",

@@ -671,9 +671,34 @@
     "tryAgainHint": "Bitte versuch es erneut.",
     "heldSend": {
       "title": "Deine Nachricht wartet",
-      "description": "Melde dich bei Stella an oder verbinde dein ChatGPT- oder Claude-Abo. Sie wird gesendet, sobald du das tust.",
+      "description": "Melde dich bei Stella an oder verbinde dein ChatGPT-, Claude- oder Gemini-Abo. Sie wird gesendet, sobald du das tust.",
       "signIn": "Anmelden",
       "connect": "KI auswählen"
+    },
+    "connectPlan": {
+      "outTitle": "Dein kostenloses Kontingent ist aufgebraucht",
+      "outBody": "Mach kostenlos weiter mit dem KI-Abo, das du schon hast.",
+      "outBodyChatGpt": "Mach kostenlos weiter mit dem ChatGPT-Abo, das du schon hast.",
+      "nearTitle": "Dein kostenloses Kontingent ist fast aufgebraucht",
+      "nearBody": "Danach machst du kostenlos weiter mit dem KI-Abo, das du schon hast.",
+      "nearBodyChatGpt": "Danach machst du kostenlos weiter mit dem ChatGPT-Abo, das du schon hast.",
+      "chooseTitle": "Verbinde dein KI-Abo",
+      "chooseBody": "Stella läuft damit kostenlos. Deine Nachricht wird gesendet, sobald du verbunden bist.",
+      "chooseBodyNoResend": "Stella läuft damit kostenlos.",
+      "connect": "KI-Abo verbinden",
+      "connectChatGpt": "ChatGPT verbinden",
+      "plans": "Abos ansehen",
+      "noPlan": "Kein KI-Abo?",
+      "plus": "Stella Plus holen · {price}/Monat",
+      "otherWays": "API-Schlüssel oder lokales Modell verwenden",
+      "waiting": "Schließ die Anmeldung in deinem Browser ab.",
+      "claudeCliMissing": "Installiere zuerst Claude Code und versuch es dann noch einmal.",
+      "failed": "Das hat nicht geklappt. Noch einmal versuchen?",
+      "sending": "Verbunden. Deine Nachricht wird gesendet…",
+      "connected": "Verbunden. Alles bereit.",
+      "plusSending": "Du hast jetzt Stella Plus. Deine Nachricht wird gesendet…",
+      "plusReady": "Du hast jetzt Stella Plus.",
+      "bubble": "Dein kostenloses Stella-Kontingent ist aufgebraucht. Verbinde dein ChatGPT-, Claude- oder Gemini-Abo, um kostenlos weiterzumachen, oder hol dir Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2248,7 +2273,7 @@
       "antigravityHint": "Gemini über dein Google-Abo",
       "antigravityOpened": "Die Anmeldeseite von Google wurde in deinem Browser geöffnet. Melde dich dort an und füge dann den angezeigten Code ein.",
       "antigravityCode": "Den von Google angezeigten Code einfügen",
-      "antigravityPreparing": "Google Antigravity wird vorbereitet…"
+      "antigravityPreparing": "Gemini wird vorbereitet…"
     },
     "engineModels": {
       "ariaLabel": "{engine}-Modelle",

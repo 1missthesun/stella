@@ -683,9 +683,34 @@
     "tryAgainHint": "Попробуйте ещё раз.",
     "heldSend": {
       "title": "Ваше сообщение ждёт",
-      "description": "Войдите в Stella или подключите свою подписку ChatGPT или Claude. Сообщение отправится, как только вы это сделаете.",
+      "description": "Войдите в Stella или подключите подписку ChatGPT, Claude или Gemini. Сообщение отправится, как только вы это сделаете.",
       "signIn": "Войти",
       "connect": "Выбрать ИИ"
+    },
+    "connectPlan": {
+      "outTitle": "Бесплатный лимит исчерпан",
+      "outBody": "Продолжайте бесплатно с подпиской на ИИ, которая у вас уже есть.",
+      "outBodyChatGpt": "Продолжайте бесплатно с подпиской ChatGPT, которая у вас уже есть.",
+      "nearTitle": "Бесплатный лимит почти исчерпан",
+      "nearBody": "Дальше продолжайте бесплатно с подпиской на ИИ, которая у вас уже есть.",
+      "nearBodyChatGpt": "Дальше продолжайте бесплатно с подпиской ChatGPT, которая у вас уже есть.",
+      "chooseTitle": "Подключите подписку на ИИ",
+      "chooseBody": "Stella работает на ней бесплатно. Сообщение отправится, как только вы подключитесь.",
+      "chooseBodyNoResend": "Stella работает на ней бесплатно.",
+      "connect": "Подключить подписку на ИИ",
+      "connectChatGpt": "Подключить ChatGPT",
+      "plans": "Посмотреть тарифы",
+      "noPlan": "Нет подписки на ИИ?",
+      "plus": "Оформить Stella Plus · {price}/мес.",
+      "otherWays": "Использовать ключ API или локальную модель",
+      "waiting": "Завершите вход в браузере.",
+      "claudeCliMissing": "Сначала установите Claude Code, затем попробуйте ещё раз.",
+      "failed": "Не удалось подключиться. Попробовать ещё раз?",
+      "sending": "Подключено. Отправляем сообщение…",
+      "connected": "Подключено. Всё готово.",
+      "plusSending": "У вас Stella Plus. Отправляем сообщение…",
+      "plusReady": "У вас Stella Plus.",
+      "bubble": "Бесплатный лимит Stella исчерпан. Подключите подписку ChatGPT, Claude или Gemini, чтобы продолжить бесплатно, или оформите Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2268,7 +2293,7 @@
       "antigravityHint": "Gemini по вашему тарифу Google",
       "antigravityOpened": "Страница входа Google открылась в браузере. Войдите там, затем вставьте показанный код.",
       "antigravityCode": "Вставьте код, показанный Google",
-      "antigravityPreparing": "Подготовка Google Antigravity…"
+      "antigravityPreparing": "Подготовка Gemini…"
     },
     "engineModels": {
       "ariaLabel": "Модели {engine}",

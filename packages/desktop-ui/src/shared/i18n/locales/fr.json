@@ -677,9 +677,34 @@
     "tryAgainHint": "Veuillez réessayer.",
     "heldSend": {
       "title": "Votre message attend",
-      "description": "Connectez-vous à Stella ou reliez votre abonnement ChatGPT ou Claude. Il partira dès que ce sera fait.",
+      "description": "Connectez-vous à Stella ou reliez votre abonnement ChatGPT, Claude ou Gemini. Il partira dès que ce sera fait.",
       "signIn": "Se connecter",
       "connect": "Choisir votre IA"
+    },
+    "connectPlan": {
+      "outTitle": "Tu as utilisé ton usage gratuit",
+      "outBody": "Continue gratuitement avec l'abonnement IA que tu as déjà.",
+      "outBodyChatGpt": "Continue gratuitement avec l'abonnement ChatGPT que tu as déjà.",
+      "nearTitle": "Ton usage gratuit est presque épuisé",
+      "nearBody": "Ensuite, continue gratuitement avec l'abonnement IA que tu as déjà.",
+      "nearBodyChatGpt": "Ensuite, continue gratuitement avec l'abonnement ChatGPT que tu as déjà.",
+      "chooseTitle": "Connecte ton abonnement IA",
+      "chooseBody": "Stella fonctionne gratuitement avec. Ton message part dès que tu es connecté.",
+      "chooseBodyNoResend": "Stella fonctionne gratuitement avec.",
+      "connect": "Connecter ton abonnement IA",
+      "connectChatGpt": "Connecter ChatGPT",
+      "plans": "Voir les offres",
+      "noPlan": "Pas d'abonnement IA ?",
+      "plus": "Prendre Stella Plus · {price}/mois",
+      "otherWays": "Utiliser une clé API ou un modèle local",
+      "waiting": "Termine la connexion dans ton navigateur.",
+      "claudeCliMissing": "Installe d'abord Claude Code, puis réessaie.",
+      "failed": "La connexion n'a pas abouti. Réessayer ?",
+      "sending": "Connecté. Envoi de ton message…",
+      "connected": "Connecté. Tout est prêt.",
+      "plusSending": "Tu es passé à Stella Plus. Envoi de ton message…",
+      "plusReady": "Tu es passé à Stella Plus.",
+      "bubble": "Tu as utilisé ton usage gratuit de Stella. Connecte ton abonnement ChatGPT, Claude ou Gemini pour continuer gratuitement, ou prends Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2258,7 +2283,7 @@
       "antigravityHint": "Gemini avec votre forfait Google",
       "antigravityOpened": "La page de connexion de Google s’est ouverte dans votre navigateur. Connectez-vous, puis collez le code affiché.",
       "antigravityCode": "Collez le code affiché par Google",
-      "antigravityPreparing": "Préparation de Google Antigravity…"
+      "antigravityPreparing": "Préparation de Gemini…"
     },
     "engineModels": {
       "ariaLabel": "Modèles {engine}",

@@ -43,6 +43,7 @@ import {
   resolveJournalReplyRefs,
 } from "@stella/contracts/conversation-journal-projection";
 import { splitMessageReplyRefs, type ReplyRef } from "@stella/contracts/reply-refs";
+import { freeAllowanceNoticeText } from "@/features/chat/connect-plan/free-allowance-notice-text";
 
 const userEventId = userMessageEventId;
 
@@ -282,7 +283,7 @@ const terminalNoticeEvent = (
     sequence: terminal.seq,
     type: "assistant_message",
     payload: {
-      text: terminal.notice,
+      text: freeAllowanceNoticeText(terminal.notice),
       ...(userMessageId ? { userMessageId } : {}),
       source: "cloud-turn-notice",
     },

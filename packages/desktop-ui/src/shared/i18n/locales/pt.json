@@ -677,9 +677,34 @@
     "tryAgainHint": "Tente de novo.",
     "heldSend": {
       "title": "Sua mensagem está esperando",
-      "description": "Entre na Stella ou conecte seu plano do ChatGPT ou do Claude. Ela será enviada assim que você fizer isso.",
+      "description": "Entre na Stella ou conecte seu plano do ChatGPT, Claude ou Gemini. Ela será enviada assim que você fizer isso.",
       "signIn": "Entrar",
       "connect": "Escolha sua IA"
+    },
+    "connectPlan": {
+      "outTitle": "Você usou seu uso gratuito",
+      "outBody": "Continue grátis com o plano de IA que você já tem.",
+      "outBodyChatGpt": "Continue grátis com o plano do ChatGPT que você já tem.",
+      "nearTitle": "Seu uso gratuito está quase no fim",
+      "nearBody": "Depois, continue grátis com o plano de IA que você já tem.",
+      "nearBodyChatGpt": "Depois, continue grátis com o plano do ChatGPT que você já tem.",
+      "chooseTitle": "Conecte seu plano de IA",
+      "chooseBody": "A Stella funciona grátis com ele. Sua mensagem é enviada assim que você se conectar.",
+      "chooseBodyNoResend": "A Stella funciona grátis com ele.",
+      "connect": "Conectar seu plano de IA",
+      "connectChatGpt": "Conectar ChatGPT",
+      "plans": "Ver planos",
+      "noPlan": "Não tem um plano de IA?",
+      "plus": "Assinar Stella Plus · {price}/mês",
+      "otherWays": "Usar uma chave de API ou um modelo local",
+      "waiting": "Conclua o login no seu navegador.",
+      "claudeCliMissing": "Instale o Claude Code primeiro e tente de novo.",
+      "failed": "Não foi possível conectar. Tentar de novo?",
+      "sending": "Conectado. Enviando sua mensagem…",
+      "connected": "Conectado. Tudo pronto.",
+      "plusSending": "Você está no Stella Plus. Enviando sua mensagem…",
+      "plusReady": "Você está no Stella Plus.",
+      "bubble": "Você usou seu uso gratuito da Stella. Conecte seu plano do ChatGPT, Claude ou Gemini para continuar grátis, ou assine o Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2258,7 +2283,7 @@
       "antigravityHint": "Gemini no seu plano Google",
       "antigravityOpened": "A página de login do Google abriu no seu navegador. Entre por lá e depois cole o código que aparecer.",
       "antigravityCode": "Cole o código mostrado pelo Google",
-      "antigravityPreparing": "Preparando o Google Antigravity…"
+      "antigravityPreparing": "Preparando o Gemini…"
     },
     "engineModels": {
       "ariaLabel": "Modelos da {engine}",

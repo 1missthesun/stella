@@ -671,9 +671,34 @@
     "tryAgainHint": "Probeer het opnieuw.",
     "heldSend": {
       "title": "Je bericht wacht",
-      "description": "Log in bij Stella of koppel je ChatGPT- of Claude-abonnement. Het wordt verstuurd zodra je dat doet.",
+      "description": "Log in bij Stella of koppel je ChatGPT-, Claude- of Gemini-abonnement. Het wordt verstuurd zodra je dat doet.",
       "signIn": "Inloggen",
       "connect": "Kies je AI"
+    },
+    "connectPlan": {
+      "outTitle": "Je gratis gebruik is op",
+      "outBody": "Ga gratis verder met het AI-abonnement dat je al hebt.",
+      "outBodyChatGpt": "Ga gratis verder met het ChatGPT-abonnement dat je al hebt.",
+      "nearTitle": "Je gratis gebruik is bijna op",
+      "nearBody": "Ga daarna gratis verder met het AI-abonnement dat je al hebt.",
+      "nearBodyChatGpt": "Ga daarna gratis verder met het ChatGPT-abonnement dat je al hebt.",
+      "chooseTitle": "Koppel je AI-abonnement",
+      "chooseBody": "Stella werkt er gratis mee. Je bericht wordt verstuurd zodra je gekoppeld bent.",
+      "chooseBodyNoResend": "Stella werkt er gratis mee.",
+      "connect": "Je AI-abonnement koppelen",
+      "connectChatGpt": "ChatGPT koppelen",
+      "plans": "Abonnementen bekijken",
+      "noPlan": "Geen AI-abonnement?",
+      "plus": "Neem Stella Plus · {price}/mnd",
+      "otherWays": "Een API-sleutel of lokaal model gebruiken",
+      "waiting": "Rond het inloggen af in je browser.",
+      "claudeCliMissing": "Installeer eerst Claude Code en probeer het dan opnieuw.",
+      "failed": "Koppelen is niet gelukt. Opnieuw proberen?",
+      "sending": "Gekoppeld. Je bericht wordt verstuurd…",
+      "connected": "Gekoppeld. Alles staat klaar.",
+      "plusSending": "Je hebt nu Stella Plus. Je bericht wordt verstuurd…",
+      "plusReady": "Je hebt nu Stella Plus.",
+      "bubble": "Je gratis Stella-gebruik is op. Koppel je ChatGPT-, Claude- of Gemini-abonnement om gratis verder te gaan, of neem Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2248,7 +2273,7 @@
       "antigravityHint": "Gemini via je Google-abonnement",
       "antigravityOpened": "De inlogpagina van Google is geopend in je browser. Log daar in en plak daarna de code die je ziet.",
       "antigravityCode": "Plak de code die Google toont",
-      "antigravityPreparing": "Google Antigravity wordt klaargezet…"
+      "antigravityPreparing": "Gemini wordt klaargezet…"
     },
     "engineModels": {
       "ariaLabel": "{engine}-modellen",

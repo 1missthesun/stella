@@ -1,6 +1,5 @@
 import { useEffect, useMemo } from "react";
 import {
-  CONNECT_PLAN_COPY,
   CONNECT_PLAN_NEAR_SHARE,
   CONNECT_PLAN_OFFER_ENABLED,
 } from "@stella/contracts/connect-plan-offer";
@@ -9,7 +8,7 @@ import { resolveFreeAllowance } from "@/global/billing/audience";
 import { useBackendValue } from "@/platform/backend/use-backend-view";
 import { uiState } from "@/platform/ui-state";
 import { notify } from "@/features/notifications/notification-store";
-import { connectPlanChatGptOnly, connectPlanCopy, openConnectPlan } from "./connect-plan";
+import { connectPlanActionLabel, connectPlanCopy, openConnectPlan } from "./connect-plan";
 
 const SHOWN_KEY = "stella.connectPlan.nearShown";
 
@@ -44,7 +43,7 @@ export function useConnectPlanHeadsUp(conversationId: string | null): void {
       detail: copy.description,
       actions: [
         {
-          label: connectPlanChatGptOnly() ? CONNECT_PLAN_COPY.connectChatGpt : CONNECT_PLAN_COPY.connect,
+          label: connectPlanActionLabel(),
           primary: true,
           run: () => {
             done();

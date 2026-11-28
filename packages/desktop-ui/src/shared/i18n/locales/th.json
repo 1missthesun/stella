@@ -665,9 +665,34 @@
     "tryAgainHint": "โปรดลองอีกครั้ง",
     "heldSend": {
       "title": "ข้อความของคุณกำลังรออยู่",
-      "description": "ลงชื่อเข้าใช้ Stella หรือเชื่อมต่อแพ็กเกจ ChatGPT หรือ Claude ของคุณ ข้อความจะถูกส่งทันทีที่คุณทำ",
+      "description": "ลงชื่อเข้าใช้ Stella หรือเชื่อมต่อแพ็กเกจ ChatGPT, Claude หรือ Gemini ของคุณ ข้อความจะส่งทันทีที่คุณทำ",
       "signIn": "ลงชื่อเข้าใช้",
       "connect": "เลือก AI ของคุณ"
+    },
+    "connectPlan": {
+      "outTitle": "คุณใช้สิทธิ์ใช้งานฟรีหมดแล้ว",
+      "outBody": "ใช้งานต่อฟรีด้วยแพ็กเกจ AI ที่คุณมีอยู่แล้ว",
+      "outBodyChatGpt": "ใช้งานต่อฟรีด้วยแพ็กเกจ ChatGPT ที่คุณมีอยู่แล้ว",
+      "nearTitle": "สิทธิ์ใช้งานฟรีของคุณใกล้หมดแล้ว",
+      "nearBody": "หลังจากนั้น ใช้งานต่อฟรีด้วยแพ็กเกจ AI ที่คุณมีอยู่แล้ว",
+      "nearBodyChatGpt": "หลังจากนั้น ใช้งานต่อฟรีด้วยแพ็กเกจ ChatGPT ที่คุณมีอยู่แล้ว",
+      "chooseTitle": "เชื่อมต่อแพ็กเกจ AI ของคุณ",
+      "chooseBody": "Stella ใช้งานได้ฟรีบนแพ็กเกจนั้น ข้อความของคุณจะส่งทันทีที่เชื่อมต่อ",
+      "chooseBodyNoResend": "Stella ใช้งานได้ฟรีบนแพ็กเกจนั้น",
+      "connect": "เชื่อมต่อแพ็กเกจ AI ของคุณ",
+      "connectChatGpt": "เชื่อมต่อ ChatGPT",
+      "plans": "ดูแพ็กเกจ",
+      "noPlan": "ยังไม่มีแพ็กเกจ AI?",
+      "plus": "สมัคร Stella Plus · {price}/เดือน",
+      "otherWays": "ใช้คีย์ API หรือโมเดลในเครื่อง",
+      "waiting": "ลงชื่อเข้าใช้ให้เสร็จในเบราว์เซอร์",
+      "claudeCliMissing": "ติดตั้ง Claude Code ก่อน แล้วลองอีกครั้ง",
+      "failed": "เชื่อมต่อไม่สำเร็จ ลองอีกครั้งไหม",
+      "sending": "เชื่อมต่อแล้ว กำลังส่งข้อความของคุณ…",
+      "connected": "เชื่อมต่อแล้ว พร้อมใช้งาน",
+      "plusSending": "คุณใช้ Stella Plus แล้ว กำลังส่งข้อความของคุณ…",
+      "plusReady": "คุณใช้ Stella Plus แล้ว",
+      "bubble": "คุณใช้สิทธิ์ใช้งาน Stella ฟรีหมดแล้ว เชื่อมต่อแพ็กเกจ ChatGPT, Claude หรือ Gemini เพื่อใช้งานต่อฟรี หรือสมัคร Stella Plus"
     }
   },
   "cloudBrowser": {
@@ -2238,7 +2263,7 @@
       "antigravityHint": "Gemini ตามแพ็กเกจ Google ของคุณ",
       "antigravityOpened": "หน้าเข้าสู่ระบบของ Google เปิดในเบราว์เซอร์แล้ว เข้าสู่ระบบที่นั่น แล้ววางรหัสที่แสดง",
       "antigravityCode": "วางรหัสที่ Google แสดง",
-      "antigravityPreparing": "กำลังเตรียม Google Antigravity…"
+      "antigravityPreparing": "กำลังเตรียม Gemini…"
     },
     "engineModels": {
       "ariaLabel": "โมเดล {engine}",

@@ -671,9 +671,34 @@
     "tryAgainHint": "Prøv igjen.",
     "heldSend": {
       "title": "Meldingen din venter",
-      "description": "Logg inn på Stella, eller koble til ChatGPT- eller Claude-abonnementet ditt. Den sendes så snart du gjør det.",
+      "description": "Logg på Stella, eller koble til ChatGPT-, Claude- eller Gemini-abonnementet ditt. Den sendes så snart du gjør det.",
       "signIn": "Logg inn",
       "connect": "Velg AI"
+    },
+    "connectPlan": {
+      "outTitle": "Du har brukt opp gratisbruken din",
+      "outBody": "Fortsett gratis med AI-abonnementet du allerede har.",
+      "outBodyChatGpt": "Fortsett gratis med ChatGPT-abonnementet du allerede har.",
+      "nearTitle": "Gratisbruken din er snart brukt opp",
+      "nearBody": "Etter det kan du fortsette gratis med AI-abonnementet du allerede har.",
+      "nearBodyChatGpt": "Etter det kan du fortsette gratis med ChatGPT-abonnementet du allerede har.",
+      "chooseTitle": "Koble til AI-abonnementet ditt",
+      "chooseBody": "Stella kjører gratis på det. Meldingen sendes så snart du er koblet til.",
+      "chooseBodyNoResend": "Stella kjører gratis på det.",
+      "connect": "Koble til AI-abonnementet ditt",
+      "connectChatGpt": "Koble til ChatGPT",
+      "plans": "Se abonnementer",
+      "noPlan": "Ikke noe AI-abonnement?",
+      "plus": "Få Stella Plus · {price}/mnd",
+      "otherWays": "Bruk en API-nøkkel eller en lokal modell",
+      "waiting": "Fullfør påloggingen i nettleseren.",
+      "claudeCliMissing": "Installer Claude Code først, og prøv igjen.",
+      "failed": "Det gikk ikke å koble til. Prøve igjen?",
+      "sending": "Koblet til. Sender meldingen din…",
+      "connected": "Koblet til. Alt er klart.",
+      "plusSending": "Du har Stella Plus nå. Sender meldingen din…",
+      "plusReady": "Du har Stella Plus nå.",
+      "bubble": "Du har brukt opp gratisbruken din av Stella. Koble til ChatGPT-, Claude- eller Gemini-abonnementet ditt for å fortsette gratis, eller få Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2248,7 +2273,7 @@
       "antigravityHint": "Gemini på Google-abonnementet ditt",
       "antigravityOpened": "Googles påloggingsside er åpnet i nettleseren. Logg inn der, og lim deretter inn koden som vises.",
       "antigravityCode": "Lim inn koden Google viser",
-      "antigravityPreparing": "Gjør klar Google Antigravity…"
+      "antigravityPreparing": "Gjør Gemini klar…"
     },
     "engineModels": {
       "ariaLabel": "{engine}-modeller",

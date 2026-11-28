@@ -677,9 +677,34 @@
     "tryAgainHint": "Încearcă din nou.",
     "heldSend": {
       "title": "Mesajul tău așteaptă",
-      "description": "Conectează-te la Stella sau conectează abonamentul tău ChatGPT ori Claude. Se trimite imediat ce faci asta.",
+      "description": "Conectează-te la Stella sau conectează abonamentul ChatGPT, Claude sau Gemini. Se trimite imediat ce faci asta.",
       "signIn": "Conectează-te",
       "connect": "Alege AI-ul"
+    },
+    "connectPlan": {
+      "outTitle": "Ai folosit utilizarea gratuită",
+      "outBody": "Continuă gratuit cu abonamentul AI pe care îl ai deja.",
+      "outBodyChatGpt": "Continuă gratuit cu abonamentul ChatGPT pe care îl ai deja.",
+      "nearTitle": "Utilizarea gratuită aproape s-a terminat",
+      "nearBody": "După aceea, continuă gratuit cu abonamentul AI pe care îl ai deja.",
+      "nearBodyChatGpt": "După aceea, continuă gratuit cu abonamentul ChatGPT pe care îl ai deja.",
+      "chooseTitle": "Conectează abonamentul tău AI",
+      "chooseBody": "Stella rulează gratuit pe el. Mesajul se trimite imediat ce te conectezi.",
+      "chooseBodyNoResend": "Stella rulează gratuit pe el.",
+      "connect": "Conectează abonamentul AI",
+      "connectChatGpt": "Conectează ChatGPT",
+      "plans": "Vezi planurile",
+      "noPlan": "Nu ai un abonament AI?",
+      "plus": "Ia Stella Plus · {price}/lună",
+      "otherWays": "Folosește o cheie API sau un model local",
+      "waiting": "Termină conectarea în browser.",
+      "claudeCliMissing": "Instalează mai întâi Claude Code, apoi încearcă din nou.",
+      "failed": "Conectarea nu a reușit. Încerci din nou?",
+      "sending": "Conectat. Se trimite mesajul…",
+      "connected": "Conectat. Totul e gata.",
+      "plusSending": "Ai acum Stella Plus. Se trimite mesajul…",
+      "plusReady": "Ai acum Stella Plus.",
+      "bubble": "Ai folosit utilizarea gratuită Stella. Conectează abonamentul ChatGPT, Claude sau Gemini ca să continui gratuit, sau ia Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2258,7 +2283,7 @@
       "antigravityHint": "Gemini din abonamentul tău Google",
       "antigravityOpened": "Pagina de conectare Google s-a deschis în browser. Conectează-te acolo, apoi lipește codul afișat.",
       "antigravityCode": "Lipește codul afișat de Google",
-      "antigravityPreparing": "Se pregătește Google Antigravity…"
+      "antigravityPreparing": "Se pregătește Gemini…"
     },
     "engineModels": {
       "ariaLabel": "Modele {engine}",

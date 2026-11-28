@@ -683,9 +683,34 @@
     "tryAgainHint": "Zkuste to znovu.",
     "heldSend": {
       "title": "Vaše zpráva čeká",
-      "description": "Přihlaste se do Stelly nebo připojte své předplatné ChatGPT či Claude. Odešle se, jakmile to uděláte.",
+      "description": "Přihlaste se do Stelly nebo připojte své předplatné ChatGPT, Claude nebo Gemini. Odešle se, jakmile to uděláte.",
       "signIn": "Přihlásit se",
       "connect": "Vyberte AI"
+    },
+    "connectPlan": {
+      "outTitle": "Bezplatné využití je vyčerpané",
+      "outBody": "Pokračujte zdarma s předplatným AI, které už máte.",
+      "outBodyChatGpt": "Pokračujte zdarma s předplatným ChatGPT, které už máte.",
+      "nearTitle": "Bezplatné využití je skoro vyčerpané",
+      "nearBody": "Potom pokračujte zdarma s předplatným AI, které už máte.",
+      "nearBodyChatGpt": "Potom pokračujte zdarma s předplatným ChatGPT, které už máte.",
+      "chooseTitle": "Připojte své předplatné AI",
+      "chooseBody": "Stella na něm běží zdarma. Zpráva se odešle, jakmile se připojíte.",
+      "chooseBodyNoResend": "Stella na něm běží zdarma.",
+      "connect": "Připojit předplatné AI",
+      "connectChatGpt": "Připojit ChatGPT",
+      "plans": "Zobrazit plány",
+      "noPlan": "Nemáte předplatné AI?",
+      "plus": "Pořídit Stella Plus · {price}/měs.",
+      "otherWays": "Použít klíč API nebo místní model",
+      "waiting": "Dokončete přihlášení v prohlížeči.",
+      "claudeCliMissing": "Nejdřív nainstalujte Claude Code a pak to zkuste znovu.",
+      "failed": "Připojení se nepovedlo. Zkusit znovu?",
+      "sending": "Připojeno. Odesílám vaši zprávu…",
+      "connected": "Připojeno. Vše je připraveno.",
+      "plusSending": "Máte Stella Plus. Odesílám vaši zprávu…",
+      "plusReady": "Máte Stella Plus.",
+      "bubble": "Bezplatné využití Stelly je vyčerpané. Připojte své předplatné ChatGPT, Claude nebo Gemini a pokračujte zdarma, nebo si pořiďte Stella Plus."
     }
   },
   "cloudBrowser": {
@@ -2268,7 +2293,7 @@
       "antigravityHint": "Gemini z vašeho tarifu Google",
       "antigravityOpened": "V prohlížeči se otevřela přihlašovací stránka Googlu. Přihlaste se tam a vložte kód, který se zobrazí.",
       "antigravityCode": "Vložte kód zobrazený Googlem",
-      "antigravityPreparing": "Připravuje se Google Antigravity…"
+      "antigravityPreparing": "Připravuji Gemini…"
     },
     "engineModels": {
       "ariaLabel": "Modely {engine}",

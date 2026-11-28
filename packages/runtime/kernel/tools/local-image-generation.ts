@@ -20,7 +20,7 @@ import {
 } from "./image-decode-validation.js";
 import { materializeMediaArtifact } from "./media-artifact-store.js";
 import type { ManagedImageTerminalResult } from "./managed-image-job.js";
-import type { ToolContext, ToolHandlerExtras, ToolResult } from "./types.js";
+import { toolCallIdentity, type ToolContext, type ToolHandlerExtras, type ToolResult } from "./types.js";
 import { sleepWithAbort } from "./effect-runtime.js";
 import { BYOK_IMAGE_MODELS, stellaImageRequest } from "@stella/contracts/media-models";
 
@@ -290,7 +290,7 @@ export const runLocalImageGeneration = async (
   const operation = reserveDurableImageOperation({
     stellaDataDir: dataDir,
     conversationId: input.context.conversationId,
-    toolCallId: input.context.requestId,
+    toolCallId: toolCallIdentity(input.context),
     requestBody: requestIdentity,
   });
   if (operation.terminalResult) {

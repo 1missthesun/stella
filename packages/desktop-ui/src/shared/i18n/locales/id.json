@@ -2657,6 +2657,8 @@
       "onOtherDevices": "Login tersimpan Anda ada di {names}",
       "useHereHint": "Menggunakannya di sini memberi komputer ini semuanya.",
       "useHere": "Gunakan di sini",
+      "notSyncingWith": "Tidak disinkronkan dengan {names}",
+      "syncHere": "Sinkronkan di sini",
       "asked": "Diminta pukul {time}. Izinkan di {names}.",
       "askFailed": "Gagal meminta. Stella terus mencoba.",
       "askedNow": "Diminta",

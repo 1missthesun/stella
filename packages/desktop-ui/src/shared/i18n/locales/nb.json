@@ -2667,6 +2667,8 @@
       "onOtherDevices": "De lagrede innloggingene dine er på {names}",
       "useHereHint": "Bruker du dem her, får denne datamaskinen alle.",
       "useHere": "Bruk dem her",
+      "notSyncingWith": "Synkroniseres ikke med {names}",
+      "syncHere": "Synkroniser her",
       "asked": "Spurte kl. {time}. Tillat den på {names}.",
       "askFailed": "Kunne ikke spørre. Stella prøver videre.",
       "askedNow": "Spurt",

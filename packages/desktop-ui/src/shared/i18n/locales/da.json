@@ -2667,6 +2667,8 @@
       "onOtherDevices": "Dine gemte logins er på {names}",
       "useHereHint": "Bruger du dem her, får denne computer dem alle.",
       "useHere": "Brug dem her",
+      "notSyncingWith": "Synkroniserer ikke med {names}",
+      "syncHere": "Synkroniser her",
       "asked": "Spurgt kl. {time}. Tillad den på {names}.",
       "askFailed": "Kunne ikke spørge. Stella prøver igen.",
       "askedNow": "Spurgt",

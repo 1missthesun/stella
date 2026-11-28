@@ -65,6 +65,7 @@ export const runsHandlers: WorkerRpcHandlers = {
       userAuthoredPrompt?: boolean;
       scheduled?: boolean;
       handoff?: boolean;
+      model?: string;
       failover?: boolean;
       attachments?: RuntimeAttachmentRef[];
       context?: unknown;
@@ -86,6 +87,7 @@ export const runsHandlers: WorkerRpcHandlers = {
           : {}),
         ...(automation.scheduled ? { scheduled: true } : {}),
         ...(automation.handoff ? { handoff: true } : {}),
+        ...(automation.handoff && automation.model ? { model: automation.model } : {}),
         ...(automation.failover ? { failover: true } : {}),
       });
     }

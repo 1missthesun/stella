@@ -280,7 +280,11 @@ function SyncDevices({
                   action: "askAgain" as const,
                   button: t(justAsked ? "settings.secureValues.askedNow" : "settings.secureValues.useHere"),
                 }
-              : null
+              : {
+                  label: t("settings.secureValues.notSyncingWith", { names: askNames }),
+                  action: "askAgain" as const,
+                  button: t(justAsked ? "settings.secureValues.askedNow" : "settings.secureValues.syncHere"),
+                }
           : standing === "waiting" && waiting?.confirmed
             ? { label: t("settings.secureValues.waitingFor", { name: waiting.approver || t("global.savedValuesDevices.otherDevice") }) }
             : standing === "waiting" && waiting?.code

@@ -209,7 +209,8 @@ export class SavedValuesSync {
   private decided = new Set<string>();
   // Set while something on this device is waiting for the saved values on the
   // user's other devices; only then does it ask to join the list.
-  private wanted: { service?: string } | null = null;
+  private wanted: { service?: string; kept?: boolean } | null = null;
+  private unlockWaiters = 0;
   private caughtUp = false;
   private waiters = new Set<() => void>();
   private timer: ReturnType<typeof setTimeout> | null = null;
@@ -434,67 +435,83 @@ export class SavedValuesSync {
     for (const waiter of [...this.waiters]) waiter();
   }
 
-  private waitFor<T>(check: () => T | null, ms: number): Promise<T | null> {
+  private waitFor<T>(check: () => T | null, ms: number, signal?: AbortSignal): Promise<T | null> {
     return new Promise((resolve) => {
-      const first = check();
-      if (first !== null) {
+      const first = signal?.aborted ? null : check();
+      if (first !== null || signal?.aborted) {
         resolve(first);
         return;
       }
       const done = (value: T | null) => {
         clearTimeout(timer);
         this.waiters.delete(listener);
+        signal?.removeEventListener("abort", aborted);
         resolve(value);
       };
       const listener = () => {
         const value = check();
         if (value !== null) done(value);
       };
+      const aborted = () => done(null);
       const timer = setTimeout(() => done(null), ms);
       timer.unref?.();
       this.waiters.add(listener);
+      signal?.addEventListener("abort", aborted, { once: true });
     });
   }
 
   /**
-   * True when this device isn't on the list, hasn't been told no, and the
-   * user's other devices hold saved values it could get by joining.
+   * True when this device isn't on the list, hasn't been told no, and either
+   * its request to join is already out or the user's other devices hold saved
+   * values it could get by joining.
    */
   canUnlock(): boolean {
     const status = this.status;
-    return status.active && status.standing === "waiting" && status.waiting?.idle === true && (status.records ?? 0) > 0;
+    if (!status.active || status.standing !== "waiting") return false;
+    const waiting = status.waiting;
+    if (waiting?.idle) return (status.records ?? 0) > 0;
+    return this.wanted !== null && !waiting?.declined && !waiting?.skipped && !waiting?.removed;
   }
 
   /**
    * Something here needs a saved value this device doesn't have. Ask to join
    * the list now (the code check on both screens), and once allowed, wait for
    * the other devices' saved values to arrive. Joining gives this device every
-   * saved value, so it is asked once, not per value.
+   * saved value, so it is asked once, not per value: lookups that arrive while
+   * the request is out wait on that same request.
    */
-  async unlockFor(service: string): Promise<"unlocked" | "declined" | "unavailable"> {
+  async unlockFor(service: string, signal?: AbortSignal): Promise<"unlocked" | "declined" | "unavailable" | "canceled"> {
+    if (signal?.aborted) return "canceled";
     if (this.status.standing === "member") return "unlocked";
-    if (!this.canUnlock() && !this.wanted) return "unavailable";
-    this.wanted = { service };
+    if (!this.canUnlock()) return "unavailable";
+    this.wanted = this.wanted?.service ? this.wanted : { ...this.wanted, service };
+    this.unlockWaiters += 1;
     this.schedule(0);
-    const outcome = await this.waitFor<"member" | "declined" | "unavailable">(() => {
-      const status = this.status;
-      if (status.standing === "member") return "member";
-      if (!this.wanted) return "declined";
-      if (status.standing !== "waiting" || !status.active) return "unavailable";
-      const waiting = status.waiting;
-      if (waiting?.declined || waiting?.skipped || waiting?.removed) return "declined";
-      if (waiting?.askFailed) return "unavailable";
-      return null;
-    }, UNLOCK_WAIT_MS);
+    let outcome: "member" | "declined" | "unavailable" | null;
+    try {
+      outcome = await this.waitFor<"member" | "declined" | "unavailable">(() => {
+        const status = this.status;
+        if (status.standing === "member") return "member";
+        if (!this.wanted) return "declined";
+        if (status.standing !== "waiting" || !status.active) return "unavailable";
+        const waiting = status.waiting;
+        if (waiting?.declined || waiting?.skipped || waiting?.removed) return "declined";
+        if (waiting?.askFailed) return "unavailable";
+        return null;
+      }, UNLOCK_WAIT_MS, signal);
+    } finally {
+      this.unlockWaiters -= 1;
+    }
     if (outcome !== "member") {
-      if (this.wanted) {
+      if (this.wanted && this.unlockWaiters === 0 && !this.wanted.kept) {
         this.wanted = null;
         this.schedule(0);
       }
+      if (signal?.aborted) return "canceled";
       return outcome === "declined" ? "declined" : "unavailable";
     }
-    await this.waitFor(() => (this.caughtUp ? true : null), CATCH_UP_MS);
-    return "unlocked";
+    await this.waitFor(() => (this.caughtUp ? true : null), CATCH_UP_MS, signal);
+    return signal?.aborted ? "canceled" : "unlocked";
   }
 
   private wantedFields(): { forService?: string } {
@@ -627,7 +644,7 @@ export class SavedValuesSync {
     delete state.joinPaused;
     delete state.ownJoin;
     this.posted = null;
-    this.wanted = this.wanted ?? {};
+    this.wanted = { ...this.wanted, kept: true };
     this.saveState();
     await this.reconcile();
     if (state.ownJoin || this.status.standing === "member") return { ok: true };
@@ -698,6 +715,9 @@ export class SavedValuesSync {
     if (change.kind === "removed") {
       for (const id of change.ids) state.removed[id] = change.at;
       this.saveState();
+    }
+    if (change.kind === "saved" && this.status.active && this.status.standing === "waiting" && this.status.waiting?.idle) {
+      this.wanted = { ...this.wanted, kept: true };
     }
     this.schedule(RECONCILE_DEBOUNCE_MS);
   }

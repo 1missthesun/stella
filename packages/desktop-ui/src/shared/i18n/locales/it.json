@@ -2677,6 +2677,8 @@
       "onOtherDevices": "I tuoi accessi salvati sono su {names}",
       "useHereHint": "Usarli qui li dà tutti a questo computer.",
       "useHere": "Usali qui",
+      "notSyncingWith": "Non sincronizzato con {names}",
+      "syncHere": "Sincronizza qui",
       "asked": "Richiesta inviata alle {time}. Consentila su {names}.",
       "askFailed": "Impossibile inviare la richiesta. Stella continua a provare.",
       "askedNow": "Richiesta inviata",

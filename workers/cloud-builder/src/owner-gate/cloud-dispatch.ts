@@ -19,6 +19,7 @@ import {
   runsAsPiAgent,
 } from "../cloud-agent-dispatch.js";
 import type { ManagedModelAudience } from "@stella/contracts/gateway/capability";
+import type { CloudExecutionSelection } from "@stella/contracts/agent-engine";
 import {
   DISPATCH_ACCEPTED_LEASE_MS,
   type DispatchPayload,
@@ -57,6 +58,10 @@ import {
 import { log } from "./support.js";
 import { PASTED_TEXT_ONLY_PROMPT } from "@stella/contracts/pasted-text";
 import { OwnerGateDispatch } from "./dispatch.js";
+
+type CloudChatHandoffModel = { execution: CloudExecutionSelection } | { note: string };
+
+const cloudChatHandoffModelKey = (dispatchId: string) => `cloudChatHandoffModel:${dispatchId}`;
 
 const contextOnlyPrompt = (payload: DispatchPayload): string =>
   payload.context?.text ? PASTED_TEXT_ONLY_PROMPT : "(Attached files)";
@@ -254,13 +259,15 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
       sessions,
       row.conversation_id,
     );
+    const moved = await this.handoffModel(row, payload);
+    const prompt = payload.prompt || contextOnlyPrompt(payload);
     const request: CloudTurnStartRequest = {
       protocol: TURN_PLANE_PROTOCOL,
       clientMsgId: row.dispatch_id,
       ...(payload.userMessageEventId
         ? { originUserMessageId: payload.userMessageEventId }
         : {}),
-      prompt: payload.prompt || contextOnlyPrompt(payload),
+      prompt: moved && "note" in moved ? `${prompt}\n\n${moved.note}` : prompt,
       lane: "chat",
       source: row.ingress === "schedule" ? "schedule" : "placement",
       ...(payload.locale ? { locale: payload.locale } : {}),
@@ -268,7 +275,11 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
       ...(payload.context && row.ingress !== "schedule"
         ? { context: payload.context }
         : {}),
-      ...(payload.execution ? { execution: payload.execution } : {}),
+      ...(moved && "execution" in moved
+        ? { execution: moved.execution }
+        : payload.execution
+          ? { execution: payload.execution }
+          : {}),
       ...(payload.handoff || row.ingress === "schedule"
         ? { hiddenMessage: true }
         : {}),
@@ -473,6 +484,31 @@ export abstract class OwnerGateCloudDispatch extends OwnerGateDispatch {
       now,
     );
     return running.row;
+  }
+
+  /** Puts the account on the model a brain move asked for, once per dispatch so every attempt starts the same turn. */
+  protected async handoffModel(
+    row: DispatchRow,
+    payload: DispatchPayload,
+  ): Promise<CloudChatHandoffModel | undefined> {
+    const pick = payload.handoff ? payload.model?.trim() : undefined;
+    if (!pick) return undefined;
+    const key = cloudChatHandoffModelKey(row.dispatch_id);
+    const known = await this.ctx.storage.get<CloudChatHandoffModel>(key);
+    if (known) return known;
+    const response = await this.ownerStore().internalCall("agentThreads.switchOwnModel", {
+      ownerGeneration: row.owner_generation,
+      conversationId: row.conversation_id,
+      requestId: row.dispatch_id.slice(0, 128),
+      pick,
+    });
+    const outcome: CloudChatHandoffModel = response.ok
+      ? { execution: (response.value as { execution: CloudExecutionSelection }).execution }
+      : {
+          note: `[Your switch to "${pick}" didn't take in the cloud (${response.error.message}), so you carry on on the cloud's current model. Tell the user if it matters.]`,
+        };
+    await this.ctx.storage.put(key, outcome);
+    return outcome;
   }
 
   protected async retireCloudChatHandoff(a: AdmittedCloudChat): Promise<void> {

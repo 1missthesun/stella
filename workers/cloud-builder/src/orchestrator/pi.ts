@@ -431,7 +431,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
                     RULES_MEMORY_RELATIVE_PATH,
                   ),
               }),
-          moveBrain: slack ? undefined : async (authority, host, brief) => {
+          moveBrain: slack ? undefined : async (authority, host, brief, model) => {
             const handoff: BrainHandoff = {
               turnId: this.current?.turnId ?? "",
               ownerId: authority.ownerId,
@@ -439,6 +439,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
               deviceId: host.deviceId,
               clientMsgId: `handoff-${crypto.randomUUID()}`,
               prompt: piBrainHandoffPrompt("the cloud", brief),
+              ...(model ? { model } : {}),
             };
             if (this.current) {
               await this.putTurnState({ [BRAIN_HANDOFF_KEY]: handoff });
@@ -1376,6 +1377,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
         deviceId: handoff.deviceId,
         clientMsgId: handoff.clientMsgId,
         prompt: handoff.prompt,
+        ...(handoff.model ? { model: handoff.model } : {}),
         handoff: true,
       });
       log("info", "pi_brain_handoff_placed", {
@@ -1822,6 +1824,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
     context?: CloudTurnContext;
     locale?: string;
     handoff?: true;
+    model?: string;
   }): Promise<string> {
     const conversationId = this.conversationId();
     const placed = await this.ownerGate(args.ownerId).submit({
@@ -1850,6 +1853,7 @@ export abstract class OrchestratorPi extends OrchestratorCloudAgents {
             : {}),
           ...(args.context ? { context: args.context } : {}),
           ...(args.handoff ? { handoff: true as const } : {}),
+          ...(args.handoff && args.model ? { model: args.model } : {}),
         },
       },
       ...(args.ownerGeneration

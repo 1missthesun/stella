@@ -334,6 +334,7 @@ export class UserAskService {
     mirrored = new Map();
     mirroredNotified = new Map();
     mirrorRefreshing = null;
+    preAsks = new Map();
     constructor(options) {
         this.options = options;
         this.saved = new SavedSecureValues(() => this.options.getStellaAppDir() ?? null);
@@ -669,15 +670,24 @@ export class UserAskService {
             }
             else {
                 let found = await this.findSaved(save, fields, exact.length > 0 ? exact : close, request);
-                if (!found?.whole && request.savedOnly !== true && this.sync.canUnlock()) {
+                if (!found?.whole &&
+                    request.savedOnly !== true &&
+                    fields.some((field) => userAskFieldIsRememberable(field)) &&
+                    this.sync.canUnlock()) {
                     // The first time something here needs a saved value this
                     // computer doesn't hold, offer to bring every saved value
                     // from the user's other devices (the code check), then
                     // look again. Declining asks the user as before.
-                    const unlocked = await this.sync.unlockFor(save.service);
-                    if (unlocked === "unlocked") {
-                        const again = await this.saved.findCandidates(save.service, save.account);
-                        found = await this.findSaved(save, fields, again.exact.length > 0 ? again.exact : again.close, request);
+                    const stopped = await this.whilePreAsking(request, async (signal) => {
+                        const unlocked = await this.sync.unlockFor(save.service, signal);
+                        if (unlocked === "unlocked" && !signal.aborted) {
+                            const again = await this.saved.findCandidates(save.service, save.account);
+                            found = await this.findSaved(save, fields, again.exact.length > 0 ? again.exact : again.close, request);
+                        }
+                        return signal.aborted;
+                    });
+                    if (stopped) {
+                        return this.stoppedBeforeAsking();
                     }
                 }
                 if (found?.whole) {
@@ -715,6 +725,26 @@ export class UserAskService {
             },
             saveContext: save ? { ...save, replaceId, ...(prefill ? { prefill } : {}) } : null,
         });
+    }
+    async whilePreAsking(request, run) {
+        const toolCallId = typeof request.toolCallId === "string" ? request.toolCallId : "";
+        const entry = {
+            conversationId: typeof request.conversationId === "string" ? request.conversationId : "",
+            controller: new AbortController(),
+        };
+        const key = toolCallId || randomUUID();
+        this.preAsks.set(key, entry);
+        try {
+            return await run(entry.controller.signal);
+        }
+        finally {
+            if (this.preAsks.get(key) === entry) {
+                this.preAsks.delete(key);
+            }
+        }
+    }
+    stoppedBeforeAsking() {
+        return { outcome: "canceled", askId: "", at: serverNow(), note: "The run was stopped before the user answered." };
     }
     async releaseSaved(params) {
         const releaseId = typeof params?.releaseId === "string" ? params.releaseId.slice(0, 128) : "";
@@ -1067,6 +1097,12 @@ export class UserAskService {
             return { ok: false };
         }
         let withdrawn = false;
+        const preAsk = this.preAsks.get(toolCallId);
+        if (preAsk && (!conversationId || preAsk.conversationId === conversationId)) {
+            this.preAsks.delete(toolCallId);
+            preAsk.controller.abort();
+            withdrawn = true;
+        }
         for (const [askId, record] of [...this.asks]) {
             if (record.ask.toolCallId !== toolCallId) {
                 continue;
@@ -1089,6 +1125,10 @@ export class UserAskService {
         return { ok: withdrawn };
     }
     cancelAll() {
+        for (const preAsk of this.preAsks.values()) {
+            preAsk.controller.abort();
+        }
+        this.preAsks.clear();
         for (const askId of [...this.asks.keys()]) {
             const wasPending = this.pending.has(askId);
             this.closeRecord(askId, "canceled");

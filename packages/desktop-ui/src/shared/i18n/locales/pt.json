@@ -2677,6 +2677,8 @@
       "onOtherDevices": "Seus logins salvos estão em {names}",
       "useHereHint": "Usá-los aqui dá todos eles a este computador.",
       "useHere": "Usar aqui",
+      "notSyncingWith": "Não sincroniza com {names}",
+      "syncHere": "Sincronizar aqui",
       "asked": "Pedido às {time}. Permita em {names}.",
       "askFailed": "Não foi possível pedir. A Stella continua tentando.",
       "askedNow": "Pedido",

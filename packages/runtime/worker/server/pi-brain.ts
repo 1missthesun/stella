@@ -36,13 +36,14 @@ export const brainFor = (
       if (!record) throw new Error("The cloud did not record where Stella runs.");
       return record;
     },
-    handOff: async (host, brief) => {
+    handOff: async (host, brief, model) => {
       const result = (await hostBus.request(
         METHOD_NAMES.HOST_EXECUTION_DESTINATION_SWITCH,
         {
           conversationId,
           target: host.host === "cloud" ? { mode: "cloud" } : { mode: "device", deviceId: host.deviceId },
           prompt: brief,
+          ...(model ? { model } : {}),
           brain: true,
         },
         { retryOnDisconnect: true },

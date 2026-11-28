@@ -34,6 +34,8 @@ export type ToolContext = {
   conversationId: string;
   deviceId: string;
   requestId: string;
+  /** Set for a call made from inside a `code` cell: unique per call there, and the same when the cell runs again. */
+  nestedCallId?: string;
   runId?: string;
   rootRunId?: string;
   attemptGeneration?: number;
@@ -73,9 +75,13 @@ export type ToolResult = {
 
 export type ToolUpdateCallback = (update: ToolResult) => void;
 
+export type ToolHeldCallback = (held: boolean) => void;
+
 export type ToolHandlerExtras = {
   signal?: AbortSignal;
   onUpdate?: ToolUpdateCallback;
+  /** Told while the call waits on the user or a held media call inside it, so a long-call watchdog pauses. */
+  onHeld?: ToolHeldCallback;
 };
 
 export type ToolMetadata = {
@@ -231,3 +237,9 @@ export type ToolDefinition = {
   execute: ToolHandler;
 };
 
+export const nestedToolCallId = (outerCallId: string, toolName: string, sequence: number): string =>
+  `${outerCallId}\0${toolName}\0${sequence}`;
+
+/** The id of this exact tool call: a nested call's own id inside a `code` cell, or the model's tool call id. */
+export const toolCallIdentity = (context: Pick<ToolContext, "requestId" | "nestedCallId">): string =>
+  context.nestedCallId ?? context.requestId;

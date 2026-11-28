@@ -9,6 +9,7 @@ import {
 import { AGENT_MOVE_CLOUD, deviceRefusal, deviceStanding, offlineMoveRefusal, type StellaExecutionHost } from "../stella/execution.ts";
 import type { StellaPlacement } from "../stella/placement.ts";
 import { deviceModelRefusal } from "@stella/contracts/execution-context";
+import { computerOnlyInCloudMessage, computerOnlyProviderOf } from "@stella/contracts/backend/providers";
 
 const LIST_TIMEOUT_MS = 15_000;
 
@@ -39,7 +40,7 @@ export const httpDevices = (
 export type DesktopBrain = {
   read(): Promise<PiBrainRecord | null>;
   set(host: PiBrainHost, options?: { failover?: true }): Promise<PiBrainRecord>;
-  handOff(host: PiBrainHost, brief: string): Promise<void>;
+  handOff(host: PiBrainHost, brief: string, model?: string): Promise<void>;
   note(host: PiBrainHost, note: { id: string; text: string }): Promise<boolean>;
   setHome?(deviceId: string | null): Promise<void>;
 };
@@ -65,10 +66,17 @@ export function desktopExecution(options: {
     return record;
   };
 
-  const brainHostAt = async (target: StellaPlacement): Promise<{ placement: StellaPlacement; next: PiBrainHost } | { error: string }> => {
+  const brainHostAt = async (
+    target: StellaPlacement,
+    model?: string,
+  ): Promise<{ placement: StellaPlacement; next: PiBrainHost } | { error: string }> => {
     if (isHere(target)) return { error: "You already run on this computer." };
     if (!options.devices) return { error: "Sign in to Stella to move away from this computer." };
-    if (target.kind === "cloud") return { placement: target, next: { host: "cloud" } };
+    if (target.kind === "cloud") {
+      const computerOnly = model ? computerOnlyProviderOf(model) : undefined;
+      if (computerOnly) return { error: `${computerOnlyInCloudMessage(computerOnly)} Nothing moved.` };
+      return { placement: target, next: { host: "cloud" } };
+    }
     if (target.kind !== "device") return { error: "You already run on this computer." };
     const listed = await options.devices.devices().catch(() => undefined);
     if (!listed) return { error: "Couldn't read the connected devices list right now. Try again in a moment." };
@@ -78,7 +86,7 @@ export function desktopExecution(options: {
     }
     if (device.deviceId === options.deviceId) return { error: "You already run on this computer." };
     const name = device.label?.trim() || device.deviceId;
-    const refusal = deviceRefusal(device, name);
+    const refusal = deviceRefusal(device, name) ?? (model ? deviceModelRefusal(device, model) : undefined);
     if (refusal) return { error: refusal };
     return {
       placement: { kind: "device", deviceId: device.deviceId, label: name },
@@ -124,14 +132,14 @@ export function desktopExecution(options: {
       : {}),
     ...(options.brain && !options.localOnly
       ? {
-          moveBrain: async (target, brief) => {
-            const at = await brainHostAt(target);
+          moveBrain: async (target, brief, _context, model) => {
+            const at = await brainHostAt(target, model);
             if ("error" in at) return at;
             const brain = options.brain!;
             await setBrain(brain, at.next);
             void (async () => {
               await options.turnEnded?.();
-              await brain.handOff(at.next, brief);
+              await brain.handOff(at.next, brief, model);
             })().catch((error: unknown) => options.report(error));
             return { moved: at.placement };
           },

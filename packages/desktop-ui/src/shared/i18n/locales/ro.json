@@ -2677,6 +2677,8 @@
       "onOtherDevices": "Autentificările tale salvate sunt pe {names}",
       "useHereHint": "Dacă le folosești aici, acest computer le primește pe toate.",
       "useHere": "Folosește-le aici",
+      "notSyncingWith": "Nu se sincronizează cu {names}",
+      "syncHere": "Sincronizează aici",
       "asked": "Cerere trimisă la {time}. Permite pe {names}.",
       "askFailed": "Cererea nu a putut fi trimisă. Stella încearcă în continuare.",
       "askedNow": "Trimisă",

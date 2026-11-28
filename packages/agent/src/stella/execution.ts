@@ -17,12 +17,19 @@ export const SWITCH_TO_TOOL_NAME = "switch_to";
 export const LEGACY_SWITCH_DESTINATION_TOOL_NAME = "switch_destination";
 
 export type StellaExecutionHost = {
-  moveBrain?(target: StellaPlacement, brief: string, context: Context): Promise<{ moved: StellaPlacement } | { error: string }>;
+  /** With `model`, the destination puts this conversation on it before it runs the brief; this computer's pick stays. */
+  moveBrain?(
+    target: StellaPlacement,
+    brief: string,
+    context: Context,
+    model?: string,
+  ): Promise<{ moved: StellaPlacement } | { error: string }>;
   /**
    * Puts this conversation on `model` (a spawn_agent model string), and the app's model picker follows; with `brief`,
-   * Stella continues from it on that model once this turn ends. Throws when the model can't run here.
+   * Stella continues from it on that model once this turn ends. Throws when the model can't run here. `callKey` names
+   * the switch_to call, so a retry of it continues once and a later switch with the same brief continues again.
    */
-  switchBrainModel?(model: string, brief: string | undefined, context: Context): Promise<{ label: string }>;
+  switchBrainModel?(model: string, brief: string | undefined, context: Context, callKey: string): Promise<{ label: string }>;
   standing?(deviceId: string, context: Context): Promise<DeviceStanding | undefined>;
   agentTarget?(
     deviceId: string,
@@ -203,27 +210,27 @@ export const switchToTool = (host: StellaExecutionHost, rootPlacement: StellaPla
         return { output: [{ type: "text", text: `You already run on ${describePlacement(rootPlacement)}. Carry on here.` }] };
       }
       if (moves && !host.moveBrain) throw new Error("This chat is stored only on this computer, so you can only run here.");
-      if (model && !host.switchBrainModel) throw new Error("This conversation can't change its own model from here; the user picks it in the app.");
-      const switched = model ? await host.switchBrainModel!(model, moves ? undefined : brief, context) : undefined;
       if (!moves) {
+        if (!host.switchBrainModel) throw new Error("This conversation can't change its own model from here; the user picks it in the app.");
+        const switched = await host.switchBrainModel(model!, brief, context, `${String(api.taskId)}\0${api.callId}`);
         return {
           output: [
             {
               type: "text",
-              text: `You switch to ${switched!.label} once this turn ends: this conversation carries on on it from your brief, with everything so far, and the app's model picker shows it. End this turn now with at most one short line to the user; start no more work on this model.`,
+              text: `You switch to ${switched.label} once this turn ends: this conversation carries on on it from your brief, with everything so far, and the app's model picker shows it. End this turn now with at most one short line to the user; start no more work on this model.`,
             },
           ],
           details: { move: "model", model: model!, brief },
         };
       }
       if (target!.kind === "device") await untilOnline(host.standing, target!.deviceId, context);
-      const moved = await host.moveBrain!(target!, brief, context);
+      const moved = await host.moveBrain!(target!, brief, context, model);
       if ("error" in moved) throw new Error(moved.error);
       return {
         output: [
           {
             type: "text",
-            text: `You are moving to ${describePlacement(moved.moved)}${switched ? ` and onto ${switched.label}` : ""}: from now on it takes this conversation's turns, and you carry on there with your brief once this turn ends, with the whole conversation. End this turn now with at most one short line to the user; start no more work here.`,
+            text: `You are moving to ${describePlacement(moved.moved)}${model ? ` and onto ${model}` : ""}: from now on it takes this conversation's turns, and you carry on there with your brief once this turn ends, with the whole conversation. End this turn now with at most one short line to the user; start no more work here.`,
           },
         ],
         details: {

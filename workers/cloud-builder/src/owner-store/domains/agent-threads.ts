@@ -4995,8 +4995,8 @@ const resolveSafeguard = async (
   return { card };
 };
 
-/** Cloud Stella's switch_to with a model: the account's pick changes, and her brief runs next on it. */
-const switchOwnModel = async (ctx: OwnerContext, raw: unknown): Promise<{ label: string }> => {
+/** Cloud Stella's switch_to with a model, or a brain move landing in the cloud: the account's pick changes, and a brief runs next on it. */
+const switchOwnModel = async (ctx: OwnerContext, raw: unknown): Promise<{ label: string; execution: CloudExecutionSelection }> => {
   const args = object({
     ownerGeneration: generation,
     conversationId: id(256),
@@ -5023,7 +5023,7 @@ const switchOwnModel = async (ctx: OwnerContext, raw: unknown): Promise<{ label:
       execution: selected,
     });
   }
-  return { label: pick };
+  return { label: pick, execution: selected };
 };
 
 export type AgentThreadEffects = {

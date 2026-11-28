@@ -34,6 +34,7 @@ export const MAX_DISPATCH_PAYLOAD_BYTES = DISPATCH_PAYLOAD_MAX_BYTES;
 export const MAX_DISPATCH_PROMPT_CHARS = 8_000;
 export const MAX_DISPATCH_DESCRIPTION_CHARS = 1_000;
 export const MAX_DISPATCH_ATTACHMENTS = 4;
+export const MAX_DISPATCH_MODEL_CHARS = 200;
 
 export const IDEMPOTENCY_KEY_PATTERN = /^[A-Za-z0-9._:-]{8,128}$/;
 
@@ -366,6 +367,13 @@ export const parseDispatchPayload = (
       return fail("payload.handoff must be true on a chat dispatch.");
     }
     payload.handoff = true;
+  }
+  if (value.model !== undefined) {
+    const model = bounded(value.model, MAX_DISPATCH_MODEL_CHARS);
+    if (!model || !payload.handoff) {
+      return fail("payload.model names the model a chat hand-off moves onto.");
+    }
+    payload.model = model;
   }
   if (value.scheduledAgent !== undefined) {
     const agent = isRecord(value.scheduledAgent) ? value.scheduledAgent : null;

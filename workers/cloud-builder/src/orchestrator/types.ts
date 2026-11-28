@@ -196,6 +196,7 @@ export type BrainHandoff = {
   deviceId: string;
   clientMsgId: string;
   prompt: string;
+  model?: string;
 };
 
 export type AgentsView = {

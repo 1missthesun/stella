@@ -10,6 +10,7 @@ import type {
   AuthorizedToolImage,
   ToolContext,
   ToolMetadata,
+  ToolHeldCallback,
   ToolResult,
   ToolUpdateCallback,
 } from "../tools/types.js";
@@ -766,10 +767,12 @@ type RuntimeToolExecutionArgs = RuntimeToolContextArgs & {
     context: ToolContext,
     signal?: AbortSignal,
     onUpdate?: ToolUpdateCallback,
+    onHeld?: ToolHeldCallback,
   ) => Promise<ToolResult>;
   hookEmitter?: HookEmitter;
   signal?: AbortSignal;
   onUpdate?: ToolUpdateCallback;
+  onHeld?: ToolHeldCallback;
 };
 
 export const executeRuntimeToolCall = async (
@@ -802,6 +805,7 @@ export const executeRuntimeToolCall = async (
         context,
         args.signal,
         args.onUpdate,
+        args.onHeld,
       ),
   });
 };
@@ -837,6 +841,7 @@ export type ModelToolCallOptions = {
     context: ToolContext,
     signal?: AbortSignal,
     onUpdate?: ToolUpdateCallback,
+    onHeld?: ToolHeldCallback,
   ) => Promise<ToolResult>;
   hookEmitter?: HookEmitter;
   imageCapTarget?: ImageCapTarget;
@@ -851,9 +856,10 @@ export const executeModelToolCall = async (
     params: unknown;
     signal?: AbortSignal;
     onUpdate?: AgentToolUpdateCallback;
+    onHeld?: ToolHeldCallback;
   },
 ): Promise<AgentToolResult<unknown>> => {
-  const { toolName, toolCallId, params, signal, onUpdate } = call;
+  const { toolName, toolCallId, params, signal, onUpdate, onHeld } = call;
   const args = (params as Record<string, unknown>) ?? {};
   const toolResult = await executeRuntimeToolCall({
     toolCallId,
@@ -882,6 +888,7 @@ export const executeModelToolCall = async (
     toolExecutor: opts.toolExecutor,
     hookEmitter: opts.hookEmitter,
     signal,
+    ...(onHeld ? { onHeld } : {}),
     onUpdate: onUpdate
       ? (partialResult: ToolResult) => {
           const formattedPartial = formatToolResult(partialResult, !COMMAND_OUTPUT_TOOL_NAMES.has(toolName));

@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 
-import type { ToolContext, ToolHandlerExtras } from "./types.js";
+import { toolCallIdentity, type ToolContext, type ToolHandlerExtras } from "./types.js";
 import {
   attachImageOperationJob,
   reserveDurableImageOperation,
@@ -394,7 +394,7 @@ export const submitAndWaitForManagedImageJob = async (
   const operation = reserveDurableImageOperation({
     stellaDataDir,
     conversationId: options.context.conversationId,
-    toolCallId: options.context.requestId,
+    toolCallId: toolCallIdentity(options.context),
     requestBody: options.requestBody,
   });
   if (operation.terminalResult) return operation.terminalResult;

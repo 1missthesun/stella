@@ -159,12 +159,14 @@ export const createCodeTool = (options: CodeToolOptions): ToolDefinition => {
               ...(yieldTimeMs !== undefined ? { yieldTimeMs } : {}),
               ...(extras?.signal ? { signal: extras.signal } : {}),
               ...(extras?.onUpdate ? { onToolUpdate: extras.onUpdate } : {}),
+              ...(extras?.onHeld ? { onHeld: extras.onHeld } : {}),
             })
           : await registry.waitCell((args.cell_id as string).trim(), context, {
               ...(waitMs !== undefined ? { waitMs } : {}),
               ...(cursor !== undefined ? { afterCursor: cursor } : {}),
               ...(args.terminate === true ? { terminate: true } : {}),
               ...(extras?.signal ? { signal: extras.signal } : {}),
+              ...(extras?.onHeld ? { onHeld: extras.onHeld } : {}),
             });
         return resultForObservation(
           observation,

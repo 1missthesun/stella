@@ -2657,6 +2657,8 @@
       "onOtherDevices": "保存済みのログイン情報は {names} にあります",
       "useHereHint": "ここで使うと、このコンピュータにすべて渡されます。",
       "useHere": "ここで使う",
+      "notSyncingWith": "{names} と同期していません",
+      "syncHere": "ここで同期",
       "asked": "{time} に依頼しました。{names} で許可してください。",
       "askFailed": "依頼できませんでした。Stella が引き続き試します。",
       "askedNow": "依頼しました",

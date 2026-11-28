@@ -886,6 +886,12 @@
       "intro": "Open Instellingen › Account › Apparaat verbinden op je computer en scan de getoonde code. Er wordt rechtstreeks verbinding gemaakt met je computer, zonder account.",
       "cameraDenied": "Stella kan de camera niet gebruiken. Sta dit toe in Instellingen of plak de code.",
       "invalidCode": "Dat is geen koppelcode van Stella.",
+      "confirmTitle": "Koppelen met {name}?",
+      "confirmTitleUnknown": "Koppelen met deze computer?",
+      "confirmIntro": "Koppel alleen met je eigen computer: deze telefoon kan dan de Stella ervan gebruiken.",
+      "confirmId": "Computer-ID {id}",
+      "confirmPair": "Koppelen",
+      "checking": "Computer controleren…",
       "computers": "Je computers",
       "cloudChats": "{name} bewaart zijn chats in je Stella-account. Log hier met dat account in om ze te zien."
     }

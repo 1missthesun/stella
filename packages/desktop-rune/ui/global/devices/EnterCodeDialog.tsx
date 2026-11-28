@@ -30,6 +30,7 @@ export function EnterCodeDialog({ initialCode, onClose, onPaired }: { initialCod
 
   const askingRef = useRef(asking);
   askingRef.current = asking;
+  const stoppedAsking = useRef<string | null>(null);
 
   useEffect(
     () =>
@@ -65,7 +66,13 @@ export function EnterCodeDialog({ initialCode, onClose, onPaired }: { initialCod
   const ask = (computer: P2pNearbyComputer) =>
     void run(computer.id, async () => {
       if (!api) return;
-      await api.askNearby(computer.id);
+      stoppedAsking.current = null;
+      try {
+        await api.askNearby(computer.id);
+      } catch (failure) {
+        if (stoppedAsking.current === computer.id) return;
+        throw failure;
+      }
       setDigits("");
       setAsking(computer);
     });
@@ -82,15 +89,24 @@ export function EnterCodeDialog({ initialCode, onClose, onPaired }: { initialCod
     setError(null);
   };
 
+  const unpaired = nearby.filter((c) => !c.paired);
+  // Asked, and waiting for the person at that computer to allow it.
+  const waitingOn = busy ? (unpaired.find((c) => c.id === busy) ?? null) : null;
+
+  const stopWaiting = () => {
+    if (!waitingOn) return;
+    stoppedAsking.current = waitingOn.id;
+    api?.cancelNearby(waitingOn.id);
+  };
+
   const close = () => {
     if (asking) api?.cancelNearby(asking.id);
+    stopWaiting();
     onClose();
   };
 
-  const unpaired = nearby.filter((c) => !c.paired);
-
   return (
-    <Dialog open onOpenChange={(open) => (!open && !busy ? close() : undefined)}>
+    <Dialog open onOpenChange={(open) => (!open && (!busy || waitingOn) ? close() : undefined)}>
       <DialogContent fit {...s.dialog_selfHostDialog}>
         <DialogHeader {...s.selfHostDialog_dialogHeader}>
           <DialogTitle>{asking ? t("devices.nearby.digitsTitle", { name: asking.name }) : t("devices.enter.title")}</DialogTitle>
@@ -156,17 +172,22 @@ export function EnterCodeDialog({ initialCode, onClose, onPaired }: { initialCod
                   {t("devices.nearby.looking")}
                 </T>
               )}
+              {waitingOn ? (
+                <T w="full" {...d.nearbyEmpty} role="status">
+                  {t("devices.nearby.waiting", { name: waitingOn.name })}
+                </T>
+              ) : null}
             </col>
             ) : null}
             <DialogDescription {...s.selfHostDialogDescription}>{t("devices.enter.intro")}</DialogDescription>
-            <Input {...s.selfHostDialogInput} value={text} spellCheck={false} placeholder="K7M-49PX" label={t("devices.enter.label")} onChange={(event) => setText(event.target.value)} disabled={busy !== null} />
+            <Input {...s.selfHostDialogInput} value={text} spellCheck={false} placeholder="K7M-Q2X-49P" label={t("devices.enter.label")} onChange={(event) => setText(event.target.value)} disabled={busy !== null} />
             {error ? (
               <T w="full" {...s.selfHostDialogError} role="alert">
                 {error}
               </T>
             ) : null}
             <row {...s.selfHostDialogActions}>
-              <Button variant="ghost" className="pill-btn" onClick={close} disabled={busy !== null}>
+              <Button variant="ghost" className="pill-btn" onClick={waitingOn ? stopWaiting : close} disabled={busy !== null && !waitingOn}>
                 {t("common.cancel")}
               </Button>
               <Button type="submit" variant="primary" className="pill-btn" disabled={busy !== null || !text.trim()}>

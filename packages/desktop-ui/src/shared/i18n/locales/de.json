@@ -1771,6 +1771,12 @@
       "intro": "Öffne auf deinem Computer Einstellungen › Konto › Gerät verbinden und scanne den angezeigten Code. Die Verbindung geht direkt zu deinem Computer, ohne Konto.",
       "cameraDenied": "Stella kann die Kamera nicht nutzen. Erlaube es in den Einstellungen oder füge stattdessen den Code ein.",
       "invalidCode": "Das ist kein Kopplungscode von Stella.",
+      "confirmTitle": "Mit {name} koppeln?",
+      "confirmTitleUnknown": "Mit diesem Computer koppeln?",
+      "confirmIntro": "Kopple nur mit deinem eigenen Computer: Dieses Telefon kann dann dessen Stella nutzen.",
+      "confirmId": "Computer-ID {id}",
+      "confirmPair": "Koppeln",
+      "checking": "Computer wird geprüft…",
       "computers": "Deine Computer",
       "cloudChats": "{name} speichert seine Chats in deinem Stella-Konto. Melde dich hier damit an, um sie zu sehen."
     }
@@ -4024,6 +4030,7 @@
     "nearby": {
       "title": "Computer in der Nähe",
       "looking": "Suche nach Computern in diesem Netzwerk…",
+      "waiting": "Lass es auf {name} zu, um fortzufahren.",
       "connectTo": "Mit {name} verbinden",
       "digitsTitle": "Mit {name} verbinden",
       "digitsIntro": "Gib die sechs Ziffern ein, die {name} gerade anzeigt.",
@@ -4032,7 +4039,9 @@
       "ended": "{name} hat die Anfrage beendet. Versuch es erneut.",
       "requestTitle": "{name} möchte Stella auf diesem Computer nutzen",
       "requestIntro": "Gib diesen Code auf {name} ein, um den Zugriff zu erlauben. Wenn du das nicht angefordert hast, erlaube es nicht.",
-      "deny": "Nicht erlauben"
+      "deny": "Nicht erlauben",
+      "allow": "Zulassen",
+      "allowIntro": "Lass es nur zu, wenn du {name} gerade verbindest."
     }
   }
 }

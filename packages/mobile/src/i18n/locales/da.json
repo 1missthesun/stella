@@ -886,6 +886,12 @@
       "intro": "Åbn Indstillinger › Konto › Forbind en enhed på din computer, og scan den viste kode. Den forbinder direkte til din computer uden en konto.",
       "cameraDenied": "Stella kan ikke bruge kameraet. Tillad det i Indstillinger, eller indsæt koden i stedet.",
       "invalidCode": "Det er ikke en parringskode fra Stella.",
+      "confirmTitle": "Par med {name}?",
+      "confirmTitleUnknown": "Par med denne computer?",
+      "confirmIntro": "Par kun med din egen computer: denne telefon vil kunne bruge dens Stella.",
+      "confirmId": "Computer-id {id}",
+      "confirmPair": "Par",
+      "checking": "Tjekker computeren…",
       "computers": "Dine computere",
       "cloudChats": "{name} gemmer sine chats på din Stella-konto. Log ind her med den for at se dem."
     }

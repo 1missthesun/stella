@@ -885,6 +885,12 @@
       "intro": "在電腦上開啟「設定 › 帳號 › 連線裝置」，掃描顯示的代碼。它會直接連線到你的電腦，不需要帳號。",
       "cameraDenied": "Stella 無法使用相機。請在設定中允許，或改為貼上代碼。",
       "invalidCode": "這不是 Stella 的配對碼。",
+      "confirmTitle": "要與 {name} 配對嗎？",
+      "confirmTitleUnknown": "要與這台電腦配對嗎？",
+      "confirmIntro": "只與你自己的電腦配對：這支手機將能使用它的 Stella。",
+      "confirmId": "電腦 ID {id}",
+      "confirmPair": "配對",
+      "checking": "正在檢查電腦…",
       "computers": "你的電腦",
       "cloudChats": "{name} 的聊天保存在你的 Stella 帳號中。在這裡登入該帳號即可查看。"
     }

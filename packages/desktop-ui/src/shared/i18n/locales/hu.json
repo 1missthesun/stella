@@ -1771,6 +1771,12 @@
       "intro": "A számítógépeden nyisd meg a Beállítások › Fiók › Eszköz csatlakoztatása menüt, és olvasd be a megjelenő kódot. Közvetlenül a számítógépedhez csatlakozik, fiók nélkül.",
       "cameraDenied": "A Stella nem tudja használni a kamerát. Engedélyezd a Beállításokban, vagy illeszd be a kódot.",
       "invalidCode": "Ez nem Stella párosítási kód.",
+      "confirmTitle": "Párosítás ezzel: {name}?",
+      "confirmTitleUnknown": "Párosítás ezzel a számítógéppel?",
+      "confirmIntro": "Csak a saját számítógépeddel párosíts: ez a telefon használhatja majd a Stelláját.",
+      "confirmId": "Számítógép-azonosító: {id}",
+      "confirmPair": "Párosítás",
+      "checking": "A számítógép ellenőrzése…",
       "computers": "Saját számítógépek",
       "cloudChats": "{name} a Stella-fiókodban tárolja a beszélgetéseit. Jelentkezz be itt azzal a fiókkal, hogy lásd őket."
     }
@@ -4024,6 +4030,7 @@
     "nearby": {
       "title": "Közeli számítógépek",
       "looking": "Számítógépek keresése ezen a hálózaton…",
+      "waiting": "A folytatáshoz engedélyezd a(z) {name} eszközön.",
       "connectTo": "Csatlakozás ehhez: {name}",
       "digitsTitle": "Csatlakozás ehhez: {name}",
       "digitsIntro": "Írd be a {name} által most mutatott hat számjegyet.",
@@ -4032,7 +4039,9 @@
       "ended": "{name} lezárta a kérést. Próbáld újra.",
       "requestTitle": "{name} használni szeretné a Stella alkalmazást ezen a számítógépen",
       "requestIntro": "Írd be ezt a kódot a(z) {name} eszközön a hozzáféréshez. Ha nem te kérted, ne engedélyezd.",
-      "deny": "Tiltás"
+      "deny": "Tiltás",
+      "allow": "Engedélyezés",
+      "allowIntro": "Csak akkor engedélyezd, ha most csatlakoztatod a(z) {name} eszközt."
     }
   }
 }

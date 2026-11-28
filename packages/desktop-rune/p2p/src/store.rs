@@ -47,6 +47,27 @@ pub struct Peers {
     /// The UDP port this node listened on last, so paired devices find it at the same address after a restart.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub port: Option<u16>,
+    #[serde(default, skip_serializing_if = "NearbyGuard::is_clear")]
+    pub nearby_guard: NearbyGuard,
+}
+
+/// Failed nearby pairings (wrong digits, requests denied or left unanswered), kept across restarts
+/// and reconnects so the six digits never get a fresh budget (crate::nearby).
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct NearbyGuard {
+    #[serde(default)]
+    pub failures: u32,
+    #[serde(default)]
+    pub last_failure_at: u64,
+    #[serde(default)]
+    pub locked_until: u64,
+}
+
+impl NearbyGuard {
+    pub fn is_clear(&self) -> bool {
+        *self == NearbyGuard::default()
+    }
 }
 
 pub struct Store {

@@ -110,8 +110,8 @@ const listen = <A extends unknown[]>(set: Set<(...args: A) => void>, listener: (
   return () => void set.delete(listener);
 };
 
-/** The person typed a short code (`K7M-49PX`, any case, dash optional) rather than a full one. */
-const isShortCode = (code: string) => /^[0-9a-z]{3}[\s-]?[0-9a-z]{4}$/i.test(code.trim());
+/** The person typed a short code (`K7M-Q2X-49P`, any case, dashes optional) rather than a full one. */
+const isShortCode = (code: string) => /^[0-9a-z]{9}$/i.test(code.trim().replace(/[\s-]/g, ""));
 
 export function p2pApi(): P2pApi {
   const live = () => {
@@ -174,6 +174,9 @@ export function p2pApi(): P2pApi {
     onNearbyEnded: (listener) => listen(nearbyEndedListeners, listener),
     confirming: () => confirms?.get() ?? null,
     subscribeConfirming: (listener) => confirms?.subscribe(listener) ?? (() => {}),
+    allowNearby: async (request) => {
+      await engineTransport.command("pairing.allow", { request });
+    },
     denyNearby: async (request) => {
       await engineTransport.command("pairing.deny", { request });
     },

@@ -46,6 +46,31 @@ pub async fn pair(inner: &Arc<Inner>, code: &str) -> Result<Value, String> {
     saved(inner, code.host, &reply, code.relay, code.addrs)
 }
 
+/// Who a pairing code names, as that computer itself answers (the connection proves it holds the
+/// code's key), without pairing or spending the code.
+pub async fn preview(inner: &Arc<Inner>, code: &str) -> Result<Value, String> {
+    let code = Code::decode(code)?;
+    if code.host == inner.endpoint.id() {
+        return Err("That's this device's own pairing code. Open it on the other device.".into());
+    }
+    let addr = pairing::endpoint_addr(code.host, code.relay.as_deref(), &code.addrs);
+    let reach = || "Couldn't reach that computer. Check that Stella is open on it and try again.".to_owned();
+    let conn = tokio::time::timeout(Duration::from_secs(20), inner.endpoint.connect(addr, PAIR_ALPN)).await.map_err(|_| reach())?.map_err(|_| reach())?;
+    let ask = async {
+        let (mut send, mut recv) = conn.open_bi().await.map_err(|e| e.to_string())?;
+        wire::write(&mut send, &json!({ "v": 1, "mode": "info" })).await?;
+        let _ = send.finish();
+        wire::read(&mut recv).await?.ok_or_else(|| "The computer closed the connection.".to_owned())
+    };
+    let info = tokio::time::timeout(Duration::from_secs(15), ask).await.map_err(|_| "The computer didn't answer.".to_owned());
+    conn.close(0u32.into(), b"thanks");
+    let info = info??;
+    let id = code.host.to_string();
+    let text = |k: &str, fallback: &str| info.get(k).and_then(|x| x.as_str()).map(|x| x.chars().take(80).collect::<String>()).filter(|x| !x.is_empty()).unwrap_or_else(|| fallback.to_owned());
+    let paired = lock(&inner.store).computer(&id).is_some();
+    Ok(json!({ "id": id, "name": text("name", "Computer"), "platform": text("platform", "unknown"), "paired": paired }))
+}
+
 /// Keeps a computer that just accepted this device and starts the link to it.
 pub(crate) fn saved(inner: &Arc<Inner>, host: EndpointId, reply: &Value, relay: Option<String>, addrs: Vec<String>) -> Result<Value, String> {
     let text = |k: &str, fallback: &str| reply.get(k).and_then(|x| x.as_str()).map(|x| x.chars().take(80).collect::<String>()).filter(|x| !x.is_empty()).unwrap_or_else(|| fallback.to_owned());

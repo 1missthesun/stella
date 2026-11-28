@@ -886,6 +886,12 @@
       "intro": "Öffne auf deinem Computer Einstellungen › Konto › Gerät verbinden und scanne den angezeigten Code. Die Verbindung geht direkt zu deinem Computer, ohne Konto.",
       "cameraDenied": "Stella kann die Kamera nicht nutzen. Erlaube es in den Einstellungen oder füge stattdessen den Code ein.",
       "invalidCode": "Das ist kein Kopplungscode von Stella.",
+      "confirmTitle": "Mit {name} koppeln?",
+      "confirmTitleUnknown": "Mit diesem Computer koppeln?",
+      "confirmIntro": "Kopple nur mit deinem eigenen Computer: Dieses Telefon kann dann dessen Stella nutzen.",
+      "confirmId": "Computer-ID {id}",
+      "confirmPair": "Koppeln",
+      "checking": "Computer wird geprüft…",
       "computers": "Deine Computer",
       "cloudChats": "{name} speichert seine Chats in deinem Stella-Konto. Melde dich hier damit an, um sie zu sehen."
     }

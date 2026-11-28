@@ -1,6 +1,7 @@
 //! `p2p.*`: Stella's direct device link (crate `stella-p2p`, ../p2p). `p2p.start {dataDir, name,
-//! platform, relay?}` starts this computer's node once; every other `p2p.<command>` is that
-//! crate's command of the same name, with its reply. Its events reach TS as `{t:"p2p", ...event}`.
+//! platform, relay?}` starts this computer's node once and `p2p.stop` shuts it down (a later start
+//! makes a new one); every other `p2p.<command>` is that crate's command of the same name, with
+//! its reply. Its events reach TS as `{t:"p2p", ...event}`.
 
 use std::sync::{Arc, Mutex};
 
@@ -33,6 +34,17 @@ pub fn command(cmd: &str, rid: Option<u64>, v: &Value) {
             }
             let started = node.as_ref().expect("started");
             started.command("status", Value::Null, move |result| reply_any_thread(rid, result));
+        });
+        return;
+    }
+    if name == "stop" {
+        // Taken out first, so a later `p2p.start` makes a live node instead of finding this closed one.
+        let stopping = NODE.lock().unwrap_or_else(|e| e.into_inner()).take();
+        std::thread::spawn(move || {
+            if let Some(node) = stopping {
+                node.shutdown();
+            }
+            reply_any_thread(rid, Ok(Value::Null));
         });
         return;
     }

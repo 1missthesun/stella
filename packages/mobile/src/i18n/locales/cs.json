@@ -888,6 +888,12 @@
       "intro": "Na počítači otevřete Nastavení › Účet › Připojit zařízení a naskenujte zobrazený kód. Připojí se přímo k vašemu počítači bez účtu.",
       "cameraDenied": "Stella nemůže používat fotoaparát. Povolte ho v Nastavení nebo místo toho vložte kód.",
       "invalidCode": "To není párovací kód aplikace Stella.",
+      "confirmTitle": "Spárovat s {name}?",
+      "confirmTitleUnknown": "Spárovat s tímto počítačem?",
+      "confirmIntro": "Párujte jen se svým vlastním počítačem: tento telefon bude moci používat jeho Stellu.",
+      "confirmId": "ID počítače {id}",
+      "confirmPair": "Spárovat",
+      "checking": "Ověřuji počítač…",
       "computers": "Vaše počítače",
       "cloudChats": "{name} ukládá své chaty do vašeho účtu Stella. Přihlaste se tu tímto účtem a zobrazte je."
     }

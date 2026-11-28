@@ -1,5 +1,5 @@
 //! Short codes people type: the six digits a computer shows for a nearby device, and the
-//! `K7M-49PX` codes that cross networks. Each is the password of a SPAKE2 exchange, so whoever
+//! `K7M-Q2X-49P` codes that cross networks. Each is the password of a SPAKE2 exchange, so whoever
 //! sits between the two (a relay, the rendezvous mailbox, a look-alike on the same network) gets
 //! one guess per attempt and learns nothing it can search offline.
 
@@ -13,7 +13,8 @@ use spake2::{Ed25519Group, Identity, Password, Spake2};
 /// Crockford's base32: no I, L, O or U, so nothing reads as something else.
 const ALPHABET: &[u8; 32] = b"0123456789ABCDEFGHJKMNPQRSTVWXYZ";
 /// The first symbols of a short code name its mailbox; the rest are the password, never sent.
-pub const SLOT_LEN: usize = 3;
+/// Five symbols (2^25 mailboxes) keep live codes too sparse to find by trying names.
+pub const SLOT_LEN: usize = 5;
 pub const PASSWORD_LEN: usize = 4;
 
 pub struct Exchange {
@@ -116,11 +117,12 @@ pub fn normalize_short(code: &str) -> Option<String> {
     (out.len() == SLOT_LEN + PASSWORD_LEN).then_some(out)
 }
 
+/// In threes, `K7M-Q2X-49P`, which reads aloud and types like a phone number.
 pub fn display_short(code: &str) -> String {
-    format!("{}-{}", &code[..SLOT_LEN], &code[SLOT_LEN..])
+    code.as_bytes().chunks(3).map(|c| String::from_utf8_lossy(c).into_owned()).collect::<Vec<_>>().join("-")
 }
 
 /// The password for a short code binds its slot too, so a code means one mailbox only.
 pub fn short_password(code: &str) -> Vec<u8> {
-    format!("stella-p2p short v1:{}:{}", &code[..SLOT_LEN], &code[SLOT_LEN..]).into_bytes()
+    format!("stella-p2p short v2:{}:{}", &code[..SLOT_LEN], &code[SLOT_LEN..]).into_bytes()
 }

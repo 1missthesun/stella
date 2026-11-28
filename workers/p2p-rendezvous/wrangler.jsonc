@@ -17,8 +17,9 @@
   "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Slot"] }],
   "ratelimits": [
     // Rate-limit namespaces are shared by every worker in the Cloudflare account.
-    { "name": "OPEN_LIMITER", "namespace_id": "41101", "simple": { "limit": 20, "period": 60 } },
-    { "name": "CLAIM_LIMITER", "namespace_id": "41102", "simple": { "limit": 30, "period": 60 } }
+    { "name": "OPEN_LIMITER", "namespace_id": "41101", "simple": { "limit": 10, "period": 60 } },
+    { "name": "CLAIM_LIMITER", "namespace_id": "41102", "simple": { "limit": 10, "period": 60 } },
+    { "name": "LOOKUP_LIMITER", "namespace_id": "41105", "simple": { "limit": 10, "period": 60 } }
   ],
   "env": {
     "production": {
@@ -30,8 +31,9 @@
         "bindings": [{ "name": "SLOTS", "class_name": "Slot" }]
       },
       "ratelimits": [
-        { "name": "OPEN_LIMITER", "namespace_id": "41103", "simple": { "limit": 20, "period": 60 } },
-        { "name": "CLAIM_LIMITER", "namespace_id": "41104", "simple": { "limit": 30, "period": 60 } }
+        { "name": "OPEN_LIMITER", "namespace_id": "41103", "simple": { "limit": 10, "period": 60 } },
+        { "name": "CLAIM_LIMITER", "namespace_id": "41104", "simple": { "limit": 10, "period": 60 } },
+        { "name": "LOOKUP_LIMITER", "namespace_id": "41106", "simple": { "limit": 10, "period": 60 } }
       ]
     }
   }

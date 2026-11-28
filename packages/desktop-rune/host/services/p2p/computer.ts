@@ -100,6 +100,8 @@ export function serveDevices(transport: P2pTransport, deps: ComputerDeps) {
         if (!request || !PI_OPS.has(request.op)) throw new Error("That isn't available from another device.");
         if (!reachable(request.conversationId)) throw new Error("Only this computer's private chats are reachable.");
         if (request.op === "submit") return await deps.piChat({ ...request, send: sendHere(request.send) });
+        // A device holds one watch per chat: an unwatch it never watched mustn't end someone else's.
+        if (request.op === "unwatch" && !watching.get(device)?.has(request.conversationId)) return null;
         const result = await deps.piChat(request);
         if (request.op === "watch") {
           let conversations = watching.get(device);

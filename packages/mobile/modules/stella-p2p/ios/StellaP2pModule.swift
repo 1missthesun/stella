@@ -6,8 +6,11 @@ import StellaP2pFFI
 /// node, runs `command`s (JSON in, `{ok, value}` / `{ok:false, error}` out) and gets the node's events
 /// as `onEvent`. See `src/index.ts` and the crate's `src/lib.rs` for the commands and events.
 public final class StellaP2pModule: Module {
-  private let lock = NSLock()
+  /// Guards everything below; `stopNode` waits on it until no command is inside the C API.
+  private let lock = NSCondition()
   private var node: OpaquePointer?
+  /// Commands still inside `stella_p2p_command`, which uses the node pointer only while it runs.
+  private var inFlight = 0
   private var replies: [UInt64: Promise] = [:]
   private var nextToken: UInt64 = 1
   private var startError: String?
@@ -51,12 +54,21 @@ public final class StellaP2pModule: Module {
       let (node, token) = self.lock.withLock { () -> (OpaquePointer?, UInt64) in
         let token = self.nextToken
         self.nextToken += 1
-        if self.node != nil { self.replies[token] = promise }
+        if self.node != nil {
+          self.replies[token] = promise
+          self.inFlight += 1
+        }
         return (self.node, token)
       }
       guard let node else {
         promise.resolve("{\"ok\":false,\"error\":\"The device link isn't running.\"}")
         return
+      }
+      defer {
+        self.lock.withLock {
+          self.inFlight -= 1
+          if self.inFlight == 0 { self.lock.broadcast() }
+        }
       }
       let ctx = Unmanaged.passUnretained(self).toOpaque()
       name.withCString { cmd in
@@ -85,10 +97,13 @@ public final class StellaP2pModule: Module {
     promise?.resolve(json)
   }
 
+  /// Frees the node once no command is using it; `stella_p2p_stop` itself waits out any callback
+  /// still running and lets none start after it, so `self` (the callbacks' context) stays valid.
   private func stopNode() {
     let (node, pending) = lock.withLock { () -> (OpaquePointer?, [Promise]) in
       let node = self.node
       self.node = nil
+      while self.inFlight > 0 { self.lock.wait() }
       let pending = Array(self.replies.values)
       self.replies = [:]
       return (node, pending)

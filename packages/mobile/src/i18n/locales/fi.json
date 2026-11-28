@@ -886,6 +886,12 @@
       "intro": "Avaa tietokoneellasi Asetukset › Tili › Yhdistä laite ja skannaa näkyvä koodi. Se yhdistää suoraan tietokoneeseesi ilman tiliä.",
       "cameraDenied": "Stella ei voi käyttää kameraa. Salli se asetuksissa tai liitä koodi sen sijaan.",
       "invalidCode": "Tämä ei ole Stella-pariliitoskoodi.",
+      "confirmTitle": "Muodostetaanko pari: {name}?",
+      "confirmTitleUnknown": "Muodostetaanko pari tämän tietokoneen kanssa?",
+      "confirmIntro": "Muodosta pari vain oman tietokoneesi kanssa: tämä puhelin voi käyttää sen Stellaa.",
+      "confirmId": "Tietokoneen tunnus {id}",
+      "confirmPair": "Muodosta pari",
+      "checking": "Tarkistetaan tietokonetta…",
       "computers": "Omat tietokoneet",
       "cloudChats": "{name} säilyttää keskustelunsa Stella-tililläsi. Kirjaudu täällä samalla tilillä nähdäksesi ne."
     }

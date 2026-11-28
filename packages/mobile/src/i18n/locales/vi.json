@@ -885,6 +885,12 @@
       "intro": "Trên máy tính, mở Cài đặt › Tài khoản › Kết nối thiết bị rồi quét mã hiển thị. Kết nối trực tiếp với máy tính của bạn, không cần tài khoản.",
       "cameraDenied": "Stella không dùng được camera. Cho phép trong Cài đặt hoặc dán mã thay thế.",
       "invalidCode": "Đây không phải mã ghép nối của Stella.",
+      "confirmTitle": "Ghép nối với {name}?",
+      "confirmTitleUnknown": "Ghép nối với máy tính này?",
+      "confirmIntro": "Chỉ ghép nối với máy tính của chính bạn: điện thoại này sẽ dùng được Stella trên đó.",
+      "confirmId": "ID máy tính {id}",
+      "confirmPair": "Ghép nối",
+      "checking": "Đang kiểm tra máy tính…",
       "computers": "Máy tính của bạn",
       "cloudChats": "{name} lưu các cuộc trò chuyện trong tài khoản Stella của bạn. Đăng nhập tại đây bằng tài khoản đó để xem."
     }

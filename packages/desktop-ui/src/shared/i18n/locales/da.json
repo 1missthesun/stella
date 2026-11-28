@@ -1771,6 +1771,12 @@
       "intro": "Åbn Indstillinger › Konto › Forbind en enhed på din computer, og scan den viste kode. Den forbinder direkte til din computer uden en konto.",
       "cameraDenied": "Stella kan ikke bruge kameraet. Tillad det i Indstillinger, eller indsæt koden i stedet.",
       "invalidCode": "Det er ikke en parringskode fra Stella.",
+      "confirmTitle": "Par med {name}?",
+      "confirmTitleUnknown": "Par med denne computer?",
+      "confirmIntro": "Par kun med din egen computer: denne telefon vil kunne bruge dens Stella.",
+      "confirmId": "Computer-id {id}",
+      "confirmPair": "Par",
+      "checking": "Tjekker computeren…",
       "computers": "Dine computere",
       "cloudChats": "{name} gemmer sine chats på din Stella-konto. Log ind her med den for at se dem."
     }
@@ -4024,6 +4030,7 @@
     "nearby": {
       "title": "Computere i nærheden",
       "looking": "Leder efter computere på dette netværk…",
+      "waiting": "Tillad det på {name} for at fortsætte.",
       "connectTo": "Forbind til {name}",
       "digitsTitle": "Forbind til {name}",
       "digitsIntro": "Indtast de seks cifre, som {name} viser nu.",
@@ -4032,7 +4039,9 @@
       "ended": "{name} afsluttede anmodningen. Prøv igen.",
       "requestTitle": "{name} vil bruge denne computers Stella",
       "requestIntro": "Indtast denne kode på {name} for at give adgang. Tillad det ikke, hvis du ikke bad om det.",
-      "deny": "Tillad ikke"
+      "deny": "Tillad ikke",
+      "allow": "Tillad",
+      "allowIntro": "Tillad det kun, hvis du forbinder {name} lige nu."
     }
   }
 }

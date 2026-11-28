@@ -887,6 +887,12 @@
       "intro": "No computador, abra Configurações › Conta › Conectar um dispositivo e escaneie o código exibido. A conexão é direta com o seu computador, sem conta.",
       "cameraDenied": "O Stella não pode usar a câmera. Permita nas Configurações ou cole o código.",
       "invalidCode": "Esse não é um código de pareamento do Stella.",
+      "confirmTitle": "Emparelhar com {name}?",
+      "confirmTitleUnknown": "Emparelhar com este computador?",
+      "confirmIntro": "Emparelhe apenas com o seu próprio computador: este telemóvel poderá usar a Stella dele.",
+      "confirmId": "ID do computador {id}",
+      "confirmPair": "Emparelhar",
+      "checking": "A verificar o computador…",
       "computers": "Seus computadores",
       "cloudChats": "{name} mantém as conversas na sua conta Stella. Entre aqui com essa conta para vê-las."
     }

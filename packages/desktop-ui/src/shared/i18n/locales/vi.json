@@ -1761,6 +1761,12 @@
       "intro": "Trên máy tính, mở Cài đặt › Tài khoản › Kết nối thiết bị rồi quét mã hiển thị. Kết nối trực tiếp với máy tính của bạn, không cần tài khoản.",
       "cameraDenied": "Stella không dùng được camera. Cho phép trong Cài đặt hoặc dán mã thay thế.",
       "invalidCode": "Đây không phải mã ghép nối của Stella.",
+      "confirmTitle": "Ghép nối với {name}?",
+      "confirmTitleUnknown": "Ghép nối với máy tính này?",
+      "confirmIntro": "Chỉ ghép nối với máy tính của chính bạn: điện thoại này sẽ dùng được Stella trên đó.",
+      "confirmId": "ID máy tính {id}",
+      "confirmPair": "Ghép nối",
+      "checking": "Đang kiểm tra máy tính…",
       "computers": "Máy tính của bạn",
       "cloudChats": "{name} lưu các cuộc trò chuyện trong tài khoản Stella của bạn. Đăng nhập tại đây bằng tài khoản đó để xem."
     }
@@ -3965,6 +3971,7 @@
     "nearby": {
       "title": "Máy tính ở gần",
       "looking": "Đang tìm máy tính trên mạng này…",
+      "waiting": "Hãy cho phép trên {name} để tiếp tục.",
       "connectTo": "Kết nối với {name}",
       "digitsTitle": "Kết nối với {name}",
       "digitsIntro": "Nhập sáu chữ số mà {name} đang hiển thị.",
@@ -3973,7 +3980,9 @@
       "ended": "{name} đã kết thúc yêu cầu. Hãy thử lại.",
       "requestTitle": "{name} muốn dùng Stella của máy tính này",
       "requestIntro": "Nhập mã này trên {name} để cho phép truy cập. Nếu bạn không yêu cầu, đừng cho phép.",
-      "deny": "Không cho phép"
+      "deny": "Không cho phép",
+      "allow": "Cho phép",
+      "allowIntro": "Chỉ cho phép nếu bạn đang kết nối {name} ngay lúc này."
     }
   }
 }

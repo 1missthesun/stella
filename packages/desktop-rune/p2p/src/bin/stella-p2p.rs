@@ -2,9 +2,12 @@
 //!
 //!   stella-p2p --data <dir> [--name <name>] status
 //!   stella-p2p --data <dir> serve [--short]             print a pairing code (and a short one), answer
-//!       requests with {echo}; nearby devices that ask print a `confirm` event with six digits
+//!       requests with {echo}; a nearby device that asks prints a `confirm` event, and a line
+//!       `allow` (or `deny`) on stdin answers it; once allowed, `confirm` prints the six digits.
+//!       `revoke <id>` unpairs a device, `peers` lists them, `short` shows a new short code.
 //!   stella-p2p --data <dir> pair <code>                 pair, then stay connected and print events
-//!   stella-p2p --data <dir> pair-short <K7M-49PX>       pair through the rendezvous, then stay connected
+//!   stella-p2p --data <dir> preview <code>              who the code names, as that computer answers
+//!   stella-p2p --data <dir> pair-short <K7M-Q2X-49P>    pair through the rendezvous, then stay connected
 //!   stella-p2p --data <dir> nearby                      list computers on this network for 10 seconds
 //!   stella-p2p --data <dir> pair-nearby <id>            ask a nearby computer, read its six digits from stdin
 //!   stella-p2p --data <dir> request <id> '<json body>'  one request to a paired computer
@@ -71,8 +74,15 @@ fn main() {
     if command == "serve" {
         let node: Arc<std::sync::OnceLock<Node>> = Arc::new(std::sync::OnceLock::new());
         let answering = node.clone();
+        let asking = Arc::new(std::sync::atomic::AtomicU64::new(0));
+        let asked = asking.clone();
         let started = start(&data, &name, relay, Arc::new(move |e: Value| {
             println!("{e}");
+            if e.get("state").and_then(|s| s.as_str()) == Some("confirm")
+                && let Some(request) = e.get("request").and_then(|r| r.as_u64())
+            {
+                asked.store(request, std::sync::atomic::Ordering::Relaxed);
+            }
             if e.get("kind").and_then(|k| k.as_str()) == Some("request")
                 && let Some(node) = answering.get()
             {
@@ -87,6 +97,23 @@ fn main() {
         if short {
             println!("{}", node.command_blocking("pairing.short", Value::Null).unwrap_or_else(|e| die(&e)));
         }
+        let mut line = String::new();
+        while std::io::stdin().read_line(&mut line).is_ok_and(|n| n > 0) {
+            let request = asking.load(std::sync::atomic::Ordering::Relaxed);
+            let (cmd, args) = match line.trim().split_once(' ').unwrap_or((line.trim(), "")) {
+                ("allow", _) => ("pairing.allow", json!({ "request": request })),
+                ("deny", _) => ("pairing.deny", json!({ "request": request })),
+                ("revoke", id) => ("device.revoke", json!({ "id": id })),
+                ("peers", _) => ("peers", Value::Null),
+                ("short", _) => ("pairing.short", Value::Null),
+                _ => {
+                    line.clear();
+                    continue;
+                }
+            };
+            println!("{}", json!({ cmd: node.command_blocking(cmd, args).unwrap_or_else(|e| json!({ "error": e })) }));
+            line.clear();
+        }
         loop {
             std::thread::sleep(Duration::from_secs(3600));
         }
@@ -95,6 +122,10 @@ fn main() {
     let node = start(&data, &name, relay, Arc::new(|e| println!("{e}")));
     match command.as_str() {
         "status" => println!("{}", node.command_blocking("status", Value::Null).unwrap_or_else(|e| die(&e))),
+        "preview" => {
+            let code = args.get(1).cloned().unwrap_or_else(|| die("preview <code>"));
+            println!("{}", node.command_blocking("pair.preview", json!({ "code": code })).unwrap_or_else(|e| die(&e)));
+        }
         "pair" | "pair-short" => {
             let code = args.get(1).cloned().unwrap_or_else(|| die("pair <code>"));
             let cmd = if command == "pair" { "pair" } else { "pair.short" };

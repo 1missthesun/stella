@@ -887,6 +887,12 @@
       "intro": "Pe computer, deschide Setări › Cont › Conectează un dispozitiv și scanează codul afișat. Se conectează direct la computerul tău, fără cont.",
       "cameraDenied": "Stella nu poate folosi camera. Permite accesul în Setări sau lipește codul.",
       "invalidCode": "Acesta nu este un cod de asociere Stella.",
+      "confirmTitle": "Asociezi cu {name}?",
+      "confirmTitleUnknown": "Asociezi cu acest computer?",
+      "confirmIntro": "Asociază doar cu propriul computer: acest telefon va putea folosi Stella de pe el.",
+      "confirmId": "ID computer {id}",
+      "confirmPair": "Asociază",
+      "checking": "Se verifică computerul…",
       "computers": "Computerele tale",
       "cloudChats": "{name} își păstrează conversațiile în contul tău Stella. Autentifică-te aici cu acel cont ca să le vezi."
     }

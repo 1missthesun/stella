@@ -43,29 +43,34 @@ export function createPeerChats(transport: P2pTransport, store: PeerStore, dataD
   const localListeners = new Set<(payload: LocalChatUpdatedPayload) => void>();
   const onlineWaiters = new Map<string, Set<() => void>>();
   const pendingWatches = new Set<string>();
-  /** Files a computer's replies link to (an image it made, say), by the path on that computer. */
-  const linked = new Map<string, string>();
+  /** Paths on the computer that each of its chats (by its id here) links to: an image it made, say. */
+  const linked = new Map<string, Set<string>>();
+  /** Local copies, by computer and path. */
   const fetched = new Map<string, Promise<string | null>>();
   const cacheDir = join(dataDir, "cache");
 
-  const noteLinks = (computerId: string, value: unknown, depth = 0) => {
+  const noteLinks = (remoteId: string, value: unknown, depth = 0) => {
     if (depth > 12) return;
     if (typeof value === "string") {
       if (value.length < 4 || !(value.includes("](") || value.includes("file://"))) return;
-      for (const path of extractLocalFileLinkPaths(value)) linked.set(path, computerId);
+      for (const path of extractLocalFileLinkPaths(value)) {
+        let paths = linked.get(remoteId);
+        if (!paths) linked.set(remoteId, (paths = new Set()));
+        paths.add(path);
+      }
     } else if (Array.isArray(value)) {
-      for (const item of value) noteLinks(computerId, item, depth + 1);
+      for (const item of value) noteLinks(remoteId, item, depth + 1);
     } else if (value && typeof value === "object") {
-      for (const item of Object.values(value)) noteLinks(computerId, item, depth + 1);
+      for (const item of Object.values(value)) noteLinks(remoteId, item, depth + 1);
     }
   };
 
   /** A local copy of a file on a computer, fetched over the link once; null when it can't be. */
-  const fetchLinked = (path: string): Promise<string | null> => {
-    const known = fetched.get(path);
+  const fetchLinked = (computer: P2pComputer, path: string): Promise<string | null> => {
+    const key = `${computer.id}\0${path}`;
+    const known = fetched.get(key);
     if (known) return known;
-    const computer = store.get().computers.find((c) => c.id === linked.get(path));
-    if (!computer || !online(computer.id)) return Promise.resolve(null);
+    if (!online(computer.id)) return Promise.resolve(null);
     const work = (async () => {
       const dir = join(cacheDir, peerTag(computer.id));
       await mkdir(dir, { recursive: true, mode: 0o700 });
@@ -88,10 +93,10 @@ export function createPeerChats(transport: P2pTransport, store: PeerStore, dataD
       await rename(partial, target);
       return target;
     })().catch(() => {
-      fetched.delete(path);
+      fetched.delete(key);
       return null;
     });
-    fetched.set(path, work);
+    fetched.set(key, work);
     return work;
   };
 
@@ -211,10 +216,14 @@ export function createPeerChats(transport: P2pTransport, store: PeerStore, dataD
         await untilOnline(computer.id).finally(() => pendingWatches.delete(remote.remoteId));
       }
     } else if (request.op === "unwatch") {
-      const left = (watches.get(remote.remoteId) ?? 1) - 1;
-      if (left > 0) watches.set(remote.remoteId, left);
-      else watches.delete(remote.remoteId);
-      if (!online(computer.id)) return null;
+      const watching = watches.get(remote.remoteId) ?? 0;
+      if (watching > 1) {
+        // Another view of this chat still watches it, and the computer keeps one watch per chat.
+        watches.set(remote.remoteId, watching - 1);
+        return null;
+      }
+      watches.delete(remote.remoteId);
+      if (watching === 0 || !online(computer.id)) return null;
     } else if (!(await reachable(computer))) {
       // Nothing runs where nobody can see it, so an away computer simply has no tasks to show.
       if (request.op === "agents") return { agents: [] };
@@ -223,14 +232,14 @@ export function createPeerChats(transport: P2pTransport, store: PeerStore, dataD
     const mapped = swapIds({ ...request }, remote.remoteId, conversationId) as PiChatRequest;
     if (mapped.op === "submit") mapped.send = await sendFor(computer, mapped.send);
     const result = await send(computer, { m: "pi", request: mapped }, mapped.op === "submit" ? 120_000 : 60_000);
-    noteLinks(computer.id, result);
+    noteLinks(remote.remoteId, result);
     return swapIds(result, conversationId, remote.remoteId);
   };
 
   const localChat = async (remote: Remote, op: P2pLocalChatOp, args: Record<string, unknown>) => {
     if (!(await reachable(remote.computer))) throw awayError(remote.computer.name);
     const result = await send(remote.computer, { m: "localChat", op, args: swapIds({ ...args }, remote.remoteId, remote.conversationId) });
-    noteLinks(remote.computer.id, result);
+    noteLinks(remote.remoteId, result);
     return swapIds(result, remote.conversationId, remote.remoteId);
   };
 
@@ -242,7 +251,7 @@ export function createPeerChats(transport: P2pTransport, store: PeerStore, dataD
       if (parsed?.tag !== tag || pendingWatches.has(remoteId)) continue;
       void send<{ snapshot: PiChatEventsPayload["events"][number] }>(computer, { m: "pi", request: { op: "watch", conversationId: parsed.conversationId } })
         .then((result) => {
-          noteLinks(computer.id, result.snapshot);
+          noteLinks(remoteId, result.snapshot);
           const events = [swapIds(result.snapshot, parsed.conversationId, remoteId)];
           for (const listener of piListeners) listener({ conversationId: remoteId, events });
         })
@@ -273,8 +282,8 @@ export function createPeerChats(transport: P2pTransport, store: PeerStore, dataD
     if (!computer) return;
     const body = event.body as P2pEvent;
     if (body?.t === "pi") {
-      noteLinks(computer.id, body.payload);
       const id = body.payload.conversationId;
+      noteLinks(remoteConversationId(computer.id, id), body.payload);
       const payload = swapIds(body.payload, id, remoteConversationId(computer.id, id));
       for (const listener of piListeners) listener(payload);
     } else if (body?.t === "localChat") {
@@ -297,6 +306,9 @@ export function createPeerChats(transport: P2pTransport, store: PeerStore, dataD
     forget(computerId: string) {
       chats.delete(computerId);
       writeChats(chatsFile, chats);
+      const tag = peerTag(computerId);
+      for (const remoteId of [...linked.keys()]) if (parseRemoteConversationId(remoteId)?.tag === tag) linked.delete(remoteId);
+      for (const key of [...fetched.keys()]) if (key.startsWith(`${computerId}\0`)) fetched.delete(key);
     },
 
     /** The window's ElectronApi with a paired computer's chats routed to it. */
@@ -318,9 +330,13 @@ export function createPeerChats(transport: P2pTransport, store: PeerStore, dataD
           ? {
               chatEvidence: {
                 ...evidence,
-                // A computer's chat links to files on that computer; show local copies of them.
-                cards: async (filePaths: string[]) => {
-                  const local = await Promise.all(filePaths.map(async (path) => (linked.has(path) ? ((await fetchLinked(path)) ?? path) : path)));
+                // A computer's chat links to files on that computer; show local copies of them, and
+                // only in that chat, so no chat can stand a computer's file in for one of this device's.
+                cards: async (filePaths: string[], options?: { conversationId?: string | null }) => {
+                  const remote = resolve(options?.conversationId);
+                  const paths = remote ? linked.get(remote.remoteId) : undefined;
+                  if (!remote || !paths) return await evidence.cards(filePaths);
+                  const local = await Promise.all(filePaths.map(async (path) => (paths.has(path) ? ((await fetchLinked(remote.computer, path)) ?? path) : path)));
                   return await evidence.cards(local);
                 },
               },
@@ -364,7 +380,7 @@ export function createPeerChats(transport: P2pTransport, store: PeerStore, dataD
 export type PeerChats = ReturnType<typeof createPeerChats>;
 
 type WrappableApi = {
-  chatEvidence?: { cards(filePaths: string[]): Promise<EvidenceCardSet> };
+  chatEvidence?: { cards(filePaths: string[], options?: { conversationId?: string | null }): Promise<EvidenceCardSet> };
   piChat: { request(...args: never[]): Promise<unknown>; onEvents(listener: never): () => void };
   localChat: {
     setActiveConversationId(...args: never[]): Promise<unknown>;

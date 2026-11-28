@@ -886,6 +886,12 @@
       "intro": "A számítógépeden nyisd meg a Beállítások › Fiók › Eszköz csatlakoztatása menüt, és olvasd be a megjelenő kódot. Közvetlenül a számítógépedhez csatlakozik, fiók nélkül.",
       "cameraDenied": "A Stella nem tudja használni a kamerát. Engedélyezd a Beállításokban, vagy illeszd be a kódot.",
       "invalidCode": "Ez nem Stella párosítási kód.",
+      "confirmTitle": "Párosítás ezzel: {name}?",
+      "confirmTitleUnknown": "Párosítás ezzel a számítógéppel?",
+      "confirmIntro": "Csak a saját számítógépeddel párosíts: ez a telefon használhatja majd a Stelláját.",
+      "confirmId": "Számítógép-azonosító: {id}",
+      "confirmPair": "Párosítás",
+      "checking": "A számítógép ellenőrzése…",
       "computers": "Saját számítógépek",
       "cloudChats": "{name} a Stella-fiókodban tárolja a beszélgetéseit. Jelentkezz be itt azzal a fiókkal, hogy lásd őket."
     }

@@ -1761,6 +1761,12 @@
       "intro": "Di komputermu, buka Pengaturan › Akun › Hubungkan perangkat dan pindai kode yang ditampilkan. Koneksi langsung ke komputermu, tanpa akun.",
       "cameraDenied": "Stella tidak dapat menggunakan kamera. Izinkan di Pengaturan, atau tempel kode sebagai gantinya.",
       "invalidCode": "Itu bukan kode penyandingan dari Stella.",
+      "confirmTitle": "Pasangkan dengan {name}?",
+      "confirmTitleUnknown": "Pasangkan dengan komputer ini?",
+      "confirmIntro": "Pasangkan hanya dengan komputermu sendiri: ponsel ini akan bisa memakai Stella-nya.",
+      "confirmId": "ID komputer {id}",
+      "confirmPair": "Pasangkan",
+      "checking": "Memeriksa komputer…",
       "computers": "Komputermu",
       "cloudChats": "{name} menyimpan chat di akun Stella milikmu. Masuk di sini dengan akun tersebut untuk melihatnya."
     }
@@ -3965,6 +3971,7 @@
     "nearby": {
       "title": "Komputer di sekitar",
       "looking": "Mencari komputer di jaringan ini…",
+      "waiting": "Izinkan di {name} untuk melanjutkan.",
       "connectTo": "Hubungkan ke {name}",
       "digitsTitle": "Hubungkan ke {name}",
       "digitsIntro": "Masukkan enam digit yang sedang ditampilkan {name}.",
@@ -3973,7 +3980,9 @@
       "ended": "{name} mengakhiri permintaan. Coba lagi.",
       "requestTitle": "{name} ingin menggunakan Stella di komputer ini",
       "requestIntro": "Masukkan kode ini di {name} untuk mengizinkan akses. Jika kamu tidak memintanya, jangan izinkan.",
-      "deny": "Jangan izinkan"
+      "deny": "Jangan izinkan",
+      "allow": "Izinkan",
+      "allowIntro": "Izinkan hanya jika kamu sedang menghubungkan {name} sekarang."
     }
   }
 }

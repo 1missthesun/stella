@@ -885,6 +885,12 @@
       "intro": "在电脑上打开“设置 › 账户 › 连接设备”，扫描显示的代码。它会直接连接到你的电脑，无需账户。",
       "cameraDenied": "Stella 无法使用摄像头。请在设置中允许，或改为粘贴代码。",
       "invalidCode": "这不是 Stella 的配对码。",
+      "confirmTitle": "要与 {name} 配对吗？",
+      "confirmTitleUnknown": "要与这台电脑配对吗？",
+      "confirmIntro": "只与你自己的电脑配对：这部手机将能使用它的 Stella。",
+      "confirmId": "电脑 ID {id}",
+      "confirmPair": "配对",
+      "checking": "正在检查电脑…",
       "computers": "你的电脑",
       "cloudChats": "{name} 的聊天保存在你的 Stella 账户中。在这里登录该账户即可查看。"
     }

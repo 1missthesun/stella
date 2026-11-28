@@ -1771,6 +1771,12 @@
       "intro": "On your computer, open Settings › Account › Connect a device and scan the code it shows. It connects straight to your computer, with no account.",
       "cameraDenied": "Stella can't use the camera. Allow it in Settings, or paste the code instead.",
       "invalidCode": "That isn't a pairing code from Stella.",
+      "confirmTitle": "Pair with {name}?",
+      "confirmTitleUnknown": "Pair with this computer?",
+      "confirmIntro": "Only pair with your own computer: this phone will be able to use its Stella.",
+      "confirmId": "Computer ID {id}",
+      "confirmPair": "Pair",
+      "checking": "Checking the computer…",
       "computers": "Your computers",
       "cloudChats": "{name} keeps its chats in your Stella account. Sign in here with it to see them."
     }
@@ -4024,6 +4030,7 @@
     "nearby": {
       "title": "Nearby computers",
       "looking": "Looking for computers on this network…",
+      "waiting": "Allow it on {name} to continue.",
       "connectTo": "Connect to {name}",
       "digitsTitle": "Connect to {name}",
       "digitsIntro": "Enter the six digits {name} is showing now.",
@@ -4032,7 +4039,9 @@
       "ended": "{name} ended the request. Try again.",
       "requestTitle": "{name} wants to use this computer's Stella",
       "requestIntro": "Enter this code on {name} to let it in. If you didn't ask for this, don't allow it.",
-      "deny": "Don't allow"
+      "deny": "Don't allow",
+      "allow": "Allow",
+      "allowIntro": "Allow it only if you're connecting {name} right now."
     }
   }
 }

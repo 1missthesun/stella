@@ -9,24 +9,25 @@ import { useDevicesStyles } from "./devices.styles";
 const noop = () => () => {};
 const none = (): P2pConfirmRequest | null => null;
 
-/** On this computer, wherever the person is: a nearby device asking to pair, with the six digits
- *  to type on it. It closes by itself once the device pairs or gives up. */
+/** On this computer, wherever the person is: a nearby device asking to pair. The person allows it
+ *  first; only then do the six digits to type on the device show. It closes by itself once the
+ *  device pairs or gives up. */
 export function NearbyRequestLayer() {
   const s = useSelfHost();
   const d = useDevicesStyles();
   const t = useT();
   const api = p2p();
   const request = useSyncExternalStore(api ? api.subscribeConfirming : noop, api ? api.confirming : none, none);
-  const [denying, setDenying] = useState(false);
+  const [answering, setAnswering] = useState(false);
   if (!api || !request) return null;
   const { name } = request.device;
-  const deny = () => {
-    setDenying(true);
-    void api
-      .denyNearby(request.request)
+  const answer = (allow: boolean) => {
+    setAnswering(true);
+    void (allow ? api.allowNearby(request.request) : api.denyNearby(request.request))
       .catch(() => undefined)
-      .finally(() => setDenying(false));
+      .finally(() => setAnswering(false));
   };
+  const deny = () => answer(false);
   return (
     <Dialog open onOpenChange={(open) => (!open ? deny() : undefined)}>
       <DialogContent fit {...s.dialog_selfHostDialog}>
@@ -34,14 +35,25 @@ export function NearbyRequestLayer() {
           <DialogTitle>{t("devices.nearby.requestTitle", { name })}</DialogTitle>
         </DialogHeader>
         <col {...s.selfHostDialogBody}>
-          <DialogDescription {...s.selfHostDialogDescription}>{t("devices.nearby.requestIntro", { name })}</DialogDescription>
-          <T w="full" {...d.confirmDigits} label={t("devices.nearby.digitsLabel")}>
-            {`${request.code.slice(0, 3)} ${request.code.slice(3)}`}
-          </T>
+          {request.code ? (
+            <>
+              <DialogDescription {...s.selfHostDialogDescription}>{t("devices.nearby.requestIntro", { name })}</DialogDescription>
+              <T w="full" {...d.confirmDigits} label={t("devices.nearby.digitsLabel")}>
+                {`${request.code.slice(0, 3)} ${request.code.slice(3)}`}
+              </T>
+            </>
+          ) : (
+            <DialogDescription {...s.selfHostDialogDescription}>{t("devices.nearby.allowIntro", { name })}</DialogDescription>
+          )}
           <row {...s.selfHostDialogActions}>
-            <Button variant="ghost" className="pill-btn" onClick={deny} disabled={denying}>
+            <Button variant="ghost" className="pill-btn" onClick={deny} disabled={answering}>
               {t("devices.nearby.deny")}
             </Button>
+            {request.code ? null : (
+              <Button variant="primary" className="pill-btn" onClick={() => answer(true)} disabled={answering}>
+                {t("devices.nearby.allow")}
+              </Button>
+            )}
           </row>
         </col>
       </DialogContent>

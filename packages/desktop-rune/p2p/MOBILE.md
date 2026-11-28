@@ -1,8 +1,10 @@
 # stella-p2p on phones
 
 The same crate runs the desktop engine's direct device link and a phone's. A phone is a *device*:
-it pairs with a computer's code (`pair`, which takes the full code or a short `K7M-49PX` one as
-`pair.short`), then talks to that computer (`request`, events). Start phones with
+it pairs with a computer's code (`pair`, which takes the full code or a short `K7M-Q2X-49P` one as
+`pair.short`), then talks to that computer (`request`, events). A code that arrives by link is
+first shown with `pair.preview` (the name that computer gives itself, before anything is spent)
+and paired only after a tap. Start phones with
 `discoverable: false`: they never answer nearby devices, since they are never anyone's computer.
 
 ## Rune phone app (`packages/mobile-rune`, branch `rune/mobile`)

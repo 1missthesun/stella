@@ -887,6 +887,12 @@
       "intro": "Sur votre ordinateur, ouvrez Paramètres › Compte › Connecter un appareil et scannez le code affiché. La connexion se fait directement à votre ordinateur, sans compte.",
       "cameraDenied": "Stella ne peut pas utiliser la caméra. Autorisez-la dans les paramètres ou collez le code à la place.",
       "invalidCode": "Ce n’est pas un code d’association Stella.",
+      "confirmTitle": "Associer à {name} ?",
+      "confirmTitleUnknown": "Associer à cet ordinateur ?",
+      "confirmIntro": "N'associez que votre propre ordinateur : ce téléphone pourra utiliser son Stella.",
+      "confirmId": "ID de l'ordinateur {id}",
+      "confirmPair": "Associer",
+      "checking": "Vérification de l'ordinateur…",
       "computers": "Vos ordinateurs",
       "cloudChats": "{name} conserve ses discussions dans votre compte Stella. Connectez-vous ici avec ce compte pour les voir."
     }

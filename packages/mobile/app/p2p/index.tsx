@@ -32,6 +32,7 @@ import {
   forgetComputer,
   pairWithComputer,
   parsePairInput,
+  previewComputer,
   stellaP2pAvailable,
   useComputers,
 } from "../../src/lib/p2p/link";
@@ -42,7 +43,14 @@ import { fonts } from "../../src/theme/fonts";
 import { useColors, useTheme } from "../../src/theme/theme-context";
 import { useT } from "../../src/i18n";
 
-type Step = { kind: "input"; error: string | null } | { kind: "pairing" };
+type Step =
+  | { kind: "input"; error: string | null }
+  | { kind: "pairing" }
+  /** A `stella://p2p` link opened this screen: it pairs only once the person taps Pair. */
+  | { kind: "confirm"; link: string; computer: { id: string | null; name: string | null } | null };
+
+/** The start of a computer's id, in groups, to tell one computer from another. */
+const fingerprint = (id: string) => id.slice(0, 16).match(/.{4}/g)!.join(" ");
 
 export default function PairComputerScreen() {
   const colors = useColors();
@@ -92,9 +100,18 @@ export default function PairComputerScreen() {
     const code = typeof params.c === "string" ? params.c : "";
     if (!code || handledLinkRef.current === code) return;
     handledLinkRef.current = code;
-    setEntered(code);
-    void pair(code.startsWith("stella://") ? code : `stella://p2p?c=${encodeURIComponent(code)}`);
-  }, [params.c, pair]);
+    const link = code.startsWith("stella://") ? code : `stella://p2p?c=${encodeURIComponent(code)}`;
+    const input = parsePairInput(link);
+    if (input?.kind !== "code") {
+      setStep({ kind: "input", error: t("mobile.p2p.invalidCode") });
+      return;
+    }
+    setScanning(false);
+    setStep({ kind: "confirm", link, computer: null });
+    void previewComputer(input.code).then((computer) =>
+      setStep((current) => (current.kind === "confirm" && current.link === link ? { ...current, computer } : current)),
+    );
+  }, [params.c, t]);
 
   const onBarcodeScanned = useCallback(
     (result: BarcodeScanningResult) => {
@@ -156,6 +173,72 @@ export default function PairComputerScreen() {
   if (!stellaP2pAvailable) return <Redirect href="/" />;
 
   const pairing = step.kind === "pairing";
+
+  if (step.kind === "confirm") {
+    const { computer } = step;
+    return (
+      <SafeAreaView style={styles.screen}>
+        <StatusBar style={isDark ? "light" : "dark"} />
+        <View style={styles.header}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("mobile.common.back")}
+            hitSlop={10}
+            onPress={goBack}
+            style={({ pressed }) => [{ padding: 8 }, pressed && styles.textLinkPressed]}
+          >
+            <Icon name="chevron-left" size={22} color={colors.text} />
+          </Pressable>
+        </View>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <Text style={[styles.title, { marginTop: 8 }]} accessibilityRole="header" testID="p2p-confirm-title">
+            {computer?.name
+              ? t("mobile.p2p.confirmTitle", { name: computer.name })
+              : t("mobile.p2p.confirmTitleUnknown")}
+          </Text>
+          {computer ? (
+            computer.id ? (
+              <Text style={styles.small} selectable testID="p2p-confirm-id">
+                {t("mobile.p2p.confirmId", { id: fingerprint(computer.id) })}
+              </Text>
+            ) : null
+          ) : (
+            <Text style={styles.small}>{t("mobile.p2p.checking")}</Text>
+          )}
+          <Text style={styles.body}>{t("mobile.p2p.confirmIntro")}</Text>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("mobile.p2p.confirmPair")}
+            testID="p2p-confirm-pair"
+            disabled={!computer}
+            onPress={() => {
+              tapMedium();
+              void pair(step.link);
+            }}
+            style={({ pressed }) => [
+              styles.primaryButton,
+              pressed && styles.primaryButtonPressed,
+              !computer && styles.disabled,
+            ]}
+          >
+            <Text style={styles.primaryButtonText}>{t("mobile.p2p.confirmPair")}</Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t("mobile.common.cancel")}
+            testID="p2p-confirm-cancel"
+            onPress={() => {
+              tapLight();
+              setStep({ kind: "input", error: null });
+            }}
+            style={({ pressed }) => [styles.secondaryButton, pressed && styles.secondaryButtonPressed]}
+          >
+            <Text style={styles.secondaryButtonText}>{t("mobile.common.cancel")}</Text>
+          </Pressable>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView style={styles.screen}>
@@ -283,9 +366,9 @@ export default function PairComputerScreen() {
               autoCapitalize="characters"
               autoCorrect={false}
               // Short codes read in capitals whatever the keyboard; full codes keep their case.
-              onChangeText={(value) => setEntered(/^[\w -]{0,10}$/.test(value) ? value.toUpperCase() : value)}
+              onChangeText={(value) => setEntered(/^[\w -]{0,12}$/.test(value) ? value.toUpperCase() : value)}
               onSubmitEditing={() => void pair(entered)}
-              placeholder="K7M-49PX"
+              placeholder="K7M-Q2X-49P"
               placeholderTextColor={fadeHex(colors.textMuted, 0.45)}
               returnKeyType="go"
               style={[styles.input, { flex: 1 }]}

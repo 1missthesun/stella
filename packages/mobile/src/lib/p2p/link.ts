@@ -10,6 +10,7 @@ import {
   P2P_CODE_PREFIX,
   P2P_URL_PREFIX,
   type P2pComputer,
+  type P2pComputerPreview,
   type P2pNodeEvent,
   type P2pTransport,
 } from "@stella/contracts/p2p";
@@ -166,12 +167,12 @@ export const retryComputer = (id?: string) => {
   void p2pTransport.command("computer.retry", id ? { id } : {}).catch(() => undefined);
 };
 
-/** A short code a computer shows to be typed by hand: 7 Crockford base32 symbols, dash optional. */
-const SHORT_CODE = /^[0-9A-HJKMNP-TV-Z]{7}$/;
+/** A short code a computer shows to be typed by hand: 9 Crockford base32 symbols, dashes optional. */
+const SHORT_CODE = /^[0-9A-HJKMNP-TV-Z]{9}$/;
 
 export type PairInput = { kind: "code"; code: string } | { kind: "short"; code: string };
 
-/** A pairing code as scanned, pasted or typed: `stella://p2p?c=…`, `stella-p2p1.…`, or `K7M-49PX`. */
+/** A pairing code as scanned, pasted or typed: `stella://p2p?c=…`, `stella-p2p1.…`, or `K7M-Q2X-49P`. */
 export const parsePairInput = (raw: string): PairInput | null => {
   const text = raw.trim();
   if (!text) return null;
@@ -193,7 +194,32 @@ export const parsePairInput = (raw: string): PairInput | null => {
   }
   // Crockford: O reads as 0, I and L as 1.
   const short = compact.replace(/-/g, "").toUpperCase().replace(/O/g, "0").replace(/[IL]/g, "1");
-  return SHORT_CODE.test(short) ? { kind: "short", code: `${short.slice(0, 3)}-${short.slice(3)}` } : null;
+  return SHORT_CODE.test(short) ? { kind: "short", code: `${short.slice(0, 3)}-${short.slice(3, 6)}-${short.slice(6)}` } : null;
+};
+
+/** The computer id a full code names (`stella-p2p1.<base64url JSON with h>`), read without asking it. */
+const codeHost = (code: string): string | null => {
+  try {
+    const body = code.slice(P2P_CODE_PREFIX.length).replace(/-/g, "+").replace(/_/g, "/");
+    const parsed = JSON.parse(globalThis.atob(body.padEnd(Math.ceil(body.length / 4) * 4, "="))) as { h?: unknown };
+    return typeof parsed.h === "string" && /^[0-9a-f]{64}$/i.test(parsed.h) ? parsed.h.toLowerCase() : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
+ * Who a full code names before pairing with it: the name that computer gives itself over a
+ * connection that proves it holds the code's key. Without an answer, just the id the code names.
+ */
+export const previewComputer = async (code: string): Promise<{ id: string | null; name: string | null }> => {
+  try {
+    await bootDeviceLink();
+    const preview = await p2pTransport.command<P2pComputerPreview>("pair.preview", { code });
+    return { id: preview.id, name: preview.name };
+  } catch {
+    return { id: codeHost(code), name: null };
+  }
 };
 
 export const pairingUrl = (code: string) => `${P2P_URL_PREFIX}${code}`;

@@ -1771,6 +1771,12 @@
       "intro": "Avaa tietokoneellasi Asetukset › Tili › Yhdistä laite ja skannaa näkyvä koodi. Se yhdistää suoraan tietokoneeseesi ilman tiliä.",
       "cameraDenied": "Stella ei voi käyttää kameraa. Salli se asetuksissa tai liitä koodi sen sijaan.",
       "invalidCode": "Tämä ei ole Stella-pariliitoskoodi.",
+      "confirmTitle": "Muodostetaanko pari: {name}?",
+      "confirmTitleUnknown": "Muodostetaanko pari tämän tietokoneen kanssa?",
+      "confirmIntro": "Muodosta pari vain oman tietokoneesi kanssa: tämä puhelin voi käyttää sen Stellaa.",
+      "confirmId": "Tietokoneen tunnus {id}",
+      "confirmPair": "Muodosta pari",
+      "checking": "Tarkistetaan tietokonetta…",
       "computers": "Omat tietokoneet",
       "cloudChats": "{name} säilyttää keskustelunsa Stella-tililläsi. Kirjaudu täällä samalla tilillä nähdäksesi ne."
     }
@@ -4024,6 +4030,7 @@
     "nearby": {
       "title": "Lähellä olevat tietokoneet",
       "looking": "Etsitään tietokoneita tästä verkosta…",
+      "waiting": "Salli se kohteessa {name} jatkaaksesi.",
       "connectTo": "Yhdistä laitteeseen {name}",
       "digitsTitle": "Yhdistä laitteeseen {name}",
       "digitsIntro": "Syötä kuusi numeroa, jotka {name} näyttää nyt.",
@@ -4032,7 +4039,9 @@
       "ended": "{name} päätti pyynnön. Yritä uudelleen.",
       "requestTitle": "{name} haluaa käyttää tämän tietokoneen Stella-sovellusta",
       "requestIntro": "Syötä tämä koodi laitteella {name} salliaksesi pääsyn. Jos et pyytänyt tätä, älä salli sitä.",
-      "deny": "Älä salli"
+      "deny": "Älä salli",
+      "allow": "Salli",
+      "allowIntro": "Salli vain, jos yhdistät {name} juuri nyt."
     }
   }
 }

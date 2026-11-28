@@ -90,19 +90,22 @@ export const MessageAttachments = ({
   driveCards = NO_DRIVE_CARDS,
   expansionKey,
   expandedByDefault = false,
+  conversationId = null,
 }: {
   filePaths: string[];
   part: "media" | "documents";
   driveCards?: readonly EvidenceCard[];
   expansionKey?: string;
   expandedByDefault?: boolean;
+  /** The chat showing these files, which may read them from another computer. */
+  conversationId?: string | null;
 }) => {
   const t = useT();
   const tokens = useTokens();
   const expanded = useExpanded(expansionKey, expandedByDefault);
   const [showEverything, setShowEverything] = useState(false);
   const [rowWidth, setRowWidth] = useState(0);
-  const { cards, overflowCount } = useEvidenceCards(filePaths);
+  const { cards, overflowCount } = useEvidenceCards(filePaths, conversationId);
 
   const { media, documents } = useMemo(() => {
     const media: EvidenceCard[] = [];

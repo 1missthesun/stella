@@ -886,6 +886,12 @@
       "intro": "Bilgisayarınızda Ayarlar › Hesap › Cihaz bağla bölümünü açıp gösterilen kodu tarayın. Hesap olmadan doğrudan bilgisayarınıza bağlanır.",
       "cameraDenied": "Stella kamerayı kullanamıyor. Ayarlar'dan izin verin ya da bunun yerine kodu yapıştırın.",
       "invalidCode": "Bu bir Stella eşleştirme kodu değil.",
+      "confirmTitle": "{name} ile eşlensin mi?",
+      "confirmTitleUnknown": "Bu bilgisayarla eşlensin mi?",
+      "confirmIntro": "Yalnızca kendi bilgisayarınla eşle: bu telefon onun Stella'sını kullanabilecek.",
+      "confirmId": "Bilgisayar kimliği {id}",
+      "confirmPair": "Eşle",
+      "checking": "Bilgisayar kontrol ediliyor…",
       "computers": "Bilgisayarlarınız",
       "cloudChats": "{name} sohbetlerini Stella hesabınızda tutar. Görmek için burada o hesapla oturum açın."
     }

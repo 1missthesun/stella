@@ -886,6 +886,12 @@
       "intro": "Öppna Inställningar › Konto › Anslut en enhet på din dator och skanna koden som visas. Den ansluter direkt till din dator, utan konto.",
       "cameraDenied": "Stella kan inte använda kameran. Tillåt det i Inställningar eller klistra in koden i stället.",
       "invalidCode": "Det är inte en parkopplingskod från Stella.",
+      "confirmTitle": "Parkoppla med {name}?",
+      "confirmTitleUnknown": "Parkoppla med den här datorn?",
+      "confirmIntro": "Parkoppla bara med din egen dator: den här telefonen kommer att kunna använda dess Stella.",
+      "confirmId": "Dator-ID {id}",
+      "confirmPair": "Parkoppla",
+      "checking": "Kontrollerar datorn…",
       "computers": "Dina datorer",
       "cloudChats": "{name} sparar sina chattar i ditt Stella-konto. Logga in här med det kontot för att se dem."
     }

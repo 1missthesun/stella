@@ -886,6 +886,12 @@
       "intro": "Åpne Innstillinger › Konto › Koble til en enhet på datamaskinen din, og skann koden som vises. Den kobler direkte til datamaskinen din, uten konto.",
       "cameraDenied": "Stella kan ikke bruke kameraet. Tillat det i Innstillinger, eller lim inn koden i stedet.",
       "invalidCode": "Det er ikke en paringskode fra Stella.",
+      "confirmTitle": "Koble sammen med {name}?",
+      "confirmTitleUnknown": "Koble sammen med denne datamaskinen?",
+      "confirmIntro": "Koble bare sammen med din egen datamaskin: denne telefonen vil kunne bruke Stella på den.",
+      "confirmId": "Datamaskin-ID {id}",
+      "confirmPair": "Koble sammen",
+      "checking": "Sjekker datamaskinen…",
       "computers": "Datamaskinene dine",
       "cloudChats": "{name} lagrer chattene sine i Stella-kontoen din. Logg inn her med den for å se dem."
     }

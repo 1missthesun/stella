@@ -8,11 +8,14 @@ type Env = {
   SLOTS: DurableObjectNamespace<Slot>;
   OPEN_LIMITER: RateLimit;
   CLAIM_LIMITER: RateLimit;
+  LOOKUP_LIMITER: RateLimit;
 };
 
 const TTL_MS = 5 * 60 * 1000;
 const MAX_BLOB = 2048;
-const SLOT = /^[0-9A-HJKMNP-TV-Z]{3}$/;
+// Five Crockford symbols: 2^25 slot names, so the few live at once can't be found by trying names
+// at the lookup and claim rates allowed (the code's last four symbols, its password, stay on the devices).
+const SLOT = /^[0-9A-HJKMNP-TV-Z]{5}$/;
 const B64 = /^[A-Za-z0-9_-]+$/;
 
 type State = {
@@ -155,7 +158,12 @@ export default {
       const a = blob((await body(request)) ?? {}, "a");
       return a ? slot.open(a) : empty(400);
     }
-    if (!part && method === "GET") return slot.peek();
+    // Looking a slot up (and claiming one) answers whether that name is live: both are limited
+    // per address, so nobody walks the names to find live codes or spend them with junk claims.
+    if (!part && method === "GET") {
+      if (!(await env.LOOKUP_LIMITER.limit({ key: ip })).success) return empty(429);
+      return slot.peek();
+    }
     if (!part && method === "DELETE") return slot.close(bearer);
     if (part === "b" && method === "POST") {
       if (!(await env.CLAIM_LIMITER.limit({ key: ip })).success) return empty(429);

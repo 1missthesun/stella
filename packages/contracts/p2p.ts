@@ -121,14 +121,20 @@ export type P2pPeers = { devices: P2pDevice[]; computers: P2pComputer[] };
 
 export type P2pPairing = { code: string; url: string; expiresAt: number };
 
-/** A short code (`K7M-49PX`) for the live pairing offer, through Stella's pairing mailbox. */
+/** A short code (`K7M-Q2X-49P`) for the live pairing offer, through Stella's pairing mailbox. */
 export type P2pShortCode = P2pPairing & { short: string };
 
 /** A computer on this network that takes nearby devices. */
 export type P2pNearbyComputer = { id: string; name: string; platform: string; paired: boolean };
 
-/** A nearby device asking this computer to pair; `code` is what the device must type. */
-export type P2pConfirmRequest = { request: number; code: string; device: { id: string; name: string; platform: string } };
+/**
+ * A nearby device asking this computer to pair. `code` is null until the person allows the
+ * request; then it is the six digits the device must type.
+ */
+export type P2pConfirmRequest = { request: number; code: string | null; device: { id: string; name: string; platform: string } };
+
+/** Who a full pairing code names, as that computer answered before any pairing (`pair.preview`). */
+export type P2pComputerPreview = { id: string; name: string; platform: string; paired: boolean };
 
 export type P2pPairResult = { computer: P2pComputer; conversationId: string | null };
 
@@ -170,6 +176,8 @@ export type P2pApi = {
   /** On the computer: the nearby device asking to pair right now. */
   confirming(): P2pConfirmRequest | null;
   subscribeConfirming(listener: () => void): () => void;
+  /** Lets the asking device in: this computer then shows the six digits to type on it. */
+  allowNearby(request: number): Promise<void>;
   denyNearby(request: number): Promise<void>;
   forgetComputer(id: string): Promise<void>;
   /** The computer's chat on this device, once it has said which it is. */

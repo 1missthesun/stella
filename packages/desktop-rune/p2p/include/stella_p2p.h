@@ -1,7 +1,10 @@
 /* Stella direct device link (crate stella-p2p, built with --features ffi as a staticlib).
  * Every string is UTF-8 JSON; the commands and events are listed in src/lib.rs.
  * Callbacks run on the link's own threads and must copy the string before returning.
- * `ctx` is handed back unchanged and must be safe to use from any thread. */
+ * `ctx` is handed back unchanged and must be safe to use from any thread.
+ * stella_p2p_command uses `node` only while it runs: never stop a node while a command on it is
+ * still inside stella_p2p_command. Once stella_p2p_stop returns, no callback of that node runs
+ * again, so its `ctx` may be freed; never call stella_p2p_stop from inside a callback. */
 #ifndef STELLA_P2P_H
 #define STELLA_P2P_H
 #include <stdint.h>

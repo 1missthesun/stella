@@ -1,4 +1,4 @@
-//! Short pairing codes for a device on another network, like `K7M-49PX`. The first three symbols
+//! Short pairing codes for a device on another network, like `K7M-Q2X-49P`. The first five symbols
 //! name a slot on a rendezvous mailbox (a tiny HTTP service holding a few opaque blobs for five
 //! minutes); the last four are a SPAKE2 password that never leaves the two devices. Through the
 //! slot they agree on a key, and the computer hands over its full pairing code sealed under it;
@@ -89,6 +89,9 @@ pub async fn create(inner: &Arc<Inner>) -> Result<Value, String> {
         None => host::create_offer(inner, Some(TTL.as_millis() as u64)).await?,
     };
     let code = offer.get("code").and_then(|c| c.as_str()).ok_or("no pairing code")?.to_owned();
+    if host::spent_short(inner, &code) >= crate::pairing::MAX_SPENT_SHORT_CODES {
+        return Err("Wrong tries used up the short codes for this pairing. Use the QR code, or start pairing again.".into());
+    }
     let offer_expires = offer.get("expiresAt").and_then(|e| e.as_u64()).unwrap_or(u64::MAX);
     withdraw(inner);
     let password = pake::random_symbols(pake::PASSWORD_LEN);
@@ -158,6 +161,9 @@ async fn hand_over(inner: Arc<Inner>, id: u64, base: String, slot: String, token
         }
     };
     let _ = call(&base, Method::DELETE, &path, Some(&token), None).await;
+    if outcome == "failed" {
+        host::spend_short(&inner, &code);
+    }
     {
         let mut short = lock(&inner.short);
         if short.as_ref().is_some_and(|s| s.id == id) {
@@ -171,14 +177,16 @@ async fn hand_over(inner: Arc<Inner>, id: u64, base: String, slot: String, token
 
 /// Pairs with a computer through its short code.
 pub async fn pair(inner: &Arc<Inner>, typed: &str) -> Result<Value, String> {
-    let short = pake::normalize_short(typed).ok_or("That code should be 7 letters and numbers, like K7M-49PX.")?;
+    let short = pake::normalize_short(typed).ok_or("That code should be 9 letters and numbers, like K7M-Q2X-49P.")?;
     let base = rendezvous(inner)?;
     let slot = &short[..pake::SLOT_LEN];
     let path = format!("/v1/slots/{slot}");
     let gone = || "That code has expired or doesn't exist. Check it, or show a new one on the computer.".to_owned();
     let reply = call(&base, Method::GET, &path, None, None).await?;
-    if reply.status != StatusCode::OK {
-        return Err(gone());
+    match reply.status {
+        StatusCode::OK => {}
+        StatusCode::TOO_MANY_REQUESTS => return Err("Too many tries from this network just now. Wait a minute and try again.".into()),
+        _ => return Err(gone()),
     }
     let (exchange, b) = Exchange::start(false, &pake::short_password(&short), ID_COMPUTER, ID_DEVICE);
     let keys = exchange.finish(&unb64(&reply.body, "a")).map_err(|_| gone())?;

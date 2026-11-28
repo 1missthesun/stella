@@ -513,7 +513,9 @@ export const createElectronApi = (
     },
 
     chatEvidence: {
-      cards: (filePaths: string[]) =>
+      // `conversationId` names the chat showing the files, for hosts that read some chats' files
+      // from elsewhere (a paired computer's, in Rune); main doesn't need it.
+      cards: (filePaths: string[], _options?: { conversationId?: string | null }) =>
         ipc.invoke(IPC_CHAT_EVIDENCE_CARDS, { filePaths }),
       driveCards: (files: DriveEvidenceSource[]) =>
         ipc.invoke(IPC_CHAT_EVIDENCE_DRIVE_CARDS, { files }),

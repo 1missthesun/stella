@@ -6,13 +6,13 @@ const EMPTY: EvidenceCardSet = { cards: [], overflowCount: 0 };
 const resolved = new Map<string, EvidenceCardSet>();
 const pending = new Map<string, Promise<EvidenceCardSet>>();
 
-const requestCards = (key: string, filePaths: string[]): Promise<EvidenceCardSet> => {
+const requestCards = (key: string, filePaths: string[], conversationId: string | null): Promise<EvidenceCardSet> => {
   const existing = pending.get(key);
   if (existing) return existing;
   const bridge = window.electronAPI?.chatEvidence;
   if (!bridge) return Promise.resolve(EMPTY);
   const work = bridge
-    .cards(filePaths)
+    .cards(filePaths, { conversationId })
     .then((set) => {
       resolved.set(key, set);
       return set;
@@ -25,8 +25,8 @@ const requestCards = (key: string, filePaths: string[]): Promise<EvidenceCardSet
   return work;
 };
 
-export const useEvidenceCards = (filePaths: string[]): EvidenceCardSet => {
-  const key = filePaths.join("\0");
+export const useEvidenceCards = (filePaths: string[], conversationId: string | null = null): EvidenceCardSet => {
+  const key = `${conversationId ?? ""}\0${filePaths.join("\0")}`;
   const latest = useRef(filePaths);
   latest.current = filePaths;
   const [set, setSet] = useState<EvidenceCardSet>(() => resolved.get(key) ?? EMPTY);
@@ -43,13 +43,13 @@ export const useEvidenceCards = (filePaths: string[]): EvidenceCardSet => {
       return;
     }
     let live = true;
-    void requestCards(key, paths).then((next) => {
+    void requestCards(key, paths, conversationId).then((next) => {
       if (live) setSet(next);
     });
     return () => {
       live = false;
     };
-  }, [key]);
+  }, [key, conversationId]);
 
   return set;
 };

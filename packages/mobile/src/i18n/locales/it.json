@@ -887,6 +887,12 @@
       "intro": "Sul computer, apri Impostazioni › Account › Connetti un dispositivo e scansiona il codice visualizzato. Si connette direttamente al tuo computer, senza account.",
       "cameraDenied": "Stella non può usare la fotocamera. Consenti l’accesso nelle Impostazioni o incolla il codice.",
       "invalidCode": "Questo non è un codice di abbinamento di Stella.",
+      "confirmTitle": "Associare a {name}?",
+      "confirmTitleUnknown": "Associare a questo computer?",
+      "confirmIntro": "Associa solo il tuo computer: questo telefono potrà usare la sua Stella.",
+      "confirmId": "ID computer {id}",
+      "confirmPair": "Associa",
+      "checking": "Verifica del computer…",
       "computers": "I tuoi computer",
       "cloudChats": "{name} conserva le sue chat nel tuo account Stella. Accedi qui con quell’account per vederle."
     }

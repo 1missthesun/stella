@@ -1771,6 +1771,12 @@
       "intro": "Bilgisayarınızda Ayarlar › Hesap › Cihaz bağla bölümünü açıp gösterilen kodu tarayın. Hesap olmadan doğrudan bilgisayarınıza bağlanır.",
       "cameraDenied": "Stella kamerayı kullanamıyor. Ayarlar'dan izin verin ya da bunun yerine kodu yapıştırın.",
       "invalidCode": "Bu bir Stella eşleştirme kodu değil.",
+      "confirmTitle": "{name} ile eşlensin mi?",
+      "confirmTitleUnknown": "Bu bilgisayarla eşlensin mi?",
+      "confirmIntro": "Yalnızca kendi bilgisayarınla eşle: bu telefon onun Stella'sını kullanabilecek.",
+      "confirmId": "Bilgisayar kimliği {id}",
+      "confirmPair": "Eşle",
+      "checking": "Bilgisayar kontrol ediliyor…",
       "computers": "Bilgisayarlarınız",
       "cloudChats": "{name} sohbetlerini Stella hesabınızda tutar. Görmek için burada o hesapla oturum açın."
     }
@@ -4024,6 +4030,7 @@
     "nearby": {
       "title": "Yakındaki bilgisayarlar",
       "looking": "Bu ağdaki bilgisayarlar aranıyor…",
+      "waiting": "Devam etmek için {name} üzerinde izin ver.",
       "connectTo": "{name} ile bağlan",
       "digitsTitle": "{name} ile bağlan",
       "digitsIntro": "{name} tarafından şu anda gösterilen altı rakamı girin.",
@@ -4032,7 +4039,9 @@
       "ended": "{name} isteği sonlandırdı. Tekrar deneyin.",
       "requestTitle": "{name} bu bilgisayarın Stella'sını kullanmak istiyor",
       "requestIntro": "Erişime izin vermek için bu kodu {name} üzerinde girin. Bunu siz istemediyseniz izin vermeyin.",
-      "deny": "İzin verme"
+      "deny": "İzin verme",
+      "allow": "İzin ver",
+      "allowIntro": "Yalnızca şu anda {name} cihazını bağlıyorsan izin ver."
     }
   }
 }

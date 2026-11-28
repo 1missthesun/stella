@@ -8,7 +8,7 @@
 //! and the CLI all expose exactly that surface.
 //!
 //! Commands: `status`, `rename {name}`, `pairing.create {ttlMs?}`, `pairing.short`,
-//! `pairing.cancel`, `pairing.deny {request}`, `pair {code}`, `pair.short {code}`,
+//! `pairing.cancel`, `pairing.allow {request}`, `pairing.deny {request}`, `pair {code}`, `pair.preview {code}`, `pair.short {code}`,
 //! `local.set {on}`, `nearby.start`, `nearby.stop`, `nearby.list`, `pair.nearby {id}`, `pair.nearby.confirm {id, code}`,
 //! `pair.nearby.cancel {id}`, `peers`, `device.revoke {id}`, `computer.forget {id}`,
 //! `computer.connect {id}`, `computer.disconnect {id}`, `computer.retry {id?}`,
@@ -16,7 +16,8 @@
 //! Events: `{kind:"request", req, from, body}`, `{kind:"event", from, body}`,
 //! `{kind:"device", id, state: paired|connected|disconnected|revoked|rejected, ...}`,
 //! `{kind:"computer", id, state: paired|connecting|online|offline|revoked|not_paired|forgotten, ...}`,
-//! `{kind:"pairing", state: used|expired|withdrawn|short_ended|confirm|confirm_done, ...}`,
+//! `{kind:"pairing", state: used|expired|withdrawn|short_ended|confirm|confirm_done, ...}` (`confirm`
+//! comes with `code: null` while the person has yet to allow the request, then again with the digits),
 //! `{kind:"nearby", id, state: found|lost|ended, ...}`.
 //!
 //! Local-network discovery (mDNS) and router port mapping stay off unless the config's
@@ -39,7 +40,7 @@ pub mod ffi;
 use std::collections::HashMap;
 use std::net::{Ipv4Addr, Ipv6Addr, SocketAddr};
 use std::path::PathBuf;
-use std::sync::atomic::AtomicU64;
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
@@ -147,6 +148,7 @@ pub(crate) struct Inner {
     nearby: Mutex<nearby::Nearby>,
     asking: Mutex<HashMap<String, nearby::Asking>>,
     short: Mutex<Option<short::Slot>>,
+    stopped: AtomicBool,
 }
 
 pub struct Node {
@@ -232,6 +234,7 @@ impl Node {
             nearby: Mutex::new(nearby::Nearby::default()),
             asking: Mutex::new(HashMap::new()),
             short: Mutex::new(None),
+            stopped: AtomicBool::new(false),
         });
         let bound = inner.endpoint.bound_sockets().into_iter().find(|a| a.is_ipv4()).map(|a| a.port());
         {
@@ -257,6 +260,9 @@ impl Node {
     /// Runs one command; `done` gets its reply, on a runtime thread. `emit` and `respond` run right
     /// here instead, so a chat's events reach the device in the order they were emitted.
     pub fn command(&self, cmd: &str, args: Value, done: impl FnOnce(Result<Value, String>) + Send + 'static) {
+        if self.inner.stopped.load(Ordering::Acquire) {
+            return done(Err("the device link stopped".into()));
+        }
         if let Some(result) = run_now(&self.inner, cmd, &args) {
             return done(result);
         }
@@ -266,12 +272,16 @@ impl Node {
     }
 
     pub fn command_blocking(&self, cmd: &str, args: Value) -> Result<Value, String> {
+        if self.inner.stopped.load(Ordering::Acquire) {
+            return Err("the device link stopped".into());
+        }
         self.runtime.block_on(run(self.inner.clone(), cmd, args))
     }
 
     /// Closes every connection and the endpoint.
     pub fn shutdown(self) {
         let inner = self.inner.clone();
+        inner.stopped.store(true, Ordering::Release);
         short::withdraw(&inner);
         nearby::stop(&inner);
         self.runtime.block_on(async move {
@@ -312,7 +322,8 @@ async fn run(inner: Arc<Inner>, cmd: &str, args: Value) -> Result<Value, String>
         }
         "pairing.create" => host::create_offer(&inner, args.get("ttlMs").and_then(|t| t.as_u64())).await,
         "pairing.short" => short::create(&inner).await,
-        "pairing.deny" => Ok(json!(nearby::deny(&inner, args.get("request").and_then(|r| r.as_u64()).ok_or("request is required")?))),
+        "pairing.allow" => Ok(json!(nearby::decide(&inner, args.get("request").and_then(|r| r.as_u64()).ok_or("request is required")?, true))),
+        "pairing.deny" => Ok(json!(nearby::decide(&inner, args.get("request").and_then(|r| r.as_u64()).ok_or("request is required")?, false))),
         "pair.short" => short::pair(&inner, str_arg(&args, "code")?).await,
         "local.set" => {
             let on = args.get("on").and_then(|o| o.as_bool()).ok_or("on is required")?;
@@ -338,6 +349,7 @@ async fn run(inner: Arc<Inner>, cmd: &str, args: Value) -> Result<Value, String>
             Ok(Value::Null)
         }
         "pair" => client::pair(&inner, str_arg(&args, "code")?).await,
+        "pair.preview" => client::preview(&inner, str_arg(&args, "code")?).await,
         "peers" => Ok(peers(&inner)),
         "device.revoke" => host::revoke(&inner, str_arg(&args, "id")?),
         "computer.forget" => client::forget(&inner, str_arg(&args, "id")?),
@@ -353,6 +365,9 @@ async fn run(inner: Arc<Inner>, cmd: &str, args: Value) -> Result<Value, String>
         }
         "respond" | "emit" => run_now(&inner, cmd, &args).unwrap_or(Ok(Value::Null)),
         "stop" => {
+            inner.stopped.store(true, Ordering::Release);
+            short::withdraw(&inner);
+            nearby::stop(&inner);
             for (_, link) in lock(&inner.computers).drain() {
                 let _ = link.stop.send(true);
             }

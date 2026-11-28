@@ -14,6 +14,8 @@ pub const URL_PREFIX: &str = "stella://p2p?c=";
 pub const DEFAULT_TTL: Duration = Duration::from_secs(10 * 60);
 /// Wrong secrets an offer takes before it is withdrawn.
 pub const MAX_FAILED_ATTEMPTS: u32 = 8;
+/// Short codes for one offer that a wrong (or junk) claim may spend before it gets no more.
+pub const MAX_SPENT_SHORT_CODES: u32 = 3;
 
 #[derive(Serialize, Deserialize)]
 struct Wire {
@@ -71,6 +73,7 @@ pub struct Offer {
     pub expires: Instant,
     pub expires_at_ms: u64,
     pub failed: u32,
+    pub spent_short: u32,
 }
 
 pub fn random_secret() -> [u8; 16] {

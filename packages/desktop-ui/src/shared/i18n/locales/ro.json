@@ -1781,6 +1781,12 @@
       "intro": "Pe computer, deschide Setări › Cont › Conectează un dispozitiv și scanează codul afișat. Se conectează direct la computerul tău, fără cont.",
       "cameraDenied": "Stella nu poate folosi camera. Permite accesul în Setări sau lipește codul.",
       "invalidCode": "Acesta nu este un cod de asociere Stella.",
+      "confirmTitle": "Asociezi cu {name}?",
+      "confirmTitleUnknown": "Asociezi cu acest computer?",
+      "confirmIntro": "Asociază doar cu propriul computer: acest telefon va putea folosi Stella de pe el.",
+      "confirmId": "ID computer {id}",
+      "confirmPair": "Asociază",
+      "checking": "Se verifică computerul…",
       "computers": "Computerele tale",
       "cloudChats": "{name} își păstrează conversațiile în contul tău Stella. Autentifică-te aici cu acel cont ca să le vezi."
     }
@@ -4081,6 +4087,7 @@
     "nearby": {
       "title": "Computere din apropiere",
       "looking": "Se caută computere în această rețea…",
+      "waiting": "Permite pe {name} pentru a continua.",
       "connectTo": "Conectează-te la {name}",
       "digitsTitle": "Conectează-te la {name}",
       "digitsIntro": "Introdu cele șase cifre afișate acum de {name}.",
@@ -4089,7 +4096,9 @@
       "ended": "{name} a încheiat cererea. Încearcă din nou.",
       "requestTitle": "{name} vrea să folosească Stella de pe acest computer",
       "requestIntro": "Introdu acest cod pe {name} pentru a permite accesul. Dacă nu ai cerut asta, nu permite.",
-      "deny": "Nu permite"
+      "deny": "Nu permite",
+      "allow": "Permite",
+      "allowIntro": "Permite doar dacă conectezi {name} chiar acum."
     }
   }
 }

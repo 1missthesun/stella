@@ -1791,6 +1791,12 @@
       "intro": "Na počítači otevřete Nastavení › Účet › Připojit zařízení a naskenujte zobrazený kód. Připojí se přímo k vašemu počítači bez účtu.",
       "cameraDenied": "Stella nemůže používat fotoaparát. Povolte ho v Nastavení nebo místo toho vložte kód.",
       "invalidCode": "To není párovací kód aplikace Stella.",
+      "confirmTitle": "Spárovat s {name}?",
+      "confirmTitleUnknown": "Spárovat s tímto počítačem?",
+      "confirmIntro": "Párujte jen se svým vlastním počítačem: tento telefon bude moci používat jeho Stellu.",
+      "confirmId": "ID počítače {id}",
+      "confirmPair": "Spárovat",
+      "checking": "Ověřuji počítač…",
       "computers": "Vaše počítače",
       "cloudChats": "{name} ukládá své chaty do vašeho účtu Stella. Přihlaste se tu tímto účtem a zobrazte je."
     }
@@ -4138,6 +4144,7 @@
     "nearby": {
       "title": "Počítače v okolí",
       "looking": "Hledání počítačů v této síti…",
+      "waiting": "Pro pokračování to povolte na {name}.",
       "connectTo": "Připojit k {name}",
       "digitsTitle": "Připojit k {name}",
       "digitsIntro": "Zadejte šest číslic, které teď zobrazuje {name}.",
@@ -4146,7 +4153,9 @@
       "ended": "{name} ukončil žádost. Zkuste to znovu.",
       "requestTitle": "{name} chce používat Stella na tomto počítači",
       "requestIntro": "Zadejte tento kód na {name} a povolte přístup. Pokud jste o to nežádali, přístup nepovolujte.",
-      "deny": "Nepovolit"
+      "deny": "Nepovolit",
+      "allow": "Povolit",
+      "allowIntro": "Povolte to, jen pokud právě připojujete {name}."
     }
   }
 }

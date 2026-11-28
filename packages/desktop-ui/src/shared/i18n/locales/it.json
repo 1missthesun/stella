@@ -1781,6 +1781,12 @@
       "intro": "Sul computer, apri Impostazioni › Account › Connetti un dispositivo e scansiona il codice visualizzato. Si connette direttamente al tuo computer, senza account.",
       "cameraDenied": "Stella non può usare la fotocamera. Consenti l’accesso nelle Impostazioni o incolla il codice.",
       "invalidCode": "Questo non è un codice di abbinamento di Stella.",
+      "confirmTitle": "Associare a {name}?",
+      "confirmTitleUnknown": "Associare a questo computer?",
+      "confirmIntro": "Associa solo il tuo computer: questo telefono potrà usare la sua Stella.",
+      "confirmId": "ID computer {id}",
+      "confirmPair": "Associa",
+      "checking": "Verifica del computer…",
       "computers": "I tuoi computer",
       "cloudChats": "{name} conserva le sue chat nel tuo account Stella. Accedi qui con quell’account per vederle."
     }
@@ -4081,6 +4087,7 @@
     "nearby": {
       "title": "Computer nelle vicinanze",
       "looking": "Ricerca di computer su questa rete…",
+      "waiting": "Consentilo su {name} per continuare.",
       "connectTo": "Connetti a {name}",
       "digitsTitle": "Connetti a {name}",
       "digitsIntro": "Inserisci le sei cifre che {name} mostra ora.",
@@ -4089,7 +4096,9 @@
       "ended": "{name} ha chiuso la richiesta. Riprova.",
       "requestTitle": "{name} vuole usare la Stella di questo computer",
       "requestIntro": "Inserisci questo codice su {name} per consentire l’accesso. Se non l’hai richiesto, non consentirlo.",
-      "deny": "Non consentire"
+      "deny": "Non consentire",
+      "allow": "Consenti",
+      "allowIntro": "Consentilo solo se stai collegando {name} in questo momento."
     }
   }
 }

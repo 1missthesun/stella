@@ -1781,6 +1781,12 @@
       "intro": "Sur votre ordinateur, ouvrez Paramètres › Compte › Connecter un appareil et scannez le code affiché. La connexion se fait directement à votre ordinateur, sans compte.",
       "cameraDenied": "Stella ne peut pas utiliser la caméra. Autorisez-la dans les paramètres ou collez le code à la place.",
       "invalidCode": "Ce n’est pas un code d’association Stella.",
+      "confirmTitle": "Associer à {name} ?",
+      "confirmTitleUnknown": "Associer à cet ordinateur ?",
+      "confirmIntro": "N'associez que votre propre ordinateur : ce téléphone pourra utiliser son Stella.",
+      "confirmId": "ID de l'ordinateur {id}",
+      "confirmPair": "Associer",
+      "checking": "Vérification de l'ordinateur…",
       "computers": "Vos ordinateurs",
       "cloudChats": "{name} conserve ses discussions dans votre compte Stella. Connectez-vous ici avec ce compte pour les voir."
     }
@@ -4081,6 +4087,7 @@
     "nearby": {
       "title": "Ordinateurs à proximité",
       "looking": "Recherche d’ordinateurs sur ce réseau…",
+      "waiting": "Autorisez-le sur {name} pour continuer.",
       "connectTo": "Se connecter à {name}",
       "digitsTitle": "Se connecter à {name}",
       "digitsIntro": "Saisissez les six chiffres que {name} affiche maintenant.",
@@ -4089,7 +4096,9 @@
       "ended": "{name} a mis fin à la demande. Réessayez.",
       "requestTitle": "{name} veut utiliser la Stella de cet ordinateur",
       "requestIntro": "Saisissez ce code sur {name} pour autoriser l’accès. Si vous n’avez rien demandé, ne l’autorisez pas.",
-      "deny": "Ne pas autoriser"
+      "deny": "Ne pas autoriser",
+      "allow": "Autoriser",
+      "allowIntro": "N'autorisez que si vous connectez {name} en ce moment."
     }
   }
 }

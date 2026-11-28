@@ -1761,6 +1761,12 @@
       "intro": "在電腦上開啟「設定 › 帳號 › 連線裝置」，掃描顯示的代碼。它會直接連線到你的電腦，不需要帳號。",
       "cameraDenied": "Stella 無法使用相機。請在設定中允許，或改為貼上代碼。",
       "invalidCode": "這不是 Stella 的配對碼。",
+      "confirmTitle": "要與 {name} 配對嗎？",
+      "confirmTitleUnknown": "要與這台電腦配對嗎？",
+      "confirmIntro": "只與你自己的電腦配對：這支手機將能使用它的 Stella。",
+      "confirmId": "電腦 ID {id}",
+      "confirmPair": "配對",
+      "checking": "正在檢查電腦…",
       "computers": "你的電腦",
       "cloudChats": "{name} 的聊天保存在你的 Stella 帳號中。在這裡登入該帳號即可查看。"
     }
@@ -3965,6 +3971,7 @@
     "nearby": {
       "title": "附近的電腦",
       "looking": "正在尋找此網路上的電腦…",
+      "waiting": "請在 {name} 上允許以繼續。",
       "connectTo": "連線至 {name}",
       "digitsTitle": "連線至 {name}",
       "digitsIntro": "輸入 {name} 目前顯示的六位數字。",
@@ -3973,7 +3980,9 @@
       "ended": "{name} 已結束請求。請重試。",
       "requestTitle": "{name} 想使用這台電腦上的 Stella",
       "requestIntro": "在 {name} 上輸入此代碼以允許存取。如果不是你發起的請求，請勿允許。",
-      "deny": "不允許"
+      "deny": "不允許",
+      "allow": "允許",
+      "allowIntro": "只有在你正在連接 {name} 時才允許。"
     }
   }
 }

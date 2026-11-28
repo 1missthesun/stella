@@ -47,7 +47,7 @@ pub async fn create_offer(inner: &Inner, ttl_ms: Option<u64>) -> Result<Value, S
         let mut offers = lock(&inner.offers);
         // One live code at a time: showing a new one withdraws the last.
         offers.clear();
-        offers.push(Offer { code: code.clone(), secret, expires: Instant::now() + ttl, expires_at_ms, failed: 0 });
+        offers.push(Offer { code: code.clone(), secret, expires: Instant::now() + ttl, expires_at_ms, failed: 0, spent_short: 0 });
     }
     Ok(offer_json(&code, expires_at_ms))
 }
@@ -60,6 +60,17 @@ pub fn live_offer(inner: &Inner) -> Option<Value> {
     let mut offers = lock(&inner.offers);
     offers.retain(|o| o.expires > Instant::now());
     offers.last().map(|o| offer_json(&o.code, o.expires_at_ms))
+}
+
+/// Short codes this offer's wrong claims spent.
+pub fn spent_short(inner: &Inner, code: &str) -> u32 {
+    lock(&inner.offers).iter().find(|o| o.code == code).map_or(0, |o| o.spent_short)
+}
+
+pub fn spend_short(inner: &Inner, code: &str) {
+    if let Some(offer) = lock(&inner.offers).iter_mut().find(|o| o.code == code) {
+        offer.spent_short += 1;
+    }
 }
 
 pub fn offer_is_live(inner: &Inner, code: &str) -> bool {
@@ -151,26 +162,33 @@ async fn device_incoming(inner: Arc<Inner>, conn: Connection) {
         conn.close(400u32.into(), b"no hello");
         return;
     };
-    {
+    let (events, mut queue) = mpsc::unbounded_channel::<Value>();
+    // The pairing is checked again and the link goes live under the store's lock, which `revoke`
+    // holds while it closes live links: a device revoked during the handshake is never served.
+    let previous = {
         let mut store = lock(&inner.store);
-        if let Some(mut device) = store.device(&device_id).cloned() {
-            if let Some(name) = hello.get("name").and_then(|n| n.as_str()).filter(|n| !n.is_empty()) {
-                device.name = name.chars().take(80).collect();
-            }
-            device.last_seen_at = Some(now_ms());
-            store.put_device(device);
-            let _ = store.save();
+        let Some(mut device) = store.device(&device_id).cloned() else {
+            drop(store);
+            (inner.emit)(json!({ "kind": "device", "id": device_id, "state": "rejected", "reason": "not_paired" }));
+            conn.close(CLOSE_REVOKED.into(), b"unpaired");
+            return;
+        };
+        if let Some(name) = hello.get("name").and_then(|n| n.as_str()).filter(|n| !n.is_empty()) {
+            device.name = name.chars().take(80).collect();
         }
+        device.last_seen_at = Some(now_ms());
+        store.put_device(device);
+        let _ = store.save();
+        lock(&inner.devices).insert(device_id.clone(), DeviceLink { conn: conn.clone(), events })
+    };
+    if let Some(previous) = previous {
+        previous.conn.close(CLOSE_REPLACED.into(), b"replaced by a newer connection");
     }
     let (relay, addrs) = crate::reachable(&inner);
     let name = lock(&inner.name).clone();
     if wire::write(&mut send, &json!({ "t": "hello", "v": 1, "name": name, "platform": inner.platform, "relay": relay, "addrs": addrs })).await.is_err() {
+        drop_link(&inner, &device_id, conn.stable_id());
         return;
-    }
-    let (events, mut queue) = mpsc::unbounded_channel::<Value>();
-    let previous = lock(&inner.devices).insert(device_id.clone(), DeviceLink { conn: conn.clone(), events });
-    if let Some(previous) = previous {
-        previous.conn.close(CLOSE_REPLACED.into(), b"replaced by a newer connection");
     }
     let stable = conn.stable_id();
     (inner.emit)(json!({ "kind": "device", "id": device_id, "state": "connected", "path": path_of(&conn) }));
@@ -186,7 +204,7 @@ async fn device_incoming(inner: Arc<Inner>, conn: Connection) {
         tokio::select! {
             accepted = conn.accept_bi() => match accepted {
                 Ok((send, recv)) => {
-                    tokio::spawn(answer(inner.clone(), device_id.clone(), send, recv));
+                    tokio::spawn(answer(inner.clone(), device_id.clone(), stable, send, recv));
                 }
                 Err(_) => break,
             },
@@ -194,16 +212,31 @@ async fn device_incoming(inner: Arc<Inner>, conn: Connection) {
         }
     }
     writer.abort();
+    drop_link(&inner, &device_id, stable);
+}
+
+fn drop_link(inner: &Inner, device_id: &str, stable: usize) {
     let mut devices = lock(&inner.devices);
-    if devices.get(&device_id).is_some_and(|l| l.conn.stable_id() == stable) {
-        devices.remove(&device_id);
+    if devices.get(device_id).is_some_and(|l| l.conn.stable_id() == stable) {
+        devices.remove(device_id);
         drop(devices);
         (inner.emit)(json!({ "kind": "device", "id": device_id, "state": "disconnected" }));
     }
 }
 
-async fn answer(inner: Arc<Inner>, device_id: String, mut send: SendStream, mut recv: RecvStream) {
+/// A request is served only while its connection is the device's live, still-paired link.
+fn still_serving(inner: &Inner, device_id: &str, stable: usize) -> bool {
+    let store = lock(&inner.store);
+    store.device(device_id).is_some() && lock(&inner.devices).get(device_id).is_some_and(|l| l.conn.stable_id() == stable)
+}
+
+async fn answer(inner: Arc<Inner>, device_id: String, stable: usize, mut send: SendStream, mut recv: RecvStream) {
     let Ok(Some(body)) = wire::read(&mut recv).await else { return };
+    if !still_serving(&inner, &device_id, stable) {
+        let _ = wire::write(&mut send, &json!({ "ok": false, "error": "not paired" })).await;
+        let _ = send.finish();
+        return;
+    }
     let rid = inner.next_rid.fetch_add(1, Ordering::Relaxed);
     let (reply, result) = oneshot::channel();
     lock(&inner.pending).insert(rid, reply);
@@ -232,14 +265,13 @@ pub fn revoke(inner: &Inner, id: &str) -> Result<Value, String> {
         let before = store.peers.devices.len();
         store.peers.devices.retain(|d| d.id != id);
         let removed = store.peers.devices.len() < before;
-        if removed {
-            store.save()?;
+        let saved = if removed { store.save() } else { Ok(()) };
+        if let Some(link) = lock(&inner.devices).remove(id) {
+            link.conn.close(CLOSE_REVOKED.into(), b"unpaired");
         }
+        saved?;
         removed
     };
-    if let Some(link) = lock(&inner.devices).remove(id) {
-        link.conn.close(CLOSE_REVOKED.into(), b"unpaired");
-    }
     if removed {
         (inner.emit)(json!({ "kind": "device", "id": id, "state": "revoked" }));
     }

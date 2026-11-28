@@ -887,6 +887,12 @@
       "intro": "En tu ordenador, abre Ajustes › Cuenta › Conectar un dispositivo y escanea el código que aparece. Se conecta directamente a tu ordenador, sin cuenta.",
       "cameraDenied": "Stella no puede usar la cámara. Permítelo en Ajustes o pega el código en su lugar.",
       "invalidCode": "Ese no es un código de vinculación de Stella.",
+      "confirmTitle": "¿Vincular con {name}?",
+      "confirmTitleUnknown": "¿Vincular con este ordenador?",
+      "confirmIntro": "Vincula solo con tu propio ordenador: este teléfono podrá usar su Stella.",
+      "confirmId": "ID del ordenador {id}",
+      "confirmPair": "Vincular",
+      "checking": "Comprobando el ordenador…",
       "computers": "Tus ordenadores",
       "cloudChats": "{name} guarda sus chats en tu cuenta de Stella. Inicia sesión aquí con ella para verlos."
     }

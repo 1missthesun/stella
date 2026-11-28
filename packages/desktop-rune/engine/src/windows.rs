@@ -769,13 +769,18 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
     drain(s.node);
     let closed = crate::fx::take_closed();
     let trigger_sync = crate::fx::take_trigger_sync();
+    let lens_sync = crate::fx::take_lens_sync();
     if engine::with(|e| {
         let held = !e.tree.closing.is_empty();
         if held {
             e.tree.finish_closing(&closed);
         }
         let triggers_changed = trigger_sync.as_ref().is_some_and(|want| e.tree.sync_morph_triggers(want));
-        held || triggers_changed
+        let lens_changed = !lens_sync.is_empty();
+        for &n in &lens_sync {
+            e.tree.touch(n);
+        }
+        held || triggers_changed || lens_changed
     }) {
         wake_dirty(s.node);
     }

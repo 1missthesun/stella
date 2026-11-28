@@ -24,6 +24,9 @@ use crate::windows::Win;
 const LAYER: f32 = 1.0;
 const LIGHT: f32 = 2.0;
 const OCCLUDER: f32 = 3.0;
+/// A unified menu's rows seen through its moving glass (`content_lens`): drawn over the rows while
+/// the menu opens, and only then, as each frame of it costs a backdrop copy.
+const CONTENT_LENS: f32 = 4.0;
 
 /// How far a lens's shadow and rim may paint past its shape, in points.
 const GLASS_BLEED: f32 = 28.0;
@@ -451,6 +454,11 @@ pub fn over(mut e: El, id: u32, p: &Props) -> El {
         for (i, s) in list.0.iter().enumerate().filter(|(_, s)| s.over) {
             e = e.child(layer_slot(id, i, s, p));
         }
+        if LENSED.with(|l| l.borrow().contains(&id))
+            && let Some((i, s)) = list.0.iter().enumerate().find(|(_, s)| matches!(s.effect, Effect::Glass { morph: Some(_), .. }))
+        {
+            e = e.child(slot(id, i, CONTENT_LENS, s.inset, p).effect_backdrop(true).transition(rune::Transition::none()));
+        }
     }
     if p.light.is_some() {
         e = e.child(slot(id, 0, LIGHT, 0.0, p).effect_backdrop(true));
@@ -658,6 +666,10 @@ thread_local! {
     static WHOLE: std::cell::RefCell<HashMap<u32, [f32; 2]>> = std::cell::RefCell::new(HashMap::new());
     /// Latest set of unified morph trigger nodes whose children should stay hidden (crossfaded out).
     static TRIGGER_SYNC: std::cell::RefCell<Option<HashSet<u32>>> = const { std::cell::RefCell::new(None) };
+    /// Menus opening with their rows seen through the glass (`CONTENT_LENS`), and the ones whose
+    /// slot has to come or go at the next build.
+    static LENSED: std::cell::RefCell<HashSet<u32>> = std::cell::RefCell::new(HashSet::new());
+    static LENS_SYNC: std::cell::RefCell<Vec<u32>> = const { std::cell::RefCell::new(Vec::new()) };
     /// Live transforms of unified morphs' content, by element node.
     static CONTENT: std::cell::RefCell<HashMap<u32, std::rc::Rc<ContentLive>>> = std::cell::RefCell::new(HashMap::new());
 }
@@ -753,12 +765,10 @@ fn move_content(rt: &rune::Runtime<Win>, eng: &crate::engine::Engine, rides: &[R
                 }
             };
             let bc = centre(pose.shape);
-            // UIKit's content rides a little magnified in the blob (its lens) and settles to size
-            // as the blob does.
-            let lens = 1.0 + 0.25 * (1.0 - smoothstep(0.08, 0.22, pose.tau));
-            let k = ((pose.shape.rect.w / tw).min(pose.shape.rect.h / th) * lens).clamp(0.05, 1.4);
+            // The rows fit the blob; the glass over them (`CONTENT_LENS`) magnifies them optically.
+            let k = (pose.shape.rect.w / tw).min(pose.shape.rect.h / th).clamp(0.05, 1.4);
             let offset = [bc[0] - tc[0] + (k - 1.0) * (home[0] - tc[0]), bc[1] - tc[1] + (k - 1.0) * (home[1] - tc[1])];
-            let blur = RIDE_BLUR * (1.0 - smoothstep(0.05, 0.15, pose.tau));
+            let blur = RIDE_BLUR * (1.0 - smoothstep(0.09, 0.17, pose.tau));
             let opacity = smoothstep(0.0, 0.06, pose.tau);
             l.set(k, offset, blur, opacity);
         }
@@ -773,6 +783,41 @@ fn move_content(rt: &rune::Runtime<Win>, eng: &crate::engine::Engine, rides: &[R
             keep
         })
     });
+}
+
+/// Menus whose content lens slot comes or goes: rebuild them.
+pub fn take_lens_sync() -> Vec<u32> {
+    LENS_SYNC.with(|l| std::mem::take(&mut *l.borrow_mut()))
+}
+
+/// How strongly the opening menu's glass magnifies its rows (`LensParams::bulge`): as UIKit's,
+/// the rows swim up big through the drop (about 1.6x in the middle, curling at the rim) while it
+/// grows, and settle to their own size as it lands.
+fn content_bulge(tau: f32) -> f32 {
+    0.38 * (1.0 - smoothstep(0.16, 0.23, tau))
+}
+
+/// A pass-through lens that only magnifies what is under it, by `bulge`.
+fn content_lens(bulge: f32) -> LensParams {
+    LensParams {
+        // The rows curl round the drop's rim (refracted by its bevel) while it bulges.
+        bevel: 18.0,
+        depth: 24.0 * (bulge / 0.38).min(1.0),
+        dispersion: 0.0,
+        magnification: 1.0,
+        frost: 0.0,
+        shadow: 0.0,
+        rim: 0.0,
+        tint: Rgb([0.0, 0.0, 0.0]),
+        tint_amount: 0.0,
+        veil: 0.0,
+        adapt: 0.0,
+        saturation: 1.0,
+        perceptual: true,
+        continuous: true,
+        bulge,
+        ..LensParams::default()
+    }
 }
 
 /// Latest unified morph trigger content-hide set reported by `fx::Comp` (for `windows::poll`).
@@ -1083,6 +1128,7 @@ impl Compositor<Win> for Comp {
         let mut want_hidden_triggers: HashSet<u32> = HashSet::new();
         let mut rides: Vec<Ride> = Vec::new();
         let mut handed: Vec<(u32, u32)> = Vec::new();
+        let mut lensing: HashMap<u32, (Shape, f32)> = HashMap::new();
         let frame_dt = f.dt.clamp(1.0 / 120.0, 1.0 / 30.0);
         crate::engine::read(|eng| {
             // Rising-edge hit-test for interactive `.interactive()` glass controls (topmost wins).
@@ -1240,6 +1286,9 @@ impl Compositor<Win> for Comp {
                                                 lens = mix_lens(&m.from_lens.unwrap_or(lens), &lens, smoothstep(0.0, 0.2, at_c));
                                                 if let Some(pose) = &pose {
                                                     shape = pose.shape;
+                                                    if !closing && !reduced && content_bulge(pose.tau) > 1e-3 {
+                                                        lensing.insert(node, (pose.shape, content_bulge(pose.tau)));
+                                                    }
                                                     // Landing, the button's glass wells back up under
                                                     // the blob and they pull together into one drop,
                                                     // a neck between them, until they meet.
@@ -1381,6 +1430,14 @@ impl Compositor<Win> for Comp {
                         layers.push(l);
                         slots.push(FxSlot::default().scale(k).clip(i.clip, i.fade).blend(s.blend).measure(watch));
                     }
+                    CONTENT_LENS => {
+                        let Some(&(shape, bulge)) = lensing.get(&node) else { continue };
+                        let mut l = Fx::lens(content_lens(bulge)).on(shape).at(t).reduced(reduced);
+                        l.place = rune_fx::Place::Over;
+                        shown.push(OnScreen { instance: n as u32, layer: layers.len() });
+                        layers.push(l);
+                        slots.push(FxSlot::default().scale(k).clip(i.clip, i.fade));
+                    }
                     LIGHT => {
                         let Some(spec) = p.light.as_deref() else { continue };
                         lights.push(Lighting { instance: n as u32, node, rect: i.rect, radii: i.radii, scale: k, spec: spec.clone(), prims: Vec::new() });
@@ -1444,6 +1501,15 @@ impl Compositor<Win> for Comp {
                 layers[mi].opacity = 0.0;
             }
         }
+        let want_lensed: HashSet<u32> = lensing.keys().copied().collect();
+        LENSED.with(|l| {
+            let mut l = l.borrow_mut();
+            if *l != want_lensed {
+                LENS_SYNC.with(|s| s.borrow_mut().extend(l.symmetric_difference(&want_lensed).copied()));
+                *l = want_lensed;
+                moving = true;
+            }
+        });
         if want_hidden_triggers != self.last_hidden_triggers {
             self.last_hidden_triggers = want_hidden_triggers.clone();
             TRIGGER_SYNC.with(|sync| *sync.borrow_mut() = Some(want_hidden_triggers));

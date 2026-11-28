@@ -168,8 +168,9 @@ pub fn reveal_chrome(e: El, spring: rune::Spring) -> El {
 /// How fast a closing `morphFrom` glass's content goes, ahead of the glass shrinking back.
 const CONTENT_OUT: rune::Spring = rune::Spring::new(0.045, 0.0);
 
-/// How fast a menu going back into its button loses its rows.
-const UNIFIED_OUT: rune::Spring = rune::Spring::new(0.07, 0.0);
+/// How fast a menu going back into its button loses its rows: as UIKit's, they dim at once and
+/// linger faint and blurred inside the shrinking glass for about 70 ms more.
+const UNIFIED_OUT: rune::Spring = rune::Spring::new(0.13, 0.0);
 
 /// A closing `morphFrom` element (`Tree::closing`): its glass morphing back, nothing to press,
 /// focus or dismiss.
@@ -249,7 +250,7 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
         let out = if crate::fx::unified_trigger(&eng.tree, id).is_some() {
             let (from, _) = source_origin(p);
             rune::Transition::opacity()
-                .combined(rune::Transition::blur(9.0))
+                .combined(rune::Transition::blur(6.0))
                 .combined(rune::Transition::scale_anchor(0.7, rune::Vec2::new(from[0], from[1])).allow_small_scale())
                 .springs(rune::SpringPair::new(UNIFIED_OUT, UNIFIED_OUT))
         } else {

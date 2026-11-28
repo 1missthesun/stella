@@ -82,8 +82,10 @@ function install() {
 
 /** Boot: a phone that was using a computer opens straight into its chat. */
 export function restoreComputerMode() {
-  phoneP2p.start();
-  if (computerId) install();
+  if (computerId) {
+    phoneP2p.start();
+    install();
+  } else phoneP2p.resume();
 }
 
 export const computerMode = {

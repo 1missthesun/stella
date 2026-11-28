@@ -101,6 +101,13 @@ let chats: PeerChats | null = null;
 let markLoaded: () => void = () => {};
 /** Settles once the paired computers have loaded (or the link failed to start). */
 const loaded = new Promise<void>((done) => (markLoaded = done));
+/** Watchers of the paired computers, kept before the link starts and moved onto its store. */
+const watchers = new Set<() => void>();
+
+// Starting the link opens its network endpoint, which on iOS asks for Local Network access, so it
+// starts only once the phone has paired to a computer (this flag) or someone pairs one now.
+const PAIRED_KEY = "stella-phone-p2p-paired";
+const markPaired = (paired: boolean) => (paired ? __native.storageSet(PAIRED_KEY, "1") : __native.storageRemove(PAIRED_KEY));
 
 /** Starts the link once: the paired computers load and each one connects. */
 function live() {
@@ -108,6 +115,9 @@ function live() {
   store = createPeerStore(transport);
   chats = createPeerChats(transport, store, dataDir);
   const s = store;
+  s.subscribe(() => {
+    for (const watcher of watchers) watcher();
+  });
   void startLink()
     .then(() => s.refresh())
     .finally(markLoaded)
@@ -119,8 +129,12 @@ function live() {
 }
 
 /** The phone's `P2pApi`: a device's half (pairing to computers and using them). */
-export const phoneP2p: P2pApi & { chats(): PeerChats; start(): void; loaded(): Promise<void> } = {
+export const phoneP2p: P2pApi & { chats(): PeerChats; start(): void; resume(): void; loaded(): Promise<void> } = {
   start: () => void live(),
+  /** Boot: the link comes back only on a phone that has paired to a computer. */
+  resume: () => {
+    if (__native.storageGet(PAIRED_KEY)) live();
+  },
   loaded: () => {
     live();
     return loaded;
@@ -128,7 +142,12 @@ export const phoneP2p: P2pApi & { chats(): PeerChats; start(): void; loaded(): P
   chats: () => live().chats,
   status: () => transport.command<P2pStatus>("status"),
   peers: () => store?.get() ?? NO_PEERS,
-  subscribe: (listener) => live().store.subscribe(listener),
+  subscribe: (listener) => {
+    watchers.add(listener);
+    return () => {
+      watchers.delete(listener);
+    };
+  },
   createPairing: () => Promise.reject(new Error("A phone pairs to a computer; it doesn't offer codes.")),
   cancelPairing: async () => {},
   onPaired: () => () => {},
@@ -138,6 +157,7 @@ export const phoneP2p: P2pApi & { chats(): PeerChats; start(): void; loaded(): P
     const command = pairingCommand(input);
     if (!command) throw new Error("That isn't a pairing code.");
     const paired = await transport.command<{ id: string }>(command.name, { code: command.code });
+    markPaired(true);
     await store.refresh();
     await waitFor(chats.untilOnline(paired.id), 15_000);
     const computer = store.get().computers.find((c) => c.id === paired.id);
@@ -150,6 +170,7 @@ export const phoneP2p: P2pApi & { chats(): PeerChats; start(): void; loaded(): P
     await transport.command("computer.forget", { id });
     chats.forget(id);
     await store.refresh();
+    if (!store.get().computers.length) markPaired(false);
   },
   async conversationFor(computerId) {
     const { store, chats } = live();

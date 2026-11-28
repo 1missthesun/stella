@@ -10,10 +10,17 @@ export async function check(root) {
     problems.push("build-launchers.yml: VERSION must upload last, so a launcher that sees it finds the binaries and sums");
   }
 
-  const identityFiles = /for file in (Stella-darwin[^;]+);/.exec(workflow("build-electron-identity.yml"))?.[1].split(" ") ?? [];
-  const firstSum = identityFiles.findIndex((file) => file.endsWith(".sha256"));
-  if (firstSum < 1 || identityFiles.slice(firstSum).some((file) => !file.endsWith(".sha256"))) {
-    problems.push("build-electron-identity.yml: zips must upload before their checksums");
+  // A build is addressed by its checksum and published before the pointer that names it; the
+  // first build's legacy pair is never overwritten (its URLs are cached for a year).
+  const identity = workflow("build-electron-identity.yml");
+  const zipAt = identity.indexOf('put "out/Stella-darwin-$arch.zip" "$prefix/$sha/');
+  const pointerAt = identity.indexOf('"$prefix/Stella-darwin-$arch.current.sha256"');
+  if (zipAt < 0 || pointerAt < 0 || zipAt > pointerAt) {
+    problems.push("build-electron-identity.yml: each zip must upload under its checksum before the pointer to it");
+  }
+  const legacy = /if absent "\$prefix\/Stella-darwin-\$arch\.zip\.sha256"; then\s+put "out\/Stella-darwin-\$arch\.zip" [^\n]+\n\s+put "out\/Stella-darwin-\$arch\.zip\.sha256"/;
+  if (!legacy.test(identity)) {
+    problems.push("build-electron-identity.yml: the legacy zip and checksum must upload once, zip first, never over an existing pair");
   }
 
   return problems;

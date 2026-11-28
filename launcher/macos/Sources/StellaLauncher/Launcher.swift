@@ -171,14 +171,18 @@ final class Launcher {
         return 1
     }
 
-    /// Opening Stella while it runs brings Stella forward instead of this window.
+    /// Opening Stella while it runs brings Stella forward instead of this window. Activating it
+    /// isn't enough when its window was closed (Stella keeps running in the menu bar), so it is
+    /// also asked to open its window, as Linux and Windows do; a Stella that doesn't answer
+    /// within 1.5s gets this window instead.
     func reopened() {
-        let pid = current?.pid
+        let process = current
         ui.reopen {
             // Holding Option opens the launcher's own window (Shut down, recovery) instead.
             guard !NSEvent.modifierFlags.contains(.option),
-                  let pid, let app = NSRunningApplication(processIdentifier: pid) else { return false }
+                  let process, let app = NSRunningApplication(processIdentifier: process.pid) else { return false }
             log("launcher: reopened while Stella runs; bringing Stella forward")
+            process.events.post(.timer("focus"))
             return app.activate(options: [.activateAllWindows])
         }
     }
@@ -776,6 +780,8 @@ final class Launcher {
         var quitRequested = false
         var announcedExit: Int32?
         var teardownForced = false
+        var focusAsked = 0
+        var focusPending = false
         while let event = process.events.next(until: nil) {
             switch event {
             case let .message(message):
@@ -796,6 +802,8 @@ final class Launcher {
                         if options.captureDir != nil { ui.captureRunning() }
                         process.after(options.captureDir != nil ? max(options.hold, 4) : options.hold, "self-test-quit")
                     }
+                case "focused":
+                    focusPending = false
                 case "sign":
                     handleSign(message, process: process)
                 case "prepared":
@@ -843,6 +851,18 @@ final class Launcher {
                     quitRequested = true
                     process.send(["op": "quit"])
                     process.after(30, "quit-timeout")
+                case "focus" where readyAt != nil:
+                    // The same path as opening a second instance: Stella shows and focuses its window.
+                    focusAsked += 1
+                    focusPending = true
+                    process.send(["op": "focus"])
+                    process.after(1.5, "focus-timeout-\(focusAsked)")
+                case let name where name.hasPrefix("focus-timeout-"):
+                    // Only the latest ask counts: an earlier one's answer may still be on its way.
+                    guard focusPending, name == "focus-timeout-\(focusAsked)" else { break }
+                    focusPending = false
+                    log("supervisor: \(child) didn't come forward; showing the launcher window")
+                    ui.update(show: .front) { _ in }
                 case "quit-timeout" where announcedExit == nil:
                     log("supervisor: \(child) did not quit in time; terminating")
                     process.terminate()

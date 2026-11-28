@@ -30,6 +30,8 @@ Runs the Stella runtime kernel headlessly (no Electron, no desktop shell).
 
 Options:
   -p, --prompt <text>       User prompt for the turn.
+  --prompt-file <path>      Read the prompt from a file ("-" for stdin), for
+                            prompts too long for a command line.
   --mode <mode>             chat (default) | completion | list-models
   --model <id>              Explicit model id, e.g. stella/light or
                             anthropic/claude-haiku-4-5. In completion mode
@@ -82,6 +84,11 @@ const parseArgs = (argv: string[]): CliOptions => {
       case "--prompt":
         options.prompt = next(++i);
         break;
+      case "--prompt-file": {
+        const file = next(++i);
+        options.prompt = readFileSync(file === "-" ? 0 : path.resolve(file), "utf8");
+        break;
+      }
       case "--mode": {
         const mode = next(++i);
         if (
@@ -229,7 +236,7 @@ const main = async (): Promise<void> => {
   }
 
   if (options.mode !== "list-models" && !options.prompt.trim()) {
-    throw new Error("A prompt is required (use --prompt or --help).");
+    throw new Error("A prompt is required (use --prompt, --prompt-file or --help).");
   }
 
   const host = new StellaRuntimeHost({

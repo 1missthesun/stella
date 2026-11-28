@@ -293,16 +293,41 @@ enum ElectronIdentity {
         return target
     }
 
+    /// The current build's checksum and its zip. A build lives under its own checksum, so the two
+    /// always match; versions published before that have only the first build's pair.
+    private static func signedBuild(version: String, name: String) throws -> (sha: String, zip: URL) {
+        let base = "\(signedBase)/\(version)"
+        let current = "Stella-darwin-\(arch).current.sha256"
+        guard let pointerURL = URL(string: "\(base)/\(current)"),
+              let legacySumURL = URL(string: "\(base)/\(name).sha256"),
+              let legacyZipURL = URL(string: "\(base)/\(name)")
+        else { throw LauncherError("Bad signed bundle URL.") }
+        let checksum = { (data: Data) -> String? in
+            let text = String(decoding: data, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+            return text.range(of: "^[0-9a-f]{64}$", options: .regularExpression) != nil ? text : nil
+        }
+        var pointer = URLRequest(url: pointerURL)
+        pointer.cachePolicy = .reloadIgnoringLocalCacheData
+        let (pointerData, pointerResponse) = try Net.fetch(pointer)
+        if pointerResponse.statusCode == 200 {
+            guard let sha = checksum(pointerData), let zip = URL(string: "\(base)/\(sha)/\(name)")
+            else { throw LauncherError("\(current) isn't a checksum.") }
+            return (sha, zip)
+        }
+        guard pointerResponse.statusCode == 404 else {
+            throw LauncherError("HTTP \(pointerResponse.statusCode) for \(current)")
+        }
+        let (sumData, sumResponse) = try Net.fetch(URLRequest(url: legacySumURL))
+        guard sumResponse.statusCode == 200 else { throw LauncherError("HTTP \(sumResponse.statusCode) for \(name).sha256") }
+        guard let sha = checksum(sumData) else { throw LauncherError("\(name).sha256 isn't a checksum.") }
+        return (sha, legacyZipURL)
+    }
+
     private static func installSigned(
         version: String, dir: URL, target: URL, env: [String: String], progress: (String) -> Void
     ) throws {
         let name = "Stella-darwin-\(arch).zip"
-        guard let sumURL = URL(string: "\(signedBase)/\(version)/\(name).sha256"),
-              let zipURL = URL(string: "\(signedBase)/\(version)/\(name)")
-        else { throw LauncherError("Bad signed bundle URL.") }
-        let (sumData, sumResponse) = try Net.fetch(URLRequest(url: sumURL))
-        guard sumResponse.statusCode == 200 else { throw LauncherError("HTTP \(sumResponse.statusCode) for \(name).sha256") }
-        let sha = String(decoding: sumData, as: UTF8.self).trimmingCharacters(in: .whitespacesAndNewlines)
+        let (sha, zipURL) = try signedBuild(version: version, name: name)
         progress("Setting up Stella.app…")
         log("identity: downloading signed Stella.app for Electron \(version)")
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)

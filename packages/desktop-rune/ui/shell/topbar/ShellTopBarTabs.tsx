@@ -47,7 +47,7 @@ const SEGMENT_R = SEGMENT_H / 2;
 const SETTLE_MS = 170;
 /** The shown tab's pill slides from tab to tab (`matched`) on this spring. */
 const PILL_ID = "topbar-tab-pill";
-const PILL_MOTION = { dur: 0.3, bounce: 0.12 };
+const PILL_MOTION = { dur: 0.34, bounce: 0.18 };
 
 const LABEL = look(fontSize.sm, 500, { lh: 26 / fontSize.sm });
 
@@ -72,7 +72,25 @@ function tabLook(t: Tokens) {
     rest: t.c.textBase,
     hover: t.c.textStrong,
     strong: t.c.textStrong,
-    selected: mixOklch(t.c.foreground, t.dark ? 12 : 8, "transparent"),
+    selected: t.material.solid ? (t.dark ? "rgba(255,255,255,0.16)" : "rgba(0,0,0,0.08)") : undefined,
+    selectedFx: t.material.solid
+      ? undefined
+      : ({
+          glass: {
+            bevel: 7,
+            depth: 10,
+            dispersion: 0.015,
+            magnification: 1.05,
+            frost: 0.04,
+            frostSigma: 10,
+            saturation: 1.15,
+            perceptual: true,
+            rim: t.dark ? 0.72 : 0.85,
+            shadow: t.dark ? 0.14 : 0.045,
+            veil: t.dark ? 0.16 : 0.74,
+            tint: "#ffffff",
+          },
+        } as const),
     hoverFill: mixOklch(t.c.foreground, 5, "transparent"),
     viewingFill: mixOklch(t.c.foreground, 7, "transparent"),
     draggingFill: mixOklch(t.c.foreground, 10, "transparent"),
@@ -254,7 +272,7 @@ export function ShellTopBarTabs({ room }: { room: number }) {
       <row id="topbar-tablist" role="tablist" label="Tabs" h="full" align="center" gap={2} minW={0} shrink>
         <row id="topbar-tab-chat" h={SEGMENT_H} align="center" mr={CHAT_FULL_GAP} shrink={false} hoverGroup noWindowDrag>
           {chatActive ? (
-            <box key="pill" absolute={{ left: 0, right: 0, top: 0, bottom: 0 }} radius={SEGMENT_R} fill={l.selected} matched={PILL_ID} matchedInPlace motion={PILL_MOTION} inert />
+            <box key="pill" absolute={{ left: 0, right: 0, top: 0, bottom: 0 }} radius={SEGMENT_R} fill={l.selected} fx={l.selectedFx} matched={PILL_ID} matchedInPlace motion={PILL_MOTION} inert />
           ) : (
             <box key="fill" absolute={{ left: 0, right: 0, top: 0, bottom: 0 }} radius={SEGMENT_R} fill={l.hoverFill} hoverOpacity={[0, 1]} motion={{ dur: 0.16 }} inert />
           )}
@@ -313,7 +331,7 @@ export function ShellTopBarTabs({ room }: { room: number }) {
                 }}
               >
                 {active ? (
-                  <box key="pill" absolute={{ left: 0, right: 0, top: 0, bottom: 0 }} radius={SEGMENT_R} fill={l.selected} matched={PILL_ID} matchedInPlace motion={PILL_MOTION} inert />
+                  <box key="pill" absolute={{ left: 0, right: 0, top: 0, bottom: 0 }} radius={SEGMENT_R} fill={l.selected} fx={l.selectedFx} matched={PILL_ID} matchedInPlace motion={PILL_MOTION} inert />
                 ) : (
                   <box
                     key="fill"

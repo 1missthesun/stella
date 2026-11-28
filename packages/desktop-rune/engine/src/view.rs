@@ -40,6 +40,7 @@ pub fn children(s: &Win, eng: &Engine, n: &Node, mut e: El) -> El {
             .collect()
     };
     let morph = crate::fx::morph_spring(&n.props);
+    let kin_morph = morph.is_some() && crate::fx::is_kin_morph(eng, &n.props);
     let grow_from = morph.map(|_| source_origin(&n.props));
     for (i, c) in n.children.iter().enumerate() {
         let Some(child) = eng.tree.get(*c) else {
@@ -56,7 +57,11 @@ pub fn children(s: &Win, eng: &Engine, n: &Node, mut e: El) -> El {
             && toward_web.iter().any(|(j, order)| paint_order(p) > *order || (paint_order(p) == *order && i > *j));
         let mut ce = if over { build_over(s, eng, *c) } else { build(s, eng, *c) };
         if let Some(spring) = morph.filter(|_| p.enter.is_none() && p.exit.is_none()) {
-            ce = reveal(ce, spring, grow_from.unwrap_or(([0.5, 0.5], None)));
+            ce = if kin_morph {
+                reveal_kin(ce, spring)
+            } else {
+                reveal(ce, spring, grow_from.unwrap_or(([0.5, 0.5], None)))
+            };
         }
         e = e.child(ce);
     }
@@ -98,13 +103,23 @@ fn sees_through(p: &Props) -> bool {
 
 /// Brings a `morphFrom` glass's content in with the glass: there to press from the first frame,
 /// growing out of the source's side (see `source_origin`) on the glass's own spring as it fades in.
-/// It's uncovered from the source's edge as it grows, so it stays inside the growing glass.
+/// It's uncovered from the source's edge as it grows, with a brief enter delay so text never
+/// peeks outside the budding glass bridge on the first frames.
 pub fn reveal(e: El, spring: rune::Spring, (from, edge): ([f32; 2], Option<rune::Edge>)) -> El {
-    let mut grow = rune::Transition::scale_anchor(0.8, rune::Vec2::new(from[0], from[1])).allow_small_scale();
+    let mut grow = rune::Transition::scale_anchor(0.58, rune::Vec2::new(from[0], from[1])).allow_small_scale().combined(rune::Transition::opacity());
     if let Some(edge) = edge {
         grow = grow.combined(rune::Transition::reveal(edge));
     }
-    e.transition(grow.springs(rune::SpringPair::new(spring, CONTENT_OUT)))
+    e.transition(grow.springs(rune::SpringPair::new(spring, CONTENT_OUT))).enter_delay(spring.duration * 0.14)
+}
+
+/// Content inside a `kin` group pinch-off (e.g. scroll-to-bottom button budding out of the
+/// composer): rides upward centered inside the emerging glass droplet while scaling & fading cleanly.
+pub fn reveal_kin(e: El, spring: rune::Spring) -> El {
+    let bud = rune::Transition::offset(0.0, 48.0)
+        .combined(rune::Transition::scale(0.42).allow_small_scale())
+        .combined(rune::Transition::opacity());
+    e.transition(bud.springs(rune::SpringPair::new(spring, CONTENT_OUT))).enter_delay(0.025)
 }
 
 /// Where a `morphFrom` element's source sits, in units of the element's size, for its content

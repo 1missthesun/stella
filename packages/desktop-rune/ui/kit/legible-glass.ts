@@ -17,29 +17,27 @@ export function solidEdge(t: Tokens) {
  * clip would cut it), so `shadows` lift the element. Under Reduce Transparency it is the veil's
  * colour, opaque, with a stronger edge.
  */
-export function legibleGlass(t: Tokens, shadows: Material["shadows"], veil = t.dark ? 0.9 : 0.92): Material {
-  const tint = t.dark ? mix(t.c.overlaySurface, 85, t.c.background) : t.c.background;
+export function legibleGlass(t: Tokens, shadows: Material["shadows"], veil = t.dark ? 0.74 : 0.76): Material {
+  const tint = t.dark ? mix(t.c.overlaySurface, 70, t.c.background) : t.c.background;
   if (t.material.solid) return { fill: tint, border: solidEdge(t), shadows };
   return {
     fx: {
       glass: {
-        bevel: 8,
-        depth: 14,
-        dispersion: 0.06,
+        bevel: 10,
+        depth: 16,
+        dispersion: 0.02,
         magnification: 1.02,
-        frost: 0.1,
-        frostSigma: 40,
-        saturation: t.dark ? 1.6 : 1.7,
+        frost: 0.18,
+        frostSigma: 32,
+        saturation: t.dark ? 1.25 : 1.55,
         perceptual: true,
-        rim: t.dark ? 0.2 : 0.04,
-        shadow: 0,
+        rim: t.dark ? 0.95 : 0.9,
+        shadow: t.dark ? 0.34 : 0.085,
         veil,
-        adapt: 0.25,
+        adapt: 0.2,
         tint,
       },
     },
-    border: t.dark ? t.c.border : alpha(t.c.border, 0.6),
-    shadows,
   };
 }
 
@@ -52,7 +50,7 @@ export const GLASS_ENTER = { scale: 0.96, dur: 0.18 } satisfies Effect;
 /** A modal dialog over its scrim: legible glass with a denser veil, since a whole page of text sits on it, lifted by the theme's largest shadow. */
 export function dialogGlass(t: Tokens) {
   return derive(t, "dialog-glass", (t) => {
-    const m = legibleGlass(t, t.shadow.xl, t.dark ? 0.95 : 0.96);
+    const m = legibleGlass(t, t.shadow.xl, t.dark ? 0.86 : 0.88);
     return { ...m, enter: { scale: 0.96, dur: 0.24 } satisfies Effect, exit: { scale: 0.97, dur: 0.12 } satisfies Effect };
   });
 }

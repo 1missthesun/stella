@@ -13,25 +13,43 @@ import { alpha, derive, mix, ModeScope, useTokens, type Gradient, type Tokens } 
  */
 export function chromeGlass(t: Tokens) {
   return derive(t, "chrome-glass", (t) => {
-    const base = { dispersion: 0.08, frost: 0.1, frostSigma: 26, perceptual: true, adapt: 0.25 };
-    const controlsTint = t.dark ? mix(t.c.overlaySurface, 12, t.c.background) : t.c.overlaySurface;
-    const composerTint = t.dark ? mix(t.c.overlaySurface, 70, t.c.background) : t.c.overlaySurface;
+    const base = { dispersion: 0.02, frost: 0.14, frostSigma: 24, perceptual: true, adapt: 0.22 };
+    const controlsTint = t.dark ? mix(t.c.overlaySurface, 54, t.c.background) : t.c.overlaySurface;
+    const composerTint = t.dark ? mix(t.c.overlaySurface, 88, t.c.background) : t.c.overlaySurface;
     const hairline = t.dark ? t.c.border : alpha(t.c.border, 0.6);
     if (t.material.solid) {
       const edge = solidEdge(t);
       const controls: Material = { fill: composerTint, border: edge };
-      return { controls, composer: { fill: composerTint, border: edge } as Material, hairline: edge, sheen: undefined };
+      return { controls, composer: { fill: composerTint, border: edge } as Material, clear: controls, hairline: edge, sheen: undefined };
     }
     const controls: Material = {
-      fx: { glass: { ...base, bevel: 7, depth: 14, magnification: 1.04, saturation: 1.3, rim: t.dark ? 0.3 : 0.08, shadow: t.dark ? 0.15 : 0.05, veil: 0.75, tint: controlsTint } },
+      fx: { glass: { ...base, bevel: 11, depth: 18, magnification: 1.03, saturation: t.dark ? 1.1 : 1.45, rim: t.dark ? 0.95 : 0.9, shadow: t.dark ? 0.16 : 0.048, veil: t.dark ? 0.46 : 0.58, tint: controlsTint } },
     };
     const composer: Material = {
-      fx: { glass: { ...base, bevel: 8, depth: 16, magnification: 1.03, saturation: t.dark ? 1.6 : 1.7, rim: t.dark ? 0.2 : 0.04, shadow: 0, veil: t.dark ? 0.8 : 0.82, tint: composerTint } },
-      border: hairline,
+      fx: { glass: { ...base, bevel: 11, depth: 18, magnification: 1.025, saturation: t.dark ? 1.12 : 1.5, rim: t.dark ? 0.92 : 0.85, shadow: t.dark ? 0.14 : 0.044, veil: t.dark ? 0.67 : 0.72, tint: composerTint } },
     };
-    /** The phone's dark glass buttons lighten toward the bottom (22 at the top, 33 at the bottom over black); light ones are flat. */
-    const sheen: Gradient | undefined = t.dark ? { angle: 180, stops: [[0, "rgba(255,255,255,0)"], [1, "rgba(255,255,255,0.045)"]] } : undefined;
-    return { controls, composer, hairline, sheen };
+    const clear: Material = {
+      fx: {
+        glass: {
+          bevel: 13,
+          depth: 18,
+          dispersion: 0.02,
+          magnification: 1.05,
+          frost: 0.14,
+          frostSigma: 22,
+          saturation: 1.12,
+          perceptual: true,
+          rim: t.dark ? 1.05 : 0.98,
+          shadow: t.dark ? 0.12 : 0.04,
+          veil: 0.095,
+          adapt: 0.1,
+          tint: "#ffffff",
+        },
+      },
+    };
+    /** Subtle top-to-bottom internal sheen handled primarily by the shader's meniscus/rim. */
+    const sheen: Gradient | undefined = t.dark ? { angle: 180, stops: [[0, "rgba(255,255,255,0)"], [1, "rgba(255,255,255,0.022)"]] } : undefined;
+    return { controls, composer, clear, hairline, sheen };
   });
 }
 
@@ -47,7 +65,7 @@ const COMPOSER_GROUP = "chat-composer";
 export function composerGroupGlass(t: Tokens, grows = false): FxLayer | undefined {
   const fx = chromeGlass(t).composer.fx as { glass: Glass } | undefined;
   if (!fx) return undefined;
-  return { glass: { ...fx.glass, group: COMPOSER_GROUP, ...(grows ? { morphFrom: COMPOSER_GLASS_ID } : {}) } };
+  return { glass: { ...fx.glass, group: COMPOSER_GROUP, spacing: 20, ...(grows ? { morphFrom: COMPOSER_GLASS_ID } : {}) } };
 }
 
 /** The faint top-to-bottom lightening inside a dark glass control; nothing in light or solid. Put it first among the control's children. */
@@ -59,9 +77,9 @@ export function GlassSheen({ radius }: { radius: number }) {
 
 const BackdropReport = createContext<((b: Backdrop) => void) | undefined>(undefined);
 
-/** Hysteresis on the backdrop's luminance: dark glass turns light over bright content, light glass turns dark over dark content. */
+/** Hysteresis on the backdrop's luminance: dark glass turns light over bright backdrops, light glass turns dark only over genuinely dark backdrops (preserving translucent light glass over vibrant blues/purples/corals). */
 function flips(dark: boolean, flipped: boolean, lum: number) {
-  return dark ? lum > (flipped ? 0.5 : 0.62) : lum < (flipped ? 0.5 : 0.38);
+  return dark ? lum > (flipped ? 0.58 : 0.70) : lum < (flipped ? 0.30 : 0.22);
 }
 
 /**

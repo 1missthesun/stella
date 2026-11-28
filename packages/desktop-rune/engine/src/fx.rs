@@ -26,7 +26,7 @@ const LIGHT: f32 = 2.0;
 const OCCLUDER: f32 = 3.0;
 
 /// How far a lens's shadow and rim may paint past its shape, in points.
-const GLASS_BLEED: f32 = 24.0;
+const GLASS_BLEED: f32 = 28.0;
 
 #[derive(Clone, Debug)]
 pub enum Effect {
@@ -44,22 +44,26 @@ pub struct MorphSpec {
     pub spring: Spring,
 }
 
-/// Opens in about 0.2 s, with no visible overshoot.
-const MORPH_SPRING: Spring = Spring::new(0.18, 0.06);
+/// Snappy yet visibly liquid Apple-style morph open spring (280 ms, gentle organic bounce).
+const MORPH_SPRING: Spring = Spring::new(0.28, 0.16);
 
-/// The spring a morph goes back on: quicker than it opened, and critically damped.
+/// The spring a morph goes back on: slightly quicker and softly damped into the trigger.
 fn close_spring(open: Spring) -> Spring {
-    Spring::new((open.duration * 0.7).max(0.01), 0.0)
+    Spring::new((open.duration * 0.78).max(0.01), (open.bounce * 0.25).clamp(0.0, 0.06))
 }
 
 /// How far through a morph its glass is drawn: none at the source's shape, so the source
-/// (glass, icon and label) shows as itself at both ends, and all of it from `MORPH_SHOWN`.
-const MORPH_HIDDEN: f32 = 0.04;
-const MORPH_SHOWN: f32 = 0.55;
+/// (glass, icon and label) shows as itself at both ends, and full by `MORPH_SHOWN`.
+const MORPH_HIDDEN: f32 = 0.03;
+const MORPH_SHOWN: f32 = 0.24;
+
+fn smoothstep(edge0: f32, edge1: f32, x: f32) -> f32 {
+    let t = ((x - edge0) / (edge1 - edge0)).clamp(0.0, 1.0);
+    t * t * (3.0 - 2.0 * t)
+}
 
 fn morph_alpha(at: f32) -> f32 {
-    let t = ((at - MORPH_HIDDEN) / (MORPH_SHOWN - MORPH_HIDDEN)).clamp(0.0, 1.0);
-    t * t * (3.0 - 2.0 * t)
+    smoothstep(MORPH_HIDDEN, MORPH_SHOWN, at)
 }
 
 #[derive(Clone, Debug)]
@@ -449,6 +453,17 @@ struct Gpu {
     clear: wgpu::TextureView,
 }
 
+/// Per-node smoothed center position from the previous frame, used for subtle Apple-style
+/// velocity-driven liquid inertia stretch on sliding glass controls (e.g. tab pills).
+struct SlideTrack {
+    cx: f32,
+    cy: f32,
+    t: f64,
+    stretch_x: f32,
+    stretch_y: f32,
+    seen: bool,
+}
+
 /// Every window's compositor. `window` is its `<window>` node; `None` is the main window.
 pub struct Comp {
     window: Option<u32>,
@@ -457,11 +472,13 @@ pub struct Comp {
     animating: bool,
     /// Glass growing out of (or going back into) its `morphFrom` source, by effect node.
     morphs: HashMap<u32, Morph>,
+    /// Sliding glass velocity tracker, by element key/node (for matched pill liquid inertia).
+    slides: HashMap<String, SlideTrack>,
 }
 
 impl Comp {
     pub fn new(window: Option<u32>) -> Comp {
-        Comp { window, engaged: Cell::new(false), gpu: None, animating: false, morphs: HashMap::new() }
+        Comp { window, engaged: Cell::new(false), gpu: None, animating: false, morphs: HashMap::new(), slides: HashMap::new() }
     }
 }
 
@@ -592,6 +609,19 @@ pub fn morphs(p: &Props) -> bool {
     morph_spring(p).is_some()
 }
 
+/// Whether `p`'s `morphFrom` glass belongs to the same glass group as its source (pinch-off
+/// droplet rather than anchored menu/popover).
+pub fn is_kin_morph(eng: &crate::engine::Engine, p: &Props) -> bool {
+    let Some(list) = &p.fx else { return false };
+    list.0.iter().any(|s| match &s.effect {
+        Effect::Glass { group: Some(g), morph: Some(m), .. } => {
+            let key = m.from.as_deref().or_else(|| p.anchor.as_ref().map(|a| a.to.as_str()));
+            key.and_then(|k| source_group(eng, k)).as_deref() == Some(g.as_str())
+        }
+        _ => false,
+    })
+}
+
 /// The spring a `morphFrom` glass grows on.
 pub fn morph_spring(p: &Props) -> Option<Spring> {
     p.fx.as_ref()?.0.iter().find_map(|s| match &s.effect {
@@ -628,6 +658,7 @@ impl Compositor<Win> for Comp {
         let mut watched: Vec<(usize, u32)> = Vec::new();
         let now = f.rt.t;
         let morphs = &mut self.morphs;
+        let slides = &mut self.slides;
         let mut closed: Vec<u32> = Vec::new();
         let mut moving = false;
         let mut grouped: Vec<(String, usize, Shape)> = Vec::new();
@@ -695,6 +726,7 @@ impl Compositor<Win> for Comp {
                                                 m.from = from;
                                             }
                                             let at = if settled { m.target } else { m.at(now).0 };
+                                            let at_c = at.clamp(0.0, 1.0);
                                             let kin = group.is_some() && source_group(eng, &m.key) == *group;
                                             // Out of a member of its own glass group it comes out of that glass (the
                                             // union pinches it off), so there's nothing to fade.
@@ -703,9 +735,60 @@ impl Compositor<Win> for Comp {
                                             }
                                             moving |= !settled;
                                             let from = if kin { tucked(m.from, shape) } else { m.from };
-                                            shape = mix_shape(from, shape, at);
-                                            lens = mix_lens(&m.from_lens.unwrap_or(lens), &lens, at.clamp(0.0, 1.0));
+                                            let morphed = mix_shape(from, shape, at);
+                                            lens = mix_lens(&m.from_lens.unwrap_or(lens), &lens, at_c);
+                                            // Living "liquid energy" mid-morph: slightly clearer veil, brighter
+                                            // specular rim, richer edge curvature while flowing, settling cleanly at rest.
+                                            if !settled {
+                                                let energy = (4.0 * at_c * (1.0 - at_c)).clamp(0.0, 1.0);
+                                                lens.veil *= 1.0 - 0.22 * energy;
+                                                lens.rim *= 1.0 + 0.28 * energy;
+                                                lens.depth *= 1.0 + 0.22 * energy;
+                                            }
+                                            // When an anchored glass menu/popover morphs out of a glass trigger,
+                                            // smoothly bridge it to its trigger via smooth-min union in the early
+                                            // expansion (and late retraction) before cleanly pinching free.
+                                            if !kin && !settled && m.from_lens.is_some() && at_c < 0.62 {
+                                                let bridge_t = smoothstep(0.04, 0.62, at_c);
+                                                shape = m.from;
+                                                lens.second = Some(morphed);
+                                                lens.union_k = 20.0 * (1.0 - bridge_t * 0.75);
+                                                lens.morph = bridge_t;
+                                            } else {
+                                                shape = morphed;
+                                            }
                                         }
+                                    }
+                                } else if !reduced && let Some(mid) = p.matched.as_deref() {
+                                    // Sliding shared-element glass pill (e.g. tab bar): subtle Apple
+                                    // liquid inertia stretch along velocity + momentary glass clarity lift.
+                                    let cx = shape.rect.x + shape.rect.w * 0.5;
+                                    let cy = shape.rect.y + shape.rect.h * 0.5;
+                                    let tr = slides.entry(mid.to_owned()).or_insert(SlideTrack { cx, cy, t: now, stretch_x: 0.0, stretch_y: 0.0, seen: false });
+                                    let dt = (now - tr.t).clamp(1e-4, 0.1) as f32;
+                                    let vx = (cx - tr.cx) / dt;
+                                    let vy = (cy - tr.cy) / dt;
+                                    let target_sx = (vx.abs() * 0.008).min(5.5);
+                                    let target_sy = (vy.abs() * 0.008).min(5.5);
+                                    let blend = (1.0 - (-dt * 28.0).exp()).clamp(0.0, 1.0);
+                                    tr.stretch_x += (target_sx - tr.stretch_x) * blend;
+                                    tr.stretch_y += (target_sy - tr.stretch_y) * blend;
+                                    tr.cx = cx;
+                                    tr.cy = cy;
+                                    tr.t = now;
+                                    tr.seen = true;
+                                    let speed_k = ((tr.stretch_x + tr.stretch_y) / 5.5).clamp(0.0, 1.0);
+                                    if speed_k > 0.01 {
+                                        let dx = tr.stretch_x - tr.stretch_y * 0.25;
+                                        let dy = tr.stretch_y - tr.stretch_x * 0.25;
+                                        shape.rect.x -= dx;
+                                        shape.rect.w = (shape.rect.w + dx * 2.0).max(4.0);
+                                        shape.rect.y -= dy;
+                                        shape.rect.h = (shape.rect.h + dy * 2.0).max(4.0);
+                                        lens.veil *= 1.0 - 0.35 * speed_k;
+                                        lens.rim *= 1.0 + 0.35 * speed_k;
+                                        lens.magnification += 0.05 * speed_k;
+                                        moving = true;
                                     }
                                 }
                                 if let Some(g) = group {
@@ -761,6 +844,7 @@ impl Compositor<Win> for Comp {
             }
         });
         morphs.retain(|_, m| std::mem::take(&mut m.seen));
+        slides.retain(|_, s| std::mem::take(&mut s.seen));
         WHOLE.with(|w| w.borrow_mut().retain(|n, _| morphs.contains_key(n)));
         if !closed.is_empty() {
             CLOSED.with(|c| c.borrow_mut().extend(closed));

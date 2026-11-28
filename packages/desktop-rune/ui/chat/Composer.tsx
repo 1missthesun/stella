@@ -315,7 +315,6 @@ function ComposerImpl({
         minH={MIN_COMPOSER_SHELL_HEIGHT}
         pad={1}
         radius={radius}
-        clip={radius}
         fx={sidebar ? chromeGlass(tokens).composer.fx : composerGroupGlass(tokens)}
         fill={chromeGlass(tokens).composer.fill}
         onBackdrop={glassBackdrop}

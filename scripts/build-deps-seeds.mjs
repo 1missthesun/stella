@@ -279,6 +279,9 @@ export const buildDepsSeeds = async ({
   let manifest = upload ? await published(`${base}/deps-seed.json`) : null;
   if (manifest?.lock === lock && manifest.bun === Bun.version) {
     log(`seed for ${lock.slice(0, 12)} is already published`);
+    // Shard urls are relative: the tree reads them from this publish's host,
+    // not the one the stored manifest was first written for.
+    manifest = { ...manifest, baseUrl: base };
   } else {
     const outDir = path.join(out, lock);
     fs.mkdirSync(outDir, { recursive: true });

@@ -79,7 +79,7 @@ pub fn view(s: &Win, cx: &mut Cx<Win>) -> El {
             inner.h = None;
             inner.id = None;
             root = crate::style::paint(root, &inner);
-            root = crate::view::children(s, eng, n, root);
+            root = crate::view::children(s, eng, node, n, root);
             for l in eng.tree.lifted_in(node) {
                 #[cfg(feature = "webview")]
                 let mut layer = if !eng.tree.web_above.is_empty() && !crate::webview::is_overlay(eng, l) { crate::view::build_over(s, eng, l) } else { build(s, eng, l) };
@@ -768,12 +768,14 @@ pub fn poll(s: &mut Win, _now: f64, tx: &mut Tx) -> bool {
     crate::webview::tick();
     drain(s.node);
     let closed = crate::fx::take_closed();
+    let trigger_sync = crate::fx::take_trigger_sync();
     if engine::with(|e| {
         let held = !e.tree.closing.is_empty();
         if held {
             e.tree.finish_closing(&closed);
         }
-        held
+        let triggers_changed = trigger_sync.as_ref().is_some_and(|want| e.tree.sync_morph_triggers(want));
+        held || triggers_changed
     }) {
         wake_dirty(s.node);
     }

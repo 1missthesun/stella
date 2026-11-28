@@ -23,10 +23,10 @@ export function chromeGlass(t: Tokens) {
       return { controls, composer: { fill: composerTint, border: edge } as Material, clear: controls, hairline: edge, sheen: undefined };
     }
     const controls: Material = {
-      fx: { glass: { ...base, bevel: 11, depth: 18, magnification: 1.03, saturation: t.dark ? 1.1 : 1.45, rim: t.dark ? 0.95 : 0.9, shadow: t.dark ? 0.16 : 0.048, veil: t.dark ? 0.46 : 0.58, tint: controlsTint } },
+      fx: { glass: { ...base, bevel: 11, depth: 18, magnification: 1.03, saturation: t.dark ? 1.1 : 1.45, rim: t.dark ? 0.95 : 0.9, shadow: t.dark ? 0.16 : 0.048, veil: t.dark ? 0.46 : 0.58, tint: controlsTint, interactive: true } },
     };
     const composer: Material = {
-      fx: { glass: { ...base, bevel: 11, depth: 18, magnification: 1.025, saturation: t.dark ? 1.12 : 1.5, rim: t.dark ? 0.92 : 0.85, shadow: t.dark ? 0.14 : 0.044, veil: t.dark ? 0.67 : 0.72, tint: composerTint } },
+      fx: { glass: { ...base, bevel: 11, depth: 18, magnification: 1.025, saturation: t.dark ? 1.12 : 1.5, rim: t.dark ? 0.92 : 0.85, shadow: t.dark ? 0.14 : 0.044, veil: t.dark ? 0.67 : 0.72, tint: composerTint, interactive: false } },
     };
     const clear: Material = {
       fx: {
@@ -44,6 +44,7 @@ export function chromeGlass(t: Tokens) {
           veil: 0.095,
           adapt: 0.1,
           tint: "#ffffff",
+          interactive: true,
         },
       },
     };

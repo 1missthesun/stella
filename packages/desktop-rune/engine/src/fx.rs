@@ -8,7 +8,7 @@
 //! swap, a `ref.set`) reaches the GPU with no engine rebuild.
 
 use std::cell::Cell;
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use rune::{El, Spring};
 use rune::compose::{Compositor, DeviceKey, Frame};
@@ -32,7 +32,15 @@ const GLASS_BLEED: f32 = 28.0;
 pub enum Effect {
     /// A Liquid Glass lens over what is painted behind the element; `merge` is a second shape
     /// `[x, y, w, h, radius]` in the element's points that the glass flows into.
-    Glass { lens: LensParams, merge: Option<[f32; 5]>, group: Option<String>, morph: Option<MorphSpec> },
+    Glass {
+        lens: LensParams,
+        merge: Option<[f32; 5]>,
+        group: Option<String>,
+        morph: Option<MorphSpec>,
+        /// Interactive pointer-press jelly ripple (Apple `.interactive()`). `None`: enabled
+        /// automatically when the element listens to `press` or `drag`.
+        interactive: Option<bool>,
+    },
     Fill(rune_fx::FillParams),
 }
 
@@ -42,6 +50,10 @@ pub enum Effect {
 pub struct MorphSpec {
     pub from: Option<String>,
     pub spring: Spring,
+    /// Unified single-view morph (`glassEffectID`-style): absorb the trigger's own glass and
+    /// crossfade its content instead of leaving it parked underneath. `None`: automatic when the
+    /// trigger is a standalone glass element not in the same glass group.
+    pub unified: Option<bool>,
 }
 
 /// Snappy yet visibly liquid Apple-style morph open spring (280 ms, gentle organic bounce).
@@ -161,9 +173,10 @@ fn glass(v: &J) -> Result<Effect, String> {
     let mut merge = None;
     let mut group = None;
     let mut morph: Option<MorphSpec> = None;
+    let mut interactive: Option<bool> = None;
     let Some(o) = v.as_object() else {
         return match v {
-            J::Bool(true) => Ok(Effect::Glass { lens, merge, group, morph }),
+            J::Bool(true) => Ok(Effect::Glass { lens, merge, group, morph, interactive }),
             _ => Err("`glass` is true or an object".into()),
         };
     };
@@ -185,6 +198,7 @@ fn glass(v: &J) -> Result<Effect, String> {
             ("adapt", Some(x)) => lens.adapt = x,
             ("saturation", Some(x)) => lens.saturation = x,
             ("perceptual", _) => lens.perceptual = val.as_bool().ok_or("glass `perceptual` is true or false")?,
+            ("interactive", _) => interactive = Some(val.as_bool().ok_or("glass `interactive` is true or false")?),
             ("unionK" | "spacing", Some(x)) => lens.union_k = x,
             ("group", _) => group = Some(val.as_str().ok_or("glass `group` is a string")?.to_owned()),
             ("morphFrom", _) => {
@@ -193,12 +207,28 @@ fn glass(v: &J) -> Result<Effect, String> {
                     J::Bool(true) => None,
                     _ => return Err("glass `morphFrom` is an element id or true (the anchor)".into()),
                 };
-                morph = Some(MorphSpec { from, spring: morph.map_or(MORPH_SPRING, |m| m.spring) });
+                morph = Some(MorphSpec {
+                    from,
+                    spring: morph.as_ref().map_or(MORPH_SPRING, |m| m.spring),
+                    unified: morph.as_ref().and_then(|m| m.unified),
+                });
             }
             ("morphMotion", _) => {
                 let m = val.as_object().ok_or("glass `morphMotion` is {dur, bounce}")?;
                 let spring = crate::style::spring(num(m, "dur").unwrap_or(MORPH_SPRING.duration), num(m, "bounce").unwrap_or(MORPH_SPRING.bounce));
-                morph = Some(MorphSpec { spring, from: morph.and_then(|m| m.from) });
+                morph = Some(MorphSpec {
+                    spring,
+                    from: morph.as_ref().and_then(|m| m.from.clone()),
+                    unified: morph.as_ref().and_then(|m| m.unified),
+                });
+            }
+            ("morphUnified", _) => {
+                let u = val.as_bool().ok_or("glass `morphUnified` is true or false")?;
+                morph = Some(MorphSpec {
+                    unified: Some(u),
+                    spring: morph.as_ref().map_or(MORPH_SPRING, |m| m.spring),
+                    from: morph.as_ref().and_then(|m| m.from.clone()),
+                });
             }
             ("morph", Some(x)) => lens.morph = x,
             ("tint", _) => lens.tint = rgb(val).ok_or("glass `tint` is a colour")?,
@@ -211,9 +241,9 @@ fn glass(v: &J) -> Result<Effect, String> {
         }
     }
     if morph.is_some() && !o.contains_key("morphFrom") {
-        return Err("glass `morphMotion` needs `morphFrom`".into());
+        return Err("glass `morphMotion` / `morphUnified` needs `morphFrom`".into());
     }
-    Ok(Effect::Glass { lens, merge, group, morph })
+    Ok(Effect::Glass { lens, merge, group, morph, interactive })
 }
 
 const RESERVED: &[&str] = &["fill", "preset", "place", "inset", "opacity", "seed", "blend"];
@@ -464,6 +494,86 @@ struct SlideTrack {
     seen: bool,
 }
 
+/// Per-node pointer-press spring state for Apple `.interactive()` tactile specular jelly ripple.
+struct PressState {
+    x: f32,
+    y: f32,
+    start_t: f64,
+    e_x0: f32,
+    e_v0: f32,
+    e_target: f32,
+    e_t0: f64,
+    e_spring: Spring,
+    s_x0: f32,
+    s_v0: f32,
+    s_target: f32,
+    s_t0: f64,
+    s_spring: Spring,
+    seen: bool,
+}
+
+const PRESS_ENERGY_IN: Spring = Spring::new(0.14, 0.0);
+const PRESS_ENERGY_OUT: Spring = Spring::new(0.20, 0.0);
+const PRESS_SWELL_IN: Spring = Spring::new(0.22, 0.28);
+const PRESS_SWELL_OUT: Spring = Spring::new(0.30, 0.34);
+
+impl PressState {
+    fn new(x: f32, y: f32, now: f64) -> Self {
+        PressState {
+            x,
+            y,
+            start_t: now,
+            e_x0: 0.0,
+            e_v0: 0.0,
+            e_target: 1.0,
+            e_t0: now,
+            e_spring: PRESS_ENERGY_IN,
+            s_x0: 0.0,
+            s_v0: 0.0,
+            s_target: 1.0,
+            s_t0: now,
+            s_spring: PRESS_SWELL_IN,
+            seen: true,
+        }
+    }
+
+    fn energy(&self, now: f64) -> (f32, f32) {
+        self.e_spring.sample(self.e_x0, self.e_v0, self.e_target, (now - self.e_t0).max(0.0) as f32)
+    }
+
+    fn swell(&self, now: f64) -> (f32, f32) {
+        self.s_spring.sample(self.s_x0, self.s_v0, self.s_target, (now - self.s_t0).max(0.0) as f32)
+    }
+
+    fn go_energy(&mut self, target: f32, now: f64) {
+        if (self.e_target - target).abs() < 1e-4 {
+            return;
+        }
+        let (x, v) = self.energy(now);
+        (self.e_x0, self.e_v0, self.e_target, self.e_t0) = (x, v, target, now);
+        self.e_spring = if target > x { PRESS_ENERGY_IN } else { PRESS_ENERGY_OUT };
+    }
+
+    fn go_swell(&mut self, target: f32, now: f64) {
+        if (self.s_target - target).abs() < 1e-4 {
+            return;
+        }
+        let (x, v) = self.swell(now);
+        (self.s_x0, self.s_v0, self.s_target, self.s_t0) = (x, v, target, now);
+        self.s_spring = if target > x { PRESS_SWELL_IN } else { PRESS_SWELL_OUT };
+    }
+
+    fn settled(&self, now: f64) -> bool {
+        let e_done = (now - self.e_t0) as f32 >= self.e_spring.settling_duration_from(self.e_x0, self.e_v0, self.e_target, 1e-3);
+        let s_done = (now - self.s_t0) as f32 >= self.s_spring.settling_duration_from(self.s_x0, self.s_v0, self.s_target, 1e-3);
+        e_done && s_done
+    }
+
+    fn idle(&self, now: f64) -> bool {
+        self.e_target == 0.0 && self.s_target == 0.0 && self.settled(now)
+    }
+}
+
 /// Every window's compositor. `window` is its `<window>` node; `None` is the main window.
 pub struct Comp {
     window: Option<u32>,
@@ -474,11 +584,30 @@ pub struct Comp {
     morphs: HashMap<u32, Morph>,
     /// Sliding glass velocity tracker, by element key/node (for matched pill liquid inertia).
     slides: HashMap<String, SlideTrack>,
+    /// Interactive pointer-press jelly ripple states, by effect node.
+    presses: HashMap<u32, PressState>,
+    /// Currently pressed interactive glass node (captured on pointer-down rising edge).
+    active_press: Option<u32>,
+    /// Previous frame's primary-button-down state (for rising-edge detection).
+    was_down: bool,
+    /// Last set of unified trigger nodes whose content was requested hidden.
+    last_hidden_triggers: HashSet<u32>,
 }
 
 impl Comp {
     pub fn new(window: Option<u32>) -> Comp {
-        Comp { window, engaged: Cell::new(false), gpu: None, animating: false, morphs: HashMap::new(), slides: HashMap::new() }
+        Comp {
+            window,
+            engaged: Cell::new(false),
+            gpu: None,
+            animating: false,
+            morphs: HashMap::new(),
+            slides: HashMap::new(),
+            presses: HashMap::new(),
+            active_press: None,
+            was_down: false,
+            last_hidden_triggers: HashSet::new(),
+        }
     }
 }
 
@@ -487,6 +616,13 @@ thread_local! {
     static CLOSED: std::cell::RefCell<Vec<u32>> = const { std::cell::RefCell::new(Vec::new()) };
     /// Each `morphFrom` element's size as last shown whole, which it keeps while it closes.
     static WHOLE: std::cell::RefCell<HashMap<u32, [f32; 2]>> = std::cell::RefCell::new(HashMap::new());
+    /// Latest set of unified morph trigger nodes whose children should stay hidden (crossfaded out).
+    static TRIGGER_SYNC: std::cell::RefCell<Option<HashSet<u32>>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Latest unified morph trigger content-hide set reported by `fx::Comp` (for `windows::poll`).
+pub fn take_trigger_sync() -> Option<HashSet<u32>> {
+    TRIGGER_SYNC.with(|t| t.borrow_mut().take())
 }
 
 /// The size `node` (a `morphFrom` element) was last shown at, while open.
@@ -509,6 +645,11 @@ struct Morph {
     to: Shape,
     from_lens: Option<LensParams>,
     key: String,
+    /// Trigger node id resolved from `key`, when `unified` is true.
+    trigger_node: Option<u32>,
+    /// Unified single-view morph (`glassEffectID`-style): one continuous glass shape absorbs
+    /// the trigger's own glass and crossfades its content.
+    unified: bool,
     spring: Spring,
     open: Spring,
     x0: f32,
@@ -532,14 +673,53 @@ impl Morph {
         self.spring = if target == 0.0 { close_spring(self.open) } else { self.open };
     }
 
-    /// Whether it's done: a closing one once its glass is no longer drawn.
+    /// Whether it's done: a closing unified morph lands cleanly on its trigger's exact shape
+    /// before handing back; a non-unified one finishes once its glass fades out.
     fn done(&self, now: f64) -> bool {
-        self.settled(now) || (self.target == 0.0 && self.at(now).0 <= MORPH_HIDDEN)
+        let stop = if self.unified { 0.04 } else { MORPH_HIDDEN };
+        self.settled(now) || (self.target == 0.0 && self.at(now).0 <= stop)
     }
 
     fn settled(&self, now: f64) -> bool {
         (now - self.t0) as f32 >= self.spring.settling_duration_from(self.x0, self.v0, self.target, 1e-3)
     }
+}
+
+/// Resolves the trigger node absorbed by `node` when `node` is a unified single-view `morphFrom`
+/// element (`glassEffectID`-style: standalone glass trigger not in the same glass group, or
+/// explicit `morphUnified: true`).
+pub fn unified_trigger(tree: &crate::tree::Tree, node: u32) -> Option<u32> {
+    let p = &tree.get(node)?.props;
+    let list = p.fx.as_ref()?;
+    for s in &list.0 {
+        if let Effect::Glass { group, morph: Some(ms), .. } = &s.effect {
+            let key = ms.from.as_deref().or_else(|| p.anchor.as_ref().map(|a| a.to.as_str()))?;
+            let t_id = tree.find_key(key)?;
+            if t_id == node {
+                continue;
+            }
+            let tp = &tree.get(t_id)?.props;
+            let t_glass = tp.fx.as_ref().and_then(|l| {
+                l.0.iter().find_map(|ts| match &ts.effect {
+                    Effect::Glass { group: tg, .. } => Some(tg.as_deref()),
+                    Effect::Fill(_) => None,
+                })
+            });
+            let kin = group.is_some() && t_glass.flatten() == group.as_deref();
+            if kin {
+                continue;
+            }
+            let unified = ms.unified.unwrap_or(t_glass.is_some());
+            if unified {
+                return Some(t_id);
+            }
+        }
+    }
+    None
+}
+
+fn is_interactive_glass(interactive: Option<bool>, p: &Props) -> bool {
+    interactive.unwrap_or_else(|| p.on.iter().any(|h| h == "press" || h == "drag"))
 }
 
 /// Where the element keyed `key` was drawn last frame, with its corner radius, and its glass.
@@ -657,12 +837,64 @@ impl Compositor<Win> for Comp {
         let mut occluders: Vec<(u32, Prim)> = Vec::new();
         let mut watched: Vec<(usize, u32)> = Vec::new();
         let now = f.rt.t;
+        let ptr = f.rt.pointer();
+        let is_down = f.rt.pressing() || f.rt.primary_down();
+        let just_pressed = is_down && !self.was_down;
+        if !is_down {
+            self.active_press = None;
+        }
         let morphs = &mut self.morphs;
         let slides = &mut self.slides;
+        let presses = &mut self.presses;
+        let active_press = &mut self.active_press;
         let mut closed: Vec<u32> = Vec::new();
         let mut moving = false;
         let mut grouped: Vec<(String, usize, Shape)> = Vec::new();
+        let mut glass_layer_nodes: Vec<(usize, u32)> = Vec::new();
+        let mut absorbed_glass_nodes: HashSet<u32> = HashSet::new();
+        let mut want_hidden_triggers: HashSet<u32> = HashSet::new();
         crate::engine::read(|eng| {
+            // Rising-edge hit-test for interactive `.interactive()` glass controls (topmost wins).
+            if just_pressed
+                && let Some((px, py)) = ptr
+            {
+                let mut hit: Option<u32> = None;
+                for i in &f.rt.instances {
+                    if i.params[1] != KIND_EFFECT || i.uv[1] != LAYER {
+                        continue;
+                    }
+                    let node = effect_mark(i);
+                    let Some(p) = eng.tree.get(node).map(|n| &*n.props) else { continue };
+                    let Some(s) = p.fx.as_ref().and_then(|l| l.0.get(i.uv[0] as usize)) else { continue };
+                    if let Effect::Glass { interactive, .. } = &s.effect
+                        && is_interactive_glass(*interactive, p)
+                        && !eng.tree.closing.contains_key(&node)
+                        && !eng.tree.morph_absorbed.contains(&node)
+                    {
+                        let k = i.params[3].max(1e-3);
+                        let [x, y, w, h] = i.rect.map(|v| v / k);
+                        if px >= x && px <= x + w && py >= y && py <= y + h {
+                            hit = Some(node);
+                        }
+                    }
+                }
+                *active_press = hit;
+                if let Some(node) = hit {
+                    match presses.get_mut(&node) {
+                        Some(ps) => {
+                            ps.x = px;
+                            ps.y = py;
+                            ps.start_t = now;
+                            ps.go_energy(1.0, now);
+                            ps.go_swell(1.0, now);
+                            ps.seen = true;
+                        }
+                        None => {
+                            presses.insert(node, PressState::new(px, py, now));
+                        }
+                    }
+                }
+            }
             for (n, i) in f.rt.instances.iter().enumerate() {
                 if i.params[1] != KIND_EFFECT {
                     continue;
@@ -678,8 +910,10 @@ impl Compositor<Win> for Comp {
                         let watch = matches!(s.effect, Effect::Glass { .. }) && p.on.iter().any(|h| h == "backdrop") && !watched.iter().any(|w| w.1 == node);
                         let mut shape = Shape::rounded(x, y, w, h, r);
                         let mut alpha = 1.0;
+                        let mut is_glass = false;
                         let fx = match &s.effect {
-                            Effect::Glass { lens, merge, group, morph } => {
+                            Effect::Glass { lens, merge, group, morph, interactive } => {
+                                is_glass = true;
                                 let mut lens = *lens;
                                 lens.second = merge.map(|[mx, my, mw, mh, mr]| Shape::rounded(x - s.inset + mx, y - s.inset + my, mw, mh, mr));
                                 let closing = eng.tree.closing.contains_key(&node);
@@ -696,8 +930,25 @@ impl Compositor<Win> for Comp {
                                                 (x0, v0) = old.1.at(now);
                                                 closed.push(old.0);
                                             }
+                                            let kin = group.is_some() && source_group(eng, &key) == *group;
+                                            let trigger_node = eng.tree.find_key(&key).filter(|&t_id| t_id != node);
+                                            let unified = !kin && trigger_node.is_some() && ms.unified.unwrap_or(from_lens.is_some());
                                             WHOLE.with(|w| w.borrow_mut().insert(node, [shape.rect.w, shape.rect.h]));
-                                            morphs.entry(node).or_insert(Morph { from, to: shape, from_lens, key, spring: ms.spring, open: ms.spring, x0, v0, target: 1.0, t0: now, seen: false })
+                                            morphs.entry(node).or_insert(Morph {
+                                                from,
+                                                to: shape,
+                                                from_lens,
+                                                key,
+                                                trigger_node,
+                                                unified,
+                                                spring: ms.spring,
+                                                open: ms.spring,
+                                                x0,
+                                                v0,
+                                                target: 1.0,
+                                                t0: now,
+                                                seen: false,
+                                            })
                                         }),
                                         _ => None,
                                     };
@@ -728,27 +979,41 @@ impl Compositor<Win> for Comp {
                                             let at = if settled { m.target } else { m.at(now).0 };
                                             let at_c = at.clamp(0.0, 1.0);
                                             let kin = group.is_some() && source_group(eng, &m.key) == *group;
-                                            // Out of a member of its own glass group it comes out of that glass (the
-                                            // union pinches it off), so there's nothing to fade.
-                                            if !kin {
+                                            // Unified single-view morph (`glassEffectID`-style): one
+                                            // continuous glass surface from at = 0 through rest and
+                                            // close; absorb the trigger's own glass and crossfade its
+                                            // content cleanly.
+                                            if m.unified {
+                                                alpha = 1.0;
+                                                if let Some(t_id) = m.trigger_node {
+                                                    absorbed_glass_nodes.insert(t_id);
+                                                    if !closing || at_c > 0.08 {
+                                                        want_hidden_triggers.insert(t_id);
+                                                    }
+                                                }
+                                            } else if !kin {
                                                 alpha = morph_alpha(at);
                                             }
                                             moving |= !settled;
                                             let from = if kin { tucked(m.from, shape) } else { m.from };
-                                            let morphed = mix_shape(from, shape, at);
+                                            let mut morphed = mix_shape(from, shape, at);
                                             lens = mix_lens(&m.from_lens.unwrap_or(lens), &lens, at_c);
                                             // Living "liquid energy" mid-morph: slightly clearer veil, brighter
-                                            // specular rim, richer edge curvature while flowing, settling cleanly at rest.
+                                            // specular rim, richer edge curvature and organic oval rounding while flowing.
                                             if !settled {
                                                 let energy = (4.0 * at_c * (1.0 - at_c)).clamp(0.0, 1.0);
                                                 lens.veil *= 1.0 - 0.22 * energy;
                                                 lens.rim *= 1.0 + 0.28 * energy;
                                                 lens.depth *= 1.0 + 0.22 * energy;
+                                                if m.unified {
+                                                    let max_r = morphed.rect.w.min(morphed.rect.h) * 0.5;
+                                                    morphed.radius = (morphed.radius + (max_r - morphed.radius) * 0.48 * energy).clamp(0.0, max_r);
+                                                }
                                             }
-                                            // When an anchored glass menu/popover morphs out of a glass trigger,
-                                            // smoothly bridge it to its trigger via smooth-min union in the early
-                                            // expansion (and late retraction) before cleanly pinching free.
-                                            if !kin && !settled && m.from_lens.is_some() && at_c < 0.62 {
+                                            // Unified morphs transform one continuous shape directly
+                                            // from trigger -> menu and back; bar-embedded (non-unified)
+                                            // triggers smoothly bridge out of their anchor.
+                                            if !kin && !m.unified && !settled && m.from_lens.is_some() && at_c < 0.62 {
                                                 let bridge_t = smoothstep(0.04, 0.62, at_c);
                                                 shape = m.from;
                                                 lens.second = Some(morphed);
@@ -791,6 +1056,53 @@ impl Compositor<Win> for Comp {
                                         moving = true;
                                     }
                                 }
+                                // Interactive pointer-press jelly ripple (Apple `.interactive()`).
+                                if is_interactive_glass(*interactive, p) && !closing
+                                    && let Some(ps) = presses.get_mut(&node)
+                                {
+                                    ps.seen = true;
+                                    let held = is_down && *active_press == Some(node);
+                                    if held {
+                                        if let Some((px, py)) = ptr {
+                                            let r = shape.rect;
+                                            let clamped_x = px.clamp(r.x - 16.0, r.x + r.w + 16.0);
+                                            let clamped_y = py.clamp(r.y - 16.0, r.y + r.h + 16.0);
+                                            ps.x += (clamped_x - ps.x) * 0.45;
+                                            ps.y += (clamped_y - ps.y) * 0.45;
+                                            let near = px >= r.x - 28.0 && px <= r.x + r.w + 28.0 && py >= r.y - 28.0 && py <= r.y + r.h + 28.0;
+                                            ps.go_energy(if near { 1.0 } else { 0.35 }, now);
+                                            ps.go_swell(if near { 1.0 } else { 0.25 }, now);
+                                        }
+                                    } else {
+                                        ps.go_energy(0.0, now);
+                                        ps.go_swell(0.0, now);
+                                    }
+                                    let (energy, _) = ps.energy(now);
+                                    let (swell, _) = ps.swell(now);
+                                    let energy_c = energy.clamp(0.0, 1.35);
+                                    let active = !ps.idle(now);
+                                    if active {
+                                        moving = true;
+                                    }
+                                    if !reduced && swell.abs() > 0.002 {
+                                        let sx = (shape.rect.w * 0.048).clamp(2.2, 5.2) * swell;
+                                        let sy = (shape.rect.h * 0.056).clamp(1.6, 4.6) * swell;
+                                        let cx = shape.rect.x + shape.rect.w * 0.5;
+                                        let cy = shape.rect.y + shape.rect.h * 0.5;
+                                        let lean_x = ((ps.x - cx) / (shape.rect.w * 0.5).max(1.0)).clamp(-1.0, 1.0) * 1.4 * swell;
+                                        let lean_y = ((ps.y - cy) / (shape.rect.h * 0.5).max(1.0)).clamp(-1.0, 1.0) * 1.0 * swell;
+                                        shape.rect.x -= sx - lean_x;
+                                        shape.rect.y -= sy - lean_y;
+                                        shape.rect.w = (shape.rect.w + sx * 2.0).max(4.0);
+                                        shape.rect.h = (shape.rect.h + sy * 2.0).max(4.0);
+                                        shape.radius = (shape.radius + sx.min(sy)).clamp(0.0, shape.rect.w.min(shape.rect.h) * 0.5);
+                                    }
+                                    if energy_c > 0.002 {
+                                        lens.magnification += 0.03 * energy_c;
+                                        lens.depth *= 1.0 + 0.16 * energy_c;
+                                        lens.press = [ps.x, ps.y, energy_c, (now - ps.start_t).max(0.0) as f32];
+                                    }
+                                }
                                 if let Some(g) = group {
                                     grouped.push((g.clone(), layers.len(), shape));
                                 }
@@ -800,6 +1112,9 @@ impl Compositor<Win> for Comp {
                         };
                         let mut l = fx.on(shape).at(t).seed(s.seed).reduced(reduced).opacity(s.opacity * alpha);
                         l.place = rune_fx::Place::Over;
+                        if is_glass {
+                            glass_layer_nodes.push((layers.len(), node));
+                        }
                         if watch {
                             watched.push((layers.len(), node));
                         }
@@ -843,11 +1158,26 @@ impl Compositor<Win> for Comp {
                 crate::backdrop::forget(|n| eng.tree.get(n).is_some());
             }
         });
+        self.was_down = is_down;
         morphs.retain(|_, m| std::mem::take(&mut m.seen));
         slides.retain(|_, s| std::mem::take(&mut s.seen));
+        presses.retain(|_, p| std::mem::take(&mut p.seen) && !p.idle(now));
         WHOLE.with(|w| w.borrow_mut().retain(|n, _| morphs.contains_key(n)));
         if !closed.is_empty() {
             CLOSED.with(|c| c.borrow_mut().extend(closed));
+            moving = true;
+        }
+        // Hide absorbed triggers' own glass layers so unified morphs draw one continuous surface.
+        if !absorbed_glass_nodes.is_empty() {
+            for &(layer_idx, node) in &glass_layer_nodes {
+                if absorbed_glass_nodes.contains(&node) {
+                    layers[layer_idx].opacity = 0.0;
+                }
+            }
+        }
+        if want_hidden_triggers != self.last_hidden_triggers {
+            self.last_hidden_triggers = want_hidden_triggers.clone();
+            TRIGGER_SYNC.with(|sync| *sync.borrow_mut() = Some(want_hidden_triggers));
             moving = true;
         }
         // A glass group draws as one surface at its first member: the others' shapes join its union.

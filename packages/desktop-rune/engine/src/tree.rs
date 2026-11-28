@@ -41,6 +41,11 @@ pub struct Tree {
     /// Removed `morphFrom` glass elements kept (childless, inert) while their glass morphs back
     /// into its source, since when; `fx::Comp` reports when to let them go.
     pub closing: HashMap<u32, std::time::Instant>,
+    /// Standalone glass triggers currently absorbed by a unified `morphFrom` menu/popover:
+    /// their own glass is hidden by `fx::Comp` and their children fade/scale out in `view`.
+    pub morph_absorbed: HashSet<u32>,
+    /// Recently released unified triggers whose children are springing back in (`opacity 0 -> 1`).
+    pub morph_releasing: HashMap<u32, std::time::Instant>,
     live_moved: bool,
 }
 
@@ -107,6 +112,24 @@ impl Tree {
     pub fn settle(&mut self) {
         if !std::mem::take(&mut self.live_moved) {
             return;
+        }
+        // Immediately absorb standalone glass triggers of any newly mounted unified `morphFrom`
+        // menus on the very same commit so frame 0 starts crossfading with zero delay.
+        let mut newly_absorbed: Vec<u32> = Vec::new();
+        for &id in &self.fx {
+            if self.closing.contains_key(&id) || self.window_of(id).is_none() {
+                continue;
+            }
+            if let Some(trigger) = crate::fx::unified_trigger(self, id)
+                && !self.morph_absorbed.contains(&trigger)
+            {
+                newly_absorbed.push(trigger);
+            }
+        }
+        for trigger in newly_absorbed {
+            self.morph_releasing.remove(&trigger);
+            self.morph_absorbed.insert(trigger);
+            self.touch(trigger);
         }
         self.live_above.clear();
         self.clip_of.clear();
@@ -178,6 +201,8 @@ impl Tree {
     fn destroy(&mut self, id: u32) {
         if let Some(n) = self.nodes.remove(&id) {
             self.closing.remove(&id);
+            self.morph_absorbed.remove(&id);
+            self.morph_releasing.remove(&id);
             self.removed.push(id);
             self.lifted.remove(&id);
             self.fx.remove(&id);
@@ -188,6 +213,31 @@ impl Tree {
                 self.destroy(c);
             }
         }
+    }
+
+    /// Synchronizes unified morph trigger content visibility with `fx::Comp`'s live morph state.
+    /// Returns true if any trigger changed state (caller should wake dirty windows).
+    pub fn sync_morph_triggers(&mut self, want_hidden: &HashSet<u32>) -> bool {
+        let mut changed = false;
+        let now = std::time::Instant::now();
+        let to_release: Vec<u32> = self.morph_absorbed.iter().copied().filter(|id| !want_hidden.contains(id)).collect();
+        for id in to_release {
+            self.morph_absorbed.remove(&id);
+            if self.nodes.contains_key(&id) {
+                self.morph_releasing.insert(id, now);
+                self.touch(id);
+                changed = true;
+            }
+        }
+        for &id in want_hidden {
+            if self.nodes.contains_key(&id) && self.morph_absorbed.insert(id) {
+                self.morph_releasing.remove(&id);
+                self.touch(id);
+                changed = true;
+            }
+        }
+        self.morph_releasing.retain(|id, at| self.nodes.contains_key(id) && now.duration_since(*at) < std::time::Duration::from_millis(450));
+        changed
     }
 
     fn detach_from_old(&mut self, child: u32) {

@@ -29,7 +29,7 @@ pub fn build(s: &Win, eng: &Engine, id: u32) -> El {
     build_node(s, eng, id, n)
 }
 
-pub fn children(s: &Win, eng: &Engine, n: &Node, mut e: El) -> El {
+pub fn children(s: &Win, eng: &Engine, id: u32, n: &Node, mut e: El) -> El {
     let toward_web: Vec<(usize, i16)> = if eng.tree.web_above.is_empty() {
         Vec::new()
     } else {
@@ -42,6 +42,8 @@ pub fn children(s: &Win, eng: &Engine, n: &Node, mut e: El) -> El {
     let morph = crate::fx::morph_spring(&n.props);
     let kin_morph = morph.is_some() && crate::fx::is_kin_morph(eng, &n.props);
     let grow_from = morph.map(|_| source_origin(&n.props));
+    let absorbed = eng.tree.morph_absorbed.contains(&id);
+    let releasing = !absorbed && eng.tree.morph_releasing.contains_key(&id);
     for (i, c) in n.children.iter().enumerate() {
         let Some(child) = eng.tree.get(*c) else {
             e = e.child(build(s, eng, *c));
@@ -62,6 +64,16 @@ pub fn children(s: &Win, eng: &Engine, n: &Node, mut e: El) -> El {
             } else {
                 reveal(ce, spring, grow_from.unwrap_or(([0.5, 0.5], None)))
             };
+        } else if absorbed {
+            ce = ce.opacity(0.0).scale(0.65);
+            if p.motion.is_none() {
+                ce = ce.motion(rune::Spring::new(0.055, 0.0));
+            }
+        } else if releasing {
+            ce = ce.opacity(p.opacity.unwrap_or(1.0)).scale(p.scale.unwrap_or(1.0));
+            if p.motion.is_none() {
+                ce = ce.motion(rune::Spring::new(0.105, 0.0));
+            }
         }
         e = e.child(ce);
     }
@@ -170,11 +182,26 @@ fn closing_props(id: u32, p: &crate::props::Props) -> crate::props::Props {
     crate::fx::without_chrome(&c)
 }
 
+/// A unified morph trigger while absorbed into its open/morphing menu: keeps layout & fx slot
+/// intact while suppressing any own fill/hover/border/shadow behind the morphing surface.
+fn absorbed_props(p: &crate::props::Props) -> crate::props::Props {
+    let mut c = crate::fx::without_chrome(p);
+    c.fill = None;
+    c.gradient = None;
+    c.radial = None;
+    c.hover = None;
+    c
+}
+
 fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
     let held;
     let closing = eng.tree.closing.contains_key(&id);
+    let absorbed = !closing && eng.tree.morph_absorbed.contains(&id);
     let p = if closing {
         held = closing_props(id, &n.props);
+        &held
+    } else if absorbed {
+        held = absorbed_props(&n.props);
         &held
     } else {
         &*n.props
@@ -215,9 +242,9 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
 
 fn build_kind(s: &Win, eng: &Engine, id: u32, n: &Node, p: &Props) -> El {
     match n.kind {
-        Kind::Row => crate::fx::over(children(s, eng, n, crate::fx::under(row(), id, p)), id, p),
-        Kind::Col | Kind::Window => crate::fx::over(children(s, eng, n, crate::fx::under(col(), id, p)), id, p),
-        Kind::Box => crate::fx::over(children(s, eng, n, crate::fx::under(el(), id, p)), id, p),
+        Kind::Row => crate::fx::over(children(s, eng, id, n, crate::fx::under(row(), id, p)), id, p),
+        Kind::Col | Kind::Window => crate::fx::over(children(s, eng, id, n, crate::fx::under(col(), id, p)), id, p),
+        Kind::Box => crate::fx::over(children(s, eng, id, n, crate::fx::under(el(), id, p)), id, p),
         Kind::Text => text::build(p),
         Kind::Input => crate::input::build(s, id, p),
         Kind::Image => media::image(eng, id, p),

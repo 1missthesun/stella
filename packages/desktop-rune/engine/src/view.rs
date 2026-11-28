@@ -44,6 +44,9 @@ pub fn children(s: &Win, eng: &Engine, id: u32, n: &Node, mut e: El) -> El {
     let grow_from = morph.map(|_| source_origin(&n.props));
     let absorbed = eng.tree.morph_absorbed.contains(&id);
     let releasing = !absorbed && eng.tree.morph_releasing.contains_key(&id);
+    // A menu morphing out of its button (one glass, `fx::unified_trigger`): its content rides in
+    // the blob, moved every frame by `fx::Comp`.
+    let rides = morph.is_some() && !kin_morph && !eng.tree.closing.contains_key(&id) && crate::fx::unified_trigger(&eng.tree, id).is_some();
     for (i, c) in n.children.iter().enumerate() {
         let Some(child) = eng.tree.get(*c) else {
             e = e.child(build(s, eng, *c));
@@ -58,16 +61,19 @@ pub fn children(s: &Win, eng: &Engine, id: u32, n: &Node, mut e: El) -> El {
             && !toward_web.iter().any(|(j, _)| *j == i)
             && toward_web.iter().any(|(j, order)| paint_order(p) > *order || (paint_order(p) == *order && i > *j));
         let mut ce = if over { build_over(s, eng, *c) } else { build(s, eng, *c) };
-        if let Some(spring) = morph.filter(|_| p.enter.is_none() && p.exit.is_none()) {
+        if rides && p.enter.is_none() && p.exit.is_none() {
+            ce = crate::fx::ride(ce, *c);
+        } else if let Some(spring) = morph.filter(|_| p.enter.is_none() && p.exit.is_none()) {
             ce = if kin_morph {
                 reveal_kin(ce, spring)
             } else {
                 reveal(ce, spring, grow_from.unwrap_or(([0.5, 0.5], None)))
             };
         } else if absorbed {
+            // Gone at once, as UIKit's button icon is when its menu starts out of it.
             ce = ce.opacity(0.0).scale(0.65);
             if p.motion.is_none() {
-                ce = ce.motion(rune::Spring::new(0.055, 0.0));
+                ce = ce.motion(rune::Spring::new(0.02, 0.0));
             }
         } else if releasing {
             ce = ce.opacity(p.opacity.unwrap_or(1.0)).scale(p.scale.unwrap_or(1.0));
@@ -162,6 +168,9 @@ pub fn reveal_chrome(e: El, spring: rune::Spring) -> El {
 /// How fast a closing `morphFrom` glass's content goes, ahead of the glass shrinking back.
 const CONTENT_OUT: rune::Spring = rune::Spring::new(0.045, 0.0);
 
+/// How fast a menu going back into its button loses its rows.
+const UNIFIED_OUT: rune::Spring = rune::Spring::new(0.07, 0.0);
+
 /// A closing `morphFrom` element (`Tree::closing`): its glass morphing back, nothing to press,
 /// focus or dismiss.
 fn closing_props(id: u32, p: &crate::props::Props) -> crate::props::Props {
@@ -235,7 +244,18 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
         e = e.transition(rune::Transition::none());
     }
     if closing {
-        e = e.transition(rune::Transition::none()).child_exit(rune::Transition::opacity().springs(rune::SpringPair::new(CONTENT_OUT, CONTENT_OUT)));
+        // A menu going back into its button: its rows blur out as they shrink toward it, gone
+        // in about 100 ms (UIKit's); other closing glass just fades its content.
+        let out = if crate::fx::unified_trigger(&eng.tree, id).is_some() {
+            let (from, _) = source_origin(p);
+            rune::Transition::opacity()
+                .combined(rune::Transition::blur(9.0))
+                .combined(rune::Transition::scale_anchor(0.7, rune::Vec2::new(from[0], from[1])).allow_small_scale())
+                .springs(rune::SpringPair::new(UNIFIED_OUT, UNIFIED_OUT))
+        } else {
+            rune::Transition::opacity().springs(rune::SpringPair::new(CONTENT_OUT, CONTENT_OUT))
+        };
+        e = e.transition(rune::Transition::none()).child_exit(out);
     }
     e.key(rune_key(id, p))
 }

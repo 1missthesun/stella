@@ -13,7 +13,10 @@ import { alpha, derive, mix, ModeScope, useTokens, type Gradient, type Tokens } 
  */
 export function chromeGlass(t: Tokens) {
   return derive(t, "chrome-glass", (t) => {
-    const base = { dispersion: 0.02, frost: 0.14, frostSigma: 24, perceptual: true, adapt: 0.22 };
+    // Fitted to iOS 26.2 regular glass over a photo: about 5 pt of blur, a strong saturation boost
+    // under a dense veil (vivid, not milky), and a narrow rim that bends hard enough to flip the
+    // line behind it, as Apple's lip does.
+    const base = { dispersion: 0.008, frost: 0.2, frostSigma: 24, perceptual: true, adapt: 0.22, bevel: 14 };
     const controlsTint = t.dark ? mix(t.c.overlaySurface, 54, t.c.background) : t.c.overlaySurface;
     const composerTint = t.dark ? mix(t.c.overlaySurface, 88, t.c.background) : t.c.overlaySurface;
     const hairline = t.dark ? t.c.border : alpha(t.c.border, 0.6);
@@ -23,26 +26,29 @@ export function chromeGlass(t: Tokens) {
       return { controls, composer: { fill: composerTint, border: edge } as Material, clear: controls, hairline: edge, sheen: undefined };
     }
     const controls: Material = {
-      fx: { glass: { ...base, bevel: 11, depth: 18, magnification: 1.03, saturation: t.dark ? 1.1 : 1.45, rim: t.dark ? 0.95 : 0.9, shadow: t.dark ? 0.16 : 0.048, veil: t.dark ? 0.46 : 0.58, tint: controlsTint, interactive: true } },
+      fx: { glass: { ...base, depth: 60, magnification: 1.03, saturation: t.dark ? 2.8 : 1.9, rim: t.dark ? 0.95 : 0.9, shadow: t.dark ? 0.16 : 0.048, veil: t.dark ? 0.73 : 0.66, tint: controlsTint, interactive: true } },
     };
     const composer: Material = {
-      fx: { glass: { ...base, bevel: 11, depth: 18, magnification: 1.025, saturation: t.dark ? 1.12 : 1.5, rim: t.dark ? 0.92 : 0.85, shadow: t.dark ? 0.14 : 0.044, veil: t.dark ? 0.67 : 0.72, tint: composerTint, interactive: false } },
+      fx: { glass: { ...base, depth: 50, magnification: 1.025, saturation: t.dark ? 2.2 : 1.9, rim: t.dark ? 0.92 : 0.85, shadow: t.dark ? 0.14 : 0.044, veil: 0.72, tint: composerTint, interactive: false } },
     };
     const clear: Material = {
       fx: {
         glass: {
-          bevel: 13,
-          depth: 18,
-          dispersion: 0.02,
-          magnification: 1.05,
-          frost: 0.14,
+          // Apple's clear glass is a magnifier: a lightly blurred, enlarged middle inside a wide,
+          // smooth rim that bends the surroundings into a ring, with a faint veil that lightens
+          // more over bright backdrops.
+          bevel: 26,
+          depth: 40,
+          dispersion: 0.004,
+          magnification: 1.45,
+          frost: 0.1,
           frostSigma: 22,
           saturation: 1.12,
           perceptual: true,
-          rim: t.dark ? 1.05 : 0.98,
+          rim: 1.0,
           shadow: t.dark ? 0.12 : 0.04,
-          veil: 0.095,
-          adapt: 0.1,
+          veil: 0.12,
+          adapt: 0.45,
           tint: "#ffffff",
           interactive: true,
         },

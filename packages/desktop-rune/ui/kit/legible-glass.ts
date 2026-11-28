@@ -17,8 +17,11 @@ export function solidEdge(t: Tokens) {
  * clip would cut it), so `shadows` lift the element. Under Reduce Transparency it is the veil's
  * colour, opaque, with a stronger edge.
  */
-export function legibleGlass(t: Tokens, shadows: Material["shadows"], veil = t.dark ? 0.74 : 0.76): Material {
-  const tint = t.dark ? mix(t.c.overlaySurface, 70, t.c.background) : t.c.background;
+export function legibleGlass(t: Tokens, shadows: Material["shadows"], veil = t.dark ? 0.74 : 0.7): Material {
+  // Fitted to an iOS 26.2 menu over the same backdrop (blur, saturation, veil and tint): Apple keeps
+  // what is behind vivid and dims its luminance under a dark, near-background veil, rather than
+  // greying it under a lighter one, which reads frosted.
+  const tint = t.c.background;
   if (t.material.solid) return { fill: tint, border: solidEdge(t), shadows };
   return {
     fx: {
@@ -27,9 +30,9 @@ export function legibleGlass(t: Tokens, shadows: Material["shadows"], veil = t.d
         depth: 16,
         dispersion: 0.02,
         magnification: 1.02,
-        frost: 0.18,
+        frost: 0.15,
         frostSigma: 32,
-        saturation: t.dark ? 1.25 : 1.55,
+        saturation: t.dark ? 1.7 : 1.55,
         perceptual: true,
         rim: t.dark ? 0.95 : 0.9,
         shadow: t.dark ? 0.34 : 0.085,

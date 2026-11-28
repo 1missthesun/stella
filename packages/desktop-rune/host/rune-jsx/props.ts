@@ -58,6 +58,8 @@ export type Glass = {
   saturation?: number;
   /** Apply `saturation` and `veil` to sRGB-encoded values, as UIKit composites its glass (false: linear light), so tints measured from iOS carry over as is. */
   perceptual?: boolean;
+  /** Apple's continuous corner curve (default true); `false` keeps circular corners. */
+  continuous?: boolean;
   /** A second shape the glass flows into (a gooey merge), in the element's points; `unionK` is the merge radius (22), `morph` 0..1 moves toward it alone. */
   merge?: { x: number; y: number; w: number; h: number; radius?: number }; unionK?: number; morph?: number;
   /** Glass elements with the same `group` in a window draw as one surface (Apple's `GlassEffectContainer`): shapes within `spacing` points (`unionK`, 22) bridge into each other and pinch apart as they separate. The first member's glass settings apply to all. */

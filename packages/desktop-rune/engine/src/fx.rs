@@ -56,13 +56,51 @@ pub struct MorphSpec {
     pub unified: Option<bool>,
 }
 
-/// Snappy yet visibly liquid Apple-style morph open spring (280 ms, gentle organic bounce).
-const MORPH_SPRING: Spring = Spring::new(0.28, 0.16);
+/// The spring a morph grows on: UIKit's menu, measured frame by frame on iOS 26.2 (the blob's
+/// width fits a 315 ms spring with 0.23 bounce, overshooting about 3%).
+const MORPH_SPRING: Spring = Spring::new(0.315, 0.23);
+
+/// The spring a unified morph (a menu back into its button) goes back on: UIKit's is slower than
+/// its open (about 400 ms, 0.2 bounce), so the blob lands a little smaller than the button and swells back.
+fn unified_close_spring(open: Spring) -> Spring {
+    Spring::new((open.duration * 1.25).max(0.01), 0.2)
+}
+
+/// Response of a spring to a kick, normalised to peak at 1: what lifts UIKit's menu blob off its
+/// button as it grows (and again as it goes back), then lets it land with a small overshoot.
+fn impulse(t: f32, duration: f32, bounce: f32) -> f32 {
+    if t <= 0.0 {
+        return 0.0;
+    }
+    let w = std::f32::consts::TAU / duration.max(1e-3);
+    let z = (1.0 - bounce).clamp(0.05, 0.95);
+    let wd = w * (1.0 - z * z).sqrt();
+    let tp = wd.atan2(z * w) / wd;
+    let peak = (-z * w * tp).exp() * (wd * tp).sin();
+    (-z * w * t).exp() * (wd * t).sin() / peak
+}
+
+fn centre(s: Shape) -> [f32; 2] {
+    [s.rect.x + s.rect.w * 0.5, s.rect.y + s.rect.h * 0.5]
+}
+
+/// A critically damped step from 0 to 1 over about `duration`.
+fn crit(t: f32, duration: f32) -> f32 {
+    if t <= 0.0 {
+        return 0.0;
+    }
+    let w = std::f32::consts::TAU / duration.max(1e-3);
+    1.0 - (1.0 + w * t) * (-w * t).exp()
+}
 
 /// The spring a morph goes back on: slightly quicker and softly damped into the trigger.
 fn close_spring(open: Spring) -> Spring {
     Spring::new((open.duration * 0.78).max(0.01), (open.bounce * 0.25).clamp(0.0, 0.06))
 }
+
+/// How long a closing unified morph keeps its blob after it starts back: the landing's overshoot
+/// has settled by then.
+const UNIFIED_LANDING: f64 = 0.5;
 
 /// How far through a morph its glass is drawn: none at the source's shape, so the source
 /// (glass, icon and label) shows as itself at both ends, and full by `MORPH_SHOWN`.
@@ -169,7 +207,8 @@ fn spec(v: &J) -> Result<FxSpec, String> {
 }
 
 fn glass(v: &J) -> Result<Effect, String> {
-    let mut lens = LensParams::default();
+    // Stella's glass takes Apple's continuous corner curve unless it says otherwise.
+    let mut lens = LensParams { continuous: true, ..LensParams::default() };
     let mut merge = None;
     let mut group = None;
     let mut morph: Option<MorphSpec> = None;
@@ -198,6 +237,7 @@ fn glass(v: &J) -> Result<Effect, String> {
             ("adapt", Some(x)) => lens.adapt = x,
             ("saturation", Some(x)) => lens.saturation = x,
             ("perceptual", _) => lens.perceptual = val.as_bool().ok_or("glass `perceptual` is true or false")?,
+            ("continuous", _) => lens.continuous = val.as_bool().ok_or("glass `continuous` is true or false")?,
             ("interactive", _) => interactive = Some(val.as_bool().ok_or("glass `interactive` is true or false")?),
             ("unionK" | "spacing", Some(x)) => lens.union_k = x,
             ("group", _) => group = Some(val.as_str().ok_or("glass `group` is a string")?.to_owned()),
@@ -618,6 +658,121 @@ thread_local! {
     static WHOLE: std::cell::RefCell<HashMap<u32, [f32; 2]>> = std::cell::RefCell::new(HashMap::new());
     /// Latest set of unified morph trigger nodes whose children should stay hidden (crossfaded out).
     static TRIGGER_SYNC: std::cell::RefCell<Option<HashSet<u32>>> = const { std::cell::RefCell::new(None) };
+    /// Live transforms of unified morphs' content, by element node.
+    static CONTENT: std::cell::RefCell<HashMap<u32, std::rc::Rc<ContentLive>>> = std::cell::RefCell::new(HashMap::new());
+}
+
+/// How the content of a unified morph (a menu's rows) is drawn while the glass morphs: `Comp` sets it every frame so the content rides inside the blob,
+/// scaled with it, carried by its lift and blurred while it moves, as UIKit's menus do. Bound to
+/// the element in `view::children` (`view::ride`).
+pub struct ContentLive {
+    pub scale: rune::Live<f32>,
+    pub offset: rune::Live<[f32; 2]>,
+    pub blur: rune::Live<f32>,
+    pub opacity: rune::Live<f32>,
+    /// The offset set last, to recover the element's laid-out centre from where it was drawn.
+    applied: Cell<[f32; 2]>,
+    /// The element's laid-out centre while it rides, found from where it's drawn.
+    home: Cell<Option<[f32; 2]>>,
+}
+
+/// Blur (pt) of a unified morph's content while its blob is small and moving.
+const RIDE_BLUR: f32 = 6.0;
+
+impl ContentLive {
+    fn new(hidden: bool) -> ContentLive {
+        ContentLive {
+            scale: rune::Live::new(if hidden { 0.3 } else { 1.0 }),
+            offset: rune::Live::new([0.0; 2]),
+            blur: rune::Live::new(if hidden { RIDE_BLUR } else { 0.0 }),
+            opacity: rune::Live::new(if hidden { 0.0 } else { 1.0 }),
+            applied: Cell::new([0.0; 2]),
+            home: Cell::new(None),
+        }
+    }
+
+    fn set(&self, scale: f32, offset: [f32; 2], blur: f32, opacity: f32) {
+        self.scale.set(scale);
+        self.offset.set(offset);
+        self.blur.set(blur);
+        self.opacity.set(opacity);
+        self.applied.set(offset);
+    }
+}
+
+/// The live transform of `node`, a unified morph's content: made `hidden` (as a
+/// menu's content is on the frame the menu appears) the first time it's asked for.
+pub fn content_live(node: u32, hidden: bool) -> std::rc::Rc<ContentLive> {
+    CONTENT.with(|c| c.borrow_mut().entry(node).or_insert_with(|| std::rc::Rc::new(ContentLive::new(hidden))).clone())
+}
+
+/// One unified morph's content to move for the coming frame.
+struct Ride {
+    node: u32,
+    to: Shape,
+    /// The blob as it will be drawn next frame, `None` once settled open (content at rest).
+    next: Option<Pose>,
+    closing: bool,
+}
+
+/// Binds `e`, the content `node` of an opening unified morph, to its live transform (see
+/// `ContentLive`), starting hidden.
+pub fn ride(e: El, node: u32) -> El {
+    let l = content_live(node, true);
+    e.live_scale(&l.scale).live_offset(&l.offset).live_blur(&l.blur).live_opacity(&l.opacity)
+}
+
+/// Moves each unified morph's content with its blob for the coming frame: scaled to the blob
+/// (as a whole, about the menu's centre) and a little magnified, carried by its lift, blurred
+/// until it's nearly grown and faded in over its first 60 ms, as UIKit's menus are.
+fn move_content(rt: &rune::Runtime<Win>, eng: &crate::engine::Engine, rides: &[Ride]) {
+    let mut live: HashSet<u32> = HashSet::new();
+    for r in rides {
+        if r.closing {
+            continue;
+        }
+        let Some(n) = eng.tree.get(r.node) else { continue };
+        let (tc, [tw, th]) = (centre(r.to), [r.to.rect.w.max(1.0), r.to.rect.h.max(1.0)]);
+        for &c in &n.children {
+            let Some(child) = eng.tree.get(c) else { continue };
+            live.insert(c);
+            let l = content_live(c, true);
+            let Some(pose) = &r.next else {
+                l.set(1.0, [0.0; 2], 0.0, 1.0);
+                l.home.set(None);
+                continue;
+            };
+            let home = match l.home.get() {
+                Some(h) => h,
+                None => {
+                    let Some(([x, y, w, h], _)) = rt.presented(&crate::view::rune_key(c, &child.props)) else { continue };
+                    let a = l.applied.get();
+                    let h = [x + w * 0.5 - a[0], y + h * 0.5 - a[1]];
+                    l.home.set(Some(h));
+                    h
+                }
+            };
+            let bc = centre(pose.shape);
+            // UIKit's content rides a little magnified in the blob (its lens) and settles to size
+            // as the blob does.
+            let lens = 1.0 + 0.25 * (1.0 - smoothstep(0.08, 0.22, pose.tau));
+            let k = ((pose.shape.rect.w / tw).min(pose.shape.rect.h / th) * lens).clamp(0.05, 1.4);
+            let offset = [bc[0] - tc[0] + (k - 1.0) * (home[0] - tc[0]), bc[1] - tc[1] + (k - 1.0) * (home[1] - tc[1])];
+            let blur = RIDE_BLUR * (1.0 - smoothstep(0.05, 0.15, pose.tau));
+            let opacity = smoothstep(0.0, 0.06, pose.tau);
+            l.set(k, offset, blur, opacity);
+        }
+    }
+    CONTENT.with(|m| {
+        m.borrow_mut().retain(|n, l| {
+            let keep = live.contains(n);
+            if !keep {
+                // Left at rest for whatever still holds it.
+                l.set(1.0, [0.0; 2], 0.0, 1.0);
+            }
+            keep
+        })
+    });
 }
 
 /// Latest unified morph trigger content-hide set reported by `fx::Comp` (for `windows::poll`).
@@ -656,7 +811,16 @@ struct Morph {
     v0: f32,
     target: f32,
     t0: f64,
+    /// How round a unified morph's blob was when it last turned around (see `roundness`).
+    round0: f32,
     seen: bool,
+}
+
+/// Where a unified morph's blob is drawn at one moment, and how its content rides in it.
+struct Pose {
+    shape: Shape,
+    /// Seconds since the morph last turned (opened or started back).
+    tau: f32,
 }
 
 impl Morph {
@@ -669,15 +833,79 @@ impl Morph {
             return;
         }
         let (x, v) = self.at(now);
+        self.round0 = self.roundness((now - self.t0).max(0.0) as f32);
         (self.x0, self.v0, self.target, self.t0) = (x, v, target, now);
-        self.spring = if target == 0.0 { close_spring(self.open) } else { self.open };
+        self.spring = match (target == 0.0, self.unified) {
+            (true, true) => unified_close_spring(self.open),
+            (true, false) => close_spring(self.open),
+            _ => self.open,
+        };
     }
 
-    /// Whether it's done: a closing unified morph lands cleanly on its trigger's exact shape
+    /// Whether it's done: a closing unified morph lands on its trigger, overshoots and settles
     /// before handing back; a non-unified one finishes once its glass fades out.
     fn done(&self, now: f64) -> bool {
-        let stop = if self.unified { 0.04 } else { MORPH_HIDDEN };
-        self.settled(now) || (self.target == 0.0 && self.at(now).0 <= stop)
+        if self.unified {
+            return self.settled(now) && (self.target == 1.0 || (now - self.t0) >= UNIFIED_LANDING);
+        }
+        self.settled(now) || (self.target == 0.0 && self.at(now).0 <= MORPH_HIDDEN)
+    }
+
+    /// How round a unified morph's blob is, 0 (its own corners) to 1 (fully round): UIKit's menu
+    /// blob stays a round droplet for its first 130 ms, then relaxes to the menu's corners; going
+    /// back it rounds up again at once.
+    fn roundness(&self, tau: f32) -> f32 {
+        if self.target == 1.0 {
+            1.0 - crit(tau - 0.13, 0.22)
+        } else {
+            self.round0 + (1.0 - self.round0) * crit(tau, 0.2)
+        }
+    }
+
+    /// A unified morph's blob at `now`, after UIKit's menu measured frame by frame on iOS 26.2:
+    /// its size on the morph spring; its centre lifted off the button toward the menu by a damped
+    /// kick (about 0.6 of the travel, peaking at 80 ms, then landing with a small overshoot),
+    /// stretched along the way it goes, and round while it moves. `axis` is the anchor's (0 sideways, 1 up and down).
+    fn pose(&self, from: Shape, to: Shape, axis: Option<usize>, now: f64) -> Pose {
+        let tau = (now - self.t0).max(0.0) as f32;
+        let p = self.at(now).0;
+        let mut s = mix_shape(from, to, p);
+        let (fc, tc) = (centre(from), centre(to));
+        let ax = axis.unwrap_or(if (tc[1] - fc[1]).abs() >= (tc[0] - fc[0]).abs() { 1 } else { 0 });
+        let travel = tc[ax] - fc[ax];
+        let extent = if ax == 0 { to.rect.w } else { to.rect.h };
+        let (gain, kick) = if self.target == 1.0 { (0.6, impulse(tau + 0.01, 0.38, 0.3)) } else { (0.65, impulse(tau, 0.36, 0.5)) };
+        let lift = (travel.abs() * gain).min(0.25 * extent) * travel.signum() * kick;
+        // And it stretches along the way it travels while it moves: UIKit's grows about a fifth of
+        // the travel longer as it leaves, and nearly half as it drops back into the button.
+        let stretch = if self.target == 1.0 {
+            0.22 * smoothstep(-0.01, 0.06, tau) * (1.0 - smoothstep(0.05, 0.19, tau))
+        } else {
+            0.43 * smoothstep(0.0, 0.15, tau) * (1.0 - smoothstep(0.17, 0.29, tau))
+        };
+        let stretch = (travel.abs() * stretch).min(0.3 * extent);
+        // Across that way it leads a little toward the menu: ahead of its size as it grows, behind
+        // it as it goes back (UIKit's centre sits about an eighth of the travel nearer the menu).
+        let across = tc[1 - ax] - fc[1 - ax];
+        let lead = if self.target == 1.0 {
+            0.145 * (1.0 - p.clamp(0.0, 1.0)) * smoothstep(0.0, 0.04, p)
+        } else {
+            0.12 * smoothstep(0.85, 0.15, p) * (1.0 - smoothstep(0.19, 0.29, tau))
+        };
+        let lead = across * lead;
+        if ax == 0 {
+            s.rect.x += lift - stretch * 0.5;
+            s.rect.w += stretch;
+            s.rect.y += lead;
+        } else {
+            s.rect.y += lift - stretch * 0.5;
+            s.rect.h += stretch;
+            s.rect.x += lead;
+        }
+        let half = s.rect.w.min(s.rect.h) * 0.5;
+        let k = self.roundness(tau) * smoothstep(0.0, 0.04, p.abs());
+        s.radius = (s.radius + (half - s.radius) * k).clamp(0.0, half);
+        Pose { shape: s, tau }
     }
 
     fn settled(&self, now: f64) -> bool {
@@ -853,6 +1081,9 @@ impl Compositor<Win> for Comp {
         let mut glass_layer_nodes: Vec<(usize, u32)> = Vec::new();
         let mut absorbed_glass_nodes: HashSet<u32> = HashSet::new();
         let mut want_hidden_triggers: HashSet<u32> = HashSet::new();
+        let mut rides: Vec<Ride> = Vec::new();
+        let mut handed: Vec<(u32, u32)> = Vec::new();
+        let frame_dt = f.dt.clamp(1.0 / 120.0, 1.0 / 30.0);
         crate::engine::read(|eng| {
             // Rising-edge hit-test for interactive `.interactive()` glass controls (topmost wins).
             if just_pressed
@@ -947,6 +1178,7 @@ impl Compositor<Win> for Comp {
                                                 v0,
                                                 target: 1.0,
                                                 t0: now,
+                                                round0: 1.0,
                                                 seen: false,
                                             })
                                         }),
@@ -984,19 +1216,50 @@ impl Compositor<Win> for Comp {
                                             // close; absorb the trigger's own glass and crossfade its
                                             // content cleanly.
                                             if m.unified {
+                                                // UIKit's menu: the button's own glass is the blob from
+                                                // the first frame; its icon is gone at once and comes
+                                                // back once the blob going back is a third of the way.
                                                 alpha = 1.0;
                                                 if let Some(t_id) = m.trigger_node {
                                                     absorbed_glass_nodes.insert(t_id);
-                                                    if !closing || at_c > 0.08 {
+                                                    if !closing || at > 0.3 {
                                                         want_hidden_triggers.insert(t_id);
+                                                    } else {
+                                                        handed.push((node, t_id));
                                                     }
                                                 }
+                                                moving |= !settled;
+                                                let axis = match p.anchor.as_ref().and_then(|a| a.side.as_deref()) {
+                                                    Some("top" | "bottom") => Some(1),
+                                                    Some("left" | "right" | "start" | "end") => Some(0),
+                                                    _ => None,
+                                                };
+                                                let from = m.from;
+                                                let pose = (!settled).then(|| m.pose(from, shape, axis, now));
+                                                // The menu's material from the start, as UIKit's.
+                                                lens = mix_lens(&m.from_lens.unwrap_or(lens), &lens, smoothstep(0.0, 0.2, at_c));
+                                                if let Some(pose) = &pose {
+                                                    shape = pose.shape;
+                                                    // Landing, the button's glass wells back up under
+                                                    // the blob and they pull together into one drop,
+                                                    // a neck between them, until they meet.
+                                                    if closing && at <= 0.3 {
+                                                        let g = smoothstep(0.3, 0.15, at);
+                                                        let (c, r) = (centre(from), from.rect);
+                                                        let (w, h) = (r.w * g, r.h * g);
+                                                        lens.second = Some(Shape::rounded(c[0] - w * 0.5, c[1] - h * 0.5, w, h, from.radius * g));
+                                                        lens.union_k = 16.0 * (at / 0.12).clamp(0.0, 1.0);
+                                                        lens.morph = 0.0;
+                                                    }
+                                                }
+                                                rides.push(Ride { node, to: m.to, next: pose.map(|_| m.pose(from, m.to, axis, now + frame_dt)), closing });
                                             } else if !kin {
                                                 alpha = morph_alpha(at);
                                             }
+                                            if !m.unified {
                                             moving |= !settled;
                                             let from = if kin { tucked(m.from, shape) } else { m.from };
-                                            let mut morphed = mix_shape(from, shape, at);
+                                            let morphed = mix_shape(from, shape, at);
                                             lens = mix_lens(&m.from_lens.unwrap_or(lens), &lens, at_c);
                                             // Living "liquid energy" mid-morph: slightly clearer veil, brighter
                                             // specular rim, richer edge curvature and organic oval rounding while flowing.
@@ -1005,15 +1268,10 @@ impl Compositor<Win> for Comp {
                                                 lens.veil *= 1.0 - 0.22 * energy;
                                                 lens.rim *= 1.0 + 0.28 * energy;
                                                 lens.depth *= 1.0 + 0.22 * energy;
-                                                if m.unified {
-                                                    let max_r = morphed.rect.w.min(morphed.rect.h) * 0.5;
-                                                    morphed.radius = (morphed.radius + (max_r - morphed.radius) * 0.48 * energy).clamp(0.0, max_r);
-                                                }
                                             }
-                                            // Unified morphs transform one continuous shape directly
-                                            // from trigger -> menu and back; bar-embedded (non-unified)
-                                            // triggers smoothly bridge out of their anchor.
-                                            if !kin && !m.unified && !settled && m.from_lens.is_some() && at_c < 0.62 {
+                                            // Bar-embedded (non-unified) triggers smoothly bridge out
+                                            // of their anchor.
+                                            if !kin && !settled && m.from_lens.is_some() && at_c < 0.62 {
                                                 let bridge_t = smoothstep(0.04, 0.62, at_c);
                                                 shape = m.from;
                                                 lens.second = Some(morphed);
@@ -1021,6 +1279,7 @@ impl Compositor<Win> for Comp {
                                                 lens.morph = bridge_t;
                                             } else {
                                                 shape = morphed;
+                                            }
                                             }
                                         }
                                     }
@@ -1157,6 +1416,7 @@ impl Compositor<Win> for Comp {
             if !watched.is_empty() {
                 crate::backdrop::forget(|n| eng.tree.get(n).is_some());
             }
+            move_content(f.rt, eng, &rides);
         });
         self.was_down = is_down;
         morphs.retain(|_, m| std::mem::take(&mut m.seen));
@@ -1173,6 +1433,15 @@ impl Compositor<Win> for Comp {
                 if absorbed_glass_nodes.contains(&node) {
                     layers[layer_idx].opacity = 0.0;
                 }
+            }
+        }
+        // Landing, the blob is drawn as the button's own glass, under the button's icon coming back
+        // (the menu's glass draws over the button).
+        for (menu, trigger) in handed {
+            let at = |n: u32| glass_layer_nodes.iter().find(|g| g.1 == n).map(|g| g.0);
+            if let (Some(mi), Some(ti)) = (at(menu), at(trigger)) {
+                layers[ti] = layers[mi].clone();
+                layers[mi].opacity = 0.0;
             }
         }
         if want_hidden_triggers != self.last_hidden_triggers {

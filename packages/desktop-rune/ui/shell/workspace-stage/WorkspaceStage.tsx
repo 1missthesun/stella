@@ -697,6 +697,8 @@ const SHEET_CLOSE = { dur: 0.22, bounce: 0 };
 const SHEET_DISMISS = 56;
 const SHEET_SHADOW_CLEARANCE = 40;
 
+const NOTHING = () => {};
+
 function PhoneSheetViewer({ item, bodies }: { item: DisplayTab | null; bodies: PlacedBody[] }) {
   const t = useTokens();
   const l = stageLook(t);
@@ -762,6 +764,9 @@ function PhoneSheetViewer({ item, bodies }: { item: DisplayTab | null; bodies: P
         shadows={[{ y: 10, blur: 24, color: "rgba(0,0,0,0.18)" }]}
         hidden={gone}
         inert={!open}
+        // The sheet takes the presses on its own blank space: only the scrim around it closes it
+        // (a press goes to the topmost element that handles one, which was the scrim beneath).
+        onPress={NOTHING}
         onContextMenu={shown ? (at) => itemMenu(shown.id, at) : undefined}
       >
         {shown ? <ViewerHeader item={shown} placement="float" width={geo.viewportWidth} onDrag={onPull} onDetach={null} onClose={() => fileViewer.close()} /> : null}

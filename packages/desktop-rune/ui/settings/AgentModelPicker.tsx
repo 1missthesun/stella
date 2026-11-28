@@ -895,12 +895,12 @@ function DesktopAgentModelPicker({ active = true, onSelected, className, surface
                 },
                 {
                     key: ANTIGRAVITY_SECTION_KEY,
-                    label: "Google Antigravity",
+                    label: "Gemini",
                     brandKey: "antigravity",
                     badge: enginePlaceBadge(t, destination, "antigravity"),
                     selected: current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`),
                     content: () => (<AntigravityModelSection destination={destination} computers={computers} selected={current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`)}>
-                        {(models) => (<EngineScopedModelList engineLabel="Google Antigravity" hideHead selectedRowExtra={reasoningControl} models={antigravityRows(models)} value={current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`) ? antigravityModelInUse(current.slice(ANTIGRAVITY_SECTION_KEY.length + 1), models) : ""} onSelect={(modelId) => void handleSelect(`${ANTIGRAVITY_SECTION_KEY}/${modelId}`)} disabled={!preferences || pendingAgent !== null}/>)}
+                        {(models) => (<EngineScopedModelList engineLabel="Gemini" hideHead selectedRowExtra={reasoningControl} models={antigravityRows(models)} value={current.startsWith(`${ANTIGRAVITY_SECTION_KEY}/`) ? antigravityModelInUse(current.slice(ANTIGRAVITY_SECTION_KEY.length + 1), models) : ""} onSelect={(modelId) => void handleSelect(`${ANTIGRAVITY_SECTION_KEY}/${modelId}`)} disabled={!preferences || pendingAgent !== null}/>)}
                       </AntigravityModelSection>),
                 },
                 {

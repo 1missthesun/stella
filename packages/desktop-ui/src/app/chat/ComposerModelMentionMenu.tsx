@@ -80,7 +80,7 @@ export const COMPOSER_ENGINE_MENTION_OPTIONS: readonly ComposerModelMentionOptio
     },
     {
       value: "antigravity",
-      label: "Google Antigravity",
+      label: "Gemini",
       brand: "antigravity",
       searchTerms: ["gemini", "neon", "google", "antigravity"],
     },

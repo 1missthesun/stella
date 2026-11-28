@@ -2267,10 +2267,10 @@
       "whereNone": "Niet ingelogd",
       "stellaModels": "Modellen van Stella",
       "stellaModelsHint": "Onderdeel van je Stella-abonnement",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "Inloggen met Google",
-      "antigravitySignedIn": "Deze computer is ingelogd bij Google Antigravity.",
-      "antigravityHint": "Gemini via je Google-abonnement",
+      "antigravitySignedIn": "Deze computer is ingelogd bij Gemini.",
+      "antigravityHint": "Gebruikt je Google-abonnement",
       "antigravityOpened": "De inlogpagina van Google is geopend in je browser. Log daar in en plak daarna de code die je ziet.",
       "antigravityCode": "Plak de code die Google toont",
       "antigravityPreparing": "Gemini wordt klaargezet…"

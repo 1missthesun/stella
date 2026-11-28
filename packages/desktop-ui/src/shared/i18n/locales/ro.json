@@ -2277,10 +2277,10 @@
       "whereNone": "Neconectat",
       "stellaModels": "Modelele Stella",
       "stellaModelsHint": "Parte din planul tău Stella",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "Conectează-te cu Google",
-      "antigravitySignedIn": "Acest computer este conectat la Google Antigravity.",
-      "antigravityHint": "Gemini din abonamentul tău Google",
+      "antigravitySignedIn": "Acest computer este conectat la Gemini.",
+      "antigravityHint": "Folosește abonamentul tău Google",
       "antigravityOpened": "Pagina de conectare Google s-a deschis în browser. Conectează-te acolo, apoi lipește codul afișat.",
       "antigravityCode": "Lipește codul afișat de Google",
       "antigravityPreparing": "Se pregătește Gemini…"

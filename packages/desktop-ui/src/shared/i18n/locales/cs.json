@@ -2287,10 +2287,10 @@
       "whereNone": "Nepřihlášeno",
       "stellaModels": "Modely Stelly",
       "stellaModelsHint": "Součást vašeho plánu Stelly",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "Přihlásit se přes Google",
-      "antigravitySignedIn": "Tento počítač je přihlášen do Google Antigravity.",
-      "antigravityHint": "Gemini z vašeho tarifu Google",
+      "antigravitySignedIn": "Tento počítač je přihlášen do Gemini.",
+      "antigravityHint": "Využívá váš tarif Google",
       "antigravityOpened": "V prohlížeči se otevřela přihlašovací stránka Googlu. Přihlaste se tam a vložte kód, který se zobrazí.",
       "antigravityCode": "Vložte kód zobrazený Googlem",
       "antigravityPreparing": "Připravuji Gemini…"

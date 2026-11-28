@@ -2267,10 +2267,10 @@
       "whereNone": "Oturum açılmadı",
       "stellaModels": "Stella'nın modelleri",
       "stellaModelsHint": "Stella planınıza dahil",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "Google ile oturum aç",
-      "antigravitySignedIn": "Bu bilgisayar Google Antigravity'de oturum açtı.",
-      "antigravityHint": "Google planındaki Gemini",
+      "antigravitySignedIn": "Bu bilgisayar Gemini'de oturum açtı.",
+      "antigravityHint": "Google planınızı kullanır",
       "antigravityOpened": "Google'ın oturum açma sayfası tarayıcınızda açıldı. Orada oturum açın, sonra gösterdiği kodu yapıştırın.",
       "antigravityCode": "Google'ın gösterdiği kodu yapıştırın",
       "antigravityPreparing": "Gemini hazırlanıyor…"

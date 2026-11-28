@@ -190,7 +190,7 @@ export function BrainPage({
         <Note>
           {computers.length > 0
             ? `Runs on ${computers.join(", ")}, on the Google plan signed in there. Your phone's chats use it when they run on that computer.`
-            : "Runs only on a computer signed in to Google Antigravity. Sign in on your computer in Settings › Claude and ChatGPT, then chats that run there use it."}
+            : "Runs only on a computer signed in to Gemini. Sign in on your computer in Settings › Claude and ChatGPT, then chats that run there use it."}
         </Note>
         <Hairline />
         <ModelList

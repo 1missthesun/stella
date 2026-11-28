@@ -2267,10 +2267,10 @@
       "whereNone": "Ikke logget ind",
       "stellaModels": "Stellas modeller",
       "stellaModelsHint": "En del af dit Stella-abonnement",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "Log ind med Google",
-      "antigravitySignedIn": "Denne computer er logget ind på Google Antigravity.",
-      "antigravityHint": "Gemini på dit Google-abonnement",
+      "antigravitySignedIn": "Denne computer er logget ind på Gemini.",
+      "antigravityHint": "Bruger dit Google-abonnement",
       "antigravityOpened": "Googles loginside er åbnet i din browser. Log ind dér, og indsæt derefter den kode, den viser.",
       "antigravityCode": "Indsæt koden, som Google viser",
       "antigravityPreparing": "Gør Gemini klar…"

@@ -2267,10 +2267,10 @@
       "whereNone": "Not signed in",
       "stellaModels": "Stella's models",
       "stellaModelsHint": "Part of your Stella plan",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "Sign in with Google",
-      "antigravitySignedIn": "This computer is signed in to Google Antigravity.",
-      "antigravityHint": "Gemini on your Google plan",
+      "antigravitySignedIn": "This computer is signed in to Gemini.",
+      "antigravityHint": "Uses your Google plan",
       "antigravityOpened": "Google's sign-in page opened in your browser. Sign in there, then paste the code it shows you.",
       "antigravityCode": "Paste the code Google shows",
       "antigravityPreparing": "Getting Gemini ready…"

@@ -2267,10 +2267,10 @@
       "whereNone": "Δεν έχει γίνει σύνδεση",
       "stellaModels": "Μοντέλα της Stella",
       "stellaModelsHint": "Μέρος του πλάνου σας στη Stella",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "Σύνδεση με Google",
-      "antigravitySignedIn": "Αυτός ο υπολογιστής έχει συνδεθεί στο Google Antigravity.",
-      "antigravityHint": "Gemini με το πρόγραμμα Google σας",
+      "antigravitySignedIn": "Αυτός ο υπολογιστής έχει συνδεθεί στο Gemini.",
+      "antigravityHint": "Χρησιμοποιεί το πρόγραμμα Google σας",
       "antigravityOpened": "Η σελίδα σύνδεσης της Google άνοιξε στο πρόγραμμα περιήγησής σας. Συνδεθείτε εκεί και μετά επικολλήστε τον κωδικό που εμφανίζεται.",
       "antigravityCode": "Επικολλήστε τον κωδικό που δείχνει η Google",
       "antigravityPreparing": "Προετοιμασία του Gemini…"

@@ -95,7 +95,7 @@ const ENGINE_OWNED_PROVIDERS = new Set(["stella", "chatgpt"]);
 const COMPUTER_BRAINS: ReadonlyArray<{
   provider: ComputerOnlyProviderId;
   label: string;
-}> = [{ provider: "antigravity", label: "Google Antigravity" }];
+}> = [{ provider: "antigravity", label: "Gemini" }];
 
 const computerDefaultModel = (reported: readonly string[]): string =>
   antigravityModelOptions(reported)[0]?.id ?? ANTIGRAVITY_MODEL_IDS[0]!;

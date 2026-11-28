@@ -2267,10 +2267,10 @@
       "whereNone": "साइन इन नहीं है",
       "stellaModels": "Stella के मॉडल",
       "stellaModelsHint": "आपके Stella प्लान का हिस्सा",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "Google से साइन इन करें",
-      "antigravitySignedIn": "यह कंप्यूटर Google Antigravity में साइन इन है।",
-      "antigravityHint": "आपके Google प्लान पर Gemini",
+      "antigravitySignedIn": "यह कंप्यूटर Gemini में साइन इन है।",
+      "antigravityHint": "आपके Google प्लान का इस्तेमाल करता है",
       "antigravityOpened": "Google का साइन-इन पेज आपके ब्राउज़र में खुल गया है। वहाँ साइन इन करें, फिर दिखाया गया कोड यहाँ पेस्ट करें।",
       "antigravityCode": "Google का दिखाया कोड पेस्ट करें",
       "antigravityPreparing": "Gemini तैयार हो रहा है…"

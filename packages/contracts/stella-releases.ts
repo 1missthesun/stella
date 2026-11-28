@@ -94,7 +94,7 @@ export const stellaReleases: readonly StellaRelease[] = [
     highlights: [
       "If the computer a chat runs on is asleep or offline, another of your computers that is on picks the chat up, and the cloud steps in only when none can.",
       "This works for messages you send from your phone or the web too, and when you write from a computer, that computer can answer itself.",
-      "If Antigravity isn't signed in on the computer that picks a chat up, Stella answers there with Claude Code when it can.",
+      "If Gemini isn't signed in on the computer that picks a chat up, Stella answers there with Claude Code when it can.",
     ],
     more: [
       "When a long conversation needs fresh notes, Stella now writes them in the background and keeps going, and anything you send in the meantime stays in order after them.",
@@ -190,7 +190,7 @@ export const stellaReleases: readonly StellaRelease[] = [
       "The Email page has a new look on your computer, on the web and on your phone.",
     ],
     more: [
-      "Google Antigravity signs in and installs just like Claude Code.",
+      "Gemini signs in and installs just like Claude Code.",
       "The model picker follows where the chat runs, so it only shows models that place can use.",
       "Stella opens faster and uses less power while it sits idle.",
       "You never have to sign in to use Stella on your computer.",
@@ -226,7 +226,7 @@ export const stellaReleases: readonly StellaRelease[] = [
     summary: "Use Gemini on your own Google plan, and Stella’s window opens up to twice as fast.",
     tags: ["New", "Polish"],
     highlights: [
-      "Sign in to Google Antigravity in Settings, next to Claude and ChatGPT, to use Gemini models on your own Google plan. They appear in the model picker on your computer and your phone, and run on the computer you signed in on.",
+      "Sign in with Google in Settings, next to Claude and ChatGPT, to use Gemini on your own Google plan. Its models appear in the model picker on your computer and your phone, and run on the computer you signed in on.",
       "Stella’s window opens up to twice as fast, and new installs download less.",
       "Scrolling on Windows is smooth, keeping up with high-refresh screens instead of dropping frames.",
     ],

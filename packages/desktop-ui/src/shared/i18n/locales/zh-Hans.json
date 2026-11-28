@@ -2257,10 +2257,10 @@
       "whereNone": "未登录",
       "stellaModels": "Stella 的模型",
       "stellaModelsHint": "包含在你的 Stella 套餐中",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "使用 Google 登录",
-      "antigravitySignedIn": "这台电脑已登录 Google Antigravity。",
-      "antigravityHint": "使用你的 Google 方案运行 Gemini",
+      "antigravitySignedIn": "这台电脑已登录 Gemini。",
+      "antigravityHint": "使用你的 Google 方案",
       "antigravityOpened": "Google 登录页面已在浏览器中打开。请在那里登录，然后粘贴显示的代码。",
       "antigravityCode": "粘贴 Google 显示的代码",
       "antigravityPreparing": "正在准备 Gemini…"

@@ -2277,10 +2277,10 @@
       "whereNone": "Accesso non effettuato",
       "stellaModels": "Modelli di Stella",
       "stellaModelsHint": "Incluso nel tuo piano Stella",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "Accedi con Google",
-      "antigravitySignedIn": "Questo computer ha effettuato l'accesso a Google Antigravity.",
-      "antigravityHint": "Gemini con il tuo piano Google",
+      "antigravitySignedIn": "Questo computer ha effettuato l'accesso a Gemini.",
+      "antigravityHint": "Usa il tuo piano Google",
       "antigravityOpened": "La pagina di accesso di Google si è aperta nel browser. Accedi lì, poi incolla il codice che ti mostra.",
       "antigravityCode": "Incolla il codice mostrato da Google",
       "antigravityPreparing": "Preparazione di Gemini…"

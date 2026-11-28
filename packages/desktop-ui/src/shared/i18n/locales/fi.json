@@ -2267,10 +2267,10 @@
       "whereNone": "Ei kirjautunut",
       "stellaModels": "Stellan mallit",
       "stellaModelsHint": "Osa Stella-tilaustasi",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "Kirjaudu Googlella",
-      "antigravitySignedIn": "Tämä tietokone on kirjautunut Google Antigravityyn.",
-      "antigravityHint": "Gemini Google-tilauksellasi",
+      "antigravitySignedIn": "Tämä tietokone on kirjautunut Geminiin.",
+      "antigravityHint": "Käyttää Google-tilaustasi",
       "antigravityOpened": "Googlen kirjautumissivu avautui selaimeesi. Kirjaudu siellä sisään ja liitä sitten sen näyttämä koodi.",
       "antigravityCode": "Liitä Googlen näyttämä koodi",
       "antigravityPreparing": "Gemini valmistellaan…"

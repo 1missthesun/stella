@@ -2287,10 +2287,10 @@
       "whereNone": "Вход не выполнен",
       "stellaModels": "Модели Stella",
       "stellaModelsHint": "Входит в ваш тариф Stella",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "Войти через Google",
-      "antigravitySignedIn": "Этот компьютер вошёл в Google Antigravity.",
-      "antigravityHint": "Gemini по вашему тарифу Google",
+      "antigravitySignedIn": "Этот компьютер вошёл в Gemini.",
+      "antigravityHint": "Использует ваш тариф Google",
       "antigravityOpened": "Страница входа Google открылась в браузере. Войдите там, затем вставьте показанный код.",
       "antigravityCode": "Вставьте код, показанный Google",
       "antigravityPreparing": "Подготовка Gemini…"

@@ -2257,10 +2257,10 @@
       "whereNone": "サインインしていません",
       "stellaModels": "Stella のモデル",
       "stellaModelsHint": "Stella プランに含まれます",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "Google でログイン",
-      "antigravitySignedIn": "このコンピュータは Google Antigravity にログインしています。",
-      "antigravityHint": "Google のプランで使う Gemini",
+      "antigravitySignedIn": "このコンピュータは Gemini にログインしています。",
+      "antigravityHint": "Google のプランを使います",
       "antigravityOpened": "Google のログインページをブラウザで開きました。そこでログインし、表示されたコードを貼り付けてください。",
       "antigravityCode": "Google に表示されたコードを貼り付け",
       "antigravityPreparing": "Gemini を準備しています…"

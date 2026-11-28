@@ -2257,10 +2257,10 @@
       "whereNone": "Belum masuk",
       "stellaModels": "Model Stella",
       "stellaModelsHint": "Bagian dari paket Stella Anda",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "Masuk dengan Google",
-      "antigravitySignedIn": "Komputer ini sudah masuk ke Google Antigravity.",
-      "antigravityHint": "Gemini dengan paket Google Anda",
+      "antigravitySignedIn": "Komputer ini sudah masuk ke Gemini.",
+      "antigravityHint": "Menggunakan paket Google Anda",
       "antigravityOpened": "Halaman masuk Google terbuka di browser Anda. Masuk di sana, lalu tempelkan kode yang ditampilkan.",
       "antigravityCode": "Tempelkan kode yang ditampilkan Google",
       "antigravityPreparing": "Menyiapkan Gemini…"

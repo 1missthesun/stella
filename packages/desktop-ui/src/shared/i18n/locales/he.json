@@ -2277,10 +2277,10 @@
       "whereNone": "לא מחובר",
       "stellaModels": "המודלים של Stella",
       "stellaModelsHint": "חלק מהתוכנית שלך ב-Stella",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "כניסה עם Google",
-      "antigravitySignedIn": "המחשב הזה מחובר ל-Google Antigravity.",
-      "antigravityHint": "Gemini בתוכנית Google שלך",
+      "antigravitySignedIn": "המחשב הזה מחובר ל-Gemini.",
+      "antigravityHint": "משתמש בתוכנית Google שלך",
       "antigravityOpened": "דף הכניסה של Google נפתח בדפדפן שלך. יש להיכנס שם ואז להדביק את הקוד שמוצג.",
       "antigravityCode": "הדבקת הקוד ש-Google מציגה",
       "antigravityPreparing": "מכינים את Gemini…"

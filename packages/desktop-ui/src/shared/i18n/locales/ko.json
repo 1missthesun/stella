@@ -2257,10 +2257,10 @@
       "whereNone": "로그인되지 않음",
       "stellaModels": "Stella 모델",
       "stellaModelsHint": "Stella 요금제에 포함",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "Google로 로그인",
-      "antigravitySignedIn": "이 컴퓨터가 Google Antigravity에 로그인되어 있습니다.",
-      "antigravityHint": "Google 요금제로 쓰는 Gemini",
+      "antigravitySignedIn": "이 컴퓨터가 Gemini에 로그인되어 있습니다.",
+      "antigravityHint": "Google 요금제를 사용합니다",
       "antigravityOpened": "브라우저에 Google 로그인 페이지가 열렸습니다. 로그인한 뒤 표시되는 코드를 붙여넣으세요.",
       "antigravityCode": "Google에 표시된 코드 붙여넣기",
       "antigravityPreparing": "Gemini 준비 중…"

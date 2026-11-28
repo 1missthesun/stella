@@ -2277,10 +2277,10 @@
       "whereNone": "Non connecté",
       "stellaModels": "Modèles de Stella",
       "stellaModelsHint": "Inclus dans votre forfait Stella",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "Se connecter avec Google",
-      "antigravitySignedIn": "Cet ordinateur est connecté à Google Antigravity.",
-      "antigravityHint": "Gemini avec votre forfait Google",
+      "antigravitySignedIn": "Cet ordinateur est connecté à Gemini.",
+      "antigravityHint": "Utilise votre forfait Google",
       "antigravityOpened": "La page de connexion de Google s’est ouverte dans votre navigateur. Connectez-vous, puis collez le code affiché.",
       "antigravityCode": "Collez le code affiché par Google",
       "antigravityPreparing": "Préparation de Gemini…"

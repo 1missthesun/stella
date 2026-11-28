@@ -2307,10 +2307,10 @@
       "whereNone": "لم يتم تسجيل الدخول",
       "stellaModels": "نماذج Stella",
       "stellaModelsHint": "جزء من خطة Stella الخاصة بك",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "تسجيل الدخول باستخدام Google",
-      "antigravitySignedIn": "سجّل هذا الكمبيوتر الدخول إلى Google Antigravity.",
-      "antigravityHint": "Gemini ضمن خطة Google الخاصة بك",
+      "antigravitySignedIn": "سجّل هذا الكمبيوتر الدخول إلى Gemini.",
+      "antigravityHint": "يستخدم خطة Google الخاصة بك",
       "antigravityOpened": "فُتحت صفحة تسجيل الدخول من Google في متصفحك. سجّل الدخول هناك، ثم الصق الرمز الذي يظهر لك.",
       "antigravityCode": "الصق الرمز الذي تعرضه Google",
       "antigravityPreparing": "جارٍ تجهيز Gemini…"

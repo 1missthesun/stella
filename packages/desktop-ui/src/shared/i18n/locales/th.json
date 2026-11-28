@@ -2257,10 +2257,10 @@
       "whereNone": "ยังไม่ได้ลงชื่อเข้าใช้",
       "stellaModels": "โมเดลของ Stella",
       "stellaModelsHint": "เป็นส่วนหนึ่งของแพ็กเกจ Stella ของคุณ",
-      "antigravityTitle": "Google Antigravity",
+      "antigravityTitle": "Gemini",
       "antigravitySignIn": "ลงชื่อเข้าใช้ด้วย Google",
-      "antigravitySignedIn": "คอมพิวเตอร์เครื่องนี้ลงชื่อเข้าใช้ Google Antigravity แล้ว",
-      "antigravityHint": "Gemini ตามแพ็กเกจ Google ของคุณ",
+      "antigravitySignedIn": "คอมพิวเตอร์เครื่องนี้ลงชื่อเข้าใช้ Gemini แล้ว",
+      "antigravityHint": "ใช้แพ็กเกจ Google ของคุณ",
       "antigravityOpened": "หน้าเข้าสู่ระบบของ Google เปิดในเบราว์เซอร์แล้ว เข้าสู่ระบบที่นั่น แล้ววางรหัสที่แสดง",
       "antigravityCode": "วางรหัสที่ Google แสดง",
       "antigravityPreparing": "กำลังเตรียม Gemini…"

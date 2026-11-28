@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import type { GradientColor, GradientMode } from "@stella/theme";
 import { renderGradientFile, type GradientReply, type GradientRequest } from "./gradient-file";
 import { useTokens } from "./ThemeProvider";
@@ -47,6 +47,12 @@ async function render(req: Omit<GradientRequest, "id">): Promise<GradientReply> 
 }
 
 /**
+ * Whether the window itself paints the theme's background (the phone's: its frame clears to the
+ * colour ThemeProvider gives it, springing with it), so surfaces under the app paint none of their own.
+ */
+export const WindowPaintsBackground = createContext(false);
+
+/**
  * The shell's shifting-gradient backdrop (desktop-ui's ShiftingGradient): the theme's blobs
  * rendered off the UI thread at 0.6× when the theme changes and stretched over the window, or
  * the plain background for flat themes.
@@ -58,6 +64,7 @@ export function ThemeBackdrop({ id = "theme-backdrop", mode = "soft", colorMode 
   const [image, setImage] = useState<string | null>(null);
   const latest = useRef(0);
   const flat = t.flat;
+  const windowPaints = useContext(WindowPaintsBackground);
 
   useEffect(() => {
     if (flat || !size.current) return;
@@ -76,7 +83,7 @@ export function ThemeBackdrop({ id = "theme-backdrop", mode = "soft", colorMode 
     <box
       id={id}
       absolute={{ left: 0, top: 0, right: 0, bottom: 0 }}
-      fill={t.c.background}
+      fill={windowPaints ? undefined : t.c.background}
       onLayout={(r) => {
         size.current = { w: r.w, h: r.h };
         if (!measured && r.w > 0 && r.h > 0) setMeasured(true);

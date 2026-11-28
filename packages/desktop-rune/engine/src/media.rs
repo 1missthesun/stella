@@ -266,7 +266,7 @@ pub fn icon(p: &Props) -> El {
 
 /// `<vector svg>`: a whole SVG document rasterized into the node's own pixels on each change
 /// (gradients, clip paths, transforms), replaced in place.
-fn vector_svg(n: u32, svg: &str, p: &Props) -> El {
+fn vector_raster_key(svg: &str, p: &Props) -> (u32, u64) {
     let side = |s: &Option<crate::props::Size>| match s {
         Some(crate::props::Size::Pt(v)) => *v,
         _ => 0.0,
@@ -279,19 +279,87 @@ fn vector_svg(n: u32, svg: &str, p: &Props) -> El {
         px.hash(&mut s);
         s.finish()
     };
+    (px, h)
+}
+
+/// Repaints node `n`'s `<vector svg>` in place for new props that change only its drawing,
+/// when it has drawn before. `false`: it needs building.
+pub fn repaint_vector(n: u32, p: &Props) -> bool {
+    let Some(svg) = p.svg.as_deref() else { return false };
+    let (px, h) = vector_raster_key(svg, p);
+    RASTERS.with(|m| {
+        let mut m = m.borrow_mut();
+        let Some(entry) = m.get_mut(&n) else { return false };
+        if entry.0 != h {
+            entry.0 = h;
+            raster_later(n, svg.to_owned(), px, entry.1.clone());
+        }
+        true
+    })
+}
+
+fn vector_svg(n: u32, svg: &str, p: &Props) -> El {
+    let (px, h) = vector_raster_key(svg, p);
     let pixels = RASTERS.with(|m| {
         let mut m = m.borrow_mut();
+        let first = !m.contains_key(&n);
         let entry = m.entry(n).or_insert_with(|| (0, rune::Pixels::new()));
         if entry.0 != h {
             entry.0 = h;
-            match rune::image::svg_rgba(svg.as_bytes(), px) {
-                Ok((w, h, rgba)) => entry.1.set(w, h, rgba),
-                Err(e) => eprintln!("stella-engine: vector {n}: {}", e.0),
+            // The first picture draws with the node; a change (an animated drawing's next pose)
+            // rasterizes off the frame thread and lands on a later frame.
+            if first {
+                raster_svg(n, svg, px, &entry.1);
+            } else {
+                raster_later(n, svg.to_owned(), px, entry.1.clone());
             }
         }
         entry.1.clone()
     });
     el().pixels(&pixels)
+}
+
+fn raster_svg(n: u32, svg: &str, px: u32, into: &rune::Pixels) {
+    match rune::image::svg_rgba(svg.as_bytes(), px) {
+        Ok((w, h, rgba)) => into.set(w, h, rgba),
+        Err(e) => eprintln!("stella-engine: vector {n}: {}", e.0),
+    }
+}
+
+/// SVG changes waiting for the raster thread, latest per node.
+struct RasterQueue {
+    jobs: std::sync::Mutex<HashMap<u32, (String, u32, rune::Pixels)>>,
+    ready: std::sync::Condvar,
+}
+
+fn raster_later(n: u32, svg: String, px: u32, into: rune::Pixels) {
+    static QUEUE: std::sync::OnceLock<Option<Arc<RasterQueue>>> = std::sync::OnceLock::new();
+    let queue = QUEUE.get_or_init(|| {
+        let q = Arc::new(RasterQueue { jobs: std::sync::Mutex::new(HashMap::new()), ready: std::sync::Condvar::new() });
+        let worker = q.clone();
+        let spawned = std::thread::Builder::new().name("stella-vector".into()).spawn(move || loop {
+            let (n, (svg, px, into)) = {
+                let mut jobs = worker.jobs.lock().unwrap_or_else(|e| e.into_inner());
+                loop {
+                    if let Some(&n) = jobs.keys().next() {
+                        break (n, jobs.remove(&n).unwrap());
+                    }
+                    jobs = worker.ready.wait(jobs).unwrap_or_else(|e| e.into_inner());
+                }
+            };
+            raster_svg(n, &svg, px, &into);
+        });
+        match spawned {
+            Ok(_) => Some(q),
+            Err(e) => {
+                eprintln!("stella-engine: vector thread: {e}");
+                None
+            }
+        }
+    });
+    let Some(queue) = queue else { return raster_svg(n, &svg, px, &into) };
+    queue.jobs.lock().unwrap_or_else(|e| e.into_inner()).insert(n, (svg, px, into));
+    queue.ready.notify_one();
 }
 
 const VECTOR_SCALE: f32 = 2.0;

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import { FullWindow } from "../../desktop-rune/ui/app/FullWindow";
 import { chatAtEnd } from "../../desktop-rune/ui/chat/chat-at-end";
 import { ToastPlacementContext } from "../../desktop-rune/ui/kit/Toast";
+import { WindowPaintsBackground } from "../../desktop-rune/ui/theme";
 import { usePhoneInsets } from "./phone/insets";
 import { barBase, barSpace, PHONE_TOPBAR_H } from "./phone/PhoneChrome";
 import { ConnectComputerLayer } from "./computer/ConnectComputer";
@@ -34,7 +35,9 @@ export function PhoneRoot() {
   return (
     <window id="main">
       <col id="phone-safe-area" w="full" h="full" pt={insets.top} pb={rides.current ? base : barSpace(insets)} pl={insets.left} pr={insets.right} y={rides.current ? -lift : 0}>
-        <ToastPlacementContext.Provider value={toastPlace}>{app}</ToastPlacementContext.Provider>
+        <WindowPaintsBackground.Provider value>
+          <ToastPlacementContext.Provider value={toastPlace}>{app}</ToastPlacementContext.Provider>
+        </WindowPaintsBackground.Provider>
       </col>
       <ConnectComputerLayer />
     </window>

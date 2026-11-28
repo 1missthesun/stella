@@ -84,7 +84,7 @@ function TopBar({ width, insets, tab, onWidth }: { width: number; insets: PhoneI
   const tr = useT();
   const middle = Math.max(0, width - 2 * (EDGE + BUTTON + 8));
   return (
-    <row id="phone-topbar" fixed absolute={{ left: 0, right: 0, top: insets.top }} h={PHONE_TOPBAR_H} align="center" px={EDGE} gap={8} raise={SHEET_RAISE + 1} onLayout={(r) => onWidth(r.w)}>
+    <row id="phone-topbar" fixed absolute={{ left: 0, right: 0, top: insets.top }} h={PHONE_TOPBAR_H} align="center" px={EDGE} gap={8} raise={SHEET_RAISE + 1} onSize={(r) => onWidth(r.w)}>
       <GlassButton id="phone-account-button" icon={Icons.stella.User} label={tr("settings.title")} onPress={() => phoneNav.openDrawer("account")} />
       <row grow={1} minW={0} h="full" center>
         {tab === "chat" ? (

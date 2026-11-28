@@ -15,10 +15,10 @@ path = "src/lib.rs"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-rune = { git = "https://github.com/1missthesun/rune", rev = "e7658e1d9842102b423b5d347b00735e18af35ba", features = ["tooling"] }
-rune-kit = { git = "https://github.com/1missthesun/rune", rev = "e7658e1d9842102b423b5d347b00735e18af35ba", features = ["markdown", "mermaid"] }
-rune-fx = { git = "https://github.com/1missthesun/rune", rev = "e7658e1d9842102b423b5d347b00735e18af35ba" }
-rune-light = { git = "https://github.com/1missthesun/rune", rev = "e7658e1d9842102b423b5d347b00735e18af35ba" }
+rune = { git = "https://github.com/1missthesun/rune", rev = "57b5d4a5ee83aa54477803484f309e6ba973c588", features = ["tooling"] }
+rune-kit = { git = "https://github.com/1missthesun/rune", rev = "57b5d4a5ee83aa54477803484f309e6ba973c588", features = ["markdown", "mermaid"] }
+rune-fx = { git = "https://github.com/1missthesun/rune", rev = "57b5d4a5ee83aa54477803484f309e6ba973c588" }
+rune-light = { git = "https://github.com/1missthesun/rune", rev = "57b5d4a5ee83aa54477803484f309e6ba973c588" }
 wgpu = { version = "~30.0.1", default-features = false }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -43,14 +43,14 @@ ndk-context = "0.1.1"
 winit = { version = "0.30.13", default-features = false, features = ["android-native-activity"] }
 
 [patch.crates-io]
-wgpu-hal = { git = "https://github.com/1missthesun/rune", rev = "e7658e1d9842102b423b5d347b00735e18af35ba" }
-naga = { git = "https://github.com/1missthesun/rune", rev = "e7658e1d9842102b423b5d347b00735e18af35ba" }
-winit = { git = "https://github.com/1missthesun/rune", rev = "e7658e1d9842102b423b5d347b00735e18af35ba" }
-sctk-adwaita = { git = "https://github.com/1missthesun/rune", rev = "e7658e1d9842102b423b5d347b00735e18af35ba" }
-parley_engine = { git = "https://github.com/1missthesun/rune", rev = "e7658e1d9842102b423b5d347b00735e18af35ba" }
-accesskit_windows = { git = "https://github.com/1missthesun/rune", rev = "e7658e1d9842102b423b5d347b00735e18af35ba" }
-accesskit_atspi_common = { git = "https://github.com/1missthesun/rune", rev = "e7658e1d9842102b423b5d347b00735e18af35ba" }
-accesskit_macos = { git = "https://github.com/1missthesun/rune", rev = "e7658e1d9842102b423b5d347b00735e18af35ba" }
+wgpu-hal = { git = "https://github.com/1missthesun/rune", rev = "57b5d4a5ee83aa54477803484f309e6ba973c588" }
+naga = { git = "https://github.com/1missthesun/rune", rev = "57b5d4a5ee83aa54477803484f309e6ba973c588" }
+winit = { git = "https://github.com/1missthesun/rune", rev = "57b5d4a5ee83aa54477803484f309e6ba973c588" }
+sctk-adwaita = { git = "https://github.com/1missthesun/rune", rev = "57b5d4a5ee83aa54477803484f309e6ba973c588" }
+parley_engine = { git = "https://github.com/1missthesun/rune", rev = "57b5d4a5ee83aa54477803484f309e6ba973c588" }
+accesskit_windows = { git = "https://github.com/1missthesun/rune", rev = "57b5d4a5ee83aa54477803484f309e6ba973c588" }
+accesskit_atspi_common = { git = "https://github.com/1missthesun/rune", rev = "57b5d4a5ee83aa54477803484f309e6ba973c588" }
+accesskit_macos = { git = "https://github.com/1missthesun/rune", rev = "57b5d4a5ee83aa54477803484f309e6ba973c588" }
 
 [profile.release]
 codegen-units = 16

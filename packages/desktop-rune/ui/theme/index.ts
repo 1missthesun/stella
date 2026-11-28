@@ -4,6 +4,6 @@ export { sheet, type BoxHandlers, type Style } from "./sheet";
 export { buildTokens, derive, GLASS_MATERIAL, type Gradient, type MaterialPrefs, type Shadow, type Tokens } from "./tokens";
 export { useMaterialPrefs } from "./accessibility";
 export { AppModeScope, ModeScope, ThemeProvider, ThemeScope, THEME_SPRING, tokensFor, useTokens } from "./ThemeProvider";
-export { ThemeBackdrop } from "./ThemeBackdrop";
+export { ThemeBackdrop, WindowPaintsBackground } from "./ThemeBackdrop";
 export { loadFonts, FONT_FILES } from "./fonts";
 export { useTheme, useThemeControl } from "@/context/theme-context";

@@ -1,4 +1,4 @@
-import { memo, useEffect, type ReactNode } from "react";
+import { memo, useContext, useEffect, type ReactNode } from "react";
 import { BackendAuthProvider } from "@/global/auth/BackendAuthProvider";
 import { I18nProvider } from "@/shared/i18n/RemoteI18nProvider";
 import { useLocale } from "@/shared/i18n/I18nProvider";
@@ -19,7 +19,7 @@ import { SelfHostLayer } from "@/global/self-host/SelfHostLayer";
 import { platformCapabilities } from "@/platform/capabilities";
 import { prefetchAuthSessionBeforeRender } from "@/global/auth/services/auth-session";
 import { installRendererErrorReporting } from "@/platform/diagnostics/report-error";
-import { ThemeProvider, useTokens } from "../theme";
+import { ThemeProvider, useTokens, WindowPaintsBackground } from "../theme";
 import { ToastRegion } from "../kit";
 import { ErrorBoundary } from "./ErrorBoundary";
 import { mounted, Nothing } from "./mount";
@@ -80,6 +80,7 @@ function AppProviders({ children }: { children: ReactNode }) {
 /** desktop-ui's `App`: the chat store, bootstrap, the cloud bridges and the execution layers around the full shell. */
 function App() {
   const t = useTokens();
+  const windowPaints = useContext(WindowPaintsBackground);
   useEffect(() => {
     if (!platformCapabilities.nativeBridges) return;
     const timer = window.setTimeout(() => window.sessionStorage.removeItem(AUTO_REPAIR_SIGNATURE_KEY), 20_000);
@@ -89,7 +90,7 @@ function App() {
   const dir = localeDir(useLocale());
   return (
     <>
-    <col id="app" w="full" h="full" fill={t.c.background} dir={dir} {...transitionLook}>
+    <col id="app" w="full" h="full" fill={windowPaints ? undefined : t.c.background} dir={dir} {...transitionLook}>
       <ChatStoreProvider>
         <AppBootstrap />
         <CloudMemoryPreferenceBridge />

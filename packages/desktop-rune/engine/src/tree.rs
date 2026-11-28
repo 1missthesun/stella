@@ -14,6 +14,8 @@ pub struct Node {
     pub parent: u32,
     /// Bumped whenever this node or anything under it changes; the memo version.
     pub ver: u64,
+    /// `Op::Props`'s `svg_rest` when the props last landed.
+    pub svg_rest: Option<u64>,
 }
 
 #[derive(Default)]
@@ -235,7 +237,21 @@ impl Tree {
                 }
                 self.nodes.insert(id, Node { kind, ..Default::default() });
             }
-            Op::Props { id, props } => {
+            Op::Props { id, props, svg_rest } => {
+                // A drawing that only changed its picture (an animated vector's next pose) keeps
+                // its layout: its pixels change in place, with no rebuild or relayout.
+                if let Some(n) = self.nodes.get_mut(&id)
+                    && n.kind == Kind::Vector
+                    && svg_rest.is_some()
+                    && n.svg_rest == svg_rest
+                    && crate::media::repaint_vector(id, &props)
+                {
+                    n.props = props;
+                    return;
+                }
+                if let Some(n) = self.nodes.get_mut(&id) {
+                    n.svg_rest = svg_rest;
+                }
                 if self.live_above.contains(&id) {
                     self.live_moved = true;
                 }

@@ -23,7 +23,9 @@ use crate::props::{Kind, Props};
 
 pub enum Op {
     Create { id: u32, kind: Kind },
-    Props { id: u32, props: Box<Props> },
+    /// `svg_rest`: for props carrying an `svg`, a hash of everything else, so a new drawing with
+    /// nothing else changed repaints its pixels without a relayout (`Tree::apply`).
+    Props { id: u32, props: Box<Props>, svg_rest: Option<u64> },
     Append { parent: u32, child: u32 },
     Insert { parent: u32, child: u32, before: u32 },
     Remove { parent: u32, child: u32 },
@@ -70,6 +72,24 @@ impl Cur<'_> {
     }
 }
 
+fn decode_props(j: &[u8]) -> serde_json::Result<(Props, Option<u64>)> {
+    if !j.windows(6).any(|w| w == b"\"svg\":") {
+        return Ok((serde_json::from_slice(j)?, None));
+    }
+    let mut v: serde_json::Value = serde_json::from_slice(j)?;
+    let svg = v.as_object_mut().and_then(|o| o.remove("svg"));
+    let rest = {
+        use std::hash::{Hash, Hasher};
+        let mut h = std::collections::hash_map::DefaultHasher::new();
+        v.to_string().hash(&mut h);
+        h.finish()
+    };
+    if let (Some(svg), Some(o)) = (svg, v.as_object_mut()) {
+        o.insert("svg".into(), svg);
+    }
+    Ok((serde_json::from_value(v)?, Some(rest)))
+}
+
 fn decode(frame: &[u8]) -> Vec<Op> {
     let mut c = Cur { b: frame, i: 0 };
     let mut ops = Vec::new();
@@ -83,11 +103,11 @@ fn decode(frame: &[u8]) -> Vec<Op> {
             2 => {
                 let (Some(id), Some(n)) = (c.u32(), c.u32()) else { break };
                 let Some(j) = c.bytes(n as usize) else { break };
-                let props = serde_json::from_slice::<Props>(j).unwrap_or_else(|e| {
+                let (props, svg_rest) = decode_props(j).unwrap_or_else(|e| {
                     eprintln!("stella-engine: bad props for node {id}: {e}");
-                    Props::default()
+                    (Props::default(), None)
                 });
-                Op::Props { id, props: Box::new(props) }
+                Op::Props { id, props: Box::new(props), svg_rest }
             }
             4 => {
                 let (Some(parent), Some(child)) = (c.u32(), c.u32()) else { break };

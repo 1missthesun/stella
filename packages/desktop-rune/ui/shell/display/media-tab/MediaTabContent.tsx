@@ -189,7 +189,7 @@ const clampPan = (v: ZoomView, image: Size | null): ZoomView => {
   return { scale: v.scale, x: Math.max(-mx, Math.min(mx, v.x)), y: Math.max(-my, Math.min(my, v.y)) };
 };
 
-/** Pinch to zoom about the fingers, pan a zoomed image with one finger, double-tap to zoom in and back (packages/mobile's image viewer). */
+/** Pinch to zoom about the fingers while they pan it, pan a zoomed image with one finger, double-tap to zoom in and back (packages/mobile's image viewer). */
 function useImageZoom(resetKey: unknown) {
   const [view, setView] = useState<ZoomView>(FIT);
   const [live, setLive] = useState(false);
@@ -210,28 +210,33 @@ function useImageZoom(resetKey: unknown) {
     setView(v.scale <= 1.02 ? FIT : clampPan({ ...v, scale: Math.min(ZOOM_MAX, v.scale) }, image.current));
   };
 
+  /** Where the pinch began: the view then, and the fingers' midpoint from the frame's middle. */
+  const pinchFrom = useRef<{ view: ZoomView; fx: number; fy: number } | null>(null);
   const onMagnify = (m: Magnify) => {
-    const v = current.current;
-    if (m.phase === "start") {
+    const fx = m.x - frame.current.w / 2;
+    const fy = m.y - frame.current.h / 2;
+    if (m.phase === "start" || !pinchFrom.current) {
       pinching.current = true;
       panFrom.current = null;
+      pinchFrom.current = { view: current.current, fx, fy };
       setLive(true);
     }
-    if (m.delta) {
-      // The image sits in the frame's middle and scales about its own middle: keep the point under the fingers there.
-      const scale = Math.max(0.6, Math.min(ZOOM_MAX * 1.25, v.scale * (1 + m.delta)));
-      const fx = m.x - frame.current.w / 2;
-      const fy = m.y - frame.current.h / 2;
-      const k = scale / v.scale;
-      const next = { scale, x: fx - (fx - v.x) * k, y: fy - (fy - v.y) * k };
-      current.current = next;
-      if (m.wheel) settle(next);
-      else setView(next);
-    }
-    if (m.phase === "end") {
+    const from = pinchFrom.current;
+    // packages/mobile's pinch: the point that began under the fingers stays under them, so
+    // spreading zooms about them and moving them together pans, at the same time.
+    const scale = Math.max(0.6, Math.min(ZOOM_MAX * 1.25, current.current.scale * (1 + m.delta)));
+    const k = scale / from.view.scale;
+    const next = { scale, x: fx - (from.fx - from.view.x) * k, y: fy - (from.fy - from.view.y) * k };
+    current.current = next;
+    if (m.wheel) {
+      pinchFrom.current = null;
       pinching.current = false;
-      settle(current.current);
-    }
+      settle(next);
+    } else if (m.phase === "end") {
+      pinchFrom.current = null;
+      pinching.current = false;
+      settle(next);
+    } else setView(next);
   };
 
   /** Pans a zoomed image; returns whether it took the drag (an image at its fit leaves it for swiping between files). */

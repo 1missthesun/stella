@@ -68,13 +68,17 @@ enum DebugDriver {
         }
       }
     case "/pinch":
-      // Two fingers about (x, y) moving from `from` to `to` points apart, horizontally.
-      let x = num("x", 214), y = num("y", 400), a = num("from", 60), b = num("to", 200), ms = max(16, num("ms", 400))
+      // Two fingers about (x, y) moving from `from` to `to` points apart, horizontally, while
+      // their midpoint travels (`dx`, `dy`): a pinch that pans at the same time.
+      let x0 = num("x", 214), y0 = num("y", 400), a = num("from", 60), b = num("to", 200), ms = max(16, num("ms", 400))
+      let mx = num("dx", 0), my = num("dy", 0)
+      let x = x0, y = y0
       let steps = max(2, Int(ms / 8))
       app.inject(id: 9003, phase: 0, at: CGPoint(x: x - a / 2, y: y))
       app.inject(id: 9004, phase: 0, at: CGPoint(x: x + a / 2, y: y))
       for i in 1...steps {
         let f = Double(i) / Double(steps), d = a + (b - a) * f
+        let x = x0 + mx * f, y = y0 + my * f
         DispatchQueue.main.asyncAfter(deadline: .now() + ms / 1000 * f) {
           app.inject(id: 9003, phase: i == steps ? 2 : 1, at: CGPoint(x: x - d / 2, y: y))
           app.inject(id: 9004, phase: i == steps ? 2 : 1, at: CGPoint(x: x + d / 2, y: y))

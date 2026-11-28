@@ -657,7 +657,7 @@ const antigravityRoute = async (model) => {
     path.join(home, ".local", "bin"),
     ...(isWindows && process.env.LOCALAPPDATA ? [path.join(process.env.LOCALAPPDATA, "agy", "bin")] : []),
   ]);
-  if (!cli) finish(false, "antigravity", "Antigravity isn't installed on this computer.");
+  if (!cli) finish(false, "antigravity", "Gemini isn't installed on this computer.");
   if (!(await online("https://generativelanguage.googleapis.com"))) finish(false, "antigravity", "Repair needs the internet, and this computer is offline.");
   say(`antigravity (${model}) in ${app}`);
   // agy's text mode takes its prompt only as an argument, so it gets the brief as a file.

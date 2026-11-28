@@ -163,7 +163,7 @@ const runRepair = async (install: Install, env: NodeJS.ProcessEnv, signal?: Abor
 
 const manualRepair = (install: Install | null): string =>
   install?.method === "other"
-    ? "Reinstall or update Google Antigravity's `agy` the way it was installed, then try again."
+    ? "Reinstall or update `agy` the way it was installed, then try again."
     : "Check your internet connection, then try again.";
 
 const unusable = (detail: { install: Install | null; problem: string; repair?: CliRepairOutcome }): Error => {
@@ -174,8 +174,8 @@ const unusable = (detail: { install: Install | null; problem: string; repair?: C
   return Object.assign(
     new Error(
       missing
-        ? `Google Antigravity couldn't be set up on this computer.${why} ${fix}`
-        : `Google Antigravity can't start on this computer: ${detail.install?.executable ?? "agy"} ${detail.problem}${why} ${fix}`,
+        ? `Gemini couldn't be set up on this computer.${why} ${fix}`
+        : `Gemini can't start on this computer: ${detail.install?.executable ?? "agy"} ${detail.problem}${why} ${fix}`,
     ),
     { code: "ANTIGRAVITY_CLI_UNUSABLE" },
   );

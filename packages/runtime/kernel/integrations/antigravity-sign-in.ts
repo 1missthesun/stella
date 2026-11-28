@@ -151,7 +151,7 @@ export const signOutAntigravity = async (home: string): Promise<void> => {
   if (answer.ok && !answer.signedIn) return;
   if (answer.ok) noteAntigravitySignIn(home, true);
   const why = problem ?? (replies[1]?.error ? String(replies[1].error.message ?? "") : answer.ok ? "" : answer.problem);
-  throw new Error(`Google Antigravity couldn't sign out. Try again.${why ? ` (${why})` : ""}`);
+  throw new Error(`Gemini couldn't sign out. Try again.${why ? ` (${why})` : ""}`);
 };
 
 export const antigravityInstalled = (): boolean => findAntigravityCli() !== undefined;

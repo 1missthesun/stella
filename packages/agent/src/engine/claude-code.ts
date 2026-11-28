@@ -139,7 +139,7 @@ export const ANTIGRAVITY_CLI_FLAVOR: CliEngineFlavor = {
   providerId: ANTIGRAVITY_CLI_PROVIDER_ID,
   extensionName: ANTIGRAVITY_CLI_ENGINE_EXTENSION,
   api: ANTIGRAVITY_CLI_API,
-  label: "Google Antigravity",
+  label: "Gemini",
   modelAliases: ANTIGRAVITY_MODEL_IDS,
   engineOnlyTools: [...ANTIGRAVITY_NATIVE_TOOLS.map((name) => `${ANTIGRAVITY_NATIVE_PREFIX}${name}`), ANTIGRAVITY_OTHER_TOOL],
   wrappedTools: [],

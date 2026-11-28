@@ -57,7 +57,7 @@ const START_TIMEOUT_MS = 60_000;
 
 export const ANTIGRAVITY_LOGIN_REQUIRED = "ANTIGRAVITY_CLI_LOGIN_REQUIRED";
 export const ANTIGRAVITY_SIGN_IN_NEEDED =
-  "This computer isn't signed in to Google Antigravity. Sign in with Google in Settings › Claude and ChatGPT.";
+  "This computer isn't signed in to Gemini. Sign in with Google in Settings › Claude and ChatGPT.";
 
 export type AntigravityToolSpec = { name: string; description: string; parameters: Record<string, unknown> };
 export type AntigravityToolOutcome = ToolResult;
@@ -227,8 +227,8 @@ const resultText = (update: Record<string, any>): string => {
     // The CLI gives its model a file's text or the search results, and tells its client only that the call finished.
     const paths = (Array.isArray(update.locations) ? update.locations : []).map((location: any) => location?.path).filter(Boolean);
     return update.kind === "read" && paths.length > 0
-      ? `Read ${paths.join(", ")}. Its text stayed in Antigravity; read it again to see it.`
-      : "Done. The result stayed in Antigravity.";
+      ? `Read ${paths.join(", ")}. Its text stayed with Gemini; read it again to see it.`
+      : "Done. The result stayed with Gemini.";
   }
   return output === undefined ? "" : JSON.stringify(output);
 };
@@ -405,7 +405,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
         reject(new Error("No Stella turn is active for this tool call."));
         return;
       }
-      const cancelTimer = forkTimeoutFiber(30_000, () => finish(new Error(`Antigravity called ${name} without announcing it.`)));
+      const cancelTimer = forkTimeoutFiber(30_000, () => finish(new Error(`Gemini called ${name} without announcing it.`)));
       const finish = (error?: Error) => {
         cancelTimer();
         turn.claimWaiters.delete(wake);
@@ -574,7 +574,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
           if (!waiting) continue;
           pending.delete(message.id);
           if (message.error) {
-            waiting.reject(errorWith(String(message.error.code ?? "ACP_ERROR"), String(message.error.message ?? "Antigravity failed.")));
+            waiting.reject(errorWith(String(message.error.code ?? "ACP_ERROR"), String(message.error.message ?? "Gemini failed.")));
           } else waiting.resolve(message.result);
         } else if (message.method === "session/update") {
           onUpdate(proc, message.params?.update ?? {});
@@ -587,16 +587,16 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     });
     const signInRecord = antigravitySignInRecordFile(home);
     const closeOnSignOut = () => {
-      if (antigravitySignedOutSince(home, startedAt)) kill(proc, "This computer signed out of Google Antigravity.");
+      if (antigravitySignedOutSince(home, startedAt)) kill(proc, "This computer signed out of Gemini.");
     };
     const exited = (detail: string) => {
       if (proc.exited) return;
       proc.exited = true;
       if (!started) antigravityCliKeeper.noteLaunchFailed(launch.executable);
       unwatchFile(signInRecord, closeOnSignOut);
-      for (const waiting of pending.values()) waiting.reject(new Error(`Antigravity CLI exited (${detail}).`));
+      for (const waiting of pending.values()) waiting.reject(new Error(`Gemini stopped (${detail}).`));
       pending.clear();
-      kill(proc, `Antigravity CLI exited (${detail}).${proc.stderr.trim() ? ` ${proc.stderr.trim().slice(-500)}` : ""}`);
+      kill(proc, `Gemini stopped (${detail}).${proc.stderr.trim() ? ` ${proc.stderr.trim().slice(-500)}` : ""}`);
     };
     child.on("exit", (code, signal) => exited(signal ?? String(code)));
     child.on("error", (error) => exited(error.message));
@@ -713,7 +713,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     noteModels(proc, result);
     proc.sessionId = String(result?.sessionId ?? "");
     proc.sessionShape = shape;
-    if (!proc.sessionId) throw new Error("Antigravity did not open a session.");
+    if (!proc.sessionId) throw new Error("Gemini did not open a session.");
     return false;
   };
 
@@ -724,7 +724,7 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
     const key = request.ref.sessionKey;
     let proc = procs.get(key);
     if (proc && proc.binary.identity !== launch.identity) {
-      kill(proc, "Google Antigravity was updated.");
+      kill(proc, "Gemini was updated.");
       proc = undefined;
     }
     if (proc && (proc.exited || proc.turn || proc.cwd !== request.cwd)) {
@@ -761,8 +761,8 @@ export const createAntigravityCliRuntime = (config: AntigravityCliConfig) => {
       const [gone, runs] = [antigravityModelName(antigravityModelBase(request.model)), antigravityModelName(replaced)];
       request.onModelFallback(
         antigravityModelRemoved(request.model)
-          ? `Google is removing ${gone} from Antigravity, so Stella now uses ${runs} instead.`
-          : `Your Google account doesn't have ${gone} in Antigravity, so Stella uses ${runs} instead.`,
+          ? `Google is retiring ${gone}, so Stella now uses ${runs} instead.`
+          : `Your Google account doesn't have ${gone}, so Stella uses ${runs} instead.`,
       );
     }
     if (wire && wire !== proc.currentModel) {

@@ -2221,8 +2221,7 @@
       "antigravityHint": "Gemini με το πρόγραμμα Google σας",
       "antigravityOpened": "Η σελίδα σύνδεσης της Google άνοιξε στο πρόγραμμα περιήγησής σας. Συνδεθείτε εκεί και μετά επικολλήστε τον κωδικό που εμφανίζεται.",
       "antigravityCode": "Επικολλήστε τον κωδικό που δείχνει η Google",
-      "antigravityPreparing": "Προετοιμασία του Google Antigravity…",
-      "antigravityRisk": "Η Google μπορεί να περιορίσει λογαριασμούς που χρησιμοποιούνται για εργασία χωρίς επίβλεψη."
+      "antigravityPreparing": "Προετοιμασία του Google Antigravity…"
     },
     "engineModels": {
       "ariaLabel": "Μοντέλα {engine}",

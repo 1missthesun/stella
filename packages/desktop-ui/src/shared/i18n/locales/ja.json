@@ -2211,8 +2211,7 @@
       "antigravityHint": "Google のプランで使う Gemini",
       "antigravityOpened": "Google のログインページをブラウザで開きました。そこでログインし、表示されたコードを貼り付けてください。",
       "antigravityCode": "Google に表示されたコードを貼り付け",
-      "antigravityPreparing": "Google Antigravity を準備しています…",
-      "antigravityRisk": "無人の作業に使われたアカウントは Google に制限されることがあります。"
+      "antigravityPreparing": "Google Antigravity を準備しています…"
     },
     "engineModels": {
       "ariaLabel": "{engine} のモデル",

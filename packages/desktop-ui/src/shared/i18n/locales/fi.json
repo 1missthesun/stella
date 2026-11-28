@@ -2221,8 +2221,7 @@
       "antigravityHint": "Gemini Google-tilauksellasi",
       "antigravityOpened": "Googlen kirjautumissivu avautui selaimeesi. Kirjaudu siellä sisään ja liitä sitten sen näyttämä koodi.",
       "antigravityCode": "Liitä Googlen näyttämä koodi",
-      "antigravityPreparing": "Valmistellaan Google Antigravitya…",
-      "antigravityRisk": "Google voi rajoittaa tilejä, joita käytetään valvomattomaan työhön."
+      "antigravityPreparing": "Valmistellaan Google Antigravitya…"
     },
     "engineModels": {
       "ariaLabel": "Mallit: {engine}",

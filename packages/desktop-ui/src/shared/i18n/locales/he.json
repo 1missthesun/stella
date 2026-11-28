@@ -2231,8 +2231,7 @@
       "antigravityHint": "Gemini בתוכנית Google שלך",
       "antigravityOpened": "דף הכניסה של Google נפתח בדפדפן שלך. יש להיכנס שם ואז להדביק את הקוד שמוצג.",
       "antigravityCode": "הדבקת הקוד ש-Google מציגה",
-      "antigravityPreparing": "מכינים את Google Antigravity…",
-      "antigravityRisk": "ייתכן ש-Google תגביל חשבונות שמשמשים לעבודה ללא השגחה."
+      "antigravityPreparing": "מכינים את Google Antigravity…"
     },
     "engineModels": {
       "ariaLabel": "מודלים של {engine}",

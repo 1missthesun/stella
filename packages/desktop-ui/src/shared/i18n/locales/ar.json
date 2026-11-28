@@ -2261,8 +2261,7 @@
       "antigravityHint": "Gemini ضمن خطة Google الخاصة بك",
       "antigravityOpened": "فُتحت صفحة تسجيل الدخول من Google في متصفحك. سجّل الدخول هناك، ثم الصق الرمز الذي يظهر لك.",
       "antigravityCode": "الصق الرمز الذي تعرضه Google",
-      "antigravityPreparing": "جارٍ تجهيز Google Antigravity…",
-      "antigravityRisk": "قد تقيّد Google الحسابات المستخدمة في عمل بلا إشراف."
+      "antigravityPreparing": "جارٍ تجهيز Google Antigravity…"
     },
     "engineModels": {
       "ariaLabel": "نماذج {engine}",

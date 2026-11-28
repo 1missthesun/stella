@@ -2241,8 +2241,7 @@
       "antigravityHint": "Gemini по вашему тарифу Google",
       "antigravityOpened": "Страница входа Google открылась в браузере. Войдите там, затем вставьте показанный код.",
       "antigravityCode": "Вставьте код, показанный Google",
-      "antigravityPreparing": "Подготовка Google Antigravity…",
-      "antigravityRisk": "Google может ограничивать аккаунты, используемые для работы без присмотра."
+      "antigravityPreparing": "Подготовка Google Antigravity…"
     },
     "engineModels": {
       "ariaLabel": "Модели {engine}",

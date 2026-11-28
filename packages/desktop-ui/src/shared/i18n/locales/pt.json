@@ -2231,8 +2231,7 @@
       "antigravityHint": "Gemini no seu plano Google",
       "antigravityOpened": "A página de login do Google abriu no seu navegador. Entre por lá e depois cole o código que aparecer.",
       "antigravityCode": "Cole o código mostrado pelo Google",
-      "antigravityPreparing": "Preparando o Google Antigravity…",
-      "antigravityRisk": "O Google pode limitar contas usadas para trabalho sem supervisão."
+      "antigravityPreparing": "Preparando o Google Antigravity…"
     },
     "engineModels": {
       "ariaLabel": "Modelos da {engine}",

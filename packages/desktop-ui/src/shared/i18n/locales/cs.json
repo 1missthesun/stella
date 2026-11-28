@@ -2241,8 +2241,7 @@
       "antigravityHint": "Gemini z vašeho tarifu Google",
       "antigravityOpened": "V prohlížeči se otevřela přihlašovací stránka Googlu. Přihlaste se tam a vložte kód, který se zobrazí.",
       "antigravityCode": "Vložte kód zobrazený Googlem",
-      "antigravityPreparing": "Připravuje se Google Antigravity…",
-      "antigravityRisk": "Google může omezit účty používané pro práci bez dozoru."
+      "antigravityPreparing": "Připravuje se Google Antigravity…"
     },
     "engineModels": {
       "ariaLabel": "Modely {engine}",

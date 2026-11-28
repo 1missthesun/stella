@@ -2221,8 +2221,7 @@
       "antigravityHint": "Gemini på dit Google-abonnement",
       "antigravityOpened": "Googles loginside er åbnet i din browser. Log ind dér, og indsæt derefter den kode, den viser.",
       "antigravityCode": "Indsæt koden, som Google viser",
-      "antigravityPreparing": "Gør Google Antigravity klar…",
-      "antigravityRisk": "Google kan begrænse konti, der bruges til arbejde uden opsyn."
+      "antigravityPreparing": "Gør Google Antigravity klar…"
     },
     "engineModels": {
       "ariaLabel": "{engine}-modeller",

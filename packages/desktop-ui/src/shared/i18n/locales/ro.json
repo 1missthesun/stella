@@ -2231,8 +2231,7 @@
       "antigravityHint": "Gemini din abonamentul tău Google",
       "antigravityOpened": "Pagina de conectare Google s-a deschis în browser. Conectează-te acolo, apoi lipește codul afișat.",
       "antigravityCode": "Lipește codul afișat de Google",
-      "antigravityPreparing": "Se pregătește Google Antigravity…",
-      "antigravityRisk": "Google poate limita conturile folosite pentru lucru nesupravegheat."
+      "antigravityPreparing": "Se pregătește Google Antigravity…"
     },
     "engineModels": {
       "ariaLabel": "Modele {engine}",

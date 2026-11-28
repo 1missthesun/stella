@@ -2221,8 +2221,7 @@
       "antigravityHint": "Gemini via je Google-abonnement",
       "antigravityOpened": "De inlogpagina van Google is geopend in je browser. Log daar in en plak daarna de code die je ziet.",
       "antigravityCode": "Plak de code die Google toont",
-      "antigravityPreparing": "Google Antigravity wordt klaargezet…",
-      "antigravityRisk": "Google kan accounts beperken die voor onbeheerd werk worden gebruikt."
+      "antigravityPreparing": "Google Antigravity wordt klaargezet…"
     },
     "engineModels": {
       "ariaLabel": "{engine}-modellen",

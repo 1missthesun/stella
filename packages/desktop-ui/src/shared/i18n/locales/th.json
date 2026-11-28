@@ -2211,8 +2211,7 @@
       "antigravityHint": "Gemini ตามแพ็กเกจ Google ของคุณ",
       "antigravityOpened": "หน้าเข้าสู่ระบบของ Google เปิดในเบราว์เซอร์แล้ว เข้าสู่ระบบที่นั่น แล้ววางรหัสที่แสดง",
       "antigravityCode": "วางรหัสที่ Google แสดง",
-      "antigravityPreparing": "กำลังเตรียม Google Antigravity…",
-      "antigravityRisk": "Google อาจจำกัดบัญชีที่ใช้ทำงานโดยไม่มีคนดูแล"
+      "antigravityPreparing": "กำลังเตรียม Google Antigravity…"
     },
     "engineModels": {
       "ariaLabel": "โมเดล {engine}",

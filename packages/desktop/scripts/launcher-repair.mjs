@@ -229,7 +229,8 @@ const stopTree = (child) => {
   }
 };
 
-const runBounded = (command, commandArgs, { env = process.env, cwd = app, input } = {}) =>
+// `token` goes to the child on a private pipe, fd 3 (Claude Code's CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR).
+const runBounded = (command, commandArgs, { env = process.env, cwd = app, input, token } = {}) =>
   new Promise((resolve) => {
     let out = "";
     let err = "";
@@ -240,12 +241,16 @@ const runBounded = (command, commandArgs, { env = process.env, cwd = app, input 
         cwd,
         env,
         detached: !isWindows,
-        stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe"],
+        stdio: [input === undefined ? "ignore" : "pipe", "pipe", "pipe", ...(token === undefined ? [] : ["pipe"])],
         windowsHide: true,
       });
     } catch (error) {
       resolve({ code: -1, out: "", err: String(error), timedOut: false });
       return;
+    }
+    if (token !== undefined) {
+      child.stdio[3]?.on("error", () => {});
+      child.stdio[3]?.end(`${token}\n`);
     }
     const timer = setTimeout(() => {
       timedOut = true;
@@ -341,13 +346,92 @@ const claudeRoute = async () => {
     return Number.isFinite(parsed) ? parsed : undefined;
   };
   const defaultDir = process.env.CLAUDE_CONFIG_DIR?.trim() || null;
-  // readStoredClaudeLogin (packages/contracts/claude-login.ts), on Claude Code's own file.
-  const storedLogin = (dir) => {
-    let oauth;
+  // The login stored for a config dir, where Claude Code keeps it, by the rules of
+  // readClaudeLogin (packages/node-shared/integrations/claude-login-store.ts): on macOS the login
+  // keychain by path (Claude Code's own lookup goes through the Keychain search list, which a
+  // wrong setting empties), then a keychain an ordinary lookup finds, then its credentials file.
+  // Secrets only travel through stdin, stdout and memory.
+  const SECURITY = "/usr/bin/security";
+  const securityRun = (securityArgs, input) => {
+    const result = spawnSync(SECURITY, securityArgs, {
+      input: input ?? "",
+      encoding: "utf8",
+      stdio: ["pipe", "pipe", "ignore"],
+      timeout: 10_000,
+    });
+    return { code: result.status, stdout: result.stdout ?? "" };
+  };
+  const configDirFor = (dir) => dir || process.env.CLAUDE_CONFIG_DIR || null;
+  const serviceFor = (configDir) =>
+    configDir
+      ? `Claude Code-credentials-${createHash("sha256").update(configDir.normalize("NFC")).digest("hex").slice(0, 8)}`
+      : "Claude Code-credentials";
+  const keychainAccount = (() => {
+    let name;
     try {
-      const parsed = JSON.parse(fs.readFileSync(path.join(dir ?? defaultDir ?? path.join(home, ".claude"), ".credentials.json"), "utf8"));
-      oauth = parsed?.claudeAiOauth && typeof parsed.claudeAiOauth === "object" ? parsed.claudeAiOauth : undefined;
-    } catch {}
+      name = process.env.USER || os.userInfo().username;
+    } catch {
+      name = "claude-code-user";
+    }
+    return /^[a-zA-Z0-9._-]+$/.test(name) ? name : "claude-code-user";
+  })();
+  const loginKeychain = (() => {
+    if (process.platform !== "darwin") return null;
+    // The account's home from the user database: Bun's os.userInfo() follows $HOME.
+    const passwd = spawnSync("/usr/bin/id", ["-P"], { encoding: "utf8", timeout: 5_000 });
+    const accountHome = (passwd.status === 0 ? passwd.stdout.trim().split(":")[8] : undefined) || home;
+    for (const name of ["login.keychain-db", "login.keychain"]) {
+      const candidate = path.join(accountHome, "Library", "Keychains", name);
+      if (fs.existsSync(candidate)) return candidate;
+    }
+    return null;
+  })();
+  const parseDocument = (raw) => {
+    const value = String(raw ?? "").trim();
+    for (const candidate of [value, /^[0-9a-f]+$/i.test(value) ? Buffer.from(value, "hex").toString("utf8") : null]) {
+      if (!candidate) continue;
+      try {
+        const parsed = JSON.parse(candidate);
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) return parsed;
+      } catch {}
+    }
+    return null;
+  };
+  const loginFrom = (document, source) => {
+    const oauth = document?.claudeAiOauth;
+    return oauth && typeof oauth === "object" && typeof oauth.accessToken === "string" && oauth.accessToken
+      ? { oauth, document, source }
+      : null;
+  };
+  const readLogin = (dir) => {
+    const configDir = configDirFor(dir);
+    if (process.platform === "darwin") {
+      const service = serviceFor(configDir);
+      const fromKeychain = (keychain) => {
+        const { code, stdout } = securityRun(["find-generic-password", "-a", keychainAccount, "-w", "-s", service, keychain]);
+        return code === 0 ? loginFrom(parseDocument(stdout), { kind: "keychain", keychain, service }) : null;
+      };
+      const found = loginKeychain ? fromKeychain(loginKeychain) : null;
+      if (found) return found;
+      const attributes = securityRun(["find-generic-password", "-a", keychainAccount, "-s", service]);
+      const elsewhere = attributes.code === 0 ? /^keychain: "(\/[^"\n]+)"/m.exec(attributes.stdout)?.[1] : undefined;
+      if (elsewhere && elsewhere !== loginKeychain) {
+        const there = fromKeychain(elsewhere);
+        if (there) return there;
+      }
+    }
+    const file = path.join(configDir ?? path.join(home, ".claude"), ".credentials.json");
+    let raw;
+    try {
+      raw = fs.readFileSync(file, "utf8");
+    } catch {
+      return null;
+    }
+    return loginFrom(parseDocument(raw), { kind: "file", file });
+  };
+  // readStoredClaudeLogin (packages/contracts/claude-login.ts), on that login.
+  const storedLogin = (dir) => {
+    const oauth = readLogin(dir)?.oauth;
     if (!oauth) return { alive: false };
     const now = Date.now();
     const expiresAt =
@@ -426,12 +510,146 @@ const claudeRoute = async () => {
   if (!chosen) finish(false, "claude-code", "Claude Code isn't signed in.");
   if (wanted && chosen.email !== wanted) say(`the Claude account chosen in Stella (${wanted}) isn't signed in here`);
   const env = cliEnv(chosen.dir);
+  for (const key of ["CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR", "CLAUDE_CODE_OAUTH_401_WAIT_MS", "CLAUDE_CODE_SUBSCRIPTION_TYPE", "CLAUDE_CODE_RATE_LIMIT_TIER"]) delete env[key];
+  // On macOS the login is handed to Claude Code on a private pipe (fd 3), as Stella's turns do
+  // (claude-code-host-login.ts), so the Keychain search list can't make it read as signed out.
+  const handed = process.platform === "darwin" ? await loginForRun(chosen.dir) : null;
+  if (handed) {
+    env.CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR = "3";
+    if (typeof handed.subscriptionType === "string" && handed.subscriptionType) env.CLAUDE_CODE_SUBSCRIPTION_TYPE = handed.subscriptionType;
+    if (typeof handed.rateLimitTier === "string" && handed.rateLimitTier) env.CLAUDE_CODE_RATE_LIMIT_TIER = handed.rateLimitTier;
+  }
   const model = (prefs.claudeCodeModel || "opus").trim();
   say(`claude-code (${model}) as ${chosen.email ?? chosen.configId} in ${app}`);
   return await runBounded(cli, ["-p", "--permission-mode", "bypassPermissions", "--model", model, "--output-format", "text"], {
     env,
     input: prompt,
+    ...(handed ? { token: handed.accessToken } : {}),
   });
+
+  // The access token to hand this run, renewed first (as Claude Code would, under its refresh
+  // lock, written back where it was read) when it would end before the run can. Null leaves
+  // Claude Code to find its login itself.
+  async function loginForRun(dir) {
+    const stored = readLogin(dir);
+    if (!stored || stored.oauth.loginEnded !== undefined) return null;
+    const now = Date.now();
+    const expiresAt = typeof stored.oauth.expiresAt === "number" ? stored.oauth.expiresAt : undefined;
+    const refreshes = typeof stored.oauth.refreshToken === "string" && stored.oauth.refreshToken.length > 0;
+    if (expiresAt === undefined || expiresAt > now + remainingMs() + 120_000) return stored.oauth;
+    if (!refreshes) return expiresAt > now ? stored.oauth : null;
+    const renewed = await renewLogin(dir, stored.oauth.accessToken);
+    if (renewed) return renewed.oauth;
+    return expiresAt > now ? stored.oauth : null;
+  }
+
+  async function renewLogin(dir, heldAccessToken) {
+    const configDir = configDirFor(dir);
+    const folder = configDir ?? path.join(home, ".claude");
+    let real = folder;
+    try {
+      real = fs.realpathSync(folder);
+    } catch {}
+    // Claude Code's own lock (proper-lockfile: stale after 60 s), so one refresh token is never spent twice.
+    const locks = [path.join(folder, ".oauth_refresh.lock"), `${real}.lock`];
+    const held = [];
+    const release = () => {
+      for (const lock of held.reverse()) fs.rmSync(lock, { recursive: true, force: true });
+      held.length = 0;
+    };
+    for (let attempt = 0; attempt < 20 && held.length < locks.length; attempt += 1) {
+      for (const lock of locks) {
+        try {
+          fs.mkdirSync(lock);
+          held.push(lock);
+        } catch {
+          try {
+            if (Date.now() - fs.statSync(lock).mtimeMs > 60_000) {
+              fs.rmSync(lock, { recursive: true, force: true });
+              fs.mkdirSync(lock);
+              held.push(lock);
+              continue;
+            }
+          } catch {}
+          release();
+          await new Promise((resolve) => setTimeout(resolve, 1_000 + Math.random() * 1_000));
+          break;
+        }
+      }
+    }
+    if (held.length < locks.length) return null;
+    const touch = setInterval(() => {
+      const at = new Date();
+      for (const lock of held) {
+        try {
+          fs.utimesSync(lock, at, at);
+        } catch {}
+      }
+    }, 5_000);
+    try {
+      const current = readLogin(dir);
+      if (!current) return null;
+      if (current.oauth.accessToken !== heldAccessToken) return current;
+      const serialize = (document) =>
+        JSON.stringify(document).replace(/[^\x20-\x7e]/g, (char) => `\\u${char.charCodeAt(0).toString(16).padStart(4, "0")}`);
+      const writeLine = (document) =>
+        `add-generic-password -U -a "${keychainAccount}" -s "${current.source.service}" -X "${Buffer.from(serialize(document), "utf8").toString("hex")}" "${current.source.keychain}"\n`;
+      // `security -i` drops a line of 4000 characters or more; never pass the login as an argument instead.
+      if (current.source.kind === "keychain" && writeLine(current.document).length + 1_200 >= 4_000) return null;
+      const scopes = Array.isArray(current.oauth.scopes) && current.oauth.scopes.length > 0
+        ? current.oauth.scopes
+        : ["user:inference", "user:profile", "user:sessions:claude_code"];
+      let response;
+      let body = {};
+      try {
+        response = await fetch(["https://platform.claude.com", "v1", "oauth", "token"].join("/"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            grant_type: "refresh_token",
+            refresh_token: current.oauth.refreshToken,
+            client_id: typeof current.oauth.clientId === "string" && current.oauth.clientId ? current.oauth.clientId : "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
+            scope: scopes.join(" "),
+          }),
+          signal: AbortSignal.timeout(30_000),
+        });
+        body = await response.json().catch(() => ({}));
+      } catch {
+        return null;
+      }
+      if (!response.ok || typeof body.access_token !== "string" || typeof body.expires_in !== "number") {
+        say(`renewing the Claude login didn't work (${typeof body.error === "string" ? body.error : `http_${response.status}`})`);
+        return null;
+      }
+      const at = Date.now();
+      const oauth = {
+        ...current.oauth,
+        accessToken: body.access_token,
+        refreshToken: typeof body.refresh_token === "string" && body.refresh_token ? body.refresh_token : current.oauth.refreshToken,
+        expiresAt: at + body.expires_in * 1000,
+        ...(typeof body.refresh_token_expires_in === "number" && body.refresh_token_expires_in > 0
+          ? { refreshTokenExpiresAt: at + body.refresh_token_expires_in * 1000 }
+          : {}),
+        ...(typeof body.scope === "string" && body.scope.trim() ? { scopes: body.scope.trim().split(/\s+/) } : {}),
+      };
+      const document = { ...current.document, claudeAiOauth: oauth };
+      if (current.source.kind === "keychain") {
+        if (securityRun(["-i"], writeLine(document)).code !== 0) say("the renewed Claude login couldn't be saved");
+      } else {
+        try {
+          const temp = `${current.source.file}.${process.pid}.${Date.now()}.tmp`;
+          fs.writeFileSync(temp, serialize(document), { mode: 0o600 });
+          fs.renameSync(temp, current.source.file);
+        } catch {
+          say("the renewed Claude login couldn't be saved");
+        }
+      }
+      return { ...current, oauth, document };
+    } finally {
+      clearInterval(touch);
+      release();
+    }
+  }
 };
 
 const antigravityRoute = async (model) => {

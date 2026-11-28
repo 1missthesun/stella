@@ -1,0 +1,4 @@
+modules/*/ios/vendor/**/*
+modules/*/android/vendor/**/*
+modules/*/android/.cxx/**/*
+modules/*/android/build/**/*

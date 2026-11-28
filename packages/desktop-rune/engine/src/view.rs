@@ -303,7 +303,11 @@ pub fn handlers(mut e: El, n: u32, p: &Props, is_input: bool) -> El {
                 let keys = tx.by_keys();
                 element_event(n, "press", json!({ "keys": keys }), Some(tx))
             }).press_on_return(),
-            "doublePress" => e.on_double_press_tx(move |_s: &mut Win, tx: &mut Tx| element_event(n, "doublePress", json!({}), Some(tx))),
+            "doublePress" => e.on_double_press_tx(move |_s: &mut Win, tx: &mut Tx| {
+                // Where the second press landed, in the element's own points (a double tap zooms there).
+                let at = tx.press_point().map(|p| json!({ "x": p.x, "y": p.y })).unwrap_or_else(|| json!({}));
+                element_event(n, "doublePress", at, Some(tx))
+            }),
             "contextMenu" => e.on_secondary_press(move |_s: &mut Win, at: rune::PointerPress, tx: &mut Tx| {
                 element_event(n, "contextMenu", json!({ "x": at.x, "y": at.y }), Some(tx))
             }),

@@ -68,7 +68,7 @@ const eventName = (prop: string) => prop[2].toLowerCase() + prop.slice(3);
 
 /** What each event hands its `on*` prop. Events not listed pass the whole payload. */
 const ARGS: Record<string, (e: ElementEvent) => unknown[]> = {
-  press: () => [], doublePress: () => [], dismiss: () => [], ready: () => [],
+  press: () => [], doublePress: (e) => [{ x: Number(e.x ?? NaN), y: Number(e.y ?? NaN) }], dismiss: () => [], ready: () => [],
   hover: (e) => [e.inside], focus: (e) => [e.focused, e.visible], focusWithin: (e) => [e.within],
   input: (e) => [e.value], submit: (e) => [e.value], link: (e) => [e.href], dropFiles: (e) => [e.paths],
   dropHover: (e) => [e.over], atBottom: (e) => [e.atBottom], farFromBottom: (e) => [e.far], title: (e) => [e.title], error: (e) => [e.error],

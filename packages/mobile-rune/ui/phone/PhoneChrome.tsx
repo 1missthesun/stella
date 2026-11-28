@@ -11,7 +11,7 @@ import { glyph, tabIcon } from "./icons";
 import { PhoneViewScreen } from "./ViewScreen";
 import { GlassCircle, BRAND_TOP, BRAND_ROW, TEXT, useRn } from "./rn";
 import { StatusPill } from "./StatusPill";
-import { blurTrack, DRAWER_RADIUS, DRAWER_SCALE, drawerTravel, held, pageTracks, panelTracks, sideOf, signOf, setStageBackground, stageFollow, useDrawerHost, useStage, useWindowSize, veilTrack, type Stage, type StageTracks } from "./stage";
+import { DRAWER_RADIUS, DRAWER_SCALE, drawerTravel, held, PAGE_RADIUS, pageBlurTracks, pageTracks, PANEL_DIM, panelBlurTracks, panelTracks, sideOf, signOf, setStageBackground, blurMaterial, stageFollow, useDrawerHost, useStage, useWindowSize, veilTrack, type Stage, type StageTracks } from "./stage";
 import { AccountPanel } from "./AccountPanel";
 import { ChatSettingsPanel } from "./ChatSettingsPanel";
 import { SchedulePage } from "./pages/SchedulePage";
@@ -158,9 +158,6 @@ function TabPages({ insets, tab, st }: { insets: PhoneInsets; tab: PhoneTab; st:
   );
 }
 
-/** packages/mobile's PANEL_BLUR (intensity 34), in points: the drawer sharpens out of it as it opens. */
-const PANEL_BLUR = 9;
-
 /**
  * One drawer, behind the page: it fades in, sharpens out of a blur and grows from 0.95 as the
  * page moves aside (DrawerPanel). A finger dragging it toward the page pulls it shut.
@@ -175,6 +172,8 @@ function DrawerPanel({ side, width, insets, children }: { side: Exclude<PhoneDra
   const tracks = useMemo(() => panelTracks(sign, travel), [sign, travel]);
   const t = useTokens();
   const bg = t.c.background;
+  const focus = useMemo(() => panelBlurTracks(t.dark), [t.dark]);
+  const m = blurMaterial(t.dark);
   return (
     <col
       id={`phone-drawer-${sideOf(side)}`}
@@ -182,6 +181,8 @@ function DrawerPanel({ side, width, insets, children }: { side: Exclude<PhoneDra
       absolute={sideOf(side) === "start" ? { left: 0, top: 0, bottom: 0 } : { right: 0, top: 0, bottom: 0 }}
       w={width}
       stage={tracks}
+      // Shown and hidden at once: an eased `hidden` would fade the whole drawer in a layer of its own.
+      motion={INSTANT}
       hidden={!ours}
       inert={!open}
       // RN's close pan, alongside the drawer's own scroll: a finger moving toward the page (away
@@ -195,16 +196,16 @@ function DrawerPanel({ side, width, insets, children }: { side: Exclude<PhoneDra
       </col>
       {/* packages/mobile's SidebarTopFade: the background solid under the status bar, fading out 14 pt below it. */}
       <box absolute={{ left: 0, top: 0, right: 0 }} h={insets.top + 14} inert gradient={{ angle: 180, stops: [[0, bg], [insets.top / (insets.top + 14), bg], [1, alpha(bg, 0)]] }} />
-      {/* DrawerPanel's focus blur: the drawer starts blurred (BlurView, the theme's tint) and sharpens as it opens, gone from 97 %. */}
-      {ours ? <box id={`phone-drawer-${sideOf(side)}-blur`} absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} backdropBlur={PANEL_BLUR} fill={blurTint(t.dark)} stage={PANEL_FOCUS} inert /> : null}
+      {/* DrawerPanel's focus blur: the drawer starts blurred in the theme's material (BlurView at
+          intensity 34) and sharpens as it opens, gone from 97 %; then its fade in from the background. */}
+      <box id={`phone-drawer-${sideOf(side)}-blur`} absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} backdropBlur={m.sigma * 0.34} fill={m.tint} stage={focus} hidden={!ours} inert />
+      <box id={`phone-drawer-${sideOf(side)}-dim`} absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} fill={bg} stage={PANEL_DIM} hidden={!ours} inert />
     </col>
   );
 }
 
 const noop = () => {};
-const PANEL_FOCUS: StageTracks = { opacity: held([[0, 1], [0.9, 0]]), hideAbove: 0.97 };
-/** expo-blur's light and dark tints at the drawer's intensities: a thin wash of the material over the blur. */
-const blurTint = (dark: boolean) => (dark ? "rgba(18,18,20,0.22)" : "rgba(255,255,255,0.28)");
+const INSTANT = { dur: 0 };
 
 /**
  * The drawer's button, handed off from the top bar as the drawer opens (DrawerStage's
@@ -240,6 +241,7 @@ function FloatingChevron({ side, insets }: { side: Exclude<PhoneDrawer, null>; i
       fixed
       raise={CHEVRON_RAISE}
       stage={ride}
+      motion={INSTANT}
       hidden={!ours}
       inert={!open}
     >
@@ -277,27 +279,63 @@ function Drawers({ insets }: { insets: PhoneInsets }) {
 /** Paints over the page and its chrome (the bars, the tab pages) while a drawer is out (DrawerStage's veil). */
 const VEIL_RAISE = 60;
 const STRIP_VEIL = 0.9;
-/** The page's blur with a drawer open, in points (packages/mobile's PAGE_BLUR intensity 30). */
-const PAGE_BLUR = 8;
+
+/** The page's rounded corners (DrawerStage's borderRadius), drawn at this radius and scaled with the stage's. */
+const CORNER = DRAWER_RADIUS;
+const CORNER_SCALE = held([[0, 0], [0.12, 1]]);
+const CORNERS = [
+  { key: "tl", at: { left: 0, top: 0 }, origin: [0, 0], d: `M0 0H${CORNER}A${CORNER} ${CORNER} 0 0 0 0 ${CORNER}Z` },
+  { key: "tr", at: { right: 0, top: 0 }, origin: [1, 0], d: `M${CORNER} 0V${CORNER}A${CORNER} ${CORNER} 0 0 0 0 0Z` },
+  { key: "bl", at: { left: 0, bottom: 0 }, origin: [0, 1], d: `M0 ${CORNER}V0A${CORNER} ${CORNER} 0 0 0 ${CORNER} ${CORNER}Z` },
+  { key: "br", at: { right: 0, bottom: 0 }, origin: [1, 1], d: `M${CORNER} ${CORNER}H0A${CORNER} ${CORNER} 0 0 0 ${CORNER} 0Z` },
+] as const;
+
+/**
+ * The page's corners rounded as it moves aside: the background painted over each corner outside
+ * its arc, riding the page (fixed, over its bars too, as RN's stage rounds the whole page), under
+ * the veil. Clipping the page round instead would draw it into a window-sized layer every frame.
+ */
+function PageCorners({ travel, bg, dark, hidden }: { travel: number; bg: string; dark: boolean; hidden: boolean }) {
+  const ride = useMemo(() => pageTracks(travel), [travel]);
+  // What shows behind a corner is the drawer: the background under its blur's tint.
+  const tint = useMemo(() => ({ scale: CORNER_SCALE, opacity: panelBlurTracks(dark).tint }), [dark]);
+  const m = blurMaterial(dark);
+  return (
+    <col id="phone-stage-corners" fixed inset={0} raise={VEIL_RAISE - 1} stage={ride} motion={INSTANT} hidden={hidden} inert>
+      {CORNERS.map((c) => (
+        <vector key={c.key} absolute={c.at} w={CORNER} h={CORNER} viewBox={[CORNER, CORNER]} paths={[{ d: c.d, fill: bg }]} origin={[c.origin[0], c.origin[1]]} stage={{ scale: CORNER_SCALE }} inert />
+      ))}
+      {CORNERS.map((c) => (
+        <vector key={`${c.key}-tint`} absolute={c.at} w={CORNER} h={CORNER} viewBox={[CORNER, CORNER]} paths={[{ d: c.d, fill: m.tint }]} origin={[c.origin[0], c.origin[1]]} stage={tint} inert />
+      ))}
+    </col>
+  );
+}
 
 /** The page's veil: the app's background over the page as it moves aside, which a tap or a drag on closes the drawer from. Fixed, so it carries the page's transform itself. */
 function StageVeil({ st }: { st: Stage }) {
   const t = useTokens();
   const bg = t.c.background;
-  const page = useMemo(() => pageTracks(st.travel), [st.travel]);
-  const blur = useMemo(() => ({ ...page, opacity: blurTrack() }), [page]);
+  const page = useMemo(() => ({ ...pageTracks(st.travel), radius: PAGE_RADIUS }), [st.travel]);
+  const blur = useMemo(() => ({ ...page, ...pageBlurTracks(t.dark) }), [page, t.dark]);
+  const m = blurMaterial(t.dark);
   const veil = useMemo(() => ({ ...page, opacity: veilTrack(STRIP_VEIL) }), [page]);
-  if (!st.live) return null;
+  // Always mounted, shown at once while a drawer is out: mounted by the tap or swipe that opens
+  // one, each piece would enter on Rune's default fade (the corners in a layer of their own).
+  const off = !st.live;
   return (
     <>
+    <PageCorners travel={st.travel} bg={bg} dark={t.dark} hidden={off} />
     {/* packages/mobile's page blur (DrawerStage's AnimatedBlur under the veil, in the theme's
-        tint): the page and its bars blurred as they move aside, deepening on drawerBlur's curve. */}
-    <box id="phone-stage-blur" fixed inset={0} raise={VEIL_RAISE} stage={blur} backdropBlur={PAGE_BLUR} fill={blurTint(t.dark)} inert />
+        material): the page and its bars blurred as they move aside, deepening on drawerBlur's curve. */}
+    <box id="phone-stage-blur" fixed inset={0} raise={VEIL_RAISE} motion={INSTANT} hidden={off} stage={blur} backdropBlur={m.sigma * 0.3} fill={m.tint} inert />
     <box
       id="phone-stage-veil"
       fixed
       inset={0}
       raise={VEIL_RAISE}
+      motion={INSTANT}
+      hidden={off}
       stage={veil}
       fill={bg}
       onPress={st.drawer ? () => phoneNav.closeDrawer() : undefined}

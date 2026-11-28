@@ -22,6 +22,7 @@ import { lazyScreen } from "../../kit/lazy";
 export const MediaTabContent = lazyScreen(() => import("./media-tab/MediaTabContent"), (module) => module.MediaTabContent);
 export { PreviewEmpty, PreviewProblem } from "./preview-states";
 import { PreviewEmpty, PreviewProblem } from "./preview-states";
+import { onPhone } from "../phone";
 
 const fileName = (filePath: string): string => filePath.split(/[\\/]/).pop() ?? filePath;
 
@@ -266,7 +267,8 @@ export const PdfTabContent = ({ filePath, title }: { filePath: string; title?: s
   const reportDetail = useViewerDetailReporter();
   const onPageChange = useCallback((page: number, total: number) => reportDetail(total > 1 ? `p. ${page}` : null), [reportDetail]);
   return (
-    <Rich id="display-pdf">
+    // A phone's pages fill the sheet edge to edge: zoomed in, they reach the screen's sides.
+    <Rich id="display-pdf" pad={onPhone() ? 0 : 12}>
       <PdfViewerCard filePath={filePath} title={title} pageRail onPageChange={onPageChange} />
     </Rich>
   );

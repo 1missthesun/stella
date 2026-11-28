@@ -1,4 +1,4 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import type { HostElement } from "../../../desktop-rune/host/reconciler";
 import { command } from "../../../desktop-rune/host/bridge";
 import { usePhoneNav as usePhoneNavState, type PhoneDrawer } from "./nav";
@@ -26,13 +26,27 @@ export const sideOf = (drawer: PhoneDrawer): "start" | "end" => (drawer === "cha
 /** Which way the page moves: right for the account (start) drawer, left for chat settings. */
 export const signOf = (drawer: PhoneDrawer) => (sideOf(drawer) === "start" ? 1 : -1);
 
-/** packages/mobile's drawerVeil: the page's veil over its progress (0 until 0.15, full at 0.9, eased). */
+/** CSS / Reanimated `cubic-bezier(x1, y1, x2, y2)` at `t`: x solved by Newton's method, then y. */
+function cubicBezier(x1: number, y1: number, x2: number, y2: number, t: number): number {
+  const ax = 3 * x1 - 3 * x2 + 1, bx = 3 * x2 - 6 * x1, cx = 3 * x1;
+  const ay = 3 * y1 - 3 * y2 + 1, by = 3 * y2 - 6 * y1, cy = 3 * y1;
+  let u = t;
+  for (let i = 0; i < 8; i++) {
+    const x = ((ax * u + bx) * u + cx) * u - t;
+    const dx = (3 * ax * u + 2 * bx) * u + cx;
+    if (Math.abs(x) < 1e-6 || Math.abs(dx) < 1e-6) break;
+    u -= x / dx;
+  }
+  u = Math.max(0, Math.min(1, u));
+  return ((ay * u + by) * u + cy) * u;
+}
+
+/** packages/mobile's drawerVeil: the page's veil over its progress (0 until 0.15, full at 0.9, on `cubic-bezier(0.25, 0, 0.6, 0.7)`). */
 export function drawerVeil(v: number): number {
   const t = (v - 0.15) / 0.75;
   if (t <= 0) return 0;
   if (t >= 1) return 1;
-  // cubic-bezier(0.25, 0, 0.6, 0.7), close enough by its polynomial.
-  return t * t * (3 - 2 * t) * 0.92 + t * 0.08;
+  return cubicBezier(0.25, 0, 0.6, 0.7, t);
 }
 
 /** packages/mobile's drawerBlur: the page's blur over its progress, a third of the way in by 0.15 and full at 0.9. */
@@ -58,21 +72,63 @@ export const held = (t: Track): Track => [[t[0][0] - 1, t[0][1]], ...t, [t[t.len
 /** `f` over [0, 1] in `n` steps, held past the ends. */
 export const sampled = (f: (v: number) => number, n = 24): Track => held(Array.from({ length: n + 1 }, (_, i) => [i / n, f(i / n)] as [number, number]));
 
-export type StageTracks = { x?: Track; y?: Track; scale?: Track; opacity?: Track; rotate?: Track; radius?: Track; signed?: boolean; hideAbove?: number };
+export type StageTracks = { x?: Track; y?: Track; scale?: Track; opacity?: Track; rotate?: Track; radius?: Track; blur?: Track; tint?: Track; signed?: boolean; hideAbove?: number };
 
 /** The page's own motion (DrawerStage's stage style): slid by the travel toward the drawer's side, shrunk to 0.9 (on past open as a finger pulls), its corners rounded over the first 12 %. */
-export const pageTracks = (travel: number): StageTracks => ({ x: [[0, 0], [1, travel]], scale: [[0, 1], [1, DRAWER_SCALE]], radius: held([[0, 0], [0.12, DRAWER_RADIUS]]), signed: true });
+export const pageTracks = (travel: number): StageTracks => ({ x: [[0, 0], [1, travel]], scale: [[0, 1], [1, DRAWER_SCALE]], signed: true });
+/**
+ * The page's corner radius over the stage's progress. The page itself isn't clipped round (a
+ * rounded clip draws the whole page into a window-sized layer every frame of the motion):
+ * `PageCorners` paints the background over its corners instead, and the veil and blur over it
+ * take the same radius.
+ */
+export const PAGE_RADIUS: Track = held([[0, 0], [0.12, DRAWER_RADIUS]]);
 
-const VEIL_TRACK = sampled((v) => drawerVeil(v));
-const BLUR_TRACK = sampled((v) => drawerBlur(v));
+const VEIL_TRACK = sampled((v) => drawerVeil(v), 48);
 export const veilTrack = (scale: number): Track => VEIL_TRACK.map(([v, o]) => [v, o * scale]);
-export const blurTrack = (): Track => BLUR_TRACK;
 
-/** Where the drawer itself sits (DrawerPanel): it fades in over the first 40 %, growing from 0.95 and easing in from a little behind. */
+/**
+ * iOS's light and dark blur materials (UIBlurEffect, which expo-blur's BlurView shows) at an
+ * animator fraction `f` (BlurView's `intensity / 100`), measured on the simulator: the blur's
+ * standard deviation grows linearly to 30 pt (light) or 20 pt (dark), and its tint, white or
+ * #1b1b1b, to 30 % or 73 % alpha. Nothing fades: the blur itself deepens and clears.
+ */
+export const BLUR_MATERIAL = {
+  light: { sigma: 30, tint: "#ffffff", alpha: 0.3 },
+  dark: { sigma: 20, tint: "#1b1b1b", alpha: 0.73 },
+} as const;
+export const blurMaterial = (dark: boolean) => (dark ? BLUR_MATERIAL.dark : BLUR_MATERIAL.light);
+
+/** packages/mobile's PAGE_BLUR: the page's BlurView at intensity `drawerBlur(v) * 30`. */
+const PAGE_INTENSITY = 0.3;
+/** packages/mobile's PANEL_BLUR: the drawer's BlurView at intensity 34, clearing to 0 by `v = 0.9`. */
+const PANEL_INTENSITY = 0.34;
+const PAGE_FRACTION = sampled((v) => drawerBlur(v) * PAGE_INTENSITY, 48);
+const PANEL_FRACTION = held([[0, PANEL_INTENSITY], [0.9, 0]]);
+
+/** The page's blur as the drawer opens: its sigma and its tint's alpha (DrawerStage's `pageBlur`). */
+export const pageBlurTracks = (dark: boolean): StageTracks => {
+  const m = blurMaterial(dark);
+  return { blur: PAGE_FRACTION.map(([v, f]) => [v, f * m.sigma]), tint: PAGE_FRACTION.map(([v, f]) => [v, f * m.alpha]) };
+};
+
+/** The drawer's own blur, sharpening as it opens and gone from 97 % (DrawerPanel's `panelFocus`). */
+export const panelBlurTracks = (dark: boolean): StageTracks => {
+  const m = blurMaterial(dark);
+  return { blur: PANEL_FRACTION.map(([v, f]) => [v, f * m.sigma]), tint: PANEL_FRACTION.map(([v, f]) => [v, f * m.alpha]), hideAbove: 0.97 };
+};
+
+/**
+ * DrawerPanel's fade in over the first 40 %, drawn as the app's background over the drawer
+ * fading out rather than as the drawer's opacity: the drawer sits on that background, so it is
+ * the same picture, without drawing the whole drawer into a layer of its own each frame.
+ */
+export const PANEL_DIM: StageTracks = { opacity: held([[0, 1], [0.4, 0]]), hideAbove: 0.4 };
+
+/** Where the drawer itself sits (DrawerPanel): it grows from 0.95 and eases in from a little behind (its fade is `PANEL_DIM`). */
 export const panelTracks = (sign: number, travel: number): StageTracks => ({
   x: held([[0, -sign * travel * 0.18], [1, 0]]),
   scale: held([[0, 0.95], [1, 1]]),
-  opacity: held([[0, 0], [0.4, 1]]),
 });
 
 /** Tells the engine the drawer's travel, which a finger's travel is measured against. */
@@ -160,3 +216,24 @@ const subscribeBg = (l: () => void) => {
   return () => bgListeners.delete(l);
 };
 export const useStageBackground = () => useSyncExternalStore(subscribeBg, () => stageBg, () => stageBg);
+
+/** How long after launch a drawer's contents mount while it's shut. */
+const WARM_MOUNT_MS = 1200;
+
+/**
+ * Whether a drawer's contents are mounted: from its first showing, or shortly after launch while
+ * it is still shut, as packages/mobile's DrawerStage always holds both panels. Mounted ahead, the
+ * first opening neither builds the whole panel in the frame it starts in nor fades it in (an
+ * element mounted by a tap enters on Rune's default fade, in a layer of its own); a commit no
+ * input caused mounts at once.
+ */
+export function useWarmMount(showing: boolean): boolean {
+  const [mounted, setMounted] = useState(showing);
+  if (showing && !mounted) setMounted(true);
+  useEffect(() => {
+    if (mounted) return;
+    const timer = setTimeout(() => setMounted(true), WARM_MOUNT_MS);
+    return () => clearTimeout(timer);
+  }, [mounted]);
+  return mounted;
+}

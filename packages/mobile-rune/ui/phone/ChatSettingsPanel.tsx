@@ -7,6 +7,7 @@ import { BRAND_TOP, DrawerTitle, GUTTER, Hairline, PanelPageHeader, SectionLabel
 import { accountsEngine, BrainSection, EngineAccountRow, ThinkingRow } from "./chat-settings/BrainSection";
 import { EngineAccountSection } from "./chat-settings/EngineAccounts";
 import { Rise, tapLight } from "./chat-settings/kit";
+import { useWarmMount } from "./stage";
 import { PlaceSwitcher } from "./chat-settings/PlaceSwitcher";
 import { ProviderMark } from "./chat-settings/ProviderMark";
 import { BrainPage, ProvidersPage } from "./chat-settings/ProviderPages";
@@ -21,9 +22,7 @@ type Route = { name: "home" } | { name: "providers" } | { name: "accounts" } | {
 const RESET_AFTER_CLOSE_MS = 350;
 
 export function ChatSettingsPanel({ showing, open, width, insets }: { showing: boolean; open: boolean; width: number; insets: PhoneInsets }) {
-  const shown = useRef(false);
-  if (showing) shown.current = true;
-  return shown.current ? <Panel open={open} width={width} insets={insets} /> : null;
+  return useWarmMount(showing) ? <Panel open={open} width={width} insets={insets} /> : null;
 }
 
 function Panel({ open, width, insets }: { open: boolean; width: number; insets: PhoneInsets }) {

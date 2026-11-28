@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import type { Loop } from "../../../../desktop-rune/host/rune-jsx/props";
 import { Icon } from "../../../../desktop-rune/ui/kit";
 import { glyph } from "../icons";
+import { useTokens } from "../../../../desktop-rune/ui/theme";
 import { BRAND_TOP, Dot, GUTTER, rt, TEXT, useRn } from "../rn";
 import { OPEN_SETTLE_S } from "../stage";
 import type { PhoneInsets } from "../insets";
@@ -44,31 +45,42 @@ export function DrawerPage({ id, insets, enter, children }: { id: string; insets
 }
 
 const RISE_SAMPLES = 12;
-const riseLoops = new Map<string, Loop>();
+const riseLoops = new Map<string, { slide: Loop; veil: Loop }>();
 
 /**
  * StartRise's look over the drawer's opening, played as a one-shot sequence when it opens: the
  * section slides in from `-14 - 7i` over the whole spring and fades in over half of it, starting
- * `0.08 i` in. `odd` alternates the spec between openings so the sequence plays again.
+ * `0.08 i` in. `odd` alternates the spec between openings so the sequence plays again. The fade
+ * is the drawer's background over the section fading out (`veil`), the same picture on the
+ * drawer's solid background, so the section never draws into a layer of its own each frame.
  */
-function riseLoop(i: number, odd: boolean): Loop {
+function riseLoop(i: number, odd: boolean): { slide: Loop; veil: Loop } {
   const key = `${i}:${odd ? 1 : 0}`;
   const hit = riseLoops.get(key);
   if (hit) return hit;
   const from = Math.min(0.08 * i, 0.5);
   const dx = -14 - i * 7;
-  const frames = Array.from({ length: RISE_SAMPLES + 1 }, (_, k) => {
-    const at = k / RISE_SAMPLES;
-    const v = 1 - (1 - at) ** 3;
-    return { at, opacity: Math.max(0, Math.min(1, (v - from) / 0.5)), x: dx * (1 - v) };
-  });
-  const loop: Loop = { kind: "sequence", period: OPEN_SETTLE_S + (odd ? 0.001 : 0), times: 1, ease: "linear", frames };
-  riseLoops.set(key, loop);
-  return loop;
+  const at = (k: number) => k / RISE_SAMPLES;
+  const v = (k: number) => 1 - (1 - at(k)) ** 3;
+  const steps = Array.from({ length: RISE_SAMPLES + 1 }, (_, k) => k);
+  const period = OPEN_SETTLE_S + (odd ? 0.001 : 0);
+  const loops = {
+    slide: { kind: "sequence", period, times: 1, ease: "linear", frames: steps.map((k) => ({ at: at(k), x: dx * (1 - v(k)) })) },
+    veil: { kind: "sequence", period, times: 1, ease: "linear", frames: steps.map((k) => ({ at: at(k), opacity: 1 - Math.max(0, Math.min(1, (v(k) - from) / 0.5)) })) },
+  } satisfies { slide: Loop; veil: Loop };
+  riseLoops.set(key, loops);
+  return loops;
 }
 
 export function Rise({ i, play, odd, children }: { i: number; play: boolean; odd: boolean; children: ReactNode }) {
-  return <col loop={play ? riseLoop(i, odd) : undefined}>{children}</col>;
+  const bg = useTokens().c.background;
+  const loops = play ? riseLoop(i, odd) : undefined;
+  return (
+    <col loop={loops?.slide}>
+      {children}
+      {loops ? <box absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} fill={bg} loop={loops.veil} inert /> : null}
+    </col>
+  );
 }
 
 /** settings-styles' row: a label with a quiet line under it and a control at the end. */

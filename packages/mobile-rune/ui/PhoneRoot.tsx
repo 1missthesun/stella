@@ -59,7 +59,8 @@ export function PhoneRoot() {
 
   return (
     <window id="main">
-      <col id="phone-drawer-host" ref={hostRef} absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} hidden={!live} />
+      {/* Shown and hidden at once: an eased `hidden` would fade both drawers in a layer of their own. */}
+      <col id="phone-drawer-host" ref={hostRef} absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} motion={{ dur: 0 }} hidden={!live} />
       <col
         id="phone-stage"
         w="full"

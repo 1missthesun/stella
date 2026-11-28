@@ -22,6 +22,7 @@ import { phoneAlert, phoneSheet } from "./ask";
 import { glyph } from "./icons";
 import type { PhoneInsets } from "./insets";
 import { DrawerTitle, Hairline, NavRow, PanelPageHeader, PRESS, SectionLabel, TEXT, useRn } from "./rn";
+import { useWarmMount } from "./stage";
 
 // packages/mobile's SettingsContent in the left drawer: who is signed in, the plan, the App,
 // Cloud Home and About sections, Sign out and Delete account, with each setting on its own page.
@@ -40,8 +41,7 @@ const errorText = (e: unknown): string => (e instanceof Error && e.message ? e.m
 const signIn = () => SIGN_IN_TOAST_ACTION.onClick();
 
 export function AccountPanel({ showing, open, insets }: { showing: boolean; open: boolean; width: number; insets: PhoneInsets }) {
-  const [mounted, setMounted] = useState(showing);
-  if (showing && !mounted) setMounted(true);
+  const mounted = useWarmMount(showing);
   if (!mounted) return null;
   return <AccountPages showing={showing} open={open} insets={insets} />;
 }

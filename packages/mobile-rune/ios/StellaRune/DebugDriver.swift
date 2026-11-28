@@ -7,12 +7,15 @@ import UIKit
 /// `<action>?…` command, also accepted as a `stella-rune://debug/<action>?…` deep link:
 ///   tap?x=&y=                    a finger tap (points), through Rune's touch handling or a native field
 ///   drag?x=&y=&dx=&dy=&ms=       a finger drag over ms milliseconds, released moving (flings)
+///   drag?…&hold=1 / lift         the same drag left held where it ends (a mid-swipe still), and its lift
 ///   type?text=                   text typed into the focused native field, as the keyboard does
 ///   key?name=return|backspace    a key in the focused native field
 ///   dark?on=0|1                  the app's appearance
 ///   perf?start=label | stop=label  frame recording (Documents/perf-<label>.json)
 enum DebugDriver {
   private static var timer: Timer?
+  /// Where a held drag's finger rests (`drag?…&hold=1`), for `lift`.
+  private static var held: CGPoint?
 
   /// Polls Documents/driver.txt: runs each line, then removes the file.
   static func start() {
@@ -58,14 +61,21 @@ enum DebugDriver {
       let x = num("x", 200), y = num("y", 500), dx = num("dx", 0), dy = num("dy", -300), ms = max(16, num("ms", 250))
       let steps = max(2, Int(ms / 8))
       let t0 = CACurrentMediaTime()
+      let hold = q["hold"] == "1"
       app.inject(id: 9002, phase: 0, at: CGPoint(x: x, y: y), time: t0)
+      if hold { held = CGPoint(x: x + dx, y: y + dy) }
       for i in 1...steps {
         let f = Double(i) / Double(steps)
         // Each event carries its moment on the gesture's timeline, as a real touch's timestamp
         // does, even when the main thread hands several over at once.
         DispatchQueue.main.asyncAfter(deadline: .now() + ms / 1000 * f) {
-          app.inject(id: 9002, phase: i == steps ? 2 : 1, at: CGPoint(x: x + dx * f, y: y + dy * f), time: t0 + ms / 1000 * f)
+          app.inject(id: 9002, phase: i == steps && !hold ? 2 : 1, at: CGPoint(x: x + dx * f, y: y + dy * f), time: t0 + ms / 1000 * f)
         }
+      }
+    case "/lift":
+      if let p = held {
+        held = nil
+        app.inject(id: 9002, phase: 2, at: p, time: CACurrentMediaTime())
       }
     case "/pinch":
       // Two fingers about (x, y) moving from `from` to `to` points apart, horizontally, while

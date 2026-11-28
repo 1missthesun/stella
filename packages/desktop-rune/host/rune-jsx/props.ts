@@ -180,7 +180,7 @@ export type BoxProps = {
    * linear between them and carried on past the ends, and replaces the prop. `signed` mirrors `x`
    * and `rotate` for the end drawer; `hideAbove` hides it from that progress on. No effect on desktops.
    */
-  stage?: { x?: [number, number][]; y?: [number, number][]; scale?: [number, number][]; opacity?: [number, number][]; rotate?: [number, number][]; radius?: [number, number][]; signed?: boolean; hideAbove?: number };
+  stage?: { x?: [number, number][]; y?: [number, number][]; scale?: [number, number][]; opacity?: [number, number][]; rotate?: [number, number][]; radius?: [number, number][]; /** `backdropBlur`'s sigma (points). */ blur?: [number, number][]; /** Scales the fill's alpha. */ tint?: [number, number][]; signed?: boolean; hideAbove?: number };
   /** `"open"` with `edgeDrag`, `"close"` with `onDrag`: the finger drives the phone's drawer stage in the engine instead of the handler, which hears nothing. */
   stageDrag?: "open" | "close";
   enter?: Presence; exit?: Presence;
@@ -232,7 +232,8 @@ export type BoxProps = {
   modal?: { clickOutside?: boolean; wheelOutside?: boolean; /** `false`: closing leaves nothing focused (a Radix `onCloseAutoFocus` that prevents the return). */ returnFocus?: boolean; /** Native pages under it stay live and take their own presses, as under a non-modal Radix popover. */ livePages?: boolean };
   // Events
   onPress?: () => void;
-  onDoublePress?: () => void;
+  /** Where the second press landed, in the element's own points (NaN when a press has no point). */
+  onDoublePress?: (at: { x: number; y: number }) => void;
   onContextMenu?: (at: { x: number; y: number }) => void;
   onHover?: (inside: boolean) => void;
   onFocus?: (focused: boolean, keyboard: boolean) => void;

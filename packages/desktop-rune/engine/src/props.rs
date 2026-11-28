@@ -267,6 +267,12 @@ pub struct StageP {
     pub opacity: Option<Vec<[f32; 2]>>,
     pub rotate: Option<Vec<[f32; 2]>>,
     pub radius: Option<Vec<[f32; 2]>>,
+    /// The backdrop blur's standard deviation in points (`backdropBlur`), so a blur deepens or
+    /// clears with the stage as a system material does over its animator's fraction, rather
+    /// than fading a fixed blur in and out.
+    pub blur: Option<Vec<[f32; 2]>>,
+    /// Scales the fill's alpha (a blur's tint, which deepens with it).
+    pub tint: Option<Vec<[f32; 2]>>,
     /// `x` and `rotate` follow the open drawer's side: they are given for the start (left)
     /// drawer and mirrored for the end one.
     pub signed: bool,
@@ -298,6 +304,14 @@ impl StageP {
         }
         if let Some(r) = at(&self.radius) {
             out.radius = Some(r.max(0.0));
+        }
+        if let Some(b) = at(&self.blur) {
+            out.backdrop_blur = Some(b.max(0.0));
+        }
+        if let Some(k) = at(&self.tint)
+            && let Some(c) = out.fill.as_mut()
+        {
+            c.0.a *= k.clamp(0.0, 1.0);
         }
         if self.hide_above.is_some_and(|h| v >= h) {
             out.hidden = true;

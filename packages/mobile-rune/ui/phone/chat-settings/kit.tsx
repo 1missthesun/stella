@@ -1,4 +1,5 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import { useTokens } from "../../../../desktop-rune/ui/theme";
 import { Icon } from "../../../../desktop-rune/ui/kit";
 import { glyph } from "../icons";
 import { phoneSheet } from "../ask";
@@ -24,14 +25,23 @@ export function Spinner({ color, size = 20 }: { color: string; size?: number }) 
 /**
  * packages/mobile's sidebar Rise: each block fades in and slides 14 + 7·i pt from the side as the
  * drawer opens, later blocks a little later, and leaves the same way as it closes. `fromClosed`:
- * the drawer's first opening mounts it already open, so it enters from the closed pose.
+ * the drawer's first opening mounts it already open, so it enters from the closed pose. The fade
+ * is the drawer's background over the block fading out, the same picture on the drawer's solid
+ * background, so the block never draws into a layer of its own each frame.
  */
 export function Rise({ i, open, fromClosed, children }: { i: number; open: boolean; fromClosed: boolean; children: ReactNode }) {
   const dur = 0.42 + Math.min(i * 0.06, 0.3);
   const dx = 14 + i * 7;
+  const bg = useTokens().c.background;
+  const [entered, setEntered] = useState(!fromClosed);
+  useEffect(() => {
+    if (!entered) setEntered(true);
+  }, [entered]);
+  const shown = open && entered;
   return (
-    <col w="full" opacity={open ? 1 : 0} x={open ? 0 : dx} motion={{ dur, bounce: 0 }} enter={fromClosed ? { opacity: 0, x: dx, dur, bounce: 0 } : undefined}>
+    <col w="full" x={open ? 0 : dx} motion={{ dur, bounce: 0 }} enter={fromClosed ? { x: dx, dur, bounce: 0 } : undefined}>
       {children}
+      <box absolute={{ left: 0, top: 0, right: 0, bottom: 0 }} fill={bg} opacity={shown ? 0 : 1} motion={{ dur, bounce: 0 }} inert />
     </col>
   );
 }

@@ -2,6 +2,7 @@ package com.stella.rune
 
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.graphics.Matrix
 import android.graphics.pdf.PdfRenderer
 import android.os.ParcelFileDescriptor
 import org.json.JSONArray
@@ -34,11 +35,24 @@ object PdfPages {
         }
         val out = m.optString("out")
         val width = m.optInt("width", 1000)
+        // `rect: [x0, y0, x1, y1]`: only that part of the page (fractions of it), `width` pixels wide.
+        val rect = m.optJSONArray("rect")
+        var (x0, y0, x1, y1) = listOf(0.0, 0.0, 1.0, 1.0)
+        if (rect != null && rect.length() == 4) {
+          val v = (0 until 4).map { rect.optDouble(it).coerceIn(0.0, 1.0) }
+          if (v[2] > v[0] && v[3] > v[1]) { x0 = v[0]; y0 = v[1]; x1 = v[2]; y1 = v[3] }
+        }
         r.openPage(m.optInt("page", 1) - 1).use { page ->
-          val height = (width.toDouble() * page.height / page.width).toInt().coerceAtLeast(1)
+          val height = (width.toDouble() * page.height * (y1 - y0) / (page.width * (x1 - x0))).toInt().coerceAtLeast(1)
           val bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888)
           bitmap.eraseColor(Color.WHITE)
-          page.render(bitmap, null, null, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
+          // The whole page at the scale the part fills the bitmap, shifted so the part lands on it.
+          val k = width / (page.width * (x1 - x0))
+          val matrix = Matrix().apply {
+            setScale(k.toFloat(), k.toFloat())
+            postTranslate((-x0 * page.width * k).toFloat(), (-y0 * page.height * k).toFloat())
+          }
+          page.render(bitmap, null, matrix, PdfRenderer.Page.RENDER_MODE_FOR_DISPLAY)
           File(out).parentFile?.mkdirs()
           File(out).outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 86, it) }
           bitmap.recycle()

@@ -6,6 +6,8 @@ import UIKit
 /// to it, and the viewer shows them as images. `pdf.open {path}` replies `{pages: [[w, h], …]}`
 /// (points, as the page is shown, rotation applied); `pdf.render {path, page, width, out}` writes
 /// page `page` (1-based) `width` pixels wide as a JPEG on white to `out` and replies `{path}`.
+/// With `rect: [x0, y0, x1, y1]` (fractions of the page as shown) it draws only that part of the
+/// page, `width` pixels wide: the zoomed viewer's sharp tile of what's on screen.
 final class PdfPages {
   static let shared = PdfPages()
   private let queue = DispatchQueue(label: "stella.pdf", qos: .userInitiated)
@@ -43,8 +45,15 @@ final class PdfPages {
       }
       let box = page.bounds(for: .cropBox)
       let turned = page.rotation % 180 != 0
-      let aspect = turned ? box.width / box.height : box.height / box.width
-      let size = CGSize(width: width, height: (width * aspect).rounded())
+      let full = turned ? box.width / box.height : box.height / box.width
+      // The part of the page drawn, as fractions of it as shown (all of it unless `rect`).
+      var part = CGRect(x: 0, y: 0, width: 1, height: 1)
+      if let r = m["rect"] as? [Double], r.count == 4 {
+        let x0 = max(0, min(1, r[0])), y0 = max(0, min(1, r[1])), x1 = max(0, min(1, r[2])), y1 = max(0, min(1, r[3]))
+        if x1 > x0, y1 > y0 { part = CGRect(x: x0, y: y0, width: x1 - x0, height: y1 - y0) }
+      }
+      let aspect = full * part.height / part.width
+      let size = CGSize(width: width, height: max(1, (width * aspect).rounded()))
       let format = UIGraphicsImageRendererFormat()
       format.scale = 1
       format.opaque = true
@@ -54,9 +63,13 @@ final class PdfPages {
         let cg = ctx.cgContext
         cg.translateBy(x: 0, y: size.height)
         cg.scaleBy(x: 1, y: -1)
-        // Scale the page's display box (rotation applied by PDFKit's transform) to the picture.
+        // Scale the page's display box (rotation applied by PDFKit's transform) to the picture,
+        // the part drawn filling it: the whole page is `1 / part` times the picture's size.
         let drawn = turned ? CGSize(width: box.height, height: box.width) : box.size
-        cg.scaleBy(x: size.width / drawn.width, y: size.height / drawn.height)
+        let whole = CGSize(width: size.width / part.width, height: size.height / part.height)
+        // Flipped (y up): the part's bottom edge sits at the picture's bottom.
+        cg.translateBy(x: -part.minX * whole.width, y: -(1 - part.maxY) * whole.height)
+        cg.scaleBy(x: whole.width / drawn.width, y: whole.height / drawn.height)
         page.draw(with: .cropBox, to: cg)
       }
       do {

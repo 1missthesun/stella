@@ -38,6 +38,7 @@ declare const __native: {
   readFile(path: string): Uint8Array | null;
   readText(path: string): string | null;
   writeFile(path: string, data: Uint8Array | string): boolean;
+  removeFile(path: string): boolean;
   fetch(id: number, req: { url: string; method: string; headers: Record<string, string>; redirect?: string; credentials?: string }, body: Uint8Array | string | undefined): void;
   fetchAbort(id: number): void;
   wsOpen(id: number, url: string, protocols: string[]): void;

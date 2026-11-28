@@ -16,6 +16,7 @@ import { installBackButton } from "../ui/phone/back";
 import { restoreComputerMode } from "../ui/computer/computer-mode";
 import { listenForPairingLinks } from "../ui/computer/ConnectComputer";
 import { installJsPerf } from "./jsperf";
+import { phoneConversationCache } from "./conversation-cache";
 
 const t0 = __native.now();
 
@@ -23,6 +24,10 @@ try {
   void listen();
   const env = __native.env;
   if (env.env.STELLA_JSPERF === "1") installJsPerf();
+  // The chat's cache of the last session (what Electron's SQLite store is on a computer), so a
+  // launch shows the latest messages at once and syncs on top.
+  const conversationCache = phoneConversationCache();
+  (globalThis as { __stellaConversationCache?: unknown }).__stellaConversationCache = conversationCache;
   onEngineEvent("appearance", (a: any) => {
     dom.setAppearance({ dark: !!a.dark });
     notePhoneAppearance(a);
@@ -30,6 +35,7 @@ try {
   // Backgrounding and coming back, as a browser tab's visibility and focus: the chat socket
   // checks itself and reconnects on `visibilitychange` (use-conversation), timers catch up.
   onEngineEvent("app.visible", ({ visible }) => {
+    if (!visible) conversationCache.flush();
     dom.setVisible(visible);
     dom.setFocused(visible);
   });

@@ -217,6 +217,9 @@ final class JSRuntime: NSObject, URLSessionDataDelegate, URLSessionWebSocketDele
       try? FileManager.default.createDirectory(at: URL(fileURLWithPath: path).deletingLastPathComponent(), withIntermediateDirectories: true)
       return FileManager.default.createFile(atPath: path, contents: d)
     } as @convention(block) (String, JSValue) -> Bool)
+    set("removeFile", { (path: String) -> Bool in
+      (try? FileManager.default.removeItem(atPath: path)) != nil
+    } as @convention(block) (String) -> Bool)
     set("fetch", { [weak self] (id: Int, req: [String: Any], body: JSValue) in
       self?.startFetch(id, req, body)
     } as @convention(block) (Int, [String: Any], JSValue) -> Void)

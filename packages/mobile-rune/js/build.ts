@@ -77,6 +77,16 @@ function resolveRelative(spec: string, importer: string): string | undefined {
 
 const DESKTOP_UI_SRC = path.join(UI_ROOT, "src");
 
+/** `js/ui-replace/<path>` stands in for desktop-ui's `src/<path>` on the phone, where it has no desktop-rune stand-in to replace. */
+const UI_REPLACE = path.join(JS, "ui-replace");
+function phoneUiReplacement(file: string): string | undefined {
+  if (!file.startsWith(DESKTOP_UI_SRC + path.sep)) return undefined;
+  const candidate = path.join(UI_REPLACE, path.relative(DESKTOP_UI_SRC, file));
+  if (!fs.existsSync(candidate)) return undefined;
+  if (replacementFor(file, "")) throw new Error(`${candidate}: desktop-rune replaces this file too; replace its stand-in (js/replace) instead`);
+  return candidate;
+}
+
 // Bun's bundler drops namespace bindings (`import * as ns`, `export * as ns`, e.g. zod's `util`,
 // the kit's `Icons`) whenever any plugin has an onResolve hook on relative paths, even one that
 // returns nothing. Modules with a relative namespace import get every relative specifier made
@@ -136,6 +146,16 @@ const COMPUTER_CHAT_FILES = new Map<string, (text: string) => string>([
     },
   ],
   [
+    // Not a computer's chats: the chat store's cache of the last session, which the phone keeps
+    // itself (js/conversation-cache.ts) rather than through a desktop API.
+    path.join(DESKTOP_UI_SRC, "features/cloud/cloud-conversation-cache-client.ts"),
+    (text) => {
+      const read = "return window.electronAPI?.cloudConversationCache ?? null;";
+      if (!text.includes(read)) throw new Error("conversation cache: cloud-conversation-cache-client.ts no longer reads window.electronAPI as before");
+      return text.replace(read, "return (globalThis as { __stellaConversationCache?: CloudConversationCacheRendererApi }).__stellaConversationCache ?? null;");
+    },
+  ],
+  [
     path.join(DESKTOP_UI_SRC, "features/cloud/use-cloud-chat-bridge.tsx"),
     (text) => {
       const webShell = "const webShell = isWebShell();";
@@ -163,6 +183,8 @@ const mobilePlugin: BunPlugin = {
     build.onResolve({ filter: /^(@\/|\.\.?\/)/ }, (a) => {
       if (!a.path.startsWith("@/") && !a.importer.startsWith(DESKTOP_UI_SRC + path.sep)) return undefined;
       const file = resolveSpecifier(a.path, a.importer);
+      const phone = file && phoneUiReplacement(file);
+      if (phone) return { path: phone };
       const replacement = file && replacementFor(file, a.importer);
       // desktop-rune's own stand-ins (ui/replace/…) can have a phone one in turn.
       return replacement ? { path: replacementOf(replacement) ?? replacement } : undefined;

@@ -341,6 +341,9 @@ class JSRuntime(private val context: Context) {
       }
     }
 
+    @V8Function(name = "removeFile")
+    fun removeFile(path: String): Boolean = File(path).delete()
+
     @V8Function(name = "fetch")
     fun fetch(id: Int, req: V8ValueObject, body: V8Value?) {
       val url = req.getString("url")

@@ -930,7 +930,9 @@
         "reasonCloudLogin": "Skyens login",
         "reasonOtherLogin": "Tilføjet i Stella",
         "reasonOwnLogin": "Denne computers eget Claude Code-login",
-        "reasonSelected": "Valgt i Stella"
+        "reasonSelected": "Valgt i Stella",
+        "noteKeychain": "{place}: loginet er stadig gemt, men Macens Nøglering kan ikke finde det.",
+        "rowKeychain": "Ikke fundet i Nøglering"
       },
       "claudeLogin": {
         "whereCloud": "Logger ind på Claude Code i din cloud.",

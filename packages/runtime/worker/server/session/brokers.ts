@@ -79,6 +79,7 @@ export const make = async (args: {
           configDir: result.configDir,
           ...(result.email ? { email: result.email } : {}),
           signedIn: result.signedIn,
+          ...(result.unreachable ? { unreachable: result.unreachable } : {}),
         };
       },
     });

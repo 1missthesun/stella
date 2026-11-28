@@ -2145,7 +2145,9 @@
         "reasonCloudLogin": "Pilven kirjautuminen",
         "reasonOtherLogin": "Lisätty Stellassa",
         "reasonOwnLogin": "Tämän tietokoneen oma Claude Code -kirjautuminen",
-        "reasonSelected": "Valittu Stellassa"
+        "reasonSelected": "Valittu Stellassa",
+        "noteKeychain": "{place}: kirjautuminen on yhä tallessa, mutta Macin Avainnippu ei löydä sitä.",
+        "rowKeychain": "Ei löydy Avainnipusta"
       },
       "claudeLogin": {
         "approve": "Hyväksy avautuneella Anthropicin sivulla, niin kirjautuminen valmistuu itsestään.",
@@ -3517,7 +3519,10 @@
     "signIn": "Kirjaudu",
     "signedInContinuing": "Kirjauduttu Claudeen. Stella vastaa nyt.",
     "signedInAsResend": "Kirjauduttu Claudeen tilillä {email}. Jatka lähettämällä viestisi uudelleen.",
-    "signedInResend": "Kirjauduttu Claudeen. Jatka lähettämällä viestisi uudelleen."
+    "signedInResend": "Kirjauduttu Claudeen. Jatka lähettämällä viestisi uudelleen.",
+    "keychainTitle": "Claude ei löydä kirjautumistasi tältä Macilta",
+    "keychainDescription": "Claude-kirjautumisesi on yhä tallessa tämän Macin kirjautumisavainnipussa, mutta Avainnipun haut eivät löydä sitä, yleensä koska kirjautumisavainnippu on poistettu hakuluettelosta. Mitään ei kirjauduttu ulos.",
+    "keychainHeldDescription": "Claude-kirjautumisesi on yhä tallessa tämän Macin kirjautumisavainnipussa, mutta Avainnipun haut eivät löydä sitä. Mitään ei kirjauduttu ulos. Viestisi säilyy ja lähtee heti, kun kirjautuminen löytyy taas."
   },
   "email": {
     "title": "Sähköposti",

@@ -207,6 +207,7 @@ export type HostLlmCredentialsResult =
       configDir: string | null;
       email?: string;
       signedIn: boolean;
+      unreachable?: "keychain";
     }
   | { ok: false; reason: string };
 

@@ -930,7 +930,9 @@
         "reasonCloudLogin": "Η σύνδεση του cloud",
         "reasonOtherLogin": "Προστέθηκε στο Stella",
         "reasonOwnLogin": "Η σύνδεση αυτού του υπολογιστή στο Claude Code",
-        "reasonSelected": "Επιλέχθηκε στη Stella"
+        "reasonSelected": "Επιλέχθηκε στη Stella",
+        "noteKeychain": "{place}: η σύνδεση είναι ακόμη αποθηκευμένη, αλλά η Κλειδοθήκη του Mac δεν τη βρίσκει.",
+        "rowKeychain": "Δεν βρέθηκε στην Κλειδοθήκη"
       },
       "claudeLogin": {
         "whereCloud": "Σύνδεση στο Claude Code στο cloud σας.",

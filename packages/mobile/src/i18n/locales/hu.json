@@ -930,7 +930,9 @@
         "reasonCloudLogin": "A felhő bejelentkezése",
         "reasonOtherLogin": "Stellában hozzáadva",
         "reasonOwnLogin": "Ennek a számítógépnek a saját Claude Code-bejelentkezése",
-        "reasonSelected": "Kiválasztva a Stellában"
+        "reasonSelected": "Kiválasztva a Stellában",
+        "noteKeychain": "{place}: a bejelentkezés még el van mentve, de a Mac Kulcskarikája nem találja.",
+        "rowKeychain": "Nem található a Kulcskarikában"
       },
       "claudeLogin": {
         "whereCloud": "Bejelentkezés a Claude Code-ba a felhődben.",

@@ -929,7 +929,9 @@
         "reasonCloudLogin": "云端的登录",
         "reasonOtherLogin": "在 Stella 中添加",
         "reasonOwnLogin": "这台电脑自己的 Claude Code 登录",
-        "reasonSelected": "在 Stella 中选择"
+        "reasonSelected": "在 Stella 中选择",
+        "noteKeychain": "{place}：登录仍已保存，但 Mac 的钥匙串找不到它。",
+        "rowKeychain": "钥匙串中找不到"
       },
       "claudeLogin": {
         "whereCloud": "正在你的云端登录 Claude Code。",

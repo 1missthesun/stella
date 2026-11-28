@@ -932,7 +932,9 @@
         "reasonCloudLogin": "Přihlášení cloudu",
         "reasonOtherLogin": "Přidáno ve Stella",
         "reasonOwnLogin": "Vlastní přihlášení tohoto počítače ke Claude Code",
-        "reasonSelected": "Vybráno ve Stella"
+        "reasonSelected": "Vybráno ve Stella",
+        "noteKeychain": "{place}: přihlášení je stále uložené, ale Klíčenka na Macu ho nenajde.",
+        "rowKeychain": "Nenalezeno v Klíčence"
       },
       "claudeLogin": {
         "whereCloud": "Přihlašování ke Claude Code ve vašem cloudu.",

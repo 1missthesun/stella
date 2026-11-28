@@ -9,6 +9,7 @@ import {
 } from "../head-tail-output-buffer.js";
 import { runToolEffect } from "../effect-runtime.js";
 import { isDangerousCommand } from "../command-safety.js";
+import { keychainSettingsChangeMessage } from "../keychain-guard.js";
 import { sanitizeToolVisibleText } from "../safety.js";
 import { resolveManagedShellCommand } from "./launch.js";
 import {
@@ -267,6 +268,8 @@ export const handleExecCommand = async (
     return { error: toolErrorMessage(signal.reason ?? new Error("Aborted")) };
   }
   const prepared = resolveManagedShellCommand(state, args, context);
+  const keychainBlock = keychainSettingsChangeMessage(prepared.command);
+  if (keychainBlock) return { error: keychainBlock };
   const dangerReason = isDangerousCommand(prepared.command, prepared.cwd);
   if (dangerReason) {
     return {

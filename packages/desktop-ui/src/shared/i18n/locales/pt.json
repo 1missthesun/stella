@@ -2155,7 +2155,9 @@
         "reasonCloudLogin": "O login da nuvem",
         "reasonOtherLogin": "Adicionado no Stella",
         "reasonOwnLogin": "O login do Claude Code deste computador",
-        "reasonSelected": "Escolhida no Stella"
+        "reasonSelected": "Escolhida no Stella",
+        "noteKeychain": "{place}: o login ainda está salvo, mas o Acesso às Chaves do Mac não o encontra.",
+        "rowKeychain": "Não encontrado no Acesso às Chaves"
       },
       "claudeLogin": {
         "approve": "Aprove na página da Anthropic que foi aberta e o login termina sozinho.",
@@ -3549,7 +3551,10 @@
     "signIn": "Entrar",
     "signedInContinuing": "Conectado ao Claude. A Stella está respondendo agora.",
     "signedInAsResend": "Conectado ao Claude como {email}. Envie sua mensagem novamente para continuar.",
-    "signedInResend": "Conectado ao Claude. Envie sua mensagem novamente para continuar."
+    "signedInResend": "Conectado ao Claude. Envie sua mensagem novamente para continuar.",
+    "keychainTitle": "O Claude não encontra seu login neste Mac",
+    "keychainDescription": "Seu login do Claude ainda está salvo nas chaves de login deste Mac, mas as buscas do Acesso às Chaves não o encontram, geralmente porque as chaves de login foram tiradas da lista de busca. Nenhuma sessão foi encerrada.",
+    "keychainHeldDescription": "Seu login do Claude ainda está salvo nas chaves de login deste Mac, mas as buscas do Acesso às Chaves não o encontram. Nenhuma sessão foi encerrada. Sua mensagem fica guardada e é enviada assim que ele for encontrado de novo."
   },
   "email": {
     "title": "E-mail",

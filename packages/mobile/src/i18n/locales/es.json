@@ -931,7 +931,9 @@
         "reasonCloudLogin": "El inicio de sesión de la nube",
         "reasonOtherLogin": "Añadido en Stella",
         "reasonOwnLogin": "El inicio de sesión de Claude Code de este ordenador",
-        "reasonSelected": "Elegida en Stella"
+        "reasonSelected": "Elegida en Stella",
+        "noteKeychain": "{place}: el inicio de sesión sigue guardado, pero el Llavero del Mac no lo encuentra.",
+        "rowKeychain": "No encontrado en el Llavero"
       },
       "claudeLogin": {
         "whereCloud": "Iniciando sesión en Claude Code en tu nube.",

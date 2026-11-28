@@ -1230,3 +1230,123 @@ export function getCatastrophicShellCommandReason(
 ): string | null {
   return inspectCommand(command, 0, createAnalysisState(cwd));
 }
+
+const SECURITY_SEARCH_SETTINGS = ["list-keychains", "default-keychain", "login-keychain"];
+const LOGIN_KEYCHAIN_FILE = /^login\.keychain(?:-db)?$/u;
+
+function securityCommandNamed(typed: string, full: string): boolean {
+  return typed.length > 0 && full.startsWith(typed);
+}
+
+/**
+ * `security` resolves a command from any unique-looking prefix (`security
+ * list -s` is `list-keychains -s`), and options cluster getopt-style, so
+ * this reads arguments the way the tool does.
+ */
+function inspectSecurity(args: string[]): string | null {
+  let index = 0;
+  let interactive = false;
+  while (index < args.length && /^-./u.test(args[index])) {
+    const cluster = args[index].slice(1);
+    index += 1;
+    if (cluster === "-") break;
+    for (let at = 0; at < cluster.length; at += 1) {
+      if (cluster[at] === "i") interactive = true;
+      if (cluster[at] === "p") {
+        interactive = true;
+        if (at === cluster.length - 1) index += 1;
+        break;
+      }
+    }
+  }
+  if (interactive) return "interactive security";
+  const command = args[index] ?? "";
+  const rest = args.slice(index + 1);
+  if (!command) return null;
+  let sets = false;
+  let deletesLogin = false;
+  for (let at = 0; at < rest.length; at += 1) {
+    const arg = rest[at];
+    if (/^-[^-]/u.test(arg)) {
+      const cluster = arg.slice(1);
+      for (let char = 0; char < cluster.length; char += 1) {
+        if (cluster[char] === "s") sets = true;
+        if (cluster[char] === "d") {
+          if (char === cluster.length - 1) at += 1;
+          break;
+        }
+      }
+      continue;
+    }
+    if (LOGIN_KEYCHAIN_FILE.test(arg.split("/").at(-1) ?? "")) deletesLogin = true;
+  }
+  if (sets && SECURITY_SEARCH_SETTINGS.some((name) => securityCommandNamed(command, name))) {
+    return `security ${command} -s`;
+  }
+  if (deletesLogin && securityCommandNamed(command, "delete-keychain")) {
+    return "deleting the login keychain";
+  }
+  return null;
+}
+
+function inspectSecurityDefaults(args: string[]): string | null {
+  const operands = args.filter((arg) => !arg.startsWith("-"));
+  const [verb, domain] = operands;
+  if (!verb || !domain || !["write", "delete", "import", "rename"].includes(verb)) return null;
+  const name = domain.split("/").at(-1)?.replace(/\.plist$/u, "");
+  return name === "com.apple.security" ? `defaults ${verb} com.apple.security` : null;
+}
+
+function unwrapXcrun(args: string[]): { name: string; args: string[] } | null {
+  let index = 0;
+  while (index < args.length && args[index].startsWith("-")) {
+    const option = args[index].toLowerCase();
+    if (["-f", "--find"].includes(option)) return null;
+    index += ["-sdk", "--sdk", "-toolchain", "--toolchain"].includes(option) ? 2 : 1;
+  }
+  const tool = args[index];
+  return tool ? { name: executableName(tool), args: args.slice(index + 1) } : null;
+}
+
+function inspectKeychainCommand(command: string, depth: number): string | null {
+  if (depth > MAX_NESTED_COMMAND_DEPTH) return null;
+  const lexed = lexShell(command);
+  for (const nested of lexed.nestedCommands) {
+    const reason = inspectKeychainCommand(nested, depth + 1);
+    if (reason) return reason;
+  }
+  for (const tokens of splitCommands(lexed.tokens)) {
+    const words = commandWords(tokens);
+    if (words.length === 0) continue;
+    const splitString = inspectEnvSplitString(words);
+    if (splitString) {
+      const reason = inspectKeychainCommand(splitString, depth + 1);
+      if (reason) return reason;
+    }
+    let commandInfo = unwrapCommand(words);
+    if (commandInfo?.name === "xcrun") commandInfo = unwrapXcrun(commandInfo.args);
+    if (!commandInfo) continue;
+    const { name, args } = commandInfo;
+    const literal = shellLiteral(name, args);
+    if (literal) {
+      const reason = inspectKeychainCommand(literal, depth + 1);
+      if (reason) return reason;
+    }
+    const reason =
+      name === "security"
+        ? inspectSecurity(args)
+        : name === "defaults"
+          ? inspectSecurityDefaults(args)
+          : null;
+    if (reason) return reason;
+  }
+  return null;
+}
+
+/**
+ * What in a command would change the macOS Keychain search list, default
+ * keychain or login keychain (or delete the login keychain), or null.
+ */
+export function getKeychainSettingsChange(command: string): string | null {
+  return inspectKeychainCommand(command, 0);
+}

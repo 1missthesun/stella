@@ -931,7 +931,9 @@
         "reasonCloudLogin": "O login da nuvem",
         "reasonOtherLogin": "Adicionado no Stella",
         "reasonOwnLogin": "O login do Claude Code deste computador",
-        "reasonSelected": "Escolhida no Stella"
+        "reasonSelected": "Escolhida no Stella",
+        "noteKeychain": "{place}: o login ainda está salvo, mas o Acesso às Chaves do Mac não o encontra.",
+        "rowKeychain": "Não encontrado no Acesso às Chaves"
       },
       "claudeLogin": {
         "whereCloud": "Entrando no Claude Code na sua nuvem.",

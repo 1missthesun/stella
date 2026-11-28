@@ -2145,7 +2145,9 @@
         "reasonCloudLogin": "Molnets inloggning",
         "reasonOtherLogin": "Tillagd i Stella",
         "reasonOwnLogin": "Den här datorns egen Claude Code-inloggning",
-        "reasonSelected": "Vald i Stella"
+        "reasonSelected": "Vald i Stella",
+        "noteKeychain": "{place}: inloggningen finns kvar, men Macens Nyckelring hittar den inte.",
+        "rowKeychain": "Hittades inte i Nyckelring"
       },
       "claudeLogin": {
         "approve": "Godkänn på Anthropics sida som öppnades, så slutförs det av sig självt.",
@@ -3517,7 +3519,10 @@
     "signIn": "Logga in",
     "signedInContinuing": "Inloggad på Claude. Stella svarar nu.",
     "signedInAsResend": "Inloggad på Claude som {email}. Skicka ditt meddelande igen för att fortsätta.",
-    "signedInResend": "Inloggad på Claude. Skicka ditt meddelande igen för att fortsätta."
+    "signedInResend": "Inloggad på Claude. Skicka ditt meddelande igen för att fortsätta.",
+    "keychainTitle": "Claude hittar inte din inloggning på den här Macen",
+    "keychainDescription": "Din Claude-inloggning finns fortfarande sparad i inloggningsnyckelringen på den här Macen, men sökningar i Nyckelring hittar den inte, oftast för att inloggningsnyckelringen har tagits bort från söklistan. Inget har loggats ut.",
+    "keychainHeldDescription": "Din Claude-inloggning finns fortfarande sparad i inloggningsnyckelringen på den här Macen, men sökningar i Nyckelring hittar den inte. Inget har loggats ut. Ditt meddelande sparas och skickas så snart den hittas igen."
   },
   "email": {
     "title": "E-post",

@@ -233,9 +233,19 @@ export const restartNoteText = (
 export const claudeSignInNoteText = (
   computer: { name: string; deviceId?: string },
   since: number,
-  held: { email?: string; reply: boolean; tasks: ReadonlyArray<ResumedTask> },
+  held: { email?: string; reply: boolean; tasks: ReadonlyArray<ResumedTask>; cause?: "keychain" },
 ): string => {
   const where = computer.deviceId ? `${computer.name} (device_id: ${computer.deviceId})` : computer.name;
+  if (held.cause === "keychain") {
+    return [
+      "[Claude login not found in Keychain]",
+      `Claude Code on ${where} can't answer since ${new Date(since).toISOString()}: it reports "Not logged in" because ordinary Keychain lookups on that Mac no longer find its Claude login${held.email ? ` (${held.email})` : ""}, although the login is still saved in the login keychain. Usually the login keychain was taken off the Mac's Keychain search list (a command changed it). The sign-in has not ended and nothing was signed out, so don't tell the user to sign in again. Waiting there:`,
+      ...held.tasks.map((task) => `- ${task.description} (thread_id: ${task.threadId})`),
+      ...(held.reply ? ["- your own reply in this chat"] : []),
+      `They continue by themselves, with their context, once the Keychain finds the login again; they give up after 12 hours. Until then agent_status shows them as waiting for a Claude sign-in, and messages to them wait too.`,
+      "Only the user can put the login keychain back on the search list (tasks are not allowed to change Keychain settings): in Terminal on that Mac, `security list-keychains -d user` shows the list, and `security list-keychains -d user -s ~/Library/Keychains/login.keychain-db` (plus any other keychains they keep there) restores it. Tell them when they're next around. A task that can't wait can be carried on elsewhere with send_message's destination (the cloud or another computer), or stopped.",
+    ].join("\n");
+  }
   return [
     "[Claude sign-in needed]",
     `Claude Code on ${where} can't answer since ${new Date(since).toISOString()}: its Claude sign-in${held.email ? ` (${held.email})` : ""} there has ended or was refused, so work there that runs on Claude waits for a sign-in instead of failing. Waiting there:`,
@@ -812,11 +822,17 @@ export function desktopChats(options: DesktopChatsOptions) {
     }
     return { woken, cloud };
   };
-  const loginHolds = new Map<string, Map<string, { text: string; email?: string }>>();
+  const loginHolds = new Map<string, Map<string, { text: string; email?: string; cause?: "keychain" }>>();
   const loginHoldEvent = (conversationId: string): PiChatEvent | undefined => {
     const first = loginHolds.get(conversationId)?.values().next().value;
     return first
-      ? { type: "engine_status", state: "login-required", text: first.text, ...(first.email ? { email: first.email } : {}) }
+      ? {
+          type: "engine_status",
+          state: "login-required",
+          text: first.text,
+          ...(first.email ? { email: first.email } : {}),
+          ...(first.cause ? { cause: first.cause } : {}),
+        }
       : undefined;
   };
   const loginHeldSince = new Map<string, Map<string, number>>();
@@ -835,6 +851,10 @@ export function desktopChats(options: DesktopChatsOptions) {
     signInAlert.timer = undefined;
     if (signInAlert.sent || !options.signInAlert) return;
     if (loginHeldSince.size === 0) return;
+    const signInWouldHelp = [...loginHolds.values()].some((holds) =>
+      [...holds.values()].some((hold) => hold.cause === undefined),
+    );
+    if (!signInWouldHelp) return;
     let tasks = 0;
     let reply = false;
     for (const held of loginHeldSince.values()) {
@@ -881,7 +901,11 @@ export function desktopChats(options: DesktopChatsOptions) {
     let held = loginHeldSince.get(conversationId);
     if (status.state === "login-required") {
       if (!holds) loginHolds.set(conversationId, (holds = new Map()));
-      holds.set(key, { text: status.text, ...(status.email ? { email: status.email } : {}) });
+      holds.set(key, {
+        text: status.text,
+        ...(status.email ? { email: status.email } : {}),
+        ...(status.cause ? { cause: status.cause } : {}),
+      });
       if (!held) loginHeldSince.set(conversationId, (held = new Map()));
       let episode = loginEpisodes.get(conversationId);
       if (!episode) loginEpisodes.set(conversationId, (episode = { since: Date.now() }));
@@ -1531,12 +1555,15 @@ export function desktopChats(options: DesktopChatsOptions) {
     const since = loginEpisodes.get(conversationId)?.since ?? Math.min(...held.values());
     const chat = await open(conversationId);
     const descriptions = new Map((await chat.agentRecords(context)).map((record) => [record.threadId, record.description]));
-    const email = [...(loginHolds.get(conversationId)?.values() ?? [])].find((hold) => hold.email)?.email;
+    const current = [...(loginHolds.get(conversationId)?.values() ?? [])];
+    const email = current.find((hold) => hold.email)?.email;
+    const cause = current.length > 0 && current.every((hold) => hold.cause === "keychain") ? ("keychain" as const) : undefined;
     const text = claudeSignInNoteText(
       { name: options.computerName ?? "this computer", ...(options.deviceId ? { deviceId: options.deviceId } : {}) },
       since,
       {
         ...(email ? { email } : {}),
+        ...(cause ? { cause } : {}),
         reply: held.has(""),
         tasks: [...held.keys()]
           .filter((threadId) => threadId !== "")

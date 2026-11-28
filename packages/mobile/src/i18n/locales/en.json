@@ -930,7 +930,9 @@
         "reasonCloudLogin": "The cloud's login",
         "reasonOtherLogin": "Added in Stella",
         "reasonOwnLogin": "This computer's own Claude Code login",
-        "reasonSelected": "Chosen in Stella"
+        "reasonSelected": "Chosen in Stella",
+        "noteKeychain": "{place}: the sign-in is still saved, but the Mac's Keychain can't find it.",
+        "rowKeychain": "Not found in Keychain"
       },
       "claudeLogin": {
         "whereCloud": "Signing in to Claude Code in your cloud.",

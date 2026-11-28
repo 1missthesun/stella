@@ -39,6 +39,7 @@ import {
   recordClaudeCodeResolvedModel,
 } from "./claude-code-resolved-models.js";
 import { buildExternalCliChildEnv } from "@stella/node-shared/integrations/external-cli-resolution.js";
+import { CLAUDE_CODE_GUARDED_SHELL_TOOLS } from "./claude-code-output-redaction.js";
 import {
   CLAUDE_CLI_UNUSABLE_CODE,
   noteClaudeCliLaunchFailed,
@@ -90,7 +91,7 @@ type ClaudeCodeStatusChange =
   | { state: "running" | "compacting" | "model-fallback"; text: string }
   | { state: "usage-limit"; text: string; until?: number; monthly?: true }
   | { state: "usage-limit-end"; text: string; resumed: boolean }
-  | { state: "login-required"; text: string; email?: string }
+  | { state: "login-required"; text: string; email?: string; cause?: "keychain" }
   | { state: "login-required-end"; text: string; resumed: boolean };
 type ClaudeCodeImage = { mimeType: string; data: string };
 type ClaudeCodeUsage = {
@@ -616,10 +617,17 @@ export const claudeLoginEndedText = (email: string | undefined) =>
     ? `Your Claude sign-in for ${email} on this computer has ended. Sign in again in Settings › Claude and ChatGPT to continue.`
     : "Your Claude sign-in on this computer has ended. Sign in again in Settings › Claude and ChatGPT to continue.";
 const CLAUDE_LOGIN_HOLD_TEXT = "Waiting for you to sign in to Claude again. Your message is kept and goes out once you do.";
+export const claudeLoginUnreachableText = (email: string | undefined) =>
+  `Claude Code on this Mac can't find your Claude sign-in${email ? ` for ${email}` : ""} in the Keychain, although it is still saved in your login keychain. Usually this means the login keychain was taken off the Mac's Keychain search list. Nothing was signed out, and signing in again isn't needed: it works again once the login keychain is back on the search list.`;
+const CLAUDE_LOGIN_KEYCHAIN_HOLD_TEXT =
+  "Claude Code can't find your Claude sign-in in this Mac's Keychain, although it is still saved there. Your message is kept and goes out once it is found again.";
 export const checkClaudeCodeAuth = async () => {
   const config = await getClaudeCodeConfig();
   if (config.signedIn) return { status: "ok" };
-  return { status: "reauth_required", message: claudeLoginEndedText(config.email) };
+  return {
+    status: "reauth_required",
+    message: config.unreachable ? claudeLoginUnreachableText(config.email) : claudeLoginEndedText(config.email),
+  };
 };
 /**
  * The CLI's wording for a login that is over (time limit, refresh refused,
@@ -730,6 +738,20 @@ const buildSideEffectReconciliationPrompt = (
 };
 const buildResultRetryPrompt = () =>
   "Your previous reply produced no result text. Provide your complete final answer to the pending request now.";
+const withClaudeLoginUnreachable = (error: unknown, email: string | undefined) => {
+  console.warn("[claude-code] Claude Code can't find its login in this Mac's Keychain", {
+    ...(email ? { email } : {}),
+    detail: normalizeErrorMessage(error).slice(0, 400),
+  });
+  const failure: ClaudeCodeError = new Error(claudeLoginUnreachableText(email));
+  failure.code = "CLAUDE_CODE_KEYCHAIN_UNREACHABLE";
+  return failure;
+};
+const withClaudeLoginUnavailable = (
+  error: unknown,
+  email: string | undefined,
+  unreachable: "keychain" | undefined,
+) => (unreachable ? withClaudeLoginUnreachable(error, email) : withClaudeLoginRejected(error, email));
 const withClaudeLoginRejected = (error: unknown, email: string | undefined) => {
   console.warn("[claude-code] Anthropic refused the Claude login", {
     ...(email ? { email } : {}),
@@ -838,6 +860,13 @@ const buildClaudeCodeRedactingSettings = (
   if (denyTools) {
     settings.hooks.PreToolUse = [
       { matcher: ".*", hooks: [{ type: "command", command: DENY_TOOLS_HOOK_COMMAND }] },
+    ];
+  } else if (process.platform === "darwin") {
+    settings.hooks.PreToolUse = [
+      {
+        matcher: CLAUDE_CODE_GUARDED_SHELL_TOOLS,
+        hooks: [{ type: "http", url: hook.url, headers: hook.headers, timeout: 15 }],
+      },
     ];
   }
   settings.hooks.PostToolUse = [
@@ -2303,12 +2332,16 @@ class ClaudeCodeSessionRuntime {
             ...(ended ? { rejectedConfigDir: usedDir } : {}),
           });
           if (!next.signedIn || loginRechecks > 1) {
+            const unreachable = next.signedIn ? undefined : next.unreachable;
             if (!request.holdOnLoginRequired) {
-              throw withClaudeLoginRejected(error, session.claudeLoginEmail ?? next.email);
+              throw withClaudeLoginUnavailable(error, session.claudeLoginEmail ?? next.email, unreachable);
             }
-            console.warn("[claude-code] waiting for a Claude sign-in", {
-              detail: normalizeErrorMessage(error).slice(0, 400),
-            });
+            console.warn(
+              unreachable
+                ? "[claude-code] waiting for this Mac's Keychain to find the Claude login again"
+                : "[claude-code] waiting for a Claude sign-in",
+              { detail: normalizeErrorMessage(error).slice(0, 400) },
+            );
             await this.awaitClaudeLogin(request, {
               email: session.claudeLoginEmail ?? next.email,
               force: true,
@@ -2393,14 +2426,24 @@ class ClaudeCodeSessionRuntime {
     let config = await getClaudeCodeConfig();
     if (config.signedIn && !options.force) return;
     if (!request.holdOnLoginRequired) {
-      throw withClaudeLoginRejected("Claude Code isn't signed in on this computer.", options.email ?? config.email);
+      throw withClaudeLoginUnavailable(
+        "Claude Code isn't signed in on this computer.",
+        options.email ?? config.email,
+        config.signedIn ? undefined : config.unreachable,
+      );
     }
     const email = options.email ?? config.email;
-    request.onStatusChange?.({
-      state: "login-required",
-      text: CLAUDE_LOGIN_HOLD_TEXT,
-      ...(email ? { email } : {}),
-    });
+    let cause: "keychain" | undefined;
+    const announce = (next: "keychain" | undefined) => {
+      cause = next;
+      request.onStatusChange?.({
+        state: "login-required",
+        text: next ? CLAUDE_LOGIN_KEYCHAIN_HOLD_TEXT : CLAUDE_LOGIN_HOLD_TEXT,
+        ...(email ? { email } : {}),
+        ...(next ? { cause: next } : {}),
+      });
+    };
+    announce(config.signedIn ? undefined : config.unreachable);
     const deadline = steadyNow() + CLAUDE_LOGIN_HOLD_MAX_MS;
     let resumed = false;
     let reprobes = options.earlierHolds ?? 0;
@@ -2418,6 +2461,7 @@ class ClaudeCodeSessionRuntime {
           resumed = true;
           return;
         }
+        if (config.unreachable !== cause) announce(config.unreachable);
         if (steadyNow() >= reprobeAt) {
           reprobes += 1;
           reprobeAt =
@@ -2430,7 +2474,7 @@ class ClaudeCodeSessionRuntime {
           }
         }
         if (steadyNow() >= deadline) {
-          throw withClaudeLoginRejected("Waited for a Claude sign-in.", email);
+          throw withClaudeLoginUnavailable("Waited for a Claude sign-in.", email, cause);
         }
       }
     } finally {

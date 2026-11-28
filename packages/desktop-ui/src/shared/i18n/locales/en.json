@@ -2145,7 +2145,9 @@
         "reasonCloudLogin": "The cloud's login",
         "reasonOtherLogin": "Added in Stella",
         "reasonOwnLogin": "This computer's own Claude Code login",
-        "reasonSelected": "Chosen in Stella"
+        "reasonSelected": "Chosen in Stella",
+        "noteKeychain": "{place}: the sign-in is still saved, but the Mac's Keychain can't find it.",
+        "rowKeychain": "Not found in Keychain"
       },
       "claudeLogin": {
         "approve": "Approve on Anthropic's page that opened, and it finishes by itself.",
@@ -3517,7 +3519,10 @@
     "signIn": "Sign in",
     "signedInContinuing": "Signed in to Claude. Stella is answering now.",
     "signedInAsResend": "Signed in to Claude as {email}. Send your message again to continue.",
-    "signedInResend": "Signed in to Claude. Send your message again to continue."
+    "signedInResend": "Signed in to Claude. Send your message again to continue.",
+    "keychainTitle": "Claude can't find your sign-in on this Mac",
+    "keychainDescription": "Your Claude sign-in is still saved in this Mac's login keychain, but Keychain lookups can't find it, usually because the login keychain was taken off the Keychain search list. Nothing was signed out.",
+    "keychainHeldDescription": "Your Claude sign-in is still saved in this Mac's login keychain, but Keychain lookups can't find it. Nothing was signed out. Your message is kept and goes out once it's found again."
   },
   "email": {
     "title": "Email",

@@ -1,6 +1,7 @@
 import path from "path";
 import { chmodSync, closeSync, existsSync, mkdirSync, openSync, readSync, writeFileSync } from "fs";
 import { windowsHiddenSpawnPreloadSource } from "@stella/node-shared/shared/windows-hidden-spawns.js";
+import { buildUnixSecurityShimScript } from "../keychain-guard.js";
 
 export type ShellStateOptions = {
   enableShellShims?: boolean;
@@ -361,6 +362,11 @@ export const ensureNodeShim = (
       const bunShimPath = path.join(shimDir, "bun");
       writeFileSync(bunShimPath, buildUnixBunShimScript(), "utf-8");
       unixShimPaths.push(bunShimPath);
+      if (process.platform === "darwin") {
+        const securityShimPath = path.join(shimDir, "security");
+        writeFileSync(securityShimPath, buildUnixSecurityShimScript(), "utf-8");
+        unixShimPaths.push(securityShimPath);
+      }
       for (const shim of WINDOWS_CLI_SHIMS) {
         const cliPath = options?.[shim.optionKey];
         if (typeof cliPath !== "string" || !existsSync(cliPath)) continue;

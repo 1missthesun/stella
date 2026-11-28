@@ -3,7 +3,20 @@ import { translateNow } from "@/shared/i18n/active-translator";
 
 const heldNoticeId = (conversationId: string) => `claude-login-held:${conversationId}`;
 
-export const presentClaudeLoginHeld = (conversationId: string, email: string | undefined): void => {
+export const presentClaudeLoginHeld = (
+  conversationId: string,
+  email: string | undefined,
+  cause?: "keychain",
+): void => {
+  if (cause === "keychain") {
+    const title = translateNow("claudeLogin.keychainTitle");
+    const description = translateNow("claudeLogin.keychainHeldDescription");
+    presentComposerNotice(
+      { id: heldNoticeId(conversationId), conversationId, kind: "provider", title, description },
+      { title, description, variant: "error", duration: 10000 },
+    );
+    return;
+  }
   presentComposerNotice(
     {
       id: heldNoticeId(conversationId),

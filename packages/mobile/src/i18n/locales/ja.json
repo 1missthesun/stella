@@ -929,7 +929,9 @@
         "reasonCloudLogin": "クラウドのログイン",
         "reasonOtherLogin": "Stella で追加",
         "reasonOwnLogin": "このコンピュータの Claude Code ログイン",
-        "reasonSelected": "Stella で選択"
+        "reasonSelected": "Stella で選択",
+        "noteKeychain": "{place}: サインインは保存されたままですが、Mac のキーチェーンで見つかりません。",
+        "rowKeychain": "キーチェーンに見つかりません"
       },
       "claudeLogin": {
         "whereCloud": "クラウドの Claude Code にサインインしています。",

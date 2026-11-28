@@ -201,7 +201,7 @@ export const createHostRunnerHandlers = (context, options) => ({
         if (request.operation === "claude-config") {
             const accounts = context.services.claudeLocalAccounts;
             if (request.rejectedConfigDir !== undefined) {
-                accounts.noteRejected(request.rejectedConfigDir ?? null);
+                await accounts.noteRejected(request.rejectedConfigDir ?? null);
             }
             const retried = request.retryRefused === true && accounts.retryRefused();
             const config = await accounts.configForTurn({

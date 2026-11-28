@@ -2135,7 +2135,9 @@
         "reasonCloudLogin": "클라우드의 로그인",
         "reasonOtherLogin": "Stella에서 추가됨",
         "reasonOwnLogin": "이 컴퓨터의 Claude Code 로그인",
-        "reasonSelected": "Stella에서 선택함"
+        "reasonSelected": "Stella에서 선택함",
+        "noteKeychain": "{place}: 로그인은 아직 저장되어 있지만 Mac 키체인에서 찾을 수 없습니다.",
+        "rowKeychain": "키체인에서 찾을 수 없음"
       },
       "claudeLogin": {
         "approve": "열린 Anthropic 페이지에서 승인하면 자동으로 완료됩니다.",
@@ -3483,7 +3485,10 @@
     "signIn": "로그인",
     "signedInContinuing": "Claude에 로그인했습니다. Stella가 지금 답변하고 있습니다.",
     "signedInAsResend": "{email}(으)로 Claude에 로그인했습니다. 계속하려면 메시지를 다시 보내세요.",
-    "signedInResend": "Claude에 로그인했습니다. 계속하려면 메시지를 다시 보내세요."
+    "signedInResend": "Claude에 로그인했습니다. 계속하려면 메시지를 다시 보내세요.",
+    "keychainTitle": "Claude가 이 Mac에서 로그인을 찾지 못합니다",
+    "keychainDescription": "Claude 로그인은 이 Mac의 로그인 키체인에 아직 저장되어 있지만 키체인 검색으로 찾을 수 없습니다. 보통 로그인 키체인이 검색 목록에서 빠졌기 때문입니다. 로그아웃된 것은 없습니다.",
+    "keychainHeldDescription": "Claude 로그인은 이 Mac의 로그인 키체인에 아직 저장되어 있지만 키체인 검색으로 찾을 수 없습니다. 로그아웃된 것은 없습니다. 메시지는 보관되며 다시 찾으면 바로 전송됩니다."
   },
   "email": {
     "title": "이메일",

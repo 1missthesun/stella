@@ -2145,7 +2145,9 @@
         "reasonCloudLogin": "Skyens pålogging",
         "reasonOtherLogin": "Lagt til i Stella",
         "reasonOwnLogin": "Denne datamaskinens egen Claude Code-pålogging",
-        "reasonSelected": "Valgt i Stella"
+        "reasonSelected": "Valgt i Stella",
+        "noteKeychain": "{place}: påloggingen er fortsatt lagret, men Mac-ens Nøkkelring finner den ikke.",
+        "rowKeychain": "Ikke funnet i Nøkkelring"
       },
       "claudeLogin": {
         "approve": "Godkjenn på Anthropic-siden som ble åpnet, så fullføres det av seg selv.",
@@ -3517,7 +3519,10 @@
     "signIn": "Logg på",
     "signedInContinuing": "Logget på Claude. Stella svarer nå.",
     "signedInAsResend": "Logget på Claude som {email}. Send meldingen på nytt for å fortsette.",
-    "signedInResend": "Logget på Claude. Send meldingen på nytt for å fortsette."
+    "signedInResend": "Logget på Claude. Send meldingen på nytt for å fortsette.",
+    "keychainTitle": "Claude finner ikke påloggingen din på denne Mac-en",
+    "keychainDescription": "Claude-påloggingen din er fortsatt lagret i påloggingsnøkkelringen på denne Mac-en, men oppslag i Nøkkelring finner den ikke, som regel fordi påloggingsnøkkelringen er fjernet fra søkelisten. Ingenting er logget ut.",
+    "keychainHeldDescription": "Claude-påloggingen din er fortsatt lagret i påloggingsnøkkelringen på denne Mac-en, men oppslag i Nøkkelring finner den ikke. Ingenting er logget ut. Meldingen din tas vare på og sendes så snart den finnes igjen."
   },
   "email": {
     "title": "E-post",

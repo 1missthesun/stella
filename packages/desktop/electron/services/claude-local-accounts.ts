@@ -19,6 +19,7 @@ import type {
   ClaudeCliInstallResult,
 } from "@stella/contracts/claude-local-accounts";
 import { callRuntimeAppService, watchAppServiceProgress } from "./runtime-app-services.js";
+import { claudeKeychainReach } from "./claude-keychain-reach.js";
 import type { EngineAccountAccess } from "./engine-account-access.js";
 
 const ACCOUNTS_DIR = "claude-accounts";
@@ -114,6 +115,7 @@ export type ClaudeCodeConfigForTurn = {
   configDir: string | null;
   email?: string;
   signedIn: boolean;
+  unreachable?: "keychain";
 };
 
 export type ClaudeLocalAccountsOptions = {
@@ -217,13 +219,26 @@ export class ClaudeLocalAccounts {
     return resolved;
   }
 
-  noteRejected(configDir: string | null): void {
-    const config = (this.configs ?? []).find((entry) => entry.dir === configDir);
+  async noteRejected(configDir: string | null): Promise<void> {
+    const found = (this.configs ?? []).find((entry) => entry.dir === configDir);
+    if (!found) return;
+    const unreachable = (await claudeKeychainReach(configDir ?? defaultConfigDir())) === "unreachable";
+    const config = (this.configs ?? []).find((entry) => entry.configId === found.configId);
     if (!config) return;
-    this.rejected.set(config.configId, config.loginExpiresAt ?? null);
-    this.configs = (this.configs ?? []).map((entry) =>
-      entry === config ? { ...entry, loggedIn: false, ended: true } : entry,
-    );
+    if (unreachable) {
+      console.warn("[claude-accounts] a Claude login is in the login keychain but Keychain lookups don't find it", {
+        configId: config.configId,
+      });
+    } else {
+      this.rejected.set(config.configId, config.loginExpiresAt ?? null);
+    }
+    this.configs = (this.configs ?? []).map((entry) => {
+      if (entry !== config) return entry;
+      const { ended: _ended, unreachable: _unreachable, ...rest } = entry;
+      return unreachable
+        ? { ...rest, loggedIn: false, unreachable: "keychain" as const }
+        : { ...rest, loggedIn: false, ended: true };
+    });
     this.broadcastIfChanged();
     void this.reportIfChanged();
   }
@@ -241,7 +256,7 @@ export class ClaudeLocalAccounts {
     return {
       cliInstalled: this.cliInstalled,
       configs: (this.configs ?? []).map(
-        ({ configId, isDefault, loggedIn, email, plan, loginExpiresAt, ended }) => ({
+        ({ configId, isDefault, loggedIn, email, plan, loginExpiresAt, ended, unreachable }) => ({
           configId,
           isDefault,
           loggedIn,
@@ -249,6 +264,7 @@ export class ClaudeLocalAccounts {
           ...(plan ? { plan } : {}),
           ...(loginExpiresAt !== undefined ? { loginExpiresAt } : {}),
           ...(ended ? { ended: true } : {}),
+          ...(unreachable ? { unreachable } : {}),
         }),
       ),
       activeConfigId: active?.configId ?? null,
@@ -270,9 +286,21 @@ export class ClaudeLocalAccounts {
         expiresAt,
       };
     }
+    const wanted = lower(this.chosenAccount()?.email);
+    const unreachable = (this.configs ?? []).filter((config) => config.unreachable);
+    if (unreachable.length > 0) {
+      const config =
+        (wanted ? unreachable.find((entry) => lower(entry.email) === wanted) : undefined) ??
+        unreachable.find((entry) => entry.isDefault) ??
+        unreachable[0]!;
+      return {
+        state: "unreachable",
+        configId: config.configId,
+        ...(config.email ? { email: config.email } : {}),
+      };
+    }
     const ended = (this.configs ?? []).filter((config) => config.ended);
     if (ended.length === 0) return undefined;
-    const wanted = lower(this.chosenAccount()?.email);
     const config =
       (wanted ? ended.find((entry) => lower(entry.email) === wanted) : undefined) ??
       ended.find((entry) => entry.isDefault) ??
@@ -624,6 +652,16 @@ export class ClaudeLocalAccounts {
       loginExpiresAt = stored.expiresAt;
     }
     if (loggedIn && loginExpiresAt !== undefined && loginExpiresAt <= Date.now()) loggedIn = false;
+    if (!loggedIn && !present && (await claudeKeychainReach(dir ?? defaultConfigDir())) === "unreachable") {
+      this.rejected.delete(configId);
+      return {
+        ...base,
+        loggedIn: false,
+        known: true,
+        unreachable: "keychain",
+        ...(email ? { email } : {}),
+      };
+    }
     if (this.rejected.has(configId)) {
       if (loggedIn && this.rejected.get(configId) === (loginExpiresAt ?? null)) loggedIn = false;
       else if (loggedIn) this.rejected.delete(configId);
@@ -753,7 +791,13 @@ export class ClaudeLocalAccounts {
       return { configDir: null, signedIn: true };
     }
     const config = this.activeConfig();
-    if (!config) return { configDir: null, signedIn: false };
+    if (!config) {
+      return {
+        configDir: null,
+        signedIn: false,
+        ...(configs.some((entry) => entry.unreachable) ? { unreachable: "keychain" as const } : {}),
+      };
+    }
     return {
       configDir: config.dir,
       ...(config.email ? { email: config.email } : {}),

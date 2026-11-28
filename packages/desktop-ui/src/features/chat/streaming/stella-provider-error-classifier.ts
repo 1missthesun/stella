@@ -115,6 +115,7 @@ const claudeCodeLoginRequiredMatcher = '[claude-code/login-required]'
 const claudeCodeUsageLimitMatcher = '[claude-code/usage-limit]'
 const claudeCodeNotInstalledMatcher = '[claude-code/not-installed]'
 const claudeCodeUnusableMatcher = '[claude-code/cli-unusable]'
+export const claudeCodeKeychainUnreachableMatcher = '[claude-code/keychain-unreachable]'
 
 const modelRestrictionMatchers = [
   'unsupported stella model selection',
@@ -303,7 +304,10 @@ export const classifyStellaProviderError = (
   if (normalized.includes(claudeCodeNotInstalledMatcher)) {
     return { kind: 'claude-code-not-installed', message }
   }
-  if (normalized.includes(claudeCodeUnusableMatcher)) {
+  if (
+    normalized.includes(claudeCodeUnusableMatcher) ||
+    normalized.includes(claudeCodeKeychainUnreachableMatcher)
+  ) {
     return { kind: 'claude-code-unusable', message }
   }
   const usageLimit = stellaUsageLimitOf(normalized)

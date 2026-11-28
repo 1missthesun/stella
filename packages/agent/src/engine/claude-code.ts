@@ -177,7 +177,7 @@ export type ClaudeCodeStatus =
   | { state: "running" | "compacting" | "model-fallback"; text: string }
   | { state: "usage-limit"; text: string; until?: number; monthly?: true }
   | { state: "usage-limit-end"; text: string; resumed: boolean }
-  | { state: "login-required"; text: string; email?: string }
+  | { state: "login-required"; text: string; email?: string; cause?: "keychain" }
   | { state: "login-required-end"; text: string; resumed: boolean };
 
 export type ClaudeCodeBackgroundWake = {
@@ -353,6 +353,7 @@ const markedError = (error: unknown): string => {
   const code = (error as { code?: unknown })?.code;
   const message = errorText(error);
   if (code === "CLAUDE_CODE_AUTH_REAUTH_REQUIRED") return `[claude-code/login-required] ${message}`;
+  if (code === "CLAUDE_CODE_KEYCHAIN_UNREACHABLE") return `[claude-code/keychain-unreachable] ${message}`;
   if (code === "CLAUDE_CODE_USAGE_LIMIT") return `[claude-code/usage-limit] ${message}`;
   if (/Claude Code CLI executable was not found/i.test(message)) return `[claude-code/not-installed] ${message}`;
   if (code === "CLAUDE_CODE_CLI_UNUSABLE") return `[claude-code/cli-unusable] ${message}`;

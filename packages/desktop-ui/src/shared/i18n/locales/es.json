@@ -2155,7 +2155,9 @@
         "reasonCloudLogin": "El inicio de sesión de la nube",
         "reasonOtherLogin": "Añadido en Stella",
         "reasonOwnLogin": "El inicio de sesión de Claude Code de este ordenador",
-        "reasonSelected": "Elegida en Stella"
+        "reasonSelected": "Elegida en Stella",
+        "noteKeychain": "{place}: el inicio de sesión sigue guardado, pero el Llavero del Mac no lo encuentra.",
+        "rowKeychain": "No encontrado en el Llavero"
       },
       "claudeLogin": {
         "approve": "Aprueba en la página de Anthropic que se abrió y terminará solo.",
@@ -3549,7 +3551,10 @@
     "signIn": "Iniciar sesión",
     "signedInContinuing": "Sesión iniciada en Claude. Stella está respondiendo.",
     "signedInAsResend": "Sesión iniciada en Claude como {email}. Vuelve a enviar tu mensaje para continuar.",
-    "signedInResend": "Sesión iniciada en Claude. Vuelve a enviar tu mensaje para continuar."
+    "signedInResend": "Sesión iniciada en Claude. Vuelve a enviar tu mensaje para continuar.",
+    "keychainTitle": "Claude no encuentra tu inicio de sesión en este Mac",
+    "keychainDescription": "Tu inicio de sesión de Claude sigue guardado en el llavero de inicio de sesión de este Mac, pero las búsquedas del Llavero no lo encuentran, normalmente porque el llavero de inicio de sesión se quitó de la lista de búsqueda. No se cerró ninguna sesión.",
+    "keychainHeldDescription": "Tu inicio de sesión de Claude sigue guardado en el llavero de inicio de sesión de este Mac, pero las búsquedas del Llavero no lo encuentran. No se cerró ninguna sesión. Tu mensaje se conserva y se enviará en cuanto vuelva a encontrarse."
   },
   "email": {
     "title": "Correo",

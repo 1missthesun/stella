@@ -142,7 +142,7 @@ const presentEvents = (conversationId: string, events: readonly PiChatEvent[]) =
     }
     if (event.type === "engine_status" && event.state === "login-required") {
       recordAnonymousCount({ type: "turn_error", kind: "login-required" });
-      presentClaudeLoginHeld(conversationId, event.email);
+      presentClaudeLoginHeld(conversationId, event.email, event.cause);
       continue;
     }
     if (event.type === "engine_status" && event.state === "login-required-end") {

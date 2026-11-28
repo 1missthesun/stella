@@ -2155,7 +2155,9 @@
         "reasonCloudLogin": "החיבור של הענן",
         "reasonOtherLogin": "נוסף ב‑Stella",
         "reasonOwnLogin": "החיבור של המחשב הזה ל-Claude Code",
-        "reasonSelected": "נבחר ב-Stella"
+        "reasonSelected": "נבחר ב-Stella",
+        "noteKeychain": "{place}: ההתחברות עדיין שמורה, אבל מחזיק המפתחות של ה-Mac לא מוצא אותה.",
+        "rowKeychain": "לא נמצא במחזיק המפתחות"
       },
       "claudeLogin": {
         "approve": "אשרו בדף של Anthropic שנפתח, וההתחברות תושלם מעצמה.",
@@ -3549,7 +3551,10 @@
     "signIn": "התחברות",
     "signedInContinuing": "התחברת ל-Claude. Stella עונה עכשיו.",
     "signedInAsResend": "התחברת ל-Claude בתור {email}. שלח את ההודעה שוב כדי להמשיך.",
-    "signedInResend": "התחברת ל-Claude. שלח את ההודעה שוב כדי להמשיך."
+    "signedInResend": "התחברת ל-Claude. שלח את ההודעה שוב כדי להמשיך.",
+    "keychainTitle": "Claude לא מוצא את ההתחברות שלך ב-Mac הזה",
+    "keychainDescription": "ההתחברות שלך ל-Claude עדיין שמורה במחזיק המפתחות של ההתחברות ב-Mac הזה, אבל חיפושים במחזיק המפתחות לא מוצאים אותה, בדרך כלל כי מחזיק המפתחות של ההתחברות הוסר מרשימת החיפוש. שום דבר לא התנתק.",
+    "keychainHeldDescription": "ההתחברות שלך ל-Claude עדיין שמורה במחזיק המפתחות של ההתחברות ב-Mac הזה, אבל חיפושים במחזיק המפתחות לא מוצאים אותה. שום דבר לא התנתק. ההודעה שלך נשמרת ותישלח ברגע שההתחברות תימצא שוב."
   },
   "email": {
     "title": "דוא\"ל",

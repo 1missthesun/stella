@@ -5,6 +5,7 @@ import {
 import { sanitizeToolVisibleText } from "../tools/safety.js";
 import { currentSecureValueFingerprints } from "../shared/secure-value-redaction.js";
 import { memorySyncNoteForFile } from "../memory/memory-sync-note.js";
+import { keychainSettingsChangeMessage } from "../tools/keychain-guard.js";
 
 const FILE_TOOLS = new Set(["Read", "Grep", "Glob", "NotebookRead"]);
 const BINARY_KEYS = new Set(["base64", "data"]);
@@ -90,6 +91,23 @@ export const claudeCodePostToolUseHookResponse = async (
       hookEventName: "PostToolUse",
       ...(changed ? { updatedToolOutput: output } : {}),
       ...(memoryNote ? { additionalContext: memoryNote } : {}),
+    },
+  };
+};
+
+export const CLAUDE_CODE_GUARDED_SHELL_TOOLS = "Bash";
+
+export const claudeCodePreToolUseHookResponse = (input: unknown): Record<string, unknown> => {
+  const body = input as { hook_event_name?: unknown; tool_name?: unknown; tool_input?: unknown } | null;
+  if (!body || body.hook_event_name !== "PreToolUse" || body.tool_name !== CLAUDE_CODE_GUARDED_SHELL_TOOLS) return {};
+  const command = (body.tool_input as { command?: unknown } | null)?.command;
+  const blocked = typeof command === "string" ? keychainSettingsChangeMessage(command) : null;
+  if (!blocked) return {};
+  return {
+    hookSpecificOutput: {
+      hookEventName: "PreToolUse",
+      permissionDecision: "deny",
+      permissionDecisionReason: blocked,
     },
   };
 };

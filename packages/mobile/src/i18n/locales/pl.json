@@ -932,7 +932,9 @@
         "reasonCloudLogin": "Logowanie chmury",
         "reasonOtherLogin": "Dodane w Stella",
         "reasonOwnLogin": "Własne logowanie tego komputera do Claude Code",
-        "reasonSelected": "Wybrane w Stella"
+        "reasonSelected": "Wybrane w Stella",
+        "noteKeychain": "{place}: logowanie jest nadal zapisane, ale Pęk kluczy Maca go nie znajduje.",
+        "rowKeychain": "Nie znaleziono w Pęku kluczy"
       },
       "claudeLogin": {
         "whereCloud": "Logowanie do Claude Code w Twojej chmurze.",

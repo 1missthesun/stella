@@ -2165,7 +2165,9 @@
         "reasonCloudLogin": "Přihlášení cloudu",
         "reasonOtherLogin": "Přidáno ve Stella",
         "reasonOwnLogin": "Vlastní přihlášení tohoto počítače ke Claude Code",
-        "reasonSelected": "Vybráno ve Stella"
+        "reasonSelected": "Vybráno ve Stella",
+        "noteKeychain": "{place}: přihlášení je stále uložené, ale Klíčenka na Macu ho nenajde.",
+        "rowKeychain": "Nenalezeno v Klíčence"
       },
       "claudeLogin": {
         "approve": "Schvalte to na stránce Anthropic, která se otevřela, a přihlášení se dokončí samo.",
@@ -3581,7 +3583,10 @@
     "signIn": "Přihlásit se",
     "signedInContinuing": "Přihlášeno ke Claude. Stella právě odpovídá.",
     "signedInAsResend": "Přihlášeno ke Claude jako {email}. Pokračujte odesláním zprávy znovu.",
-    "signedInResend": "Přihlášeno ke Claude. Pokračujte odesláním zprávy znovu."
+    "signedInResend": "Přihlášeno ke Claude. Pokračujte odesláním zprávy znovu.",
+    "keychainTitle": "Claude na tomto Macu nemůže najít vaše přihlášení",
+    "keychainDescription": "Vaše přihlášení ke Claude je stále uložené v přihlašovací klíčence tohoto Macu, ale vyhledávání v Klíčence ho nenajde, obvykle proto, že přihlašovací klíčenka byla odebrána ze seznamu hledání. Nic nebylo odhlášeno.",
+    "keychainHeldDescription": "Vaše přihlášení ke Claude je stále uložené v přihlašovací klíčence tohoto Macu, ale vyhledávání v Klíčence ho nenajde. Nic nebylo odhlášeno. Vaše zpráva je uložená a odejde, jakmile se přihlášení znovu najde."
   },
   "email": {
     "title": "E-mail",

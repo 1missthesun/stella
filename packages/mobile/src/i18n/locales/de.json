@@ -930,7 +930,9 @@
         "reasonCloudLogin": "Anmeldung der Cloud",
         "reasonOtherLogin": "In Stella hinzugefügt",
         "reasonOwnLogin": "Eigene Claude Code-Anmeldung dieses Computers",
-        "reasonSelected": "In Stella ausgewählt"
+        "reasonSelected": "In Stella ausgewählt",
+        "noteKeychain": "{place}: Die Anmeldung ist noch gespeichert, aber der Schlüsselbund des Mac findet sie nicht.",
+        "rowKeychain": "Nicht im Schlüsselbund gefunden"
       },
       "claudeLogin": {
         "whereCloud": "Anmeldung bei Claude Code in deiner Cloud.",

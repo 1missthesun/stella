@@ -930,7 +930,9 @@
         "reasonCloudLogin": "Bulutun oturumu",
         "reasonOtherLogin": "Stella'da eklendi",
         "reasonOwnLogin": "Bu bilgisayarın kendi Claude Code oturumu",
-        "reasonSelected": "Stella'da seçildi"
+        "reasonSelected": "Stella'da seçildi",
+        "noteKeychain": "{place}: oturum açma bilgisi hâlâ kayıtlı, ancak Mac'in Anahtar Zinciri onu bulamıyor.",
+        "rowKeychain": "Anahtar Zinciri'nde bulunamadı"
       },
       "claudeLogin": {
         "whereCloud": "Bulutunda Claude Code'da oturum açılıyor.",

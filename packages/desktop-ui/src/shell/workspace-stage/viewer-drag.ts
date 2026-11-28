@@ -19,6 +19,7 @@ const POINTER_INSIDE = 28;
 const STRETCH_LIMIT = 46;
 const LIFT = 0.025;
 const PAGE_REST_MS = 80;
+const RESIZE_SLOP = 3;
 const SETTLE_MS = 260;
 const SETTLE_EASING = "cubic-bezier(0.2, 0.9, 0.25, 1)";
 
@@ -288,9 +289,12 @@ export const resizeViewer = (
   cursor: string,
   start: FileViewerRect,
   apply: (dx: number, dy: number, start: FileViewerRect) => FileViewerRect,
+  /** Runs once, when the pointer first really moves: an expanded viewer floats at `start` there. */
+  onFirstMove?: () => void,
 ): void => {
   let latest = start;
   let pointer: Point = { x: down.clientX, y: down.clientY };
+  let moved = false;
   const steps = perFrame(() => {
     latest = clampFloatRect(
       apply(pointer.x - down.clientX, pointer.y - down.clientY, start),
@@ -310,11 +314,18 @@ export const resizeViewer = (
   trackPointer(down.pointerId, cursor, {
     move: (event) => {
       pointer = { x: event.clientX, y: event.clientY };
+      if (!moved) {
+        const dx = pointer.x - down.clientX;
+        const dy = pointer.y - down.clientY;
+        if (Math.hypot(dx, dy) < RESIZE_SLOP) return;
+        moved = true;
+        if (onFirstMove) flushSync(onFirstMove);
+      }
       steps.request();
     },
     end: () => {
       steps.flush();
-      flushSync(() => fileViewer.setRect(latest));
+      if (moved) flushSync(() => fileViewer.setRect(latest));
       page?.release();
       dockedFrame()?.removeAttribute("data-interacting");
     },

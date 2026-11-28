@@ -71,6 +71,14 @@ const stageLook = (t: Tokens) =>
 /** The rect the stage (and a stage-mode viewer) fills, in the window. */
 const stageInsets = (geo: Geometry) => ({ left: STAGE_INSET, top: STAGE_TOP, right: STAGE_INSET, bottom: stageBottom(geo) });
 
+/** The same rect as a viewer rect. */
+const stageRect = (geo: Geometry): FileViewerRect => ({
+  x: STAGE_INSET,
+  y: STAGE_TOP,
+  width: geo.viewportWidth - STAGE_INSET * 2,
+  height: geo.viewportHeight - STAGE_TOP - stageBottom(geo),
+});
+
 /** The stage's top edge opens where the topbar's open tab stands on it. */
 function StageEdge({ fill }: { fill: string }) {
   const notch = useOpenTabNotch();
@@ -550,6 +558,8 @@ function ViewerMain({ item, bodies, surface, wide, idBase }: { item: DisplayTab 
 }
 
 type ResizeEdge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+/** How far a resize must move before an expanded viewer floats. */
+const RESIZE_SLOP = 3;
 const RESIZE_EDGES: ResizeEdge[] = ["n", "s", "e", "w", "ne", "nw", "se", "sw"];
 type DragEvent = { phase: string; dx: number; dy: number; x: number; y: number };
 
@@ -604,7 +614,7 @@ function DockedViewer({ item: docked, carried, bodies, hiddenForExclusiveTab }: 
   const floatRect = useMemo(() => clampFloatRect(rect ?? defaultFloatRect(geo), geo), [geo, rect]);
   const [live, setLive] = useState<FileViewerRect | null>(null);
   const [held, setHeld] = useState<HeldViewer | null>(null);
-  const gesture = useRef<{ start: FileViewerRect } | null>(null);
+  const gesture = useRef<{ start: FileViewerRect; stage: boolean } | null>(null);
   const carry = useRef<ReturnType<typeof startViewerDrag> | null>(null);
   const hidden = !item || (!stage && hiddenForExclusiveTab) || !docked;
   const detachable = item?.kind !== "chat" && canDetachViewer();
@@ -634,17 +644,26 @@ function DockedViewer({ item: docked, carried, bodies, hiddenForExclusiveTab }: 
 
   const onResize = (edge: ResizeEdge) => (d: DragEvent) => {
     if (d.phase === "start") {
-      gesture.current = { start: floatRect };
-      setLive(floatRect);
+      // An expanded viewer resizes from the size it fills, floating once the drag moves.
+      const start = stage ? clampFloatRect(stageRect(geo), geo) : floatRect;
+      gesture.current = { start, stage };
+      setLive(start);
       return;
     }
     const g = gesture.current;
     if (!g) return;
+    const ended = d.phase === "end" || d.phase === "cancel";
+    if (g.stage && !ended) {
+      // A click or a twitch on the edge leaves an expanded viewer as it is.
+      if (Math.hypot(d.dx, d.dy) < RESIZE_SLOP) return;
+      g.stage = false;
+      fileViewer.floatAt(g.start);
+    }
     const next = clampFloatRect(resized(edge, g.start, d.dx, d.dy), geo);
-    if (d.phase === "end" || d.phase === "cancel") {
+    if (ended) {
       gesture.current = null;
       setLive(null);
-      fileViewer.setRect(next);
+      if (!g.stage) fileViewer.setRect(next);
       return;
     }
     setLive(next);
@@ -690,7 +709,7 @@ function DockedViewer({ item: docked, carried, bodies, hiddenForExclusiveTab }: 
         />
       ) : null}
       <ViewerMain item={framed} bodies={bodies} surface={DOCKED} wide={width - 2 >= WIDE_VIEWER} idBase="file-viewer-docked" />
-      {!stage ? RESIZE_EDGES.map((edge) => <box key={edge} id={`file-viewer-resize-${edge}`} {...edgeBox(edge)} cursor={edge === "n" || edge === "s" ? "nsResize" : edge === "e" || edge === "w" ? "ewResize" : edge === "ne" || edge === "sw" ? "neswResize" : "nwseResize"} onDrag={onResize(edge)} />) : null}
+      {RESIZE_EDGES.map((edge) => <box key={edge} id={`file-viewer-resize-${edge}`} {...edgeBox(edge)} cursor={edge === "n" || edge === "s" ? "nsResize" : edge === "e" || edge === "w" ? "ewResize" : edge === "ne" || edge === "sw" ? "neswResize" : "nwseResize"} onDrag={onResize(edge)} />)}
       {stage ? <StageEdge fill={t.c.background} /> : null}
     </col>
   );

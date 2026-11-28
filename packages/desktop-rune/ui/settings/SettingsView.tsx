@@ -143,7 +143,7 @@ export const SettingsScreen = ({
             {isSearching ? (
               <SettingsSearchResults query={deferredQuery} onSelect={handleResultSelect} onClear={() => setSearchQuery("")} />
             ) : (
-              <col id={`settings-tabpanel-${activeTab}`} role="tabpanel">
+              <col id={`settings-tabpanel-${activeTab}`} role="tabpanel" enter="none" exit="none">
                 <SettingsTabContent activeTab={activeTab} onSignOut={onSignOut} onOpenLegal={setActiveLegalDoc} />
               </col>
             )}

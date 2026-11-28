@@ -143,10 +143,7 @@ export function SettingsCard({ children, ...style }: Style & { children?: ReactN
       w="full"
       {...s.settingsCard}
       {...divider}
-      fill={lit ? mixOklch(t.c.interactive, 14, "transparent") : undefined}
-      shadows={lit ? [{ x: 0, y: 0, blur: 0, spread: 6, color: mixOklch(t.c.interactive, 8, "transparent") }] : undefined}
-      radius={lit || pulse?.key === titleKey ? 10 : 0}
-      motion={{ dur: lit ? 0.3 : 1.3 }}
+      radius={pulse?.key === titleKey && titleKey ? 10 : 0}
       {...style}
       onLayout={(r) => {
         y.current = r.y;
@@ -154,8 +151,24 @@ export function SettingsCard({ children, ...style }: Style & { children?: ReactN
         if (titleKey) noteCardPlace(titleKey, cardId, r.y);
       }}
     >
+      {titleKey && pulse?.key === titleKey ? <SearchTargetGlow lit={lit} fill={mixOklch(t.c.interactive, 14, "transparent")} ring={mixOklch(t.c.interactive, 8, "transparent")} spread={6} /> : null}
       <CardCtx.Provider value={reg}>{keyed}</CardCtx.Provider>
     </col>
+  );
+}
+
+/** desktop-ui's `settings-search-target-pulse`, as its own element: a `motion` on the card would also spring its subtree's layout. */
+export function SearchTargetGlow({ lit, fill, ring, spread }: { lit: boolean; fill: string; ring: string; spread: number }) {
+  return (
+    <box
+      absolute={{ top: 0, right: 0, bottom: 0, left: 0 }}
+      inert
+      radius={10}
+      fill={fill}
+      shadows={[{ x: 0, y: 0, blur: 0, spread, color: ring }]}
+      opacity={lit ? 1 : 0}
+      motion={{ dur: lit ? 0.3 : 1.3 }}
+    />
   );
 }
 

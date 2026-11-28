@@ -4,6 +4,7 @@ import { mixOklch, useTokens } from "../theme";
 import { Press, T, tx } from "../kit/compat";
 import { forgetCardPlace, noteCardPlace, usePulsingCard } from "./settings-card-targets";
 import { useSettings } from "./settings.styles";
+import { SearchTargetGlow } from "./parts";
 
 export interface AiryWordOption<T extends string> {
   value: T;
@@ -118,21 +119,19 @@ export function SettingsTabHeader({ titleKey, cardKey }: { titleKey: string; car
     return () => clearTimeout(off);
   }, [pulse, cardKey]);
   return (
-    <T
+    <col
       id={id}
-      role="heading"
       w="full"
-      {...s.settingsPageTitle}
-      fill={lit ? mixOklch(tokens.c.interactive, 12, "transparent") : undefined}
-      shadows={lit ? [{ x: 0, y: 0, blur: 0, spread: 8, color: mixOklch(tokens.c.interactive, 7, "transparent") }] : undefined}
-      radius={cardKey && (lit || pulse?.key === cardKey) ? 10 : 0}
-      motion={{ dur: lit ? 0.3 : 1.3 }}
+      mb={s.settingsPageTitle.mb}
       onLayout={(r) => {
         y.current = r.y;
         if (cardKey) noteCardPlace(cardKey, id, r.y);
       }}
     >
-      {t(titleKey)}
-    </T>
+      {cardKey && pulse?.key === cardKey ? <SearchTargetGlow lit={lit} fill={mixOklch(tokens.c.interactive, 12, "transparent")} ring={mixOklch(tokens.c.interactive, 7, "transparent")} spread={8} /> : null}
+      <T role="heading" w="full" {...s.settingsPageTitle} mb={0}>
+        {t(titleKey)}
+      </T>
+    </col>
   );
 }

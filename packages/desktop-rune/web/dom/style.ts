@@ -121,6 +121,7 @@ const PRESETS: Record<string, Effect> = {
   scale: { opacity: 0, scale: 0.96 },
   pop: { opacity: 0, scale: 0.9 },
   slide: { opacity: 0, x: 16 },
+  none: { dur: 0 },
 };
 
 export const presenceEffect = (p: Presence): Effect => (typeof p === "string" ? (PRESETS[p] ?? PRESETS.fade!) : p);

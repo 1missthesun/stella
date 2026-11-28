@@ -18,13 +18,16 @@ pub fn rune_key(n: u32, p: &Props) -> String {
 thread_local! {
     /// Building an element painted over a webview: its painting descendants mark where they draw.
     static OVER: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+    /// Building inside a `style::lands_whole` element: what sets no `enter`/`exit` lands whole too.
+    static WHOLE: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
 }
 
 pub fn build(s: &Win, eng: &Engine, id: u32) -> El {
     let Some(n) = eng.tree.get(id) else { return el() };
     if !OVER.get() && n.props.id.is_some() && !eng.tree.live_above.contains(&id) && !matches!(n.kind, Kind::Input | Kind::Video | Kind::Audio | Kind::Webview) {
         let key = rune_key(id, &n.props);
-        return rune::memo::memo_with_hash(key, n.ver, || build_node(s, eng, id, n));
+        let hash = if WHOLE.get() { n.ver ^ (1 << 63) } else { n.ver };
+        return rune::memo::memo_with_hash(key, hash, || build_node(s, eng, id, n));
     }
     build_node(s, eng, id, n)
 }
@@ -179,7 +182,11 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
     if over && (marks || unseen) {
         OVER.set(false);
     }
+    let whole = WHOLE.get();
+    let asks_presence = p.enter.is_some() || p.exit.is_some();
+    WHOLE.set(style::lands_whole(p) || (whole && !asks_presence));
     let e = build_kind(s, eng, id, n, p);
+    WHOLE.set(whole);
     OVER.set(over);
     let e = if !closing && crate::fx::morphs(p) { style::apply(e, &crate::fx::without_chrome(p)) } else { style::apply(e, p) };
     let mut e = handlers(e, id, p, false);
@@ -189,7 +196,7 @@ fn build_node(s: &Win, eng: &Engine, id: u32, n: &Node) -> El {
     } else if marks || hits {
         e = crate::webview::over(e, s.node, id, p.corners.unwrap_or([p.radius.unwrap_or(0.0); 4]), marks, marks && sees_through(p));
     }
-    if !closing && p.enter.is_none() && crate::fx::morphs(p) {
+    if !closing && ((p.enter.is_none() && crate::fx::morphs(p)) || (whole && !asks_presence)) {
         e = e.transition(rune::Transition::none());
     }
     if closing {

@@ -34,7 +34,7 @@ const effectFrame = (e: Effect, base: string | undefined): Keyframe => ({
 
 function playPresence(el: HTMLElement, p: BoxProps, which: "enter" | "exit"): Animation | null {
   const spec = which === "enter" ? p.enter : p.exit;
-  if (!spec || typeof el.animate !== "function") return null;
+  if (!spec || spec === "none" || typeof el.animate !== "function") return null;
   const e = presenceEffect(spec);
   const base = transformCss(p);
   const rest: Keyframe = { opacity: p.opacity ?? 1, transform: base ?? "none", ...(e.blur ? { filter: "blur(0px)" } : {}) };
@@ -45,7 +45,7 @@ function playPresence(el: HTMLElement, p: BoxProps, which: "enter" | "exit"): An
 
 /** Keeps the element on screen after React removes it, playing its `exit` (Rune keeps exiting nodes until they finish). */
 function playExit(el: HTMLElement, p: BoxProps) {
-  if (!el.isConnected || !el.parentNode) return;
+  if (p.exit === "none" || !el.isConnected || !el.parentNode) return;
   const clone = el.cloneNode(true) as HTMLElement;
   delete clone.dataset.rid;
   for (const n of clone.querySelectorAll<HTMLElement>("[data-rid]")) delete n.dataset.rid;

@@ -17,6 +17,7 @@ export type { InlineWorkingIndicatorMountProps, InlineWorkingIndicatorProps } fr
 export const EXIT_ANIMATION_MS = 240;
 export const ENTER_ANIMATION_MS = 320;
 const LEAVE_MS = 220;
+const INDICATOR_IN = { opacity: 0, y: 4, scale: 0.96, dur: ENTER_ANIMATION_MS / 1000 } as const;
 const MIN_VISIBLE_MS = INLINE_WORKING_INDICATOR_MIN_VISIBLE_MS;
 const SHOW_DELAY_MS = INLINE_WORKING_INDICATOR_SHOW_DELAY_MS;
 
@@ -201,30 +202,32 @@ export function InlineWorkingIndicator({
       h={leaving && !handingOff ? 0 : undefined}
       clip={leaving && !handingOff ? 0 : undefined}
       origin={handingOff ? [0, 0.5] : [0, 0]}
-      enter={entering ? { opacity: 0, y: 4, scale: 0.96, dur: ENTER_ANIMATION_MS / 1000 } : undefined}
       {...(leaving ? leaveLook : { opacity: 1, y: 0, scale: 1, blur: 0 })}
       motion={{ dur: (handingOff ? EXIT_ANIMATION_MS : LEAVE_MS) / 1000, bounce: 0 }}
       layout={leaving && !handingOff ? LEAVE_MS / 1000 : undefined}
       role="status"
     >
       {showInner ? (
-        <WorkingIndicator
-          status={displayProps.status ?? undefined}
-          toolName={displayProps.runningTool}
-          toolCallId={displayProps.runningToolId}
-          compacting={displayProps.compacting}
-          isReasoning={!displayProps.runningTool}
-          reasoningSeed={reasoningSeed}
-          minimumVisibleMs={displayProps.minimumVisibleMs}
-          animationActive={active && !leaving}
-        />
-      ) : null}
-      {showInner && onStop && !leaving ? (
-        <box ml={4} px={10} py={4} radius={radius["3xl"]} hoverColor={tokens.c.textStrong} hoverGroup enter={{ opacity: 0, y: 4, dur: 0.4 }} onPress={onStop} role="button" focusable label={t("app.chat.composer.stop")}>
-          <text size={fontSize.sm} color={tokens.c.textWeak} hoverColor={tokens.c.textStrong}>
-            {t("app.chat.composer.stop")}
-          </text>
-        </box>
+        // The row stays mounted through the reserved phase, so `inline-indicator-in` plays on this inner element.
+        <row align="center" origin={[0, 0]} enter={entering ? INDICATOR_IN : undefined} exit="none">
+          <WorkingIndicator
+            status={displayProps.status ?? undefined}
+            toolName={displayProps.runningTool}
+            toolCallId={displayProps.runningToolId}
+            compacting={displayProps.compacting}
+            isReasoning={!displayProps.runningTool}
+            reasoningSeed={reasoningSeed}
+            minimumVisibleMs={displayProps.minimumVisibleMs}
+            animationActive={active && !leaving}
+          />
+          {onStop && !leaving ? (
+            <box ml={4} px={10} py={4} radius={radius["3xl"]} hoverColor={tokens.c.textStrong} hoverGroup enter={{ opacity: 0, y: 4, dur: 0.4 }} onPress={onStop} role="button" focusable label={t("app.chat.composer.stop")}>
+              <text size={fontSize.sm} color={tokens.c.textWeak} hoverColor={tokens.c.textStrong}>
+                {t("app.chat.composer.stop")}
+              </text>
+            </box>
+          ) : null}
+        </row>
       ) : null}
     </row>
   );

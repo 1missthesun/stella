@@ -138,7 +138,9 @@ dumps. An element with an `id` is memoized: it rebuilds only when it or somethin
   changes. `instant` makes changes land without motion. Without `motion` or `layout` on the
   element or an ancestor, a change lands at once, as in CSS.
 - `enter` / `exit`: a preset (`fade rise drop blur scale pop slide`) or `{opacity, scale, x, y,
-  blur, dur, bounce}`.
+  blur, dur, bounce}`. `none` shows the element whole the frame it mounts and drops it the frame
+  it's removed, instead of the default fade, and so does what mounts inside it without its own
+  `enter`/`exit`.
 - `matched: "id"` (SwiftUI `matchedGeometryEffect`): an element that mounts in the same commit
   another with that id leaves starts where the old one was drawn, with its velocity, radius, fill
   and opacity, and springs on its `motion` to its own place; neither plays `enter`/`exit`.
@@ -181,7 +183,8 @@ its own label.
 
 **Overlays.**
 - `anchor {to: "<id>", side, align, gap, fit}` places the element against another element, in
-  the window's top layer (popovers, menus).
+  the window's top layer (popovers, menus). Without its own `enter`/`exit` it acts as `enter="none"`:
+  it and its contents show whole the frame it mounts, as Radix popovers and menus do.
 - `modal {clickOutside, wheelOutside, returnFocus}` traps focus and makes the rest of the window inert; `returnFocus: false` leaves nothing focused as it closes instead of returning focus to what had it.
   Escape, or a press outside when `clickOutside` is set, fires `onDismiss`.
 

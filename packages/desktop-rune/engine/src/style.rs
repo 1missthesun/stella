@@ -316,6 +316,7 @@ fn preset(name: &str) -> Transition {
         "scale" => Transition::scale(0.96),
         "pop" => Transition::scale(0.9),
         "slide" => Transition::slide(),
+        "none" => Transition::none(),
         _ => Transition::opacity(),
     }
 }
@@ -329,6 +330,14 @@ fn presence(p: &PresenceP) -> (Transition, Option<Spring>) {
             (t, f.dur.map(|d| spring(d, f.bounce.unwrap_or(0.0))))
         }
     }
+}
+
+/// Shows whole, with its subtree, the frame it mounts: `enter="none"`, or an anchored overlay with
+/// no presence of its own (Radix popovers and menus have none). Rune's default fade would paint it
+/// in an isolated layer, where its own clip cuts its shadow until the fade settles.
+pub fn lands_whole(p: &Props) -> bool {
+    let anchored = p.anchor.is_some() && p.enter.is_none() && p.exit.is_none() && crate::fx::morph_spring(p).is_none();
+    anchored || matches!(&p.enter, Some(PresenceP::Preset(name)) if name == "none")
 }
 
 pub fn motion(mut e: El, p: &Props) -> El {
@@ -352,6 +361,7 @@ pub fn motion(mut e: El, p: &Props) -> El {
         e = e.origin(x, y);
     }
     match (&p.enter, &p.exit) {
+        (None, None) if lands_whole(p) => e = e.transition(Transition::none()),
         (None, None) => {}
         (enter, exit) => {
             let (ti, si) = enter.as_ref().map(presence).unwrap_or((Transition::identity(), None));

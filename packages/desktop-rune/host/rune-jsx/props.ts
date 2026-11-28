@@ -18,7 +18,7 @@ export type Radial = { center?: [number, number]; radius: number | [number, numb
 export type Insets = { left?: number; top?: number; right?: number; bottom?: number };
 export type Side = "top" | "bottom" | "left" | "right";
 export type Effect = { opacity?: number; scale?: number; x?: number; y?: number; blur?: number; dur?: number; bounce?: number };
-export type Presence = "fade" | "rise" | "drop" | "blur" | "scale" | "pop" | "slide" | Effect;
+export type Presence = "fade" | "rise" | "drop" | "blur" | "scale" | "pop" | "slide" | "none" | Effect;
 export type Frame = { at: number; x?: number; y?: number; scale?: number; scaleX?: number; scaleY?: number; opacity?: number; rotate?: number };
 /** `opacity` pulses low↔high, `rotation` spins, `slide` moves from→to, `sequence` plays `frames`. */
 export type Loop = {

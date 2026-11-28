@@ -201,11 +201,11 @@ export function StellaCharacter({ size, state = "idle", shape = "star", ink = "a
     let queued = false;
     let alive = true;
     const schedule = () => {
-      if (queued || motion.current.paused) return;
+      if (queued) return;
       queued = true;
       queueMicrotask(() => {
         queued = false;
-        if (alive && dirty && !motion.current.paused) {
+        if (alive && dirty) {
           if (raf) cancelAnimationFrame(raf);
           draw();
         }

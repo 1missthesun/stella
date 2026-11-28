@@ -14,6 +14,7 @@ import { createHash } from "node:crypto";
 import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { forkDelayed, forkEvery, sleep } from "../shared/effect-timers.js";
 
 const SECURITY = "/usr/bin/security";
 const SECURITY_TIMEOUT_MS = 10_000;
@@ -136,13 +137,13 @@ const runSecurity = (
     }
     let stdout = "";
     child.stdout?.on("data", (chunk: Buffer) => (stdout += chunk.toString("utf8")));
-    const timer = setTimeout(() => child.kill(), SECURITY_TIMEOUT_MS);
+    const cancelKill = forkDelayed(SECURITY_TIMEOUT_MS, () => child.kill());
     child.once("error", () => {
-      clearTimeout(timer);
+      cancelKill();
       resolve({ code: -1, stdout: "" });
     });
     child.once("close", (code) => {
-      clearTimeout(timer);
+      cancelKill();
       resolve({ code, stdout });
     });
     child.stdin?.on("error", () => undefined);
@@ -300,20 +301,19 @@ const takeRefreshLock = async (configDir: string | null): Promise<HeldLock | nul
       }
     }
     if (!busy) {
-      const touch = setInterval(() => {
+      const stopTouching = forkEvery(LOCK_UPDATE_MS, () => {
         const now = new Date();
         for (const lock of held) void fs.promises.utimes(lock, now, now).catch(() => undefined);
-      }, LOCK_UPDATE_MS);
-      touch.unref?.();
+      });
       return {
         release: async () => {
-          clearInterval(touch);
+          stopTouching();
           for (const lock of held.reverse()) await fs.promises.rm(lock, { recursive: true, force: true }).catch(() => undefined);
         },
       };
     }
     for (const lock of held.reverse()) await fs.promises.rm(lock, { recursive: true, force: true }).catch(() => undefined);
-    await new Promise((resolve) => setTimeout(resolve, 1_000 + Math.random() * 1_000));
+    await sleep(1_000 + Math.random() * 1_000);
   }
   return null;
 };

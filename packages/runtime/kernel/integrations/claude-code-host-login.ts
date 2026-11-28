@@ -23,6 +23,7 @@ import {
   writeClaudeLogin,
   type ClaudeStoredLogin,
 } from "@stella/node-shared/integrations/claude-login-store.js";
+import { forkDelayed, sleep } from "@stella/node-shared/shared/effect-timers.js";
 
 /** The descriptor Claude Code reads its token from (`CLAUDE_CODE_OAUTH_TOKEN_FILE_DESCRIPTOR`). */
 export const CLAUDE_HOST_LOGIN_FD = 3;
@@ -168,7 +169,7 @@ export const prepareClaudeHostLogin = async (configDir: string | null): Promise<
   let held = first.oauth.accessToken;
   let heldExpiresAt = expiresAtOf(first);
   let write: ((line: string) => void) | null = null;
-  let timer: ReturnType<typeof setTimeout> | null = null;
+  let cancelTimer: (() => void) | null = null;
   let closed = false;
   const pushIds = new Set<string>();
 
@@ -190,12 +191,11 @@ export const prepareClaudeHostLogin = async (configDir: string | null): Promise<
   };
 
   const schedule = () => {
-    if (timer) clearTimeout(timer);
-    timer = null;
+    cancelTimer?.();
+    cancelTimer = null;
     if (closed || heldExpiresAt === undefined) return;
     const wait = Math.max(heldExpiresAt - RENEW_BEFORE_END_MS - Date.now(), RECHECK_MS);
-    timer = setTimeout(() => void due(), Math.min(wait, MAX_TIMER_MS));
-    timer.unref?.();
+    cancelTimer = forkDelayed(Math.min(wait, MAX_TIMER_MS), () => void due());
   };
 
   const due = async () => {
@@ -208,7 +208,7 @@ export const prepareClaudeHostLogin = async (configDir: string | null): Promise<
     if (closed) return;
     // The token Claude Code holds was refused: a newer stored one, or a renewal of it.
     if (push(await renew(configDir, held).catch(() => null))) return;
-    await new Promise((resolve) => setTimeout(resolve, REFUSED_RECHECK_MS).unref?.());
+    await sleep(REFUSED_RECHECK_MS);
     if (!closed) push(await readStored(configDir, true).catch(() => null));
   };
 
@@ -254,8 +254,8 @@ export const prepareClaudeHostLogin = async (configDir: string | null): Promise<
     close() {
       closed = true;
       write = null;
-      if (timer) clearTimeout(timer);
-      timer = null;
+      cancelTimer?.();
+      cancelTimer = null;
     },
   };
 };

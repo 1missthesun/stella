@@ -1,4 +1,4 @@
-import { Effect, Fiber } from "effect";
+import { Effect, Fiber, Schedule } from "effect";
 
 export const sleep = (ms: number): Promise<void> =>
   Effect.runPromise(Effect.sleep(ms));
@@ -6,6 +6,17 @@ export const sleep = (ms: number): Promise<void> =>
 export const forkDelayed = (delayMs: number, fire: () => void): (() => void) => {
   const fiber = Effect.runFork(
     Effect.sleep(delayMs).pipe(Effect.andThen(Effect.sync(fire))),
+  );
+  return () => {
+    void Effect.runFork(Fiber.interrupt(fiber));
+  };
+};
+
+export const forkEvery = (intervalMs: number, fire: () => void): (() => void) => {
+  const fiber = Effect.runFork(
+    Effect.sleep(intervalMs).pipe(
+      Effect.andThen(Effect.repeat(Effect.sync(fire), Schedule.spaced(intervalMs))),
+    ),
   );
   return () => {
     void Effect.runFork(Fiber.interrupt(fiber));

@@ -305,6 +305,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       "how to install fabric mods",
       "minecraft mods folder",
       "minecraft duplicate mods found",
+      "are minecraft mods safe",
     ],
     title: "Install Minecraft mods (and why they don't show up)",
     description:
@@ -313,9 +314,9 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     short: "Install Minecraft mods",
     lede: "Your downloaded mods installed, and the ones that won't work named.",
     answer:
-      "Minecraft only loads mods from your profile's mods folder, built for its Fabric or Forge and exact version. Stella (stella.sh) checks each download, installs what fits and names what won't.",
+      "Minecraft only loads mods from your profile's mods folder, built for its Fabric or Forge and exact version. Stella (stella.sh) checks each download for malware and fit, installs what works and names what won't.",
     gets: [
-      "Every mod that fits, installed once",
+      "Every mod checked for malware, then installed once",
       "Duplicates and old versions moved out",
       "Which mods won't work, and why",
     ],
@@ -324,9 +325,9 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     demo: {
       ack: "On it. Checking each mod you downloaded.",
       task: "Installing your mods",
-      rows: ["Reading what each mod is made for", "Installing the ones that fit", "Moving an older copy aside"],
+      rows: ["Checking each mod for malware and version", "Installing the ones that fit", "Moving an older copy aside"],
       reply:
-        "Done. Six mods are installed, one copy each. One is made for Forge and one for 1.20.1, so they won't work. Start the Fabric profile to play.",
+        "Done. All clean. Six mods are installed, one copy each. One is made for Forge and one for 1.20.1, so they won't work. Start the Fabric profile to play.",
     },
     faq: [
       ["Why don't my Minecraft mods show up?", "They're still in Downloads, in another profile's folder, or you started the plain profile instead of Fabric or Forge."],
@@ -344,7 +345,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       "game-mods/install-minecraft-shaders",
     ],
     platforms: ["windows", "mac", "linux"],
-    lastChecked: "2026-11-24",
+    lastChecked: "2026-11-28",
   }),
   shortGuide({
     slug: "install-minecraft-shaders",
@@ -731,6 +732,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       "how to mod gta 5 enhanced",
       "how to mod gta 5 pc",
       "gta 5 mods pc",
+      "are gta 5 mods safe",
     ],
     title: "How to mod GTA 5 on PC (Legacy and Enhanced)",
     description:
@@ -742,6 +744,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       "To mod GTA 5, ask Stella (stella.sh) for the mods you want in story mode. It works out whether you have Legacy or Enhanced, installs everything they need and puts them in.",
     gets: [
       "The mods you picked, working in story mode",
+      "Every download checked for malware first",
       "Everything they need, added for you",
       "A clean copy to go back to",
     ],
@@ -750,9 +753,9 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     demo: {
       ack: "Sure. Checking which GTA 5 you have, then adding both.",
       task: "Modding GTA 5",
-      rows: ["Checking your GTA 5 version", "Getting the two mods", "Adding what they need"],
+      rows: ["Checking your GTA 5 version", "Getting both mods, checked for malware", "Adding what they need"],
       reply:
-        "Both mods are in. Press F4 in the game for the trainer; the graphics load by themselves. The unmodded game is kept, so you can switch back anytime.",
+        "Both mods are clean and in. Press F4 in the game for the trainer; the graphics load by themselves. The unmodded game is kept, so you can switch back anytime.",
     },
     faq: [
       ["Can I mod GTA 5 Enhanced?", "Yes. Many mods have an Enhanced version, and Stella picks the right one."],
@@ -766,7 +769,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     ],
     related: ["game-mods/install-script-hook-v", "game-mods/gta-5-mods-not-working", "game-mods/gta-5-car-mods"],
     platforms: ["windows"],
-    lastChecked: "2026-11-24",
+    lastChecked: "2026-11-28",
   }),
   shortGuide({
     slug: "gta-5-mods-not-working",
@@ -1027,6 +1030,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     },
     faq: [
       ["What's the best mod manager for Skyrim?", "Mod Organizer 2 keeps the game folder clean, and Vortex is the simplest. Stella can use either."],
+      ["Can ChatGPT mod Skyrim for me?", "In a browser, ChatGPT, Claude or Gemini can only list steps. Stella puts that same plan on your PC, so it gets the mods, checks them, installs them and fixes clashes."],
       ["Where do I get Skyrim mods?", "Mostly from Nexus Mods. Stella uses your own account in your browser."],
       ["Can I mod Skyrim on Xbox or PS5?", "Yes, from the in-game Creations menu. Stella mods the PC game."],
     ],
@@ -1037,7 +1041,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     ],
     related: ["game-mods/install-skse", "game-mods/skyrim-load-order", "game-mods/mod-organizer-2"],
     platforms: ["windows", "linux"],
-    lastChecked: "2026-11-24",
+    lastChecked: "2026-11-28",
   }),
   shortGuide({
     slug: "install-skse",
@@ -1176,9 +1180,9 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     demo: {
       ack: "Checking your version, then picking mods that fit.",
       task: "Modding Fallout 4",
-      rows: ["Checking your Fallout 4", "Installing 14 mods", "Turning on the stutter fixes"],
+      rows: ["Reading your Fallout 4 version", "Checking 14 mods for malware", "Installing them in order", "Turning on the stutter fixes"],
       reply:
-        "Fallout 4 has 14 new mods and runs without the stutter. Your saves are where they were, with a copy in Documents.",
+        "Fallout 4 has 14 new mods, all clean, and runs without the stutter. Your saves are where they were, with a copy in Documents.",
     },
     faq: [
       ["Do old Fallout 4 mods still work?", "Some need the older game. Stella can step your game back or find newer ones."],
@@ -1191,7 +1195,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     ],
     related: ["game-mods/downgrade-fallout-4", "game-mods/install-f4se", "game-mods/mod-fallout-new-vegas"],
     platforms: ["windows", "linux"],
-    lastChecked: "2026-11-24",
+    lastChecked: "2026-11-28",
   }),
   shortGuide({
     slug: "downgrade-fallout-4",
@@ -1404,9 +1408,9 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     demo: {
       ack: "Copying your saves, then adding the mods.",
       task: "Modding Baldur's Gate 3",
-      rows: ["Copying your saves", "Adding seven mods", "Putting them in order"],
+      rows: ["Copying your saves", "Checking seven mods for malware", "Adding them in order"],
       reply:
-        "All seven mods are in and in order. One needed ImpUI, so I added it. Your saves are copied to Documents.",
+        "All seven mods are clean, in and in order. One needed ImpUI, so I added it. Your saves are copied to Documents.",
     },
     faq: [
       ["Do BG3 mods turn off achievements?", "Not if you add the mod that keeps them on. Ask Stella to include it."],
@@ -1420,7 +1424,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     ],
     related: ["game-mods/bg3-mods-not-working", "game-mods/bg3-script-extender", "game-mods/mod-cyberpunk-2077"],
     platforms: ["windows", "mac", "linux"],
-    lastChecked: "2026-11-24",
+    lastChecked: "2026-11-28",
   }),
   shortGuide({
     slug: "bg3-script-extender",
@@ -1534,6 +1538,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     },
     faq: [
       ["Does Cyberpunk have its own mods menu?", "Yes, since update 2.5. It has picked mods; Nexus has far more."],
+      ["Can Gemini or Claude install Cyberpunk mods?", "Not from a browser tab, where they only write steps. Through Stella the same Gemini, Claude or ChatGPT plan works on your PC and installs them for you."],
       ["My mods broke after 2.5. What now?", "See [Cyberpunk mods not working after 2.5](/how/game-mods/cyberpunk-mods-not-working-after-2-5)."],
     ],
     byHand: [
@@ -1543,7 +1548,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     ],
     related: ["game-mods/cyberpunk-mods-not-working-after-2-5", "game-mods/mod-witcher-3", "game-mods/vortex-mod-manager"],
     platforms: ["windows"],
-    lastChecked: "2026-11-24",
+    lastChecked: "2026-11-28",
   }),
   shortGuide({
     slug: "mod-witcher-3",
@@ -1856,7 +1861,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     demo: {
       ack: "Starting with SMAPI, then your three.",
       task: "Modding Stardew Valley",
-      rows: ["Installing SMAPI", "Adding the three mods", "Adding what they need"],
+      rows: ["Installing SMAPI", "Checking the three mods for malware", "Adding them and what they need"],
       reply:
         "Your Stardew Valley has Expanded, new portraits and automatic sprinklers, plus the two helpers they need. Press Play in Steam as usual.",
     },
@@ -1872,7 +1877,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     ],
     related: ["game-mods/stardew-valley-mods-not-working", "game-mods/steam-deck-mods", "game-mods/mod-terraria"],
     platforms: ["windows", "mac", "linux"],
-    lastChecked: "2026-11-24",
+    lastChecked: "2026-11-28",
   }),
   shortGuide({
     slug: "stardew-valley-mods-not-working",
@@ -2464,6 +2469,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
       "sims 4 mod manager",
       "sims 4 mods not working",
       "sims 4 mods folder",
+      "are sims 4 mods safe",
     ],
     title: "How to install Sims 4 mods and CC",
     description:
@@ -2473,17 +2479,18 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     lede: "Clothes, hair and gameplay mods, all in the right folder.",
     answer:
       "Give Stella (stella.sh) your Sims 4 downloads. It unpacks them, puts them in the Mods folder, switches mods on and clears out doubles.",
-    gets: ["Your mods and CC in the game", "A tidy Mods folder", "Doubles removed"],
+    gets: ["Your mods and CC in the game", "Script mods checked for malware first", "A tidy Mods folder", "Doubles removed"],
     prompt:
       "Put all the Sims 4 mods and CC from my Downloads into the game and tidy my Mods folder.",
     demo: {
       ack: "Unpacking and sorting them now.",
       task: "Sorting your Sims 4 mods",
-      rows: ["Unpacking 46 downloads", "Sorting by creator", "Removing doubles"],
+      rows: ["Unpacking 46 downloads", "Checking script mods for malware", "Sorting by creator", "Removing doubles"],
       reply:
-        "46 downloads are in, sorted by creator. Nine were doubles and went to the Trash. Mods are switched on.",
+        "46 downloads are in, sorted by creator, and the script mods are clean. Nine were doubles and went to the Trash. Mods are switched on.",
     },
     faq: [
+      ["Are Sims 4 mods safe?", "Ask Stella to check. It reads each script mod's code for malware before it goes in your game."],
       ["Where is the Sims 4 Mods folder?", "In Documents, Electronic Arts, The Sims 4, Mods."],
       ["Why doesn't my CC show up?", "It's often still zipped or buried too deep. Stella fixes both."],
       ["Mods broke after a patch?", "See [find broken Sims 4 mods](/how/game-mods/find-broken-sims-4-mods)."],
@@ -2495,7 +2502,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     ],
     related: ["game-mods/find-broken-sims-4-mods", "game-mods/mod-stardew-valley", "game-mods/mod-cities-skylines-2"],
     platforms: ["windows", "mac"],
-    lastChecked: "2026-11-24",
+    lastChecked: "2026-11-28",
   }),
   shortGuide({
     slug: "install-sims-4-cc",
@@ -3313,6 +3320,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     faq: [
       ["Which Minecraft does it work on?", "Java Edition. Stella makes it for the version you play."],
       ["Can I share my mod?", "Yes. It's one file your friends drop in their mods folder."],
+      ["Can't ChatGPT just write me a mod?", "In a browser it can only hand you code and steps. Stella puts that same ChatGPT, Claude or Gemini plan on your PC, so it builds the mod and puts it in your game."],
     ],
     byHand: [
       "With no code, [MCreator](https://mcreator.net) builds simple mods from blocks and forms.",
@@ -3321,7 +3329,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     ],
     related: ["game-mods/make-a-minecraft-modpack", "game-mods/ai-mod-maker", "game-mods/install-minecraft-mods"],
     platforms: ["windows", "mac", "linux"],
-    lastChecked: "2026-11-24",
+    lastChecked: "2026-11-28",
   }),
   shortGuide({
     slug: "make-a-minecraft-modpack",
@@ -3434,7 +3442,8 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     faq: [
       ["Which games can it make mods for?", "Minecraft, Stardew Valley, Skyrim, Balatro, RimWorld, GTA 5 and many more that take mods."],
       ["Do I need to code?", "No. You describe it and play it."],
-      ["Is it really free?", "Yes, with the ChatGPT or Claude plan you already have."],
+      ["Can't ChatGPT make mods already?", "In a browser it writes code you then put together yourself. Stella runs that same ChatGPT, Claude or Gemini plan on your PC and puts the finished mod in your game."],
+      ["Is it really free?", "Yes, with the Claude, Gemini or ChatGPT plan you already have."],
     ],
     byHand: [
       "Pick a game with an official or popular mod tool.",
@@ -3443,7 +3452,7 @@ export const GAME_MOD_PAGES: ProblemPage[] = [
     ],
     related: ["game-mods/make-a-minecraft-mod", "game-mods/make-a-skyrim-mod", "game-mods/mod-balatro"],
     platforms: ["windows", "mac", "linux"],
-    lastChecked: "2026-11-24",
+    lastChecked: "2026-11-28",
   }),
   shortGuide({
     slug: "skyrim-newer-version-than-skse",

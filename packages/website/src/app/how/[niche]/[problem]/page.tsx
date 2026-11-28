@@ -103,7 +103,7 @@ export default async function ProblemPageRoute({ params }: Params) {
             <p className={h.sub}>{page.lede}</p>
             <HeroCta />
             {niche.needsTopModel ? (
-              <PlanCallout recommended={niche.recommended} className={h.plan} />
+              <PlanCallout recommended={niche.recommended} body={niche.planBody} className={h.plan} />
             ) : niche.recommended ? (
               <ModelStrip recommended={niche.recommended} className={h.models} />
             ) : null}

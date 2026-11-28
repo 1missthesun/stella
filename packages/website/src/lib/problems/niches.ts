@@ -6,12 +6,14 @@ export const NICHES: Niche[] = [
     recommended: "claude",
     needsTopModel: true,
     name: "Game mods",
-    h1: "Game mods, installed and working.",
+    h1: "Game mods, checked, installed and working.",
     title: "Game mods: get them in your game, fixed or made for you",
     description:
-      "Mods for GTA, Skyrim, Fallout, Baldur's Gate 3, Stardew Valley, Minecraft and more: installed, fixed or made for you by Stella (stella.sh).",
+      "Mods for GTA, Skyrim, Minecraft, Sims 4 and more: found, checked for malware, installed, fixed or made for you by Stella (stella.sh) on your PC.",
     intro:
-      "Pick your game, say what you want, and play it. Stella (stella.sh) installs mods, fixes the ones that broke and makes new ones.",
+      "Pick your game, say what you want, and play it. In a browser, Claude, Gemini or ChatGPT can only write out steps. Stella (stella.sh) puts that same plan on your PC to find mods, check them for malware before anything runs, install them, fix clashes and make your own.",
+    planBody:
+      "In a browser tab they can only write out steps. Stella puts that same plan on your PC: it finds mods, checks them for malware before anything runs, installs them, fixes clashes and makes your own.",
     sections: [
       { title: "Grand Theft Auto and Red Dead.", slugs: ["gta-6-mods", "mod-gta-5", "gta-5-mods-not-working", "gta-5-car-mods", "install-script-hook-v", "install-fivem-mods", "mod-gta-san-andreas", "mod-rdr2"] },
       { title: "Skyrim, Fallout and Starfield.", slugs: ["mod-skyrim", "install-skse", "skyrim-load-order", "skyrim-crash-log", "mod-fallout-4", "downgrade-fallout-4", "install-f4se", "mod-fallout-new-vegas", "mod-starfield", "mod-oblivion-remastered"] },

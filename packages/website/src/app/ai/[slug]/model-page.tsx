@@ -4,7 +4,7 @@ import { LinkedText } from "@/components/landing/linked-text";
 import h from "@/components/problems/how.module.css";
 import { BackLink, GuideGrid, HeroCta, HowTitle } from "@/components/problems/how-ui";
 import { HeroMascot } from "@/components/problems/hero-mascot";
-import { ModelStrip } from "@/components/problems/model-strip";
+import { ModelStrip, PlanCallout } from "@/components/problems/model-strip";
 import { StellaDemo } from "@/components/stella-demo/stella-demo";
 import { ANSWER_PAGES, answerTitle, type AnswerPage } from "@/lib/answers";
 import { demoFrom } from "@/lib/demo";
@@ -23,7 +23,11 @@ export function ModelAnswerPage({ page }: { page: AnswerPage }) {
         <HowTitle text={page.headline} />
         {page.lede ? <p className={h.sub}>{page.lede}</p> : null}
         <HeroCta />
-        <ModelStrip recommended={page.recommended} className={h.models} />
+        {page.planCallout ? (
+          <PlanCallout recommended={page.recommended} body={niche?.planBody} className={h.plan} />
+        ) : (
+          <ModelStrip recommended={page.recommended} className={h.models} />
+        )}
       </header>
 
       {demo ? (

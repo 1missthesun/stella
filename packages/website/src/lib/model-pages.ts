@@ -316,12 +316,12 @@ export const MODEL_PAGES_DATA: ModelPage[] = [
     queries: ["best AI for game modding", "AI for modding games", "AI that installs mods", "AI mod manager"],
     metaTitle: "The best AI for game modding (installs, fixes and makes mods)",
     metaDescription:
-      "The best AI for game modding works on your PC: Claude through Stella (stella.sh) installs mods, fixes broken ones and makes new ones. Free with your plan.",
+      "The best AI for game modding works on your PC: Stella (stella.sh) finds mods, checks them for malware, installs them, fixes clashes and makes new ones.",
     eyebrow: "Best AI for game modding",
     headline: "The best AI for game modding.",
     lede: "Claude, with Gemini beside it, modding the game on your PC.",
     recommended: "claude",
-    answer: `The best AI for game modding is one that works on your PC, not in a browser tab. Stella (stella.sh) runs Claude, Gemini or ChatGPT on your computer, so it installs mods, fixes broken ones and makes new ones. ${FREE}`,
+    answer: `In a browser tab, Claude, Gemini or ChatGPT can only write out steps. Stella (stella.sh) puts that same plan on your PC, where it finds mods, checks them for malware before anything runs, installs them, fixes clashes and makes new ones. ${FREE}`,
     demo: {
       prompt: "My GTA 5 mods stopped working after the update. Get them working again.",
       ack: "Checking your GTA 5 folder and the mod log.",
@@ -336,13 +336,18 @@ export const MODEL_PAGES_DATA: ModelPage[] = [
       },
       {
         title: "Done on your PC, not described.",
-        body: "In a browser chat you copy files around and hope. Through Stella the AI opens the game folder, gets the mods, puts them in place and starts the game to check.",
+        body: "A browser chat hands you steps to follow and files to move. Through Stella the same AI opens the game folder, gets the mods, puts them in place and starts the game to check.",
+      },
+      {
+        title: "Checked before it runs.",
+        body: "Before a mod, launcher or fan port goes in your game, Stella reads its code for malware or anything sending your data away, and tells you what it found.",
       },
       {
         title: "Any game.",
         body: "Skyrim, GTA, Baldur's Gate 3, Minecraft, Stardew Valley, Cyberpunk and hundreds more, with the mod manager you like or none.",
       },
     ],
+    planCallout: true,
     guides: ["game-mods/mod-skyrim", "game-mods/mod-gta-5", "game-mods/gta-5-mods-not-working", "game-mods/mod-baldurs-gate-3", "game-mods/ai-mod-maker", "game-mods/install-minecraft-mods"],
     questions: [
       { q: "Can AI make a mod?", a: "Yes. Describe it, play it and ask for changes. See [AI mod maker](/how/game-mods/ai-mod-maker)." },

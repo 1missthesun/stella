@@ -124,6 +124,8 @@ export type AnswerPage = {
   demo?: { prompt: string; ack: string; task: string; rows: string[]; reply: string; files?: string[] };
   why?: { title: string; body: string }[];
   guides?: string[];
+  /** Show the large plan callout (with the hub's plan line) instead of the small "Runs on" strip. */
+  planCallout?: boolean;
 };
 
 const faq = (q: string) => {

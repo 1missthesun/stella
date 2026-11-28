@@ -93,7 +93,7 @@ export default async function NicheHub({ params }: Params) {
             <p className={h.sub}>{niche.intro.split(/(?<=\.) /)[0]}</p>
             <HeroCta />
             {niche.needsTopModel ? (
-              <PlanCallout recommended={niche.recommended} className={h.plan} />
+              <PlanCallout recommended={niche.recommended} body={niche.planBody} className={h.plan} />
             ) : niche.recommended ? (
               <ModelStrip recommended={niche.recommended} className={h.models} />
             ) : null}

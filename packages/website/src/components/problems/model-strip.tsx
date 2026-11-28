@@ -1,3 +1,4 @@
+import Link from "next/link";
 import s from "./model-strip.module.css";
 
 export type ModelId = "claude" | "gemini" | "chatgpt";
@@ -31,12 +32,25 @@ export function ModelStrip({ recommended, className }: { recommended?: ModelId; 
   );
 }
 
-export function PlanCallout({ recommended, className }: { recommended?: ModelId; className?: string }) {
+const PLAN_BODY = "Jobs like this need a top model. Sign in with the plan you already pay for, at no extra cost.";
+
+export function PlanCallout({
+  recommended,
+  body = PLAN_BODY,
+  className,
+}: {
+  recommended?: ModelId;
+  body?: string;
+  className?: string;
+}) {
   return (
     <div className={`${s.plan} ${className ?? ""}`}>
       <p className={s.planTitle}>Use your Claude, Gemini or ChatGPT plan.</p>
-      <p className={s.planBody}>Jobs like this need a top model. Sign in with the plan you already pay for, at no extra cost.</p>
+      <p className={s.planBody}>{body}</p>
       <ModelList recommended={recommended} className={s.planList} />
+      <p className={s.planNone}>
+        Don&rsquo;t have one yet? Grab a $20/mo plan from any of them, or use <Link href="/pricing">Stella Plus</Link>.
+      </p>
     </div>
   );
 }

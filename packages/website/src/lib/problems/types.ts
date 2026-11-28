@@ -42,4 +42,6 @@ export type Niche = {
   sections?: { title: string; slugs: string[] }[];
   recommended?: "claude" | "gemini" | "chatgpt";
   needsTopModel?: boolean;
+  /** Body line of the hero PlanCallout on this hub and its guides. */
+  planBody?: string;
 };

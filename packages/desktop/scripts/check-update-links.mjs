@@ -75,8 +75,12 @@ await build({
   bundle: true,
   platform: "node",
   format: "esm",
-  alias: { "@stella/contracts": path.join(app, "packages", "contracts") },
-  packages: "external",
+  // The bundle lives in the scratch folder, where no package resolves, so it
+  // carries everything it imports (workspace packages and their dependencies).
+  alias: {
+    "@stella/contracts": path.join(app, "packages", "contracts"),
+    "@stella/node-shared": path.join(app, "packages", "node-shared"),
+  },
   outfile: bundle,
   logLevel: "error",
 });
